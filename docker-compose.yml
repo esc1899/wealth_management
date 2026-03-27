@@ -2,28 +2,33 @@ version: "3.9"
 
 services:
   langfuse:
-    image: langfuse/langfuse:latest
-    platform: linux/amd64
+    image: langfuse/langfuse:2
     ports:
       - "3000:3000"
     environment:
       - DATABASE_URL=postgresql://langfuse:langfuse@db:5432/langfuse
-      - NEXTAUTH_SECRET=change_this_secret
+      - NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET:-change_this_in_production}
       - NEXTAUTH_URL=http://localhost:3000
-      - SALT=change_this_salt
+      - SALT=${LANGFUSE_SALT:-change_this_in_production}
+      - TELEMETRY_ENABLED=false
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
   db:
     image: postgres:15-alpine
-    platform: linux/amd64
     environment:
       - POSTGRES_USER=langfuse
       - POSTGRES_PASSWORD=langfuse
       - POSTGRES_DB=langfuse
     volumes:
       - langfuse_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
 volumes:
