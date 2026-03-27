@@ -1,0 +1,27 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+class Config:
+    # Claude API
+    ANTHROPIC_API_KEY: str = os.environ["ANTHROPIC_API_KEY"]
+
+    # Langfuse
+    LANGFUSE_SECRET_KEY: str = os.environ["LANGFUSE_SECRET_KEY"]
+    LANGFUSE_PUBLIC_KEY: str = os.environ["LANGFUSE_PUBLIC_KEY"]
+    LANGFUSE_HOST: str = os.getenv("LANGFUSE_HOST", "http://localhost:3000")
+
+    # Ollama
+    OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.2")
+
+    # Encryption
+    ENCRYPTION_KEY: str = os.environ["ENCRYPTION_KEY"]
+
+    # Storage
+    DB_PATH: str = os.getenv("DB_PATH", "data/portfolio.db")
+
+
+config = Config()
