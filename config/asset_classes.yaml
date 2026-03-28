@@ -1,0 +1,67 @@
+# Asset-Klassen Konfiguration
+# Jede Klasse definiert: Investment-Typ, Standard-Einheit, sichtbare Felder, Kursquelle.
+# Neue Klassen hier ergänzen — kein Code-Änderung notwendig.
+
+asset_classes:
+
+  Aktie:
+    investment_type: Wertpapiere
+    default_unit: Stück
+    visible_fields:
+      - isin
+      - wkn
+      - ticker
+      - quantity
+      - purchase_price
+      - purchase_date
+      - recommendation_source
+      - strategy
+      - notes
+    price_source: yfinance
+    requires_ticker: true
+
+  Aktienfonds:
+    investment_type: Wertpapiere
+    default_unit: Stück
+    visible_fields:
+      - isin
+      - wkn
+      - ticker
+      - quantity
+      - purchase_price
+      - purchase_date
+      - strategy
+      - notes
+    price_source: yfinance
+    requires_ticker: true
+
+  Immobilienfonds:
+    investment_type: Immobilien
+    default_unit: Stück
+    visible_fields:
+      - isin
+      - wkn
+      - ticker
+      - quantity
+      - purchase_price
+      - purchase_date
+      - strategy
+      - notes
+    price_source: yfinance
+    requires_ticker: true
+
+  Edelmetall:
+    investment_type: Edelmetalle
+    default_unit: Troy Oz
+    unit_options:
+      - Troy Oz
+      - g
+    visible_fields:
+      - ticker
+      - quantity
+      - unit
+      - purchase_price
+      - purchase_date
+      - notes
+    price_source: yfinance
+    requires_ticker: true

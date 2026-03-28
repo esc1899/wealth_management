@@ -6,7 +6,7 @@ load_dotenv()
 
 class Config:
     # Claude API
-    ANTHROPIC_API_KEY: str = os.environ["ANTHROPIC_API_KEY"]
+    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
 
     # Langfuse
     LANGFUSE_SECRET_KEY: str = os.environ["LANGFUSE_SECRET_KEY"]
@@ -22,6 +22,10 @@ class Config:
 
     # Storage
     DB_PATH: str = os.getenv("DB_PATH", "data/portfolio.db")
+
+    # Market data
+    MARKET_DATA_FETCH_HOUR: int = int(os.getenv("MARKET_DATA_FETCH_HOUR", "18"))
+    RATE_LIMIT_RPS: float = float(os.getenv("RATE_LIMIT_RPS", "2.0"))
 
 
 config = Config()

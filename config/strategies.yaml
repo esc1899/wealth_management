@@ -1,0 +1,40 @@
+# Investmentstrategien / Research-Skills
+# Jede Strategie definiert einen Analyse-Fokus als System-Prompt-Snippet.
+# Neue Strategien hier ergänzen — kein Code-Änderung notwendig.
+# Custom-Strategien können im UI direkt eingegeben werden.
+
+strategies:
+
+  Value Investing:
+    description: "Analyse nach Graham / Buffett — innerer Wert, Sicherheitsmarge, Burggraben"
+    system_prompt: |
+      Analysiere die Aktie nach Value-Investing-Prinzipien:
+      - Berechne oder schätze den inneren Wert (DCF, KGV, Kurs-Buchwert-Verhältnis)
+      - Prüfe die Sicherheitsmarge: Wie weit liegt der aktuelle Kurs unter dem inneren Wert?
+      - Analysiere die Bilanzqualität: Eigenkapitalquote, Verschuldungsgrad, Free Cash Flow
+      - Bewerte den wirtschaftlichen Burggraben (Moat): Marktposition, Preismacht, Kundenbindung, Patente
+      - Beurteile das Management: Kapitalallokation, Aktionärsfreundlichkeit
+      - Fazit: Ist die Aktie attraktiv bewertet für eine Haltedauer von 5-10 Jahren?
+      - Kapitalerhalt hat Vorrang vor Rendite
+
+  Wachstum 5-10 Jahre:
+    description: "Wachstumsaktien mit langem Zeithorizont — TAM, Skalierbarkeit, Burggraben"
+    system_prompt: |
+      Analysiere die Aktie als Wachstumsinvestment über einen Horizont von 5-10 Jahren:
+      - Bewerte Umsatzwachstum der letzten Jahre und das Potenzial des Gesamtmarkts (TAM)
+      - Prüfe die Skalierbarkeit des Geschäftsmodells: Wächst die Marge mit dem Umsatz?
+      - Analysiere Wettbewerbsvorteile und Burggraben: Warum wird dieses Unternehmen in 10 Jahren noch relevant sein?
+      - Bewerte Qualität und Vision des Managements
+      - Höhere Bewertungsmultiplikatoren sind akzeptabel, wenn das Wachstum stark und nachhaltig genug ist
+      - Fazit: Wie hoch ist das Kurspotenzial in 5-10 Jahren?
+
+  Dividendenstrategie:
+    description: "Stabile Dividendenzahler — Kontinuität, Nachhaltigkeit, defensives Geschäftsmodell"
+    system_prompt: |
+      Analysiere die Aktie als Dividendeninvestment:
+      - Prüfe die Dividendenhistorie: Wie lange wird gezahlt, wie oft wurde erhöht?
+      - Analysiere die Nachhaltigkeit: Ausschüttungsquote vs. Free Cash Flow
+      - Bewerte die Stabilität des Geschäftsmodells: defensiv oder zyklisch?
+      - Prüfe die Bilanz: Kann das Unternehmen die Dividende auch in schlechten Jahren halten?
+      - Vergleiche Dividendenrendite mit dem Marktdurchschnitt
+      - Fazit: Ist dies ein verlässlicher Dividendenzahler für die nächsten 5-10 Jahre?
