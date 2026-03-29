@@ -59,11 +59,11 @@ st.divider()
 
 
 def fmt_optional(val, pattern="{:.2f}"):
-    return pattern.format(val) if val is not None else "—"
+    return pattern.format(val) if val is not None and not pd.isna(val) else "—"
 
 
 def fmt_quantity(x):
-    if x is None:
+    if x is None or pd.isna(x):
         return "—"
     if x == int(x):
         return f"{int(x):,}"
