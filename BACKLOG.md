@@ -52,7 +52,13 @@ Recommendations only — no trade execution. Cost-aware (no churning).
 → [GitHub Issue #2](https://github.com/esc1899/wealth_management/issues/2)
 
 ### Improvements
-<!-- UI/UX, performance, code quality -->
+
+#### [P2] [IMPR] Seed example skills in all environments
+Default skills available out-of-the-box in dev, test, and production.
+Central config (`config/default_skills.yaml`) per area, `seed_if_empty()` runs for all areas on startup.
+New areas (rebalance, search) ship with at least one example skill.
+
+→ [GitHub Issue #3](https://github.com/esc1899/wealth_management/issues/3)
 
 ### Bugs
 <!-- Known bugs -->
