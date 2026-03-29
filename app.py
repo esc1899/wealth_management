@@ -14,6 +14,13 @@ st.set_page_config(
 from config import config  # noqa: E402
 from core.i18n import t, set_language, current_language, SUPPORTED_LANGUAGES  # noqa: E402
 
+# Fail fast if required config is missing
+_config_errors = config.validate()
+if _config_errors:
+    for _err in _config_errors:
+        st.error(f"⚙️ **Configuration error:** {_err}")
+    st.stop()
+
 if config.DEMO_MODE:
     st.warning(t("demo.banner"), icon="🎭")
 

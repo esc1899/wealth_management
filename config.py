@@ -7,10 +7,11 @@ load_dotenv()
 class Config:
     # Claude API
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+    ANTHROPIC_BASE_URL: str = os.getenv("ANTHROPIC_BASE_URL", "")  # optional proxy
 
-    # Langfuse
-    LANGFUSE_SECRET_KEY: str = os.environ["LANGFUSE_SECRET_KEY"]
-    LANGFUSE_PUBLIC_KEY: str = os.environ["LANGFUSE_PUBLIC_KEY"]
+    # Langfuse (optional monitoring — omit keys to disable)
+    LANGFUSE_SECRET_KEY: str = os.getenv("LANGFUSE_SECRET_KEY", "")
+    LANGFUSE_PUBLIC_KEY: str = os.getenv("LANGFUSE_PUBLIC_KEY", "")
     LANGFUSE_HOST: str = os.getenv("LANGFUSE_HOST", "http://localhost:3000")
 
     # Ollama
@@ -18,7 +19,7 @@ class Config:
     OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.2")
 
     # Encryption
-    ENCRYPTION_KEY: str = os.environ["ENCRYPTION_KEY"]
+    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
 
     # Demo mode
     DEMO_MODE: bool = os.getenv("DEMO_MODE", "false").lower() == "true"
@@ -34,6 +35,21 @@ class Config:
     # Market data
     MARKET_DATA_FETCH_HOUR: int = int(os.getenv("MARKET_DATA_FETCH_HOUR", "18"))
     RATE_LIMIT_RPS: float = float(os.getenv("RATE_LIMIT_RPS", "2.0"))
+
+    def validate(self) -> list[str]:
+        """Return list of error messages for missing required config. Empty = OK."""
+        errors = []
+        if not self.DEMO_MODE and not self.ENCRYPTION_KEY:
+            errors.append(
+                "ENCRYPTION_KEY is not set. "
+                "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+            )
+        if not self.ANTHROPIC_API_KEY and not self.ANTHROPIC_BASE_URL:
+            errors.append(
+                "Neither ANTHROPIC_API_KEY nor ANTHROPIC_BASE_URL is set. "
+                "Set ANTHROPIC_API_KEY for direct API access, or ANTHROPIC_BASE_URL for proxy access."
+            )
+        return errors
 
 
 config = Config()

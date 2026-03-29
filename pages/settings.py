@@ -38,13 +38,48 @@ else:
         st.markdown(f"**{t('settings.area_label')}: {area}**")
         for skill in area_skills:
             with st.expander(f"{skill.name}" + (f" — {skill.description}" if skill.description else "")):
-                st.markdown(f"**{t('settings.description_prefix')}:** {skill.description or '–'}")
-                st.markdown(f"**{t('settings.prompt_prefix')}:**")
-                st.code(skill.prompt, language=None)
-                if st.button(t("settings.delete_button"), key=f"del_{skill.id}", type="secondary"):
-                    skills_repo.delete(skill.id)
-                    st.success(f"{t('settings.skill_deleted')} '{skill.name}'")
-                    st.rerun()
+                if st.session_state.get("editing_skill_id") == skill.id:
+                    # --- Edit form ---
+                    with st.form(key=f"edit_form_{skill.id}"):
+                        edit_name = st.text_input(t("settings.name_label"), value=skill.name)
+                        edit_area = st.text_input(t("settings.area_label_required"), value=skill.area)
+                        edit_desc = st.text_input(t("settings.description_label"), value=skill.description or "")
+                        edit_prompt = st.text_area(t("settings.prompt_label"), value=skill.prompt, height=180)
+                        col_save, col_cancel = st.columns(2)
+                        with col_save:
+                            submitted = st.form_submit_button(t("settings.save_button"), use_container_width=True)
+                        with col_cancel:
+                            cancelled = st.form_submit_button(t("settings.cancel_button"), use_container_width=True)
+                    if submitted:
+                        if not edit_name.strip() or not edit_prompt.strip():
+                            st.error(t("settings.name_required_error"))
+                        else:
+                            updated = skill.model_copy(update={
+                                "name": edit_name.strip(),
+                                "area": edit_area.strip() or skill.area,
+                                "description": edit_desc.strip() or None,
+                                "prompt": edit_prompt.strip(),
+                            })
+                            skills_repo.update(updated)
+                            del st.session_state["editing_skill_id"]
+                            st.rerun()
+                    if cancelled:
+                        del st.session_state["editing_skill_id"]
+                        st.rerun()
+                else:
+                    st.markdown(f"**{t('settings.description_prefix')}:** {skill.description or '–'}")
+                    st.markdown(f"**{t('settings.prompt_prefix')}:**")
+                    st.code(skill.prompt, language=None)
+                    col_edit, col_del = st.columns(2)
+                    with col_edit:
+                        if st.button(t("settings.edit_button"), key=f"edit_{skill.id}", use_container_width=True):
+                            st.session_state["editing_skill_id"] = skill.id
+                            st.rerun()
+                    with col_del:
+                        if st.button(t("settings.delete_button"), key=f"del_{skill.id}", type="secondary", use_container_width=True):
+                            skills_repo.delete(skill.id)
+                            st.success(f"{t('settings.skill_deleted')} '{skill.name}'")
+                            st.rerun()
 
 st.divider()
 

@@ -22,6 +22,7 @@ common:
   date: "Datum"
   refresh: "Jetzt aktualisieren"
   ai_disclaimer: "⚠️ KI-generiert – keine Anlageberatung"
+  agent_error: "Fehler beim Agenten-Aufruf"
 
 nav:
   dashboard: "Dashboard"
@@ -141,7 +142,9 @@ settings:
   save_button: "Skill speichern"
   skill_saved: "Skill gespeichert."
   skill_deleted: "Skill gelöscht."
+  edit_button: "Bearbeiten"
   delete_button: "Löschen"
+  cancel_button: "Abbrechen"
   other_area: "Anderer…"
   custom_area_label: "Eigener Bereich *"
   custom_area_placeholder: "z.B. risk_analysis"

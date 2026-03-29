@@ -22,6 +22,7 @@ common:
   date: "Date"
   refresh: "Refresh Now"
   ai_disclaimer: "⚠️ AI-generated – not financial advice"
+  agent_error: "Agent call failed"
 
 nav:
   dashboard: "Dashboard"
@@ -141,7 +142,9 @@ settings:
   save_button: "Save Skill"
   skill_saved: "Skill saved."
   skill_deleted: "Skill deleted."
+  edit_button: "Edit"
   delete_button: "Delete"
+  cancel_button: "Cancel"
   other_area: "Other…"
   custom_area_label: "Custom Area *"
   custom_area_placeholder: "e.g. risk_analysis"

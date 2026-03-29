@@ -21,8 +21,12 @@ with col_refresh:
     if st.button(f"🔄 {t('common.refresh')}"):
         st.rerun()
 
-valuations = market_agent.get_portfolio_valuation()
-last_fetch = market_agent._market.get_latest_fetch_time()
+try:
+    valuations = market_agent.get_portfolio_valuation()
+    last_fetch = market_agent._market.get_latest_fetch_time()
+except Exception as exc:
+    st.error(f"⚠️ {t('common.agent_error')}: {exc}")
+    st.stop()
 
 if last_fetch:
     st.caption(f"{t('dashboard.prices_last_fetched')}: {last_fetch.strftime('%d.%m.%Y %H:%M')} UTC")

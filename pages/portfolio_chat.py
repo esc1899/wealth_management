@@ -38,7 +38,10 @@ with col_chat:
 
         with st.chat_message("assistant"):
             with st.spinner(t("portfolio_chat.thinking")):
-                response = asyncio.run(agent.chat(prompt))
+                try:
+                    response = asyncio.run(agent.chat(prompt))
+                except Exception as exc:
+                    response = f"⚠️ {t('common.agent_error')}: {exc}"
             st.markdown(response)
 
         st.session_state.messages.append({"role": "assistant", "content": response})
@@ -66,8 +69,8 @@ with col_tables:
         ])
         st.dataframe(
             df.style.format({
-                t("common.quantity"):        "{:.4g}",
-                t("common.purchase_price"):  lambda x: f"{x:.2f}" if x is not None else "—",
+                t("common.quantity"):        lambda x: "—" if x is None or pd.isna(x) else (f"{int(x):,}" if x == int(x) else f"{x:,.2f}"),
+                t("common.purchase_price"):  lambda x: f"{x:.2f}" if x is not None and not pd.isna(x) else "—",
             }),
             use_container_width=True,
             hide_index=True,

@@ -90,7 +90,10 @@ with col_sidebar:
                 f"strukturierte Bewertung gemäß der Analysestrategie."
             )
             with st.spinner(t("research_chat.thinking")):
-                asyncio.run(agent.chat(session.id, initial_msg))
+                try:
+                    asyncio.run(agent.chat(session.id, initial_msg))
+                except Exception as exc:
+                    st.error(f"⚠️ {t('common.agent_error')}: {exc}")
             st.rerun()
 
     st.divider()
@@ -154,7 +157,10 @@ with col_chat:
                     st.markdown(prompt)
                 with st.chat_message("assistant"):
                     with st.spinner(t("research_chat.analysing")):
-                        response = asyncio.run(agent.chat(session_id, prompt))
+                        try:
+                            response = asyncio.run(agent.chat(session_id, prompt))
+                        except Exception as exc:
+                            response = f"⚠️ {t('common.agent_error')}: {exc}"
                     st.markdown(response)
                     st.caption(t("common.ai_disclaimer"))
                 st.rerun()
