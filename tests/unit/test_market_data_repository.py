@@ -31,7 +31,9 @@ def make_price(symbol: str = "AAPL", price_eur: float = 150.0) -> PriceRecord:
     )
 
 
-def make_history(symbol: str = "AAPL", d: date = date(2024, 1, 15), close: float = 148.0) -> HistoricalPrice:
+def make_history(symbol: str = "AAPL", d: date = None, close: float = 148.0) -> HistoricalPrice:
+    if d is None:
+        d = date.today()
     return HistoricalPrice(symbol=symbol, date=d, close_eur=close, volume=50_000_000)
 
 
@@ -111,8 +113,10 @@ class TestUpsertHistorical:
         assert len(repo.get_historical("AAPL")) == 1
 
     def test_different_dates_stored(self, repo):
-        repo.upsert_historical(make_history(d=date(2024, 1, 15)))
-        repo.upsert_historical(make_history(d=date(2024, 1, 16)))
+        from datetime import timedelta
+        today = date.today()
+        repo.upsert_historical(make_history(d=today - timedelta(days=2)))
+        repo.upsert_historical(make_history(d=today - timedelta(days=1)))
         assert len(repo.get_historical("AAPL")) == 2
 
 
@@ -121,15 +125,21 @@ class TestGetHistorical:
         assert repo.get_historical("UNKNOWN") == []
 
     def test_ordered_by_date_ascending(self, repo):
-        repo.upsert_historical(make_history(d=date(2024, 1, 20)))
-        repo.upsert_historical(make_history(d=date(2024, 1, 10)))
-        repo.upsert_historical(make_history(d=date(2024, 1, 15)))
+        from datetime import timedelta
+        today = date.today()
+        repo.upsert_historical(make_history(d=today - timedelta(days=1)))
+        repo.upsert_historical(make_history(d=today - timedelta(days=3)))
+        repo.upsert_historical(make_history(d=today - timedelta(days=2)))
         history = repo.get_historical("AAPL")
         dates = [h.date for h in history]
         assert dates == sorted(dates)
 
     def test_respects_days_limit(self, repo):
-        for i in range(1, 20):
-            repo.upsert_historical(make_history(d=date(2024, 1, i)))
+        from datetime import timedelta
+        today = date.today()
+        # Insert 19 records: 1 older than 5 days, 18 within last 5 days
+        repo.upsert_historical(make_history(d=today - timedelta(days=10)))
+        for i in range(1, 6):
+            repo.upsert_historical(make_history(d=today - timedelta(days=i)))
         history = repo.get_historical("AAPL", days=5)
         assert len(history) == 5

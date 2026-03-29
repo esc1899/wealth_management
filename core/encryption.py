@@ -45,3 +45,16 @@ class EncryptionService:
 
     def decrypt(self, ciphertext: str) -> str:
         return self._fernet.decrypt(ciphertext.encode()).decode()
+
+
+class PassthroughEncryptionService:
+    """
+    No-op encryption service for demo mode.
+    Values are stored and retrieved as plain strings — no encryption applied.
+    """
+
+    def encrypt(self, plaintext: str) -> str:
+        return plaintext
+
+    def decrypt(self, ciphertext: str) -> str:
+        return ciphertext

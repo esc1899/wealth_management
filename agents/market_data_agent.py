@@ -105,8 +105,18 @@ class MarketDataAgent:
 
             price_record = self._market.get_price(pos.ticker)
             current_price = price_record.price_eur if price_record else None
-            current_value = current_price * pos.quantity if current_price and pos.quantity else None
-            cost_basis = pos.purchase_price * pos.quantity if pos.purchase_price and pos.quantity else None
+
+            # Edelmetall in Gramm: Preis ist per Troy Oz, Menge in g → umrechnen
+            TROY_OZ_TO_G = 31.1035
+            if pos.unit == "g" and current_price and pos.quantity:
+                current_value = (current_price / TROY_OZ_TO_G) * pos.quantity
+            else:
+                current_value = current_price * pos.quantity if current_price and pos.quantity else None
+
+            if pos.unit == "g" and pos.purchase_price and pos.quantity:
+                cost_basis = pos.purchase_price * pos.quantity
+            else:
+                cost_basis = pos.purchase_price * pos.quantity if pos.purchase_price and pos.quantity else None
             pnl_eur = (current_value - cost_basis) if current_value is not None and cost_basis is not None else None
             pnl_pct = (pnl_eur / cost_basis * 100) if pnl_eur is not None and cost_basis is not None and cost_basis > 0 else None
 

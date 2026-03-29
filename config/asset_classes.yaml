@@ -35,6 +35,21 @@ asset_classes:
     price_source: yfinance
     requires_ticker: true
 
+  Rentenfonds:
+    investment_type: Wertpapiere
+    default_unit: Stück
+    visible_fields:
+      - isin
+      - wkn
+      - ticker
+      - quantity
+      - purchase_price
+      - purchase_date
+      - strategy
+      - notes
+    price_source: yfinance
+    requires_ticker: true
+
   Immobilienfonds:
     investment_type: Immobilien
     default_unit: Stück

@@ -90,8 +90,8 @@ class MarketDataRepository:
             """
             SELECT * FROM historical_prices
             WHERE symbol = ?
+              AND date >= date('now', '-' || ? || ' days')
             ORDER BY date ASC
-            LIMIT ?
             """,
             (symbol.upper(), days),
         ).fetchall()

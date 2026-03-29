@@ -52,6 +52,17 @@ if not tickers:
 def fmt_opt(val, pattern="{:.2f}"):
     return pattern.format(val) if val is not None else "—"
 
+
+def fmt_quantity(x):
+    if x is None:
+        return "—"
+    if x == int(x):
+        return f"{int(x):,}"
+    elif x >= 1:
+        return f"{x:,.2f}"
+    else:
+        return f"{x:.4f}"
+
 def render_valuations(entries):
     if not entries:
         st.info("Noch keine Kurse. Auf 'Jetzt aktualisieren' klicken.")
@@ -72,7 +83,7 @@ def render_valuations(entries):
     df = pd.DataFrame(rows)
     st.dataframe(
         df.style.format({
-            "Anzahl": "{:.4g}",
+            "Anzahl": fmt_quantity,
             "Kurs €": lambda x: fmt_opt(x),
             "Wert €": lambda x: fmt_opt(x, "€ {:,.2f}"),
         }),

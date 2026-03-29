@@ -7,14 +7,20 @@ import asyncio
 import streamlit as st
 
 from core.strategy_config import CUSTOM_STRATEGY_NAME
-from state import get_research_agent
+from state import get_research_agent, get_skills_repo
 
 st.set_page_config(page_title="Research Chat", page_icon="🔍", layout="wide")
 st.title("🔍 Research Chat")
 st.caption("Aktienanalyse mit Claude + Web-Suche")
+st.info("☁️ Dieser Assistent nutzt die Claude API. Eingaben werden an Anthropic übermittelt.", icon="ℹ️")
 
 agent = get_research_agent()
-strategy_registry = agent._strategies
+
+# Load research skills from DB; fall back gracefully if none exist
+research_skills = get_skills_repo().get_by_area("research")
+skill_names = [s.name for s in research_skills] + [CUSTOM_STRATEGY_NAME]
+# Build lookup: name -> skill
+_skill_map = {s.name: s for s in research_skills}
 
 # ------------------------------------------------------------------
 # Session state
@@ -42,8 +48,7 @@ with col_sidebar:
             placeholder="z.B. Apple, AAPL, SAP SE, SAP.DE",
         ).strip()
 
-        strategy_options = strategy_registry.all_names() + [CUSTOM_STRATEGY_NAME]
-        strategy_choice = st.selectbox("Strategie", strategy_options)
+        strategy_choice = st.selectbox("Strategie", skill_names)
 
         custom_prompt = ""
         if strategy_choice == CUSTOM_STRATEGY_NAME:
@@ -61,12 +66,21 @@ with col_sidebar:
         elif strategy_choice == CUSTOM_STRATEGY_NAME and not custom_prompt:
             st.error("Bitte Analysefokus eingeben.")
         else:
+            # Resolve prompt: use DB skill prompt or custom free-text prompt
+            if strategy_choice == CUSTOM_STRATEGY_NAME:
+                resolved_prompt = custom_prompt or None
+                resolved_strategy_name = CUSTOM_STRATEGY_NAME
+            else:
+                selected_skill = _skill_map[strategy_choice]
+                resolved_prompt = selected_skill.prompt
+                resolved_strategy_name = selected_skill.name
+
             # Use input as ticker placeholder; agent will resolve it if it's a name
             session = agent.start_session(
                 ticker=company_input.upper(),
-                strategy_name=strategy_choice,
+                strategy_name=resolved_strategy_name,
                 company_name=None,
-                custom_prompt=custom_prompt or None,
+                custom_prompt=resolved_prompt,
             )
             st.session_state.rc_session_id = session.id
             initial_msg = (

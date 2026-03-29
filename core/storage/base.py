@@ -100,6 +100,17 @@ def init_db(conn: sqlite3.Connection) -> None:
     ]
     for stmt in statements:
         conn.execute(stmt)
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS skills (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT NOT NULL,
+            area        TEXT NOT NULL,
+            description TEXT,
+            prompt      TEXT NOT NULL,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(name, area)
+        )"""
+    )
     conn.commit()
 
 

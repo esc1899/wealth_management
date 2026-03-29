@@ -232,3 +232,18 @@ class ResearchMessage(BaseModel):
     role: str       # 'user', 'assistant', 'tool'
     content: str
     created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Skills model
+# ---------------------------------------------------------------------------
+
+class Skill(BaseModel):
+    """A reusable prompt skill for a specific area (research, analysis, etc.)."""
+
+    id: Optional[int] = None
+    name: str
+    area: str
+    description: Optional[str] = None
+    prompt: str
+    created_at: Optional[str] = None

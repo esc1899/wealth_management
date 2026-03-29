@@ -20,8 +20,16 @@ class Config:
     # Encryption
     ENCRYPTION_KEY: str = os.environ["ENCRYPTION_KEY"]
 
-    # Storage
-    DB_PATH: str = os.getenv("DB_PATH", "data/portfolio.db")
+    # Demo mode
+    DEMO_MODE: bool = os.getenv("DEMO_MODE", "false").lower() == "true"
+    DEMO_DB_PATH: str = os.getenv("DEMO_DB_PATH", "data/demo.db")
+
+    # Storage — in demo mode, use the demo DB
+    DB_PATH: str = (
+        os.getenv("DEMO_DB_PATH", "data/demo.db")
+        if os.getenv("DEMO_MODE", "false").lower() == "true"
+        else os.getenv("DB_PATH", "data/portfolio.db")
+    )
 
     # Market data
     MARKET_DATA_FETCH_HOUR: int = int(os.getenv("MARKET_DATA_FETCH_HOUR", "18"))

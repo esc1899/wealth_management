@@ -15,10 +15,12 @@ from agents.research_agent import ResearchAgent
 from core.asset_class_config import get_asset_class_registry, AssetClassRegistry
 from core.llm.claude import ClaudeProvider
 from core.llm.local import OllamaProvider
+from core.encryption import PassthroughEncryptionService
 from core.storage.base import build_encryption_service, get_connection, init_db
 from core.storage.market_data import MarketDataRepository
 from core.storage.positions import PositionsRepository
 from core.storage.research import ResearchRepository
+from core.storage.skills import SkillsRepository
 from core.strategy_config import get_strategy_registry
 from monitoring.langfuse_client import create_langfuse_client
 
@@ -32,6 +34,8 @@ def get_db_connection():
 
 @st.cache_resource
 def get_encryption_service():
+    if config.DEMO_MODE:
+        return PassthroughEncryptionService()
     return build_encryption_service(config.ENCRYPTION_KEY, "data/salt.bin")
 
 
@@ -76,6 +80,18 @@ def get_market_agent() -> MarketDataAgent:
 @st.cache_resource
 def get_research_repo() -> ResearchRepository:
     return ResearchRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_skills_repo() -> SkillsRepository:
+    repo = SkillsRepository(get_db_connection())
+    registry = get_strategy_registry()
+    defaults = [
+        {"name": name, "area": "research", "description": f"Strategie: {name}", "prompt": registry.get(name).system_prompt}
+        for name in registry.all_names()
+    ]
+    repo.seed_if_empty("research", defaults)
+    return repo
 
 
 @st.cache_resource
