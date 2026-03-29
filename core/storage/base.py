@@ -127,6 +127,13 @@ def init_db(conn: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL
         )""",
         "CREATE INDEX IF NOT EXISTS idx_search_messages_session ON search_messages(session_id)",
+        """CREATE TABLE IF NOT EXISTS news_runs (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            skill_name TEXT NOT NULL,
+            tickers    TEXT NOT NULL,
+            result     TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )""",
     ]:
         conn.execute(stmt)
     conn.commit()

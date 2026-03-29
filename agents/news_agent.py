@@ -21,17 +21,18 @@ from core.llm.claude import ClaudeProvider
 BASE_SYSTEM_PROMPT = """You are an investment news analyst.
 For each portfolio position provided, search for recent news (last 14 days) and assess its relevance.
 
-For every position produce a section:
+For every position produce a section using EXACTLY this format:
 ## [TICKER] — [Company Name]
 - Key news item 1 (date if known)
 - Key news item 2
 - **Assessment:** [🟢 No action needed / 🟡 Worth monitoring / 🔴 Review position]
+- **Sources:** [title1](url1), [title2](url2)
 
 Rules:
 - Only include news that is relevant to the investment decision
-- Skip positions where nothing noteworthy was found (note this briefly)
-- Be concise: 2–4 bullets per position maximum
-- Cite sources or dates where available
+- Skip positions where nothing noteworthy was found (note this briefly with 🟢 No action needed)
+- Be concise: 2–4 news bullets per position maximum
+- Always include a **Sources:** line with clickable markdown links to the articles you found
 - Apply the filter strategy below when deciding what counts as relevant"""
 
 # Server-side web search — Anthropic executes this, no client handling needed

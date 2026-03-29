@@ -29,7 +29,7 @@ nav:
   market_data: "Marktdaten"
   analysis: "Analyse"
   portfolio_chat: "Portfolio Chat"
-  rebalance_chat: "Rebalance"
+  rebalance_chat: "Investieren / Rebalancieren"
   research_chat: "Research Chat"
   news_chat: "News Digest"
   search_chat: "Investment Search"
@@ -104,7 +104,7 @@ analysis:
   refreshing: "Aktualisieren"
 
 rebalance_chat:
-  title: "Rebalance"
+  title: "Investieren / Rebalancieren"
   subtitle: "Portfolio-Rebalancing-Analyse"
   private_notice: "🔒 Dieser Assistent läuft lokal auf deinem Rechner via Ollama. Portfoliodaten verlassen deine Infrastruktur nicht."
   settings_header: "Analyse-Einstellungen"
@@ -128,6 +128,9 @@ news_chat:
   select_skill: "Strategie auswählen und 'News Digest starten' klicken."
   result_header: "News Digest — {skill}"
   positions_found: "Positionen"
+  history_header: "Vergangene Digests"
+  history_tickers: "Ticker"
+  no_history: "Noch keine Digests vorhanden."
 
 search_chat:
   title: "Investment Search"

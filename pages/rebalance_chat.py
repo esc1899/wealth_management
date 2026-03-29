@@ -9,7 +9,7 @@ import streamlit as st
 from core.i18n import t
 from state import get_rebalance_agent, get_skills_repo
 
-st.set_page_config(page_title="Rebalance", page_icon="⚖️", layout="wide")
+st.set_page_config(page_title="Invest / Rebalance", page_icon="⚖️", layout="wide")
 st.title(f"⚖️ {t('rebalance_chat.title')}")
 st.caption(t("rebalance_chat.subtitle"))
 st.info(t("rebalance_chat.private_notice"), icon="🔒")
@@ -55,6 +55,7 @@ with col_controls:
                 st.session_state["rebalance_result"] = result
                 st.session_state["rebalance_skill"] = selected_skill_name
             except Exception as exc:
+                st.error(f"⚠️ {t('common.agent_error')}: {exc}")
                 st.session_state["rebalance_result"] = (
                     f"⚠️ {t('common.agent_error')}: {exc}"
                 )

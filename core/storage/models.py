@@ -259,6 +259,20 @@ class SearchMessage(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# News model
+# ---------------------------------------------------------------------------
+
+class NewsRun(BaseModel):
+    """A single news digest run — snapshot of results for a set of tickers."""
+
+    id: Optional[int] = None
+    skill_name: str
+    tickers: str       # comma-separated ticker symbols
+    result: str        # full markdown digest
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
 # Skills model
 # ---------------------------------------------------------------------------
 
