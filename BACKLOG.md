@@ -60,6 +60,17 @@ New areas (rebalance, search) ship with at least one example skill.
 
 → [GitHub Issue #3](https://github.com/esc1899/wealth_management/issues/3)
 
+#### [P1] [FEAT] Multi-environment setup & proxy LLM support
+Prepare installation on additional machines (e.g. "Work" environment).
+
+- Environment profiles via `.env` (home, work, ...)
+- `LLM_PROXY_URL` as alternative to `ANTHROPIC_API_KEY` (corporate proxy, no key needed)
+- `OLLAMA_BASE_URL` configurable for non-default setups
+- `scripts/seed_demo.py` runnable on any machine to recreate demo data
+- README documents full setup including proxy options
+
+→ [GitHub Issue #4](https://github.com/esc1899/wealth_management/issues/4)
+
 ### Bugs
 <!-- Known bugs -->
 
