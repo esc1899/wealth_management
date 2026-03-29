@@ -51,6 +51,16 @@ Recommendations only — no trade execution. Cost-aware (no churning).
 
 → [GitHub Issue #2](https://github.com/esc1899/wealth_management/issues/2)
 
+#### [P2] [FEAT] News Agent (Cloud ☁️)
+Searches for recent news for all portfolio positions, filtered by a configurable skill/strategy.
+
+- Iterates over all positions, runs web_search per ticker
+- Skill examples: "long-term investor" (ignore noise), "earnings focus", "ESG monitor"
+- Output: news digest per position with relevance assessment
+- Results optionally saved to DB for later review
+
+→ [GitHub Issue #5](https://github.com/esc1899/wealth_management/issues/5)
+
 ### Improvements
 
 #### [P2] [IMPR] Seed example skills in all environments
@@ -70,6 +80,26 @@ Prepare installation on additional machines (e.g. "Work" environment).
 - README documents full setup including proxy options
 
 → [GitHub Issue #4](https://github.com/esc1899/wealth_management/issues/4)
+
+#### [P2] [IMPR] Auto-fetch market data on position creation
+When a new position is added, automatically fetch:
+1. Historical price for the purchase date (accurate cost basis)
+2. Current price for latest trading day
+
+Uses existing `MarketDataFetcher`. Graceful fallback if ticker invalid. No UI blocking.
+
+→ [GitHub Issue #6](https://github.com/esc1899/wealth_management/issues/6)
+
+#### [P1] [IMPR] Input validation when creating positions
+Validate agent-extracted values before saving to DB:
+- Quantity/price: must be positive
+- Purchase date: not in the future, valid format
+- Asset class: must exist in `asset_classes.yaml`
+- Ticker: basic format check; optionally verify via yfinance
+
+Validation in `PortfolioAgent` layer with clear user-facing error messages.
+
+→ [GitHub Issue #7](https://github.com/esc1899/wealth_management/issues/7)
 
 ### Bugs
 <!-- Known bugs -->
