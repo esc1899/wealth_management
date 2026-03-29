@@ -2,6 +2,10 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
+# Optional profile override: ENV_PROFILE=work loads .env.work on top of .env
+_profile = os.getenv("ENV_PROFILE", "")
+if _profile:
+    load_dotenv(f".env.{_profile}", override=True)
 
 
 class Config:

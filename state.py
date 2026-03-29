@@ -85,13 +85,19 @@ def get_research_repo() -> ResearchRepository:
 @st.cache_resource
 def get_skills_repo() -> SkillsRepository:
     repo = SkillsRepository(get_db_connection())
-    registry = get_strategy_registry()
-    defaults = [
-        {"name": name, "area": "research", "description": f"Strategie: {name}", "prompt": registry.get(name).system_prompt}
-        for name in registry.all_names()
-    ]
-    repo.seed_if_empty("research", defaults)
+    _seed_default_skills(repo)
     return repo
+
+
+def _seed_default_skills(repo: SkillsRepository) -> None:
+    """Seed all areas from config/default_skills.yaml on first startup."""
+    import yaml
+    from pathlib import Path
+    path = Path(__file__).parent / "config" / "default_skills.yaml"
+    with open(path) as f:
+        data = yaml.safe_load(f)
+    for area, skills_list in (data.get("skills") or {}).items():
+        repo.seed_if_empty(area, skills_list or [])
 
 
 @st.cache_resource

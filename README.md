@@ -52,16 +52,62 @@ DEMO_MODE=true streamlit run app.py
 
 ## Configuration
 
-Copy `.env.example` to `.env`:
+Copy `.env.example` to `.env` and fill in your values.
 
 | Variable | Required | Description |
 |---|---|---|
-| `ENCRYPTION_KEY` | Yes | Fernet key for encrypting portfolio data |
-| `LANGFUSE_SECRET_KEY` | Yes | Langfuse monitoring |
-| `LANGFUSE_PUBLIC_KEY` | Yes | Langfuse monitoring |
-| `ANTHROPIC_API_KEY` | Optional | Required for Research Chat |
-| `OLLAMA_HOST` | Optional | Default: http://localhost:11434 |
-| `DEMO_MODE` | Optional | Set to `true` for demo database |
+| `ENCRYPTION_KEY` | Yes | Fernet key — generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+| `ANTHROPIC_API_KEY` | See below | Direct Anthropic API key (for Research Chat) |
+| `ANTHROPIC_BASE_URL` | See below | LLM proxy URL — use instead of `ANTHROPIC_API_KEY` |
+| `OLLAMA_HOST` | Optional | Default: `http://localhost:11434` |
+| `OLLAMA_MODEL` | Optional | Default: `llama3.2` |
+| `LANGFUSE_SECRET_KEY` | Optional | Langfuse monitoring (omit to disable) |
+| `LANGFUSE_PUBLIC_KEY` | Optional | Langfuse monitoring (omit to disable) |
+| `DEMO_MODE` | Optional | Set to `true` to use the demo database |
+| `DB_PATH` | Optional | Default: `data/portfolio.db` |
+| `MARKET_DATA_FETCH_HOUR` | Optional | Hour (0–23) for automatic price refresh, default `18` |
+
+At least one of `ANTHROPIC_API_KEY` or `ANTHROPIC_BASE_URL` is required to use Research Chat.
+
+### LLM Proxy (corporate environments)
+
+If your organisation routes LLM traffic through a proxy instead of issuing direct API keys,
+set `ANTHROPIC_BASE_URL` to your proxy endpoint and leave `ANTHROPIC_API_KEY` unset:
+
+```env
+ANTHROPIC_BASE_URL=https://your-llm-proxy.example.com
+```
+
+The proxy must expose an Anthropic-compatible API.
+
+### Multi-Environment Setup
+
+Use environment profiles to maintain separate configs for different machines
+(e.g. home vs. work) without duplicating your base `.env`:
+
+1. Keep shared defaults in `.env`
+2. Create a profile file with only the overrides: `.env.work`
+3. Set `ENV_PROFILE=work` when starting the app — it loads `.env.work` on top of `.env`
+
+```bash
+# .env.work — only the values that differ from .env
+ANTHROPIC_BASE_URL=https://your-corp-proxy.example.com
+OLLAMA_HOST=http://work-server:11434
+DB_PATH=data/work.db
+```
+
+```bash
+ENV_PROFILE=work streamlit run app.py
+```
+
+### Demo Data on a New Machine
+
+To recreate the demo database on any machine:
+
+```bash
+python scripts/seed_demo.py        # creates data/demo.db
+DEMO_MODE=true streamlit run app.py
+```
 
 ## Disclaimer
 

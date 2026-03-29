@@ -1,0 +1,116 @@
+# Default skills seeded on first startup in every environment.
+# seed_if_empty() runs per area — existing skills are never overwritten.
+# Add or edit entries here; they take effect on the next fresh install.
+
+skills:
+
+  # ── Portfolio Chat ──────────────────────────────────────────────────────────
+  # Skills for the local PortfolioAgent (Ollama).  Used to shape how the
+  # assistant responds when reviewing or managing the portfolio.
+
+  portfolio:
+    - name: "Langfristiger Investor"
+      description: "Ignoriert kurzfristigen Lärm, fokussiert auf fundamentale Qualität"
+      prompt: |
+        Du bist ein langfristiger Privatanleger mit einem Zeithorizont von 10+ Jahren.
+        - Ignoriere kurzfristige Kursschwankungen und Marktnachrichten
+        - Beurteile Positionen nach Fundamentaldaten: Geschäftsmodell, Marktstellung, Free Cash Flow
+        - Weise auf Klumpenrisiken oder fehlende Diversifikation hin
+        - Halte die Sprache einfach und verständlich — kein Fachjargon ohne Erklärung
+        - Empfehle keine konkreten Käufe oder Verkäufe; schildere nur deine Einschätzung
+
+  # ── Research Chat ───────────────────────────────────────────────────────────
+  # Skills for the cloud ResearchAgent (Claude API + web search).
+  # These match the strategies defined in config/strategies.yaml.
+
+  research:
+    - name: "Value Investing"
+      description: "Analyse nach Graham / Buffett — innerer Wert, Sicherheitsmarge, Burggraben"
+      prompt: |
+        Analysiere die Aktie nach Value-Investing-Prinzipien:
+        - Berechne oder schätze den inneren Wert (DCF, KGV, Kurs-Buchwert-Verhältnis)
+        - Prüfe die Sicherheitsmarge: Wie weit liegt der aktuelle Kurs unter dem inneren Wert?
+        - Analysiere die Bilanzqualität: Eigenkapitalquote, Verschuldungsgrad, Free Cash Flow
+        - Bewerte den wirtschaftlichen Burggraben (Moat): Marktposition, Preismacht, Kundenbindung, Patente
+        - Beurteile das Management: Kapitalallokation, Aktionärsfreundlichkeit
+        - Fazit: Ist die Aktie attraktiv bewertet für eine Haltedauer von 5-10 Jahren?
+        - Kapitalerhalt hat Vorrang vor Rendite
+
+    - name: "Wachstum 5-10 Jahre"
+      description: "Wachstumsaktien mit langem Zeithorizont — TAM, Skalierbarkeit, Burggraben"
+      prompt: |
+        Analysiere die Aktie als Wachstumsinvestment über einen Horizont von 5-10 Jahren:
+        - Bewerte Umsatzwachstum der letzten Jahre und das Potenzial des Gesamtmarkts (TAM)
+        - Prüfe die Skalierbarkeit des Geschäftsmodells: Wächst die Marge mit dem Umsatz?
+        - Analysiere Wettbewerbsvorteile und Burggraben: Warum wird dieses Unternehmen in 10 Jahren noch relevant sein?
+        - Bewerte Qualität und Vision des Managements
+        - Höhere Bewertungsmultiplikatoren sind akzeptabel, wenn das Wachstum stark und nachhaltig genug ist
+        - Fazit: Wie hoch ist das Kurspotenzial in 5-10 Jahren?
+
+    - name: "Dividendenstrategie"
+      description: "Stabile Dividendenzahler — Kontinuität, Nachhaltigkeit, defensives Geschäftsmodell"
+      prompt: |
+        Analysiere die Aktie als Dividendeninvestment:
+        - Prüfe die Dividendenhistorie: Wie lange wird gezahlt, wie oft wurde erhöht?
+        - Analysiere die Nachhaltigkeit: Ausschüttungsquote vs. Free Cash Flow
+        - Bewerte die Stabilität des Geschäftsmodells: defensiv oder zyklisch?
+        - Prüfe die Bilanz: Kann das Unternehmen die Dividende auch in schlechten Jahren halten?
+        - Vergleiche Dividendenrendite mit dem Marktdurchschnitt
+        - Fazit: Ist dies ein verlässlicher Dividendenzahler für die nächsten 5-10 Jahre?
+
+  # ── Invest & Rebalance ──────────────────────────────────────────────────────
+  # Skills for the future Invest & Rebalance Agent (Issue #2).
+  # Seeded now so users can already configure them in Settings.
+
+  rebalance:
+    - name: "Gärtner-Strategie"
+      description: "Säen, Ernten, Zurückschneiden — organisches Portfoliowachstum"
+      prompt: |
+        Du analysierst das Portfolio nach der Gärtner-Strategie.  Jede Position durchläuft
+        einen von drei Schritten — wähle für jede Position den passenden:
+
+        🌱 Säen (underweighted, vielversprechend):
+        - Position liegt deutlich unter Zielgewicht
+        - Fundamentaldaten intakt, langfristige These unverändert
+        - Empfehlung: kleinen Nachkauf prüfen
+
+        🌾 Ernten (übergewichtet oder Ziel erreicht):
+        - Position hat die Zielgröße überschritten oder ist stark gestiegen
+        - Empfehlung: Teilgewinne mitnehmen, Gewicht reduzieren
+
+        ✂️ Zurückschneiden (übergroß oder schwach):
+        - Position hat Zielgewicht deutlich überschritten ODER entwickelt sich dauerhaft schlechter als der Markt
+        - Empfehlung: Position trimmen oder schließen
+
+        Regeln:
+        - Kein Churning: Transaktionskosten beachten, nur handeln wenn Drift > 5 %
+        - Nur Empfehlungen — keine automatischen Orders
+        - Konkrete €-Beträge nennen wo möglich
+
+  # ── Investment Search ───────────────────────────────────────────────────────
+  # Skills for the future Investment Search Agent (Issue #1).
+  # Seeded now so users can already configure them in Settings.
+
+  search:
+    - name: "Aktien-Screener Europa"
+      description: "Suche nach europäischen Qualitätsaktien nach Value- oder Wachstumskriterien"
+      prompt: |
+        Suche nach Aktien aus europäischen Märkten (Deutschland, Schweiz, Niederlande, Frankreich, Nordics).
+        Filterkriterien:
+        - Marktkapitalisierung: mid-cap bis large-cap (> 1 Mrd. €)
+        - KGV: unter dem Sektor-Durchschnitt oder unter 20
+        - Dividendenrendite: mindestens 1,5 % (sofern dividendenzahlend)
+        - Verschuldungsgrad: moderat (Debt/Equity < 1,5)
+        - Transaktionskosten beachten: illiquide Märkte oder hohe Spreads flaggen
+        Ausgabe: Ranked-Liste mit Ticker, Name, Sektor, Region, KGV, Dividendenrendite, Kurzbewertung
+
+    - name: "Fonds-Screener (kostenbewusst)"
+      description: "ETFs und aktive Fonds filtern — TER, Performance, Thema"
+      prompt: |
+        Suche nach ETFs und aktiven Investmentfonds nach Kostenbewusstsein.
+        Filterkriterien:
+        - TER (Total Expense Ratio): ETFs max. 0,30 %, aktive Fonds max. 0,75 %
+        - Performance: 3-Jahres-Rendite vs. Benchmark (outperformt oder zumindest gleichwertig)
+        - AUM: mindestens 500 Mio. € (Liquiditätsrisiko minimieren)
+        - Themen: ESG, Technologie, Emerging Markets, Global — je nach Anfrage
+        Ausgabe: Ranked-Liste mit Ticker/ISIN, Name, TER, 1J/3J/5J-Performance, AUM, Thema-Match

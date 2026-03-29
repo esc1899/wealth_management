@@ -63,24 +63,6 @@ Searches for recent news for all portfolio positions, filtered by a configurable
 
 ### Improvements
 
-#### [P2] [IMPR] Seed example skills in all environments
-Default skills available out-of-the-box in dev, test, and production.
-Central config (`config/default_skills.yaml`) per area, `seed_if_empty()` runs for all areas on startup.
-New areas (rebalance, search) ship with at least one example skill.
-
-→ [GitHub Issue #3](https://github.com/esc1899/wealth_management/issues/3)
-
-#### [P1] [FEAT] Multi-environment setup & proxy LLM support
-Prepare installation on additional machines (e.g. "Work" environment).
-
-- Environment profiles via `.env` (home, work, ...)
-- `LLM_PROXY_URL` as alternative to `ANTHROPIC_API_KEY` (corporate proxy, no key needed)
-- `OLLAMA_BASE_URL` configurable for non-default setups
-- `scripts/seed_demo.py` runnable on any machine to recreate demo data
-- README documents full setup including proxy options
-
-→ [GitHub Issue #4](https://github.com/esc1899/wealth_management/issues/4)
-
 #### [P2] [IMPR] Auto-fetch market data on position creation
 When a new position is added, automatically fetch:
 1. Historical price for the purchase date (accurate cost basis)
@@ -114,4 +96,16 @@ Validation in `PortfolioAgent` layer with clear user-facing error messages.
 
 ## Done
 
-<!-- Completed items with date and commit/PR reference -->
+#### [P2] [IMPR] Seed example skills in all environments
+`config/default_skills.yaml` covers all areas (portfolio, research, rebalance, search).
+`seed_if_empty()` seeded for every area on startup via `state.py`.
+
+→ [GitHub Issue #3](https://github.com/esc1899/wealth_management/issues/3)
+
+#### [P1] [FEAT] Multi-environment setup & proxy LLM support
+`ENV_PROFILE=work` loads `.env.work` on top of `.env`.
+`ANTHROPIC_BASE_URL` for corporate proxy (no API key needed).
+`.env.example` updated with all vars and comments.
+README documents multi-env setup and proxy config.
+
+→ [GitHub Issue #4](https://github.com/esc1899/wealth_management/issues/4)
