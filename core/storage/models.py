@@ -235,6 +235,30 @@ class ResearchMessage(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Search models
+# ---------------------------------------------------------------------------
+
+class SearchSession(BaseModel):
+    """A search session for finding investment opportunities."""
+
+    id: Optional[int] = None
+    query: str
+    skill_name: str
+    skill_prompt: str
+    created_at: datetime
+
+
+class SearchMessage(BaseModel):
+    """A single message in a search session."""
+
+    id: Optional[int] = None
+    session_id: int
+    role: str       # 'user' or 'assistant'
+    content: str
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
 # Skills model
 # ---------------------------------------------------------------------------
 

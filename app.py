@@ -25,10 +25,16 @@ if config.DEMO_MODE:
     st.warning(t("demo.banner"), icon="🎭")
 
 # Initialise shared resources (agents, repos, scheduler) on first load
-from state import get_market_agent, get_portfolio_agent, get_research_agent  # noqa: E402
+from state import (  # noqa: E402
+    get_market_agent, get_news_agent, get_portfolio_agent,
+    get_rebalance_agent, get_research_agent, get_search_agent,
+)
 get_portfolio_agent()
 get_market_agent()
 get_research_agent()
+get_news_agent()
+get_search_agent()
+get_rebalance_agent()
 
 @st.dialog("Disclaimer & Privacy Notice", width="large")
 def _legal_dialog():
@@ -49,16 +55,19 @@ if not st.session_state.get("legal_accepted"):
 
 pg = st.navigation({
     t("nav.group_portfolio"): [
-        st.Page("pages/dashboard.py",      title=t("nav.dashboard"),       icon=":material/dashboard:"),
-        st.Page("pages/marktdaten.py",     title=t("nav.market_data"),     icon=":material/trending_up:"),
-        st.Page("pages/analyse.py",        title=t("nav.analysis"),        icon=":material/bar_chart:"),
+        st.Page("pages/dashboard.py",       title=t("nav.dashboard"),        icon=":material/dashboard:"),
+        st.Page("pages/marktdaten.py",      title=t("nav.market_data"),      icon=":material/trending_up:"),
+        st.Page("pages/analyse.py",         title=t("nav.analysis"),         icon=":material/bar_chart:"),
     ],
     t("nav.group_assistant"): [
-        st.Page("pages/portfolio_chat.py", title=t("nav.portfolio_chat"),  icon=":material/chat:"),
+        st.Page("pages/portfolio_chat.py",  title=t("nav.portfolio_chat"),   icon=":material/chat:"),
+        st.Page("pages/rebalance_chat.py",  title=t("nav.rebalance_chat"),   icon=":material/balance:"),
     ],
     t("nav.group_research"): [
-        st.Page("pages/research_chat.py",  title=t("nav.research_chat"),   icon=":material/search:"),
-        st.Page("pages/settings.py",       title=t("nav.settings"),        icon=":material/settings:"),
+        st.Page("pages/research_chat.py",   title=t("nav.research_chat"),    icon=":material/search:"),
+        st.Page("pages/news_chat.py",       title=t("nav.news_chat"),        icon=":material/newspaper:"),
+        st.Page("pages/search_chat.py",     title=t("nav.search_chat"),      icon=":material/manage_search:"),
+        st.Page("pages/settings.py",        title=t("nav.settings"),         icon=":material/settings:"),
     ],
 })
 

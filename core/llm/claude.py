@@ -40,8 +40,11 @@ class ClaudeProvider(LLMProvider):
     Only used for agents explicitly configured to use Claude.
     """
 
-    def __init__(self, api_key: str, model: str = DEFAULT_MODEL):
-        self._client = anthropic.AsyncAnthropic(api_key=api_key)
+    def __init__(self, api_key: str = "", model: str = DEFAULT_MODEL, base_url: str = ""):
+        client_kwargs: dict = {"api_key": api_key or "no-key-proxy"}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        self._client = anthropic.AsyncAnthropic(**client_kwargs)
         self._model = model
 
     async def chat(

@@ -1,0 +1,212 @@
+"""
+Search Agent — chat-based investment screening using Claude + web search.
+
+Flow per chat() call:
+  1. Save user message to DB
+  2. Load conversation history from DB
+  3. Call Claude with web_search + add_to_watchlist tools
+  4. If Claude calls add_to_watchlist → execute → send result → call Claude again
+  5. Save final assistant response to DB and return it
+"""
+
+from __future__ import annotations
+
+from datetime import date
+from typing import Optional
+
+from core.asset_class_config import get_asset_class_registry
+from core.llm.claude import ClaudeProvider, ClaudeResponse, ClaudeToolCall
+from core.storage.models import Position, SearchSession
+from core.storage.positions import PositionsRepository
+from core.storage.search import SearchRepository
+
+# ------------------------------------------------------------------
+# System prompt
+# ------------------------------------------------------------------
+
+BASE_SYSTEM_PROMPT = """You are an experienced investment screening analyst.
+The user wants to find investment opportunities matching specific criteria.
+
+Approach:
+1. Use web search to find current, relevant investments matching the criteria
+2. Screen and rank results according to the skill strategy below
+3. Present a structured output:
+   - **Summary** (2–3 sentences of key findings)
+   - **Ranked Candidates** — each entry:
+     - Ticker/ISIN, full name, sector/theme
+     - Key metrics: P/E, dividend yield, TER (for funds), 1y/3y performance, etc.
+     - Brief assessment (1–2 sentences)
+   - **Cost Warning** — flag any high fees, wide spreads, or illiquid markets
+   - **Watchlist Picks** — top 1–3 candidates worth adding to the watchlist
+
+Use the add_to_watchlist tool only when the user explicitly asks to add something.
+Be factual and cite specific numbers wherever available."""
+
+# ------------------------------------------------------------------
+# Tool definitions
+# ------------------------------------------------------------------
+
+WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search"}
+
+ADD_TO_WATCHLIST_TOOL = {
+    "name": "add_to_watchlist",
+    "description": "Add an investment to the watchlist when the user explicitly requests it.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "ticker": {
+                "type": "string",
+                "description": "Ticker symbol or ISIN, e.g. AAPL, IE00B4L5Y983, SAP.DE",
+            },
+            "name": {
+                "type": "string",
+                "description": "Full name of the investment",
+            },
+            "asset_class": {
+                "type": "string",
+                "enum": ["Aktie", "Aktienfonds", "Immobilienfonds", "Edelmetall"],
+                "description": "Asset class: Aktie = stock, Aktienfonds = equity fund/ETF",
+            },
+            "notes": {
+                "type": "string",
+                "description": "Brief reason for adding to the watchlist",
+            },
+        },
+        "required": ["ticker", "name", "asset_class"],
+    },
+}
+
+TOOLS = [WEB_SEARCH_TOOL, ADD_TO_WATCHLIST_TOOL]
+CLIENT_TOOL_NAMES = {"add_to_watchlist"}
+MAX_TOOL_ITERATIONS = 5
+
+
+class SearchAgent:
+
+    def __init__(
+        self,
+        positions_repo: PositionsRepository,
+        search_repo: SearchRepository,
+        llm: ClaudeProvider,
+    ):
+        self._positions = positions_repo
+        self._search = search_repo
+        self._llm = llm
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def start_session(
+        self,
+        query: str,
+        skill_name: str,
+        skill_prompt: str,
+    ) -> SearchSession:
+        """Create a new search session."""
+        return self._search.create_session(
+            query=query,
+            skill_name=skill_name,
+            skill_prompt=skill_prompt,
+        )
+
+    async def chat(self, session_id: int, user_message: str) -> str:
+        """Send a user message in an existing session and return the assistant reply."""
+        session = self._search.get_session(session_id)
+        if session is None:
+            raise ValueError(f"Session {session_id} not found")
+
+        system = BASE_SYSTEM_PROMPT + "\n\n## Screening Strategy\n" + session.skill_prompt
+
+        api_messages = self._build_api_messages(session_id)
+        api_messages.append({"role": "user", "content": user_message})
+        self._search.add_message(session_id, "user", user_message)
+
+        response: Optional[ClaudeResponse] = None
+        for _ in range(MAX_TOOL_ITERATIONS):
+            response = await self._llm.chat_with_tools(
+                messages=api_messages,
+                tools=TOOLS,
+                system=system,
+                max_tokens=4096,
+            )
+
+            client_calls = [
+                tc for tc in response.tool_calls if tc.name in CLIENT_TOOL_NAMES
+            ]
+            if not client_calls:
+                break
+
+            tool_results = []
+            for tc in client_calls:
+                result_text = self._execute_tool(tc)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tc.id,
+                    "content": result_text,
+                })
+
+            api_messages.append({"role": "assistant", "content": response.raw_blocks})
+            api_messages.append({"role": "user", "content": tool_results})
+
+        final_content = response.content if response else ""
+        self._search.add_message(session_id, "assistant", final_content)
+        return final_content
+
+    def list_sessions(self, limit: int = 50):
+        return self._search.list_sessions(limit=limit)
+
+    def get_session(self, session_id: int) -> Optional[SearchSession]:
+        return self._search.get_session(session_id)
+
+    def get_messages(self, session_id: int):
+        return self._search.get_messages(session_id)
+
+    def delete_session(self, session_id: int) -> None:
+        self._search.delete_session(session_id)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _build_api_messages(self, session_id: int) -> list[dict]:
+        db_messages = self._search.get_messages(session_id)
+        return [
+            {"role": m.role, "content": m.content}
+            for m in db_messages
+            if m.role in ("user", "assistant")
+        ]
+
+    def _execute_tool(self, tool_call: ClaudeToolCall) -> str:
+        if tool_call.name == "add_to_watchlist":
+            return self._tool_add_to_watchlist(tool_call.input)
+        return f"Unknown tool: {tool_call.name}"
+
+    def _tool_add_to_watchlist(self, args: dict) -> str:
+        ticker = args.get("ticker", "")
+        name = args.get("name", ticker)
+        asset_class = args.get("asset_class", "Aktie")
+        notes = args.get("notes", "")
+
+        registry = get_asset_class_registry()
+        try:
+            cfg = registry.require(asset_class)
+        except Exception:
+            cfg = registry.require("Aktie")
+
+        try:
+            position = Position(
+                ticker=ticker,
+                name=name,
+                asset_class=asset_class,
+                investment_type=cfg.investment_type,
+                unit=cfg.default_unit,
+                notes=notes,
+                added_date=date.today(),
+                in_portfolio=False,
+                recommendation_source="search_agent",
+            )
+            saved = self._positions.add(position)
+            return f"'{name}' ({ticker}) added to watchlist (ID: {saved.id})."
+        except Exception as exc:
+            return f"Error adding to watchlist: {exc}"

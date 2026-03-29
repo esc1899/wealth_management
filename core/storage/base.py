@@ -111,6 +111,24 @@ def init_db(conn: sqlite3.Connection) -> None:
             UNIQUE(name, area)
         )"""
     )
+    for stmt in [
+        """CREATE TABLE IF NOT EXISTS search_sessions (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            query        TEXT NOT NULL,
+            skill_name   TEXT NOT NULL,
+            skill_prompt TEXT NOT NULL,
+            created_at   TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS search_messages (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL REFERENCES search_sessions(id),
+            role       TEXT NOT NULL,
+            content    TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_search_messages_session ON search_messages(session_id)",
+    ]:
+        conn.execute(stmt)
     conn.commit()
 
 
