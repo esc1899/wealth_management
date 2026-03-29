@@ -40,7 +40,7 @@ DEMO_POSITIONS = [
     # ETFs / Funds
     dict(name="iShares Core MSCI World",        ticker="IWDA.AS", asset_class="Aktienfonds",    investment_type="Wertpapiere", unit="Stück", purchase_date="2020-05-04"),
     dict(name="Vanguard FTSE All-World",        ticker="VWRL.AS", asset_class="Aktienfonds",    investment_type="Wertpapiere", unit="Stück", purchase_date="2021-03-15"),
-    dict(name="iShares Global Aggregate Bond",  ticker="AGGG.L",  asset_class="Rentenfonds",    investment_type="Wertpapiere", unit="Stück", purchase_date="2019-10-07"),
+    dict(name="iShares Global Aggregate Bond",  ticker="AGGG.L",  asset_class="Rentenfonds",    investment_type="Renten",      unit="Stück", purchase_date="2019-10-07"),
     dict(name="iShares Global REIT ETF",        ticker="REET",    asset_class="Immobilienfonds", investment_type="Immobilien",  unit="Stück", purchase_date="2020-08-03"),
     # Precious metals — asset_class="Edelmetall", investment_type="Edelmetalle"
     dict(name="Gold (Unzen)",  ticker="GC=F", asset_class="Edelmetall", investment_type="Edelmetalle", unit="Troy Oz", purchase_date="2021-01-04"),

@@ -34,7 +34,7 @@ ASSET_TYPE_MAP = {
     "stock":  ("Aktie",          "Wertpapiere"),
     "etf":    ("Aktienfonds",    "Wertpapiere"),
     "crypto": ("Aktie",          "Wertpapiere"),   # no crypto class yet — manual fix needed
-    "bond":   ("Aktie",          "Wertpapiere"),   # no bond class yet — manual fix needed
+    "bond":   ("Rentenfonds",    "Renten"),
     "other":  ("Aktie",          "Wertpapiere"),   # review manually
 }
 

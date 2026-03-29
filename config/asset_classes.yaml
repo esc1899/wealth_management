@@ -36,7 +36,7 @@ asset_classes:
     requires_ticker: true
 
   Rentenfonds:
-    investment_type: Wertpapiere
+    investment_type: Renten
     default_unit: Stück
     visible_fields:
       - isin
