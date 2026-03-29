@@ -37,6 +37,20 @@ Follows the existing skills architecture — each search strategy is a skill.
 
 → [GitHub Issue #1](https://github.com/esc1899/wealth_management/issues/1)
 
+#### [P1] [FEAT] Invest & Rebalance Agent (Private 🔒)
+Agent with full portfolio access that suggests buy/sell/rebalance actions.
+
+**Skill: "Gärtner" Strategy**
+- **Säen**: underweighted positions → small initial buy
+- **Ernten**: positions that grew beyond target weight → take profits
+- **Zurückschneiden**: oversized or underperforming positions → trim
+
+General rebalance: compares current vs. target allocation per asset class/region,
+flags drift beyond threshold (e.g. ±5%), suggests concrete € amounts.
+Recommendations only — no trade execution. Cost-aware (no churning).
+
+→ [GitHub Issue #2](https://github.com/esc1899/wealth_management/issues/2)
+
 ### Improvements
 <!-- UI/UX, performance, code quality -->
 
