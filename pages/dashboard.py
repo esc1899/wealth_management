@@ -7,29 +7,30 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from core.i18n import t
 from state import get_market_agent
 
 st.set_page_config(page_title="Dashboard", page_icon="📊", layout="wide")
-st.title("📊 Dashboard")
+st.title(f"📊 {t('dashboard.title')}")
 st.caption("Agentic Wealth Manager")
 
 market_agent = get_market_agent()
 
 col_title, col_refresh = st.columns([5, 1])
 with col_refresh:
-    if st.button("🔄 Aktualisieren"):
+    if st.button(f"🔄 {t('common.refresh')}"):
         st.rerun()
 
 valuations = market_agent.get_portfolio_valuation()
 last_fetch = market_agent._market.get_latest_fetch_time()
 
 if last_fetch:
-    st.caption(f"Kurse zuletzt abgerufen: {last_fetch.strftime('%d.%m.%Y %H:%M')} UTC")
+    st.caption(f"{t('dashboard.prices_last_fetched')}: {last_fetch.strftime('%d.%m.%Y %H:%M')} UTC")
 else:
-    st.caption("Noch keine Kursdaten. Bitte auf der Marktdaten-Seite aktualisieren.")
+    st.caption(t("dashboard.no_price_data"))
 
 if not valuations:
-    st.info("Portfolio ist leer. Füge Positionen im Portfolio-Chat hinzu.")
+    st.info(t("dashboard.portfolio_empty"))
     st.stop()
 
 # ------------------------------------------------------------------
@@ -43,16 +44,16 @@ total_pnl_pct = (total_pnl / total_cost * 100) if total_pnl is not None and tota
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Portfoliowert", f"€ {total_value:,.2f}" if has_prices else "Keine Kurse")
+    st.metric(t("dashboard.portfolio_value"), f"€ {total_value:,.2f}" if has_prices else t("dashboard.no_prices"))
 with col2:
     if total_pnl is not None:
-        st.metric("Gesamt G/V", f"€ {total_pnl:,.2f}", delta=f"{total_pnl_pct:.2f}%")
+        st.metric(t("dashboard.pnl"), f"€ {total_pnl:,.2f}", delta=f"{total_pnl_pct:.2f}%")
     else:
-        st.metric("Gesamt G/V", "—")
+        st.metric(t("dashboard.pnl"), "—")
 with col3:
-    st.metric("Einstandswert", f"€ {total_cost:,.2f}" if total_cost else "—")
+    st.metric(t("dashboard.cost_basis"), f"€ {total_cost:,.2f}" if total_cost else "—")
 with col4:
-    st.metric("Positionen", len(valuations))
+    st.metric(t("dashboard.positions_count"), len(valuations))
 
 st.divider()
 
@@ -72,14 +73,26 @@ def fmt_quantity(x):
         return f"{x:.4f}"
 
 
+# Column header keys mapped to translation keys
+COL_QUANTITY = t("common.quantity")
+COL_UNIT = t("common.unit")
+COL_PURCHASE_PRICE = t("common.purchase_price")
+COL_CURRENT_PRICE = t("common.current_price")
+COL_VALUE = t("common.value")
+COL_PNL_EUR = t("common.pnl_eur")
+COL_PNL_PCT = t("common.pnl_pct")
+COL_TICKER = t("common.ticker")
+COL_NAME = t("common.name")
+COL_ASSET_CLASS = t("common.asset_class")
+
 fmt = {
-    "Anzahl": fmt_quantity,
-    "Einheit": "{}",
-    "Kaufpreis €": lambda x: fmt_optional(x),
-    "Aktuell €":   lambda x: fmt_optional(x),
-    "Wert €":      lambda x: fmt_optional(x, "€ {:,.2f}"),
-    "G/V €":       lambda x: fmt_optional(x, "{:+,.2f}"),
-    "G/V %":       lambda x: fmt_optional(x, "{:+.2f}%"),
+    COL_QUANTITY:       fmt_quantity,
+    COL_UNIT:           "{}",
+    COL_PURCHASE_PRICE: lambda x: fmt_optional(x),
+    COL_CURRENT_PRICE:  lambda x: fmt_optional(x),
+    COL_VALUE:          lambda x: fmt_optional(x, "€ {:,.2f}"),
+    COL_PNL_EUR:        lambda x: fmt_optional(x, "{:+,.2f}"),
+    COL_PNL_PCT:        lambda x: fmt_optional(x, "{:+.2f}%"),
 }
 
 # ------------------------------------------------------------------
@@ -93,16 +106,16 @@ for inv_type in investment_types:
 
     rows = [
         {
-            "Symbol":      v.symbol,
-            "Name":        v.name,
-            "Klasse":      v.asset_class,
-            "Anzahl":      v.quantity,
-            "Einheit":     v.unit,
-            "Kaufpreis €": v.purchase_price_eur,
-            "Aktuell €":   v.current_price_eur,
-            "Wert €":      v.current_value_eur,
-            "G/V €":       v.pnl_eur,
-            "G/V %":       v.pnl_pct,
+            "Symbol":         v.symbol,
+            COL_NAME:         v.name,
+            COL_ASSET_CLASS:  v.asset_class,
+            COL_QUANTITY:     v.quantity,
+            COL_UNIT:         v.unit,
+            COL_PURCHASE_PRICE: v.purchase_price_eur,
+            COL_CURRENT_PRICE:  v.current_price_eur,
+            COL_VALUE:          v.current_value_eur,
+            COL_PNL_EUR:        v.pnl_eur,
+            COL_PNL_PCT:        v.pnl_pct,
         }
         for v in group
     ]
@@ -114,12 +127,12 @@ for inv_type in investment_types:
 # ------------------------------------------------------------------
 if has_prices:
     st.divider()
-    st.subheader("Portfoliogewichtung")
+    st.subheader(t("dashboard.portfolio_weight"))
 
     col_pie1, col_pie2 = st.columns(2)
 
     with col_pie1:
-        st.caption("Nach Investment-Typ")
+        st.caption(t("dashboard.by_type"))
         alloc_type = {}
         for v in valuations:
             if v.current_value_eur:
@@ -130,7 +143,7 @@ if has_prices:
             st.plotly_chart(fig, use_container_width=True)
 
     with col_pie2:
-        st.caption("Nach Position")
+        st.caption(t("dashboard.by_position"))
         alloc_pos = {v.symbol: v.current_value_eur for v in valuations if v.current_value_eur}
         if alloc_pos:
             fig2 = px.pie(names=list(alloc_pos.keys()), values=list(alloc_pos.values()), hole=0.4)

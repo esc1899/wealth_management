@@ -1,7 +1,7 @@
-# Investmentstrategien / Research-Skills
-# Jede Strategie definiert einen Analyse-Fokus als System-Prompt-Snippet.
-# Neue Strategien hier ergänzen — kein Code-Änderung notwendig.
-# Custom-Strategien können im UI direkt eingegeben werden.
+# Investment strategies / Research skills
+# Each strategy defines an analysis focus as a system-prompt snippet.
+# Add new strategies here — no code change required.
+# Custom strategies can be entered directly in the UI.
 
 strategies:
 

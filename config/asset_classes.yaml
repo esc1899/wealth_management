@@ -1,6 +1,6 @@
-# Asset-Klassen Konfiguration
-# Jede Klasse definiert: Investment-Typ, Standard-Einheit, sichtbare Felder, Kursquelle.
-# Neue Klassen hier ergänzen — kein Code-Änderung notwendig.
+# Asset class configuration
+# Each class defines: investment type, default unit, visible fields, price source.
+# Add new classes here — no code change required.
 
 asset_classes:
 

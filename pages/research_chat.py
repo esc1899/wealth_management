@@ -6,19 +6,20 @@ import asyncio
 
 import streamlit as st
 
+from core.i18n import t
 from core.strategy_config import CUSTOM_STRATEGY_NAME
 from state import get_research_agent, get_skills_repo
 
 st.set_page_config(page_title="Research Chat", page_icon="🔍", layout="wide")
-st.title("🔍 Research Chat")
-st.caption("Aktienanalyse mit Claude + Web-Suche")
-st.info("☁️ Dieser Assistent nutzt die Claude API. Eingaben werden an Anthropic übermittelt.", icon="ℹ️")
+st.title(f"🔍 {t('research_chat.title')}")
+st.caption(t("research_chat.subtitle"))
+st.info(t("research_chat.cloud_notice"), icon="ℹ️")
 
 agent = get_research_agent()
 
 # Load research skills from DB; fall back gracefully if none exist
 research_skills = get_skills_repo().get_by_area("research")
-skill_names = [s.name for s in research_skills] + [CUSTOM_STRATEGY_NAME]
+skill_names = [s.name for s in research_skills] + [t("research_chat.custom_strategy")]
 # Build lookup: name -> skill
 _skill_map = {s.name: s for s in research_skills}
 
@@ -40,34 +41,34 @@ col_sidebar, col_chat = st.columns([1, 2])
 # ------------------------------------------------------------------
 
 with col_sidebar:
-    st.subheader("Neue Analyse")
+    st.subheader(t("research_chat.new_session"))
 
     with st.form("new_session_form"):
         company_input = st.text_input(
-            "Unternehmen oder Ticker *",
-            placeholder="z.B. Apple, AAPL, SAP SE, SAP.DE",
+            t("research_chat.company_label"),
+            placeholder=t("research_chat.company_placeholder"),
         ).strip()
 
-        strategy_choice = st.selectbox("Strategie", skill_names)
+        strategy_choice = st.selectbox(t("research_chat.strategy_label"), skill_names)
 
         custom_prompt = ""
-        if strategy_choice == CUSTOM_STRATEGY_NAME:
+        if strategy_choice == t("research_chat.custom_strategy"):
             custom_prompt = st.text_area(
-                "Analysefokus *",
-                placeholder="Beschreibe deinen Analysefokus...",
+                t("research_chat.custom_strategy_label"),
+                placeholder=t("research_chat.custom_strategy_placeholder"),
                 height=120,
             ).strip()
 
-        submitted = st.form_submit_button("Analyse starten", use_container_width=True)
+        submitted = st.form_submit_button(t("research_chat.start_button"), use_container_width=True)
 
     if submitted:
         if not company_input:
-            st.error("Bitte Unternehmen oder Ticker eingeben.")
-        elif strategy_choice == CUSTOM_STRATEGY_NAME and not custom_prompt:
-            st.error("Bitte Analysefokus eingeben.")
+            st.error(t("research_chat.no_company_error"))
+        elif strategy_choice == t("research_chat.custom_strategy") and not custom_prompt:
+            st.error(t("research_chat.no_focus_error"))
         else:
             # Resolve prompt: use DB skill prompt or custom free-text prompt
-            if strategy_choice == CUSTOM_STRATEGY_NAME:
+            if strategy_choice == t("research_chat.custom_strategy"):
                 resolved_prompt = custom_prompt or None
                 resolved_strategy_name = CUSTOM_STRATEGY_NAME
             else:
@@ -88,16 +89,16 @@ with col_sidebar:
                 f"finde zunächst das korrekte Ticker-Symbol und gib mir dann eine "
                 f"strukturierte Bewertung gemäß der Analysestrategie."
             )
-            with st.spinner("Analyse läuft…"):
+            with st.spinner(t("research_chat.thinking")):
                 asyncio.run(agent.chat(session.id, initial_msg))
             st.rerun()
 
     st.divider()
-    st.subheader("Vergangene Analysen")
+    st.subheader(t("research_chat.past_sessions"))
 
     sessions = agent.list_sessions(limit=30)
     if not sessions:
-        st.info("Noch keine Analysen.")
+        st.info(t("research_chat.no_sessions"))
     else:
         for s in sessions:
             label = f"**{s.ticker}** — {s.strategy_name}"
@@ -119,11 +120,11 @@ with col_chat:
     session_id = st.session_state.rc_session_id
 
     if session_id is None:
-        st.info("Wähle links eine vergangene Analyse oder starte eine neue.")
+        st.info(t("research_chat.select_or_start"))
     else:
         session = agent.get_session(session_id)
         if session is None:
-            st.warning("Session nicht gefunden.")
+            st.warning(t("research_chat.session_not_found"))
             st.session_state.rc_session_id = None
         else:
             # Header
@@ -132,8 +133,8 @@ with col_chat:
                 header += f" · {session.company_name}"
             st.markdown(header)
             st.caption(
-                f"Strategie: {session.strategy_name} · "
-                f"Gestartet: {session.created_at.strftime('%d.%m.%Y %H:%M')}"
+                f"{t('research_chat.strategy_caption')}: {session.strategy_name} · "
+                f"{t('research_chat.started_caption')}: {session.created_at.strftime('%d.%m.%Y %H:%M')}"
             )
 
             # Display messages
@@ -144,13 +145,16 @@ with col_chat:
                 role = "user" if msg.role == "user" else "assistant"
                 with st.chat_message(role):
                     st.markdown(msg.content)
+                    if role == "assistant":
+                        st.caption(t("common.ai_disclaimer"))
 
             # Chat input
-            if prompt := st.chat_input("Frage zur Analyse…"):
+            if prompt := st.chat_input(t("research_chat.chat_placeholder")):
                 with st.chat_message("user"):
                     st.markdown(prompt)
                 with st.chat_message("assistant"):
-                    with st.spinner("Analysiere…"):
+                    with st.spinner(t("research_chat.analysing")):
                         response = asyncio.run(agent.chat(session_id, prompt))
                     st.markdown(response)
+                    st.caption(t("common.ai_disclaimer"))
                 st.rerun()

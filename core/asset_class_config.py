@@ -1,6 +1,6 @@
 """
-Asset-Klassen Konfiguration.
-Lädt config/asset_classes.yaml und stellt die Definitionen app-weit bereit.
+Asset class configuration.
+Loads config/asset_classes.yaml and provides the definitions application-wide.
 """
 
 from __future__ import annotations

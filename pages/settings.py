@@ -1,5 +1,5 @@
 """
-Einstellungen — Skills verwalten und mit KI generieren.
+Settings — manage and AI-generate skills.
 """
 
 import asyncio
@@ -7,13 +7,14 @@ import asyncio
 import streamlit as st
 
 from config import config
+from core.i18n import t
 from core.llm.local import OllamaProvider
 from core.llm.base import Message, Role
 from core.storage.models import Skill
 from state import get_skills_repo
 
 st.set_page_config(page_title="Einstellungen", page_icon="⚙️", layout="wide")
-st.title("Einstellungen")
+st.title(t("settings.title"))
 
 skills_repo = get_skills_repo()
 
@@ -21,12 +22,12 @@ skills_repo = get_skills_repo()
 # Section: Skills list
 # ------------------------------------------------------------------
 
-st.subheader("Skills")
+st.subheader(t("settings.skills_header"))
 
 all_skills = skills_repo.get_all()
 
 if not all_skills:
-    st.info("Noch keine Skills vorhanden.")
+    st.info(t("settings.no_skills"))
 else:
     # Group by area
     areas: dict[str, list] = {}
@@ -34,15 +35,15 @@ else:
         areas.setdefault(skill.area, []).append(skill)
 
     for area, area_skills in areas.items():
-        st.markdown(f"**Bereich: {area}**")
+        st.markdown(f"**{t('settings.area_label')}: {area}**")
         for skill in area_skills:
             with st.expander(f"{skill.name}" + (f" — {skill.description}" if skill.description else "")):
-                st.markdown(f"**Beschreibung:** {skill.description or '–'}")
-                st.markdown("**Prompt:**")
+                st.markdown(f"**{t('settings.description_prefix')}:** {skill.description or '–'}")
+                st.markdown(f"**{t('settings.prompt_prefix')}:**")
                 st.code(skill.prompt, language=None)
-                if st.button("Löschen", key=f"del_{skill.id}", type="secondary"):
+                if st.button(t("settings.delete_button"), key=f"del_{skill.id}", type="secondary"):
                     skills_repo.delete(skill.id)
-                    st.success(f"Skill '{skill.name}' gelöscht.")
+                    st.success(f"{t('settings.skill_deleted')} '{skill.name}'")
                     st.rerun()
 
 st.divider()
@@ -51,28 +52,28 @@ st.divider()
 # Section: Add skill manually
 # ------------------------------------------------------------------
 
-st.subheader("Skill hinzufügen")
+st.subheader(t("settings.add_skill"))
 
-AREA_OPTIONS = ["research", "stock_search", "rebalancing", "portfolio_analysis", "Anderer…"]
+AREA_OPTIONS = ["research", "stock_search", "rebalancing", "portfolio_analysis", t("settings.other_area")]
 
 with st.form("add_skill_form"):
-    new_name = st.text_input("Name *", placeholder="z.B. Value Investing")
-    area_choice = st.selectbox("Bereich *", AREA_OPTIONS)
+    new_name = st.text_input(t("settings.name_label"), placeholder=t("settings.name_placeholder"))
+    area_choice = st.selectbox(t("settings.area_label_required"), AREA_OPTIONS)
     custom_area = ""
-    if area_choice == "Anderer…":
-        custom_area = st.text_input("Eigener Bereich *", placeholder="z.B. risk_analysis")
-    new_description = st.text_input("Beschreibung (optional)", placeholder="Kurze Beschreibung des Skills")
-    new_prompt = st.text_area("Prompt *", placeholder="Gib hier den Prompt-Text ein…", height=180)
-    save_btn = st.form_submit_button("Skill speichern", use_container_width=True)
+    if area_choice == t("settings.other_area"):
+        custom_area = st.text_input(t("settings.custom_area_label"), placeholder=t("settings.custom_area_placeholder"))
+    new_description = st.text_input(t("settings.description_label"), placeholder=t("settings.description_placeholder"))
+    new_prompt = st.text_area(t("settings.prompt_label"), placeholder=t("settings.prompt_placeholder"), height=180)
+    save_btn = st.form_submit_button(t("settings.save_button"), use_container_width=True)
 
 if save_btn:
-    resolved_area = custom_area.strip() if area_choice == "Anderer…" else area_choice
+    resolved_area = custom_area.strip() if area_choice == t("settings.other_area") else area_choice
     if not new_name.strip():
-        st.error("Bitte einen Namen eingeben.")
-    elif area_choice == "Anderer…" and not resolved_area:
-        st.error("Bitte einen Bereich eingeben.")
+        st.error(t("settings.name_required_error"))
+    elif area_choice == t("settings.other_area") and not resolved_area:
+        st.error(t("settings.area_required_error"))
     elif not new_prompt.strip():
-        st.error("Bitte einen Prompt eingeben.")
+        st.error(t("settings.prompt_required_error"))
     else:
         try:
             skill = Skill(
@@ -82,10 +83,10 @@ if save_btn:
                 prompt=new_prompt.strip(),
             )
             skills_repo.add(skill)
-            st.success(f"Skill '{skill.name}' gespeichert.")
+            st.success(f"'{skill.name}' {t('settings.skill_saved')}")
             st.rerun()
         except Exception as exc:
-            st.error(f"Fehler beim Speichern: {exc}")
+            st.error(f"{t('settings.save_error')}: {exc}")
 
 st.divider()
 
@@ -93,20 +94,20 @@ st.divider()
 # Section: LLM-generated skill
 # ------------------------------------------------------------------
 
-st.subheader("Skill mit KI generieren")
+st.subheader(t("settings.generate_header"))
 
 gen_description = st.text_input(
-    "Beschreibung des Anwendungsfalls",
-    placeholder="z.B. Nachhaltigkeitsanalyse für ESG-Investitionen",
+    t("settings.generate_description"),
+    placeholder=t("settings.generate_description_placeholder"),
     key="gen_desc",
 )
-gen_area = st.selectbox("Bereich", AREA_OPTIONS[:-1], key="gen_area")
+gen_area = st.selectbox(t("settings.generate_area"), AREA_OPTIONS[:-1], key="gen_area")
 
-if st.button("Mit KI generieren", key="gen_btn"):
+if st.button(t("settings.generate_button"), key="gen_btn"):
     if not gen_description.strip():
-        st.error("Bitte eine Beschreibung eingeben.")
+        st.error(t("settings.description_required"))
     else:
-        with st.spinner("KI generiert Prompt…"):
+        with st.spinner(t("settings.generating")):
             try:
                 llm = OllamaProvider(host=config.OLLAMA_HOST, model=config.OLLAMA_MODEL)
                 user_msg = (
@@ -117,24 +118,24 @@ if st.button("Mit KI generieren", key="gen_btn"):
                 generated = asyncio.run(llm.chat([Message(role=Role.USER, content=user_msg)]))
                 st.session_state["gen_result"] = generated
             except Exception as exc:
-                st.error(f"Fehler bei der KI-Generierung: {exc}")
+                st.error(f"{t('settings.ai_error')}: {exc}")
 
 if "gen_result" in st.session_state and st.session_state["gen_result"]:
-    st.markdown("**Generierter Prompt** (bearbeitbar):")
+    st.markdown(f"**{t('settings.generated_label')}:**")
     edited_prompt = st.text_area(
-        "Prompt bearbeiten",
+        t("settings.generated_edit_label"),
         value=st.session_state["gen_result"],
         height=200,
         key="gen_edit",
     )
-    gen_save_name = st.text_input("Name für diesen Skill *", key="gen_save_name")
-    gen_save_desc = st.text_input("Beschreibung (optional)", key="gen_save_desc")
+    gen_save_name = st.text_input(t("settings.generated_name_label"), key="gen_save_name")
+    gen_save_desc = st.text_input(t("settings.generated_desc_label"), key="gen_save_desc")
 
-    if st.button("Generierten Skill speichern", key="gen_save_btn"):
+    if st.button(t("settings.save_generated"), key="gen_save_btn"):
         if not gen_save_name.strip():
-            st.error("Bitte einen Namen für den Skill eingeben.")
+            st.error(t("settings.name_required_gen"))
         elif not edited_prompt.strip():
-            st.error("Prompt darf nicht leer sein.")
+            st.error(t("settings.prompt_empty_error"))
         else:
             try:
                 skill = Skill(
@@ -144,8 +145,8 @@ if "gen_result" in st.session_state and st.session_state["gen_result"]:
                     prompt=edited_prompt.strip(),
                 )
                 skills_repo.add(skill)
-                st.success(f"Skill '{skill.name}' gespeichert.")
+                st.success(f"'{skill.name}' {t('settings.generated_saved')}")
                 del st.session_state["gen_result"]
                 st.rerun()
             except Exception as exc:
-                st.error(f"Fehler beim Speichern: {exc}")
+                st.error(f"{t('settings.save_error')}: {exc}")

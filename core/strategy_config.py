@@ -1,6 +1,6 @@
 """
-Investmentstrategie-Konfiguration.
-Lädt config/strategies.yaml und stellt die Definitionen app-weit bereit.
+Investment strategy configuration.
+Loads config/strategies.yaml and provides the definitions application-wide.
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ class StrategyRegistry:
         """Create an ad-hoc custom strategy (not persisted in YAML)."""
         return StrategyConfig(
             name=CUSTOM_STRATEGY_NAME,
-            description=description or "Benutzerdefinierte Analysestrategie",
+            description=description or "User-defined analysis strategy",
             system_prompt=system_prompt,
             is_custom=True,
         )

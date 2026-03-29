@@ -6,10 +6,11 @@ import asyncio
 import pandas as pd
 import streamlit as st
 
+from core.i18n import t
 from state import get_portfolio_agent, get_positions_repo
 
 st.set_page_config(page_title="Portfolio Chat", page_icon="💬", layout="wide")
-st.title("💬 Portfolio Chat")
+st.title(f"💬 {t('portfolio_chat.title')}")
 
 agent = get_portfolio_agent()
 repo = get_positions_repo()
@@ -30,13 +31,13 @@ with col_chat:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    if prompt := st.chat_input("Nachricht eingeben..."):
+    if prompt := st.chat_input(t("portfolio_chat.input_placeholder")):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            with st.spinner("Denke nach..."):
+            with st.spinner(t("portfolio_chat.thinking")):
                 response = asyncio.run(agent.chat(prompt))
             st.markdown(response)
 
@@ -46,48 +47,50 @@ with col_chat:
 with col_tables:
     # Always read fresh from DB
     portfolio = repo.get_portfolio()
-    st.subheader(f"Portfolio ({len(portfolio)} Positionen)")
+    portfolio_count_label = t("portfolio_chat.portfolio_count").replace("{count}", str(len(portfolio)))
+    st.subheader(portfolio_count_label)
     if portfolio:
         df = pd.DataFrame([
             {
-                "ID":          e.id,
-                "Ticker":      e.ticker or "—",
-                "Name":        e.name,
-                "Klasse":      e.asset_class,
-                "Strategie":   e.strategy or "—",
-                "Anzahl":      e.quantity,
-                "Einheit":     e.unit,
-                "Kaufpreis €": e.purchase_price,
-                "Datum":       e.purchase_date.strftime("%d.%m.%Y") if e.purchase_date else "—",
+                "ID":                        e.id,
+                t("common.ticker"):          e.ticker or "—",
+                t("common.name"):            e.name,
+                t("common.asset_class"):     e.asset_class,
+                t("common.strategy"):        e.strategy or "—",
+                t("common.quantity"):        e.quantity,
+                t("common.unit"):            e.unit,
+                t("common.purchase_price"):  e.purchase_price,
+                t("common.date"):            e.purchase_date.strftime("%d.%m.%Y") if e.purchase_date else "—",
             }
             for e in portfolio
         ])
         st.dataframe(
             df.style.format({
-                "Anzahl":      "{:.4g}",
-                "Kaufpreis €": lambda x: f"{x:.2f}" if x is not None else "—",
+                t("common.quantity"):        "{:.4g}",
+                t("common.purchase_price"):  lambda x: f"{x:.2f}" if x is not None else "—",
             }),
             use_container_width=True,
             hide_index=True,
         )
     else:
-        st.info("Noch keine Positionen.")
+        st.info(t("portfolio_chat.empty_positions"))
 
     watchlist = repo.get_watchlist()
-    st.subheader(f"Watchlist ({len(watchlist)} Einträge)")
+    watchlist_count_label = t("portfolio_chat.watchlist_count").replace("{count}", str(len(watchlist)))
+    st.subheader(watchlist_count_label)
     if watchlist:
         df_wl = pd.DataFrame([
             {
-                "ID":        e.id,
-                "Ticker":    e.ticker or "—",
-                "Name":      e.name,
-                "Klasse":    e.asset_class,
-                "Strategie": e.strategy or "—",
-                "Quelle":    e.recommendation_source or "—",
-                "Notizen":   e.notes or "",
+                "ID":                        e.id,
+                t("common.ticker"):          e.ticker or "—",
+                t("common.name"):            e.name,
+                t("common.asset_class"):     e.asset_class,
+                t("common.strategy"):        e.strategy or "—",
+                t("portfolio_chat.source"):  e.recommendation_source or "—",
+                t("portfolio_chat.notes"):   e.notes or "",
             }
             for e in watchlist
         ])
         st.dataframe(df_wl, use_container_width=True, hide_index=True)
     else:
-        st.info("Noch keine Einträge.")
+        st.info(t("portfolio_chat.empty_portfolio"))
