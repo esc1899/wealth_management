@@ -4,6 +4,8 @@ A self-hosted, agentic wealth management system built with Python, Streamlit, an
 
 > **Disclaimer:** This app is for informational purposes only. AI-generated content does not constitute financial or investment advice. The authors accept no liability for financial losses. See [Disclaimer](#disclaimer) below.
 
+> **Tip — Setup with Claude Code:** This project was built with and is optimized for [Claude Code](https://claude.ai/code). Using it for initial setup, configuration, and troubleshooting is recommended — but entirely optional. All setup steps can be followed manually without it.
+
 ## Requirements & Responsibility
 
 This app **must be self-hosted**. The authors do not operate any instance of this software and have no access to your data at any time.
