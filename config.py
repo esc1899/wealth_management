@@ -11,7 +11,6 @@ if _profile:
 class Config:
     # Claude API
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
-    ANTHROPIC_BASE_URL: str = os.getenv("ANTHROPIC_BASE_URL", "")  # optional proxy
 
     # Langfuse (optional monitoring — omit keys to disable)
     LANGFUSE_SECRET_KEY: str = os.getenv("LANGFUSE_SECRET_KEY", "")
@@ -48,10 +47,10 @@ class Config:
                 "ENCRYPTION_KEY is not set. "
                 "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
             )
-        if not self.ANTHROPIC_API_KEY and not self.ANTHROPIC_BASE_URL:
+        if not self.ANTHROPIC_API_KEY:
             errors.append(
-                "Neither ANTHROPIC_API_KEY nor ANTHROPIC_BASE_URL is set. "
-                "Set ANTHROPIC_API_KEY for direct API access, or ANTHROPIC_BASE_URL for proxy access."
+                "ANTHROPIC_API_KEY is not set. "
+                "Set it in your .env file."
             )
         return errors
 

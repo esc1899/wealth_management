@@ -81,10 +81,50 @@ class TestClearWatchlist:
         assert result["deleted"] == 1
 
 
+class TestClearPortfolio:
+    def test_deletes_all_portfolio_entries(self, agent, mock_repo):
+        mock_repo.get_portfolio.return_value = [
+            _make_watchlist_position(1, "AAPL"),
+            _make_watchlist_position(2, "SAP.DE"),
+        ]
+        result = agent._tool_clear_portfolio()
+        assert result["deleted"] == 2
+        assert mock_repo.delete.call_count == 2
+
+    def test_deletes_correct_ids(self, agent, mock_repo):
+        mock_repo.get_portfolio.return_value = [
+            _make_watchlist_position(10, "AAPL"),
+            _make_watchlist_position(20, "SAP.DE"),
+        ]
+        agent._tool_clear_portfolio()
+        deleted_ids = {call.args[0] for call in mock_repo.delete.call_args_list}
+        assert deleted_ids == {10, 20}
+
+    def test_empty_portfolio_returns_zero(self, agent, mock_repo):
+        mock_repo.get_portfolio.return_value = []
+        result = agent._tool_clear_portfolio()
+        assert result["deleted"] == 0
+        mock_repo.delete.assert_not_called()
+
+    def test_partial_delete_counts_only_successful(self, agent, mock_repo):
+        mock_repo.get_portfolio.return_value = [
+            _make_watchlist_position(1, "AAPL"),
+            _make_watchlist_position(2, "MSFT"),
+        ]
+        mock_repo.delete.side_effect = [True, False]
+        result = agent._tool_clear_portfolio()
+        assert result["deleted"] == 1
+
+
 class TestToolDispatch:
     def test_clear_watchlist_dispatched(self, agent, mock_repo):
         mock_repo.get_watchlist.return_value = []
         result = agent._execute_tool("clear_watchlist", {})
+        assert "deleted" in result
+
+    def test_clear_portfolio_dispatched(self, agent, mock_repo):
+        mock_repo.get_portfolio.return_value = []
+        result = agent._execute_tool("clear_portfolio", {})
         assert "deleted" in result
 
     def test_remove_watchlist_dispatched(self, agent, mock_repo):

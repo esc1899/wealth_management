@@ -61,10 +61,10 @@ _assistant_group = (
 
 pg = st.navigation({
     t("nav.group_portfolio"): [
-        st.Page("pages/dashboard.py",         title=t("nav.dashboard"),          icon=":material/dashboard:"),
-        st.Page("pages/marktdaten.py",        title=t("nav.market_data"),        icon=":material/trending_up:"),
-        st.Page("pages/analyse.py",           title=t("nav.analysis"),           icon=":material/bar_chart:"),
-        st.Page("pages/import_positions.py",  title=t("nav.import_positions"),   icon=":material/upload_file:"),
+        st.Page("pages/dashboard.py",    title=t("nav.dashboard"),   icon=":material/dashboard:"),
+        st.Page("pages/positionen.py",   title=t("nav.positions"),   icon=":material/edit_note:"),
+        st.Page("pages/marktdaten.py",   title=t("nav.market_data"), icon=":material/trending_up:"),
+        st.Page("pages/analyse.py",      title=t("nav.analysis"),    icon=":material/bar_chart:"),
     ],
     _assistant_group: [
         st.Page("pages/portfolio_chat.py",  title=t("nav.portfolio_chat"),   icon=":material/chat:"),

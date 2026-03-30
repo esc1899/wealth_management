@@ -42,10 +42,6 @@ def run_static_checks(config) -> list[HealthCheck]:
     if langfuse_enabled and not is_local_url(config.LANGFUSE_HOST):
         checks.append(HealthCheck("langfuse_cloud", Severity.WARNING, config.LANGFUSE_HOST))
 
-    # Corporate proxy: all Claude requests are routed through a third party
-    if config.ANTHROPIC_BASE_URL:
-        checks.append(HealthCheck("anthropic_proxy", Severity.WARNING, config.ANTHROPIC_BASE_URL))
-
     # Demo mode: data is stored in the demo DB and can be reset at any time
     if config.DEMO_MODE:
         checks.append(HealthCheck("demo_mode", Severity.WARNING))

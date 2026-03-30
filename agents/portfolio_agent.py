@@ -118,6 +118,14 @@ TOOLS: list[dict] = [
             "parameters": {"type": "object", "properties": {}},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "clear_portfolio",
+            "description": "Remove ALL entries from the portfolio at once.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
 ]
 
 
@@ -205,6 +213,8 @@ class PortfolioAgent:
             return self._tool_list_watchlist()
         elif name == "clear_watchlist":
             return self._tool_clear_watchlist()
+        elif name == "clear_portfolio":
+            return self._tool_clear_portfolio()
         else:
             return {"error": f"Unknown tool: {name}"}
 
@@ -273,6 +283,14 @@ class PortfolioAgent:
     def _tool_remove_watchlist(self, args: dict) -> dict:
         deleted = self._positions.delete(args["entry_id"])
         return {"success": deleted}
+
+    def _tool_clear_portfolio(self) -> dict:
+        entries = self._positions.get_portfolio()
+        count = 0
+        for entry in entries:
+            if self._positions.delete(entry.id):
+                count += 1
+        return {"deleted": count}
 
     def _tool_clear_watchlist(self) -> dict:
         entries = self._positions.get_watchlist()

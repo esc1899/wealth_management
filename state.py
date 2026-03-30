@@ -130,7 +130,6 @@ def _seed_default_skills(repo: SkillsRepository) -> None:
 def _make_claude_provider(model: str, agent_name: str) -> ClaudeProvider:
     provider = ClaudeProvider(
         api_key=config.ANTHROPIC_API_KEY,
-        base_url=config.ANTHROPIC_BASE_URL,
         model=model,
     )
     provider.on_usage = lambda i, o: get_usage_repo().record(agent_name, model, i, o)
