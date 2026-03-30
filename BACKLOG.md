@@ -46,6 +46,17 @@ Validation in `PortfolioAgent` layer with clear user-facing error messages.
 
 → [GitHub Issue #7](https://github.com/esc1899/wealth_management/issues/7)
 
+#### [P2] [IMPR] Portfolio Chat: Skill + proactive clarification + save confirmation
+Three linked improvements to make the LLM-based entry reliable:
+1. **Skill for Portfolio Chat** — example skill that tells the LLM which fields matter
+   (name, quantity, price, purchase date, ISIN/WKN) and how to derive or ask for missing ones.
+2. **Plausibility check before saving** — `PortfolioAgent` validates extracted values
+   (required fields present, quantity > 0, date not future) and asks the user for
+   clarification before calling `repo.add()` if anything is missing or implausible.
+3. **Explicit save confirmation in chat** — after a successful `add` or `update` tool call
+   the agent replies "Position X was saved (quantity: …, price: …)" so the user sees
+   unambiguously whether the operation succeeded or not.
+
 ---
 
 ## Ideas / Later
