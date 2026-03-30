@@ -26,23 +26,6 @@ The Rebalance page silently crashes — no user-visible error, just a blank resu
 
 ### Improvements
 
-#### [P1] [IMPR] Rename "Rebalance" to "Invest / Rebalance"
-The current name doesn't convey that the agent also helps with investment decisions, not just rebalancing.
-- Update nav label in `app.py` and `translations/en.yaml` + `translations/de.yaml`
-- Update page title in `pages/rebalance_chat.py`
-
-#### [P2] [IMPR] News Digest: expandable detail per position
-Currently each position gets a brief summary line. Users want to read more and see sources.
-- Add `st.expander()` per position with full analysis text
-- Include clickable source references (URLs) returned by `web_search`
-- Requires `NewsAgent` to return structured per-ticker results (list of dicts) instead of one markdown blob
-
-#### [P2] [IMPR] News Digest: session history
-News runs are stateless — results are lost on page reload or navigation.
-- Store each digest run as a session in DB (analogous to `ResearchRepository`)
-- Show past runs in a sidebar, loadable on click
-- New: `core/storage/news.py` + `NewsRepository`, or reuse `SearchRepository` pattern
-
 #### [P2] [IMPR] Auto-fetch market data on position creation
 When a new position is added, automatically fetch:
 1. Historical price for the purchase date (accurate cost basis)
@@ -76,6 +59,18 @@ The agent would then factor this into its rebalancing recommendations
 
 ## Done
 
+#### [P2] [IMPR] Streamlit Deploy-Button ausblenden
+`.streamlit/config.toml` mit `toolbarMode = "minimal"` — verhindert versehentliches Deployment auf Streamlit Cloud.
+
+#### [P2] [FEAT] System Health / Setup Checks
+`core/health.py` mit statischen Checks (kein Netzwerk) + Ollama-Connectivity-Check.
+- Sidebar-Ampel (grün/gelb/rot) auf jeder Seite sichtbar
+- Detail-Ansicht in Einstellungen mit Check-Button für Ollama
+- Checks: Ollama auf Remote-Host (🔴), Langfuse Cloud (🟡), Corporate Proxy (🟡), Demo-Modus (🟡)
+- Portfolio Chat: Info-Banner wenn Demo-Modus aktiv
+
+---
+
 #### [P1] [FEAT] Investment Search Agent (Cloud ☁️)
 `SearchAgent` with `SearchRepository` + session-based chat. Skills: European Stock Screener, Fund Screener (Cost-Conscious). Page: `pages/search_chat.py`.
 
@@ -104,3 +99,12 @@ README documents multi-env setup and proxy config.
 `NewsAgent` — stateless, one-shot digest per run. Skills: Long-term Investor, Earnings Focus, ESG Monitor. Page: `pages/news_chat.py`.
 
 → [GitHub Issue #5](https://github.com/esc1899/wealth_management/issues/5)
+
+#### [P1] [IMPR] Rename "Rebalance" to "Invest / Rebalance"
+Nav label, page title, and translations updated.
+
+#### [P2] [IMPR] News Digest: expandable detail per position
+`st.expander()` per position with full analysis and assessment emoji. Source links (Markdown URLs) included.
+
+#### [P2] [IMPR] News Digest: session history
+Runs stored in DB via `NewsRepository`. Sidebar shows past runs, loadable on click, deletable.

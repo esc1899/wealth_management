@@ -6,6 +6,8 @@ import asyncio
 import pandas as pd
 import streamlit as st
 
+from config import config
+from core.health import is_local_url
 from core.i18n import t
 from state import get_portfolio_agent, get_positions_repo
 
@@ -20,6 +22,14 @@ st.caption(
     "Beispiele: 'Ich habe heute 10 SAP-Aktien für 185€ gekauft' · "
     "'Zeig mein Portfolio' · 'Füge Tesla zur Watchlist hinzu'"
 )
+
+if is_local_url(config.OLLAMA_HOST):
+    st.info(t("rebalance_chat.private_notice"), icon="🔒")
+else:
+    st.warning(t("rebalance_chat.remote_notice").format(host=config.OLLAMA_HOST), icon="⚠️")
+
+if config.DEMO_MODE:
+    st.info(t("portfolio_chat.demo_warning"), icon=":material/experiment:")
 
 col_chat, col_tables = st.columns([3, 2])
 

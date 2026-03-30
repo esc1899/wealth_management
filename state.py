@@ -23,6 +23,7 @@ from core.storage.base import build_encryption_service, get_connection, init_db
 from core.storage.market_data import MarketDataRepository
 from core.storage.positions import PositionsRepository
 from core.storage.news import NewsRepository
+from core.storage.rebalance import RebalanceRepository
 from core.storage.research import ResearchRepository
 from core.storage.search import SearchRepository
 from core.storage.skills import SkillsRepository
@@ -90,6 +91,11 @@ def get_research_repo() -> ResearchRepository:
 @st.cache_resource
 def get_news_repo() -> NewsRepository:
     return NewsRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_rebalance_repo() -> RebalanceRepository:
+    return RebalanceRepository(get_db_connection())
 
 
 @st.cache_resource

@@ -7,6 +7,7 @@ import asyncio
 import streamlit as st
 
 from config import config
+from core.health import Severity, check_ollama_connectivity, run_static_checks
 from core.i18n import t
 from core.llm.local import OllamaProvider
 from core.llm.base import Message, Role
@@ -15,6 +16,40 @@ from state import get_skills_repo
 
 st.set_page_config(page_title="Einstellungen", page_icon="⚙️", layout="wide")
 st.title(t("settings.title"))
+
+# ------------------------------------------------------------------
+# Section: System Health
+# ------------------------------------------------------------------
+
+st.subheader(t("health.title"))
+
+_static_checks = run_static_checks(config)
+_all_checks = list(_static_checks)
+
+if st.button(t("health.check_connectivity"), icon=":material/wifi_find:"):
+    with st.spinner("…"):
+        st.session_state["_ollama_conn_check"] = check_ollama_connectivity(config.OLLAMA_HOST)
+
+if "_ollama_conn_check" in st.session_state:
+    _all_checks.append(st.session_state["_ollama_conn_check"])
+
+if not _all_checks or all(c.severity == Severity.OK for c in _all_checks):
+    st.success(t("health.all_ok"), icon=":material/check_circle:")
+else:
+    for _chk in _all_checks:
+        _title = t(f"health.checks.{_chk.key}.title")
+        _desc = t(f"health.checks.{_chk.key}.description")
+        if _chk.detail:
+            _desc = _desc.replace("{detail}", _chk.detail)
+        _msg = f"**{_title}** — {_desc}"
+        if _chk.severity == Severity.ERROR:
+            st.error(_msg, icon=":material/error:")
+        elif _chk.severity == Severity.WARNING:
+            st.warning(_msg, icon=":material/warning:")
+        else:
+            st.success(_msg, icon=":material/check_circle:")
+
+st.divider()
 
 skills_repo = get_skills_repo()
 

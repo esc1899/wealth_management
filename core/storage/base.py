@@ -134,6 +134,29 @@ def init_db(conn: sqlite3.Connection) -> None:
             result     TEXT NOT NULL,
             created_at TEXT NOT NULL
         )""",
+        """CREATE TABLE IF NOT EXISTS news_messages (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id     INTEGER NOT NULL REFERENCES news_runs(id),
+            role       TEXT NOT NULL,
+            content    TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_news_messages_run ON news_messages(run_id)",
+        """CREATE TABLE IF NOT EXISTS rebalance_sessions (
+            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            skill_name         TEXT NOT NULL,
+            skill_prompt       TEXT NOT NULL,
+            portfolio_snapshot TEXT NOT NULL,
+            created_at         TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS rebalance_messages (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL REFERENCES rebalance_sessions(id),
+            role       TEXT NOT NULL,
+            content    TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_rebalance_messages_session ON rebalance_messages(session_id)",
     ]:
         conn.execute(stmt)
     conn.commit()

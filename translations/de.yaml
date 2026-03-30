@@ -36,6 +36,7 @@ nav:
   settings: "Einstellungen"
   group_portfolio: "Portfolio"
   group_assistant: "Assistent 🔒"
+  group_assistant_remote: "Assistent ⚠️"
   group_research: "Research ☁️"
 
 dashboard:
@@ -67,6 +68,7 @@ portfolio_chat:
   watchlist_count: "Watchlist ({count} Einträge)"
   source: "Quelle"
   notes: "Notizen"
+  demo_warning: "Daten werden in der **Demo-Datenbank** gespeichert und gehen beim Zurücksetzen verloren. Für echte Daten `DEMO_MODE=false` in der `.env` setzen und die App neu starten."
 
 market_data:
   title: "Marktdaten"
@@ -106,31 +108,40 @@ analysis:
 rebalance_chat:
   title: "Investieren / Rebalancieren"
   subtitle: "Portfolio-Rebalancing-Analyse"
-  private_notice: "🔒 Dieser Assistent läuft lokal auf deinem Rechner via Ollama. Portfoliodaten verlassen deine Infrastruktur nicht."
-  settings_header: "Analyse-Einstellungen"
+  private_notice: "🔒 Dieser Assistent läuft lokal via Ollama. Portfoliodaten verlassen deine Infrastruktur nicht."
+  remote_notice: "⚠️ Ollama läuft auf einem Remote-Server ({host}). Portfoliodaten werden extern verarbeitet — dies entspricht nicht dem 'privaten' Modus."
+  new_session: "Neue Analyse"
   skill_label: "Strategie"
-  run_button: "Portfolio analysieren"
-  thinking: "Analysiere…"
+  context_label: "Kontext / Ziel (optional)"
+  context_placeholder: "z.B. 'Ich möchte €2.000 investieren' · 'Ich plane Teilentnahmen' · 'Wie ist mein Tech-Exposure?'"
+  start_button: "Portfolio analysieren"
+  past_sessions: "Vergangene Analysen"
+  no_sessions: "Noch keine Analysen."
   no_skill: "Keine Rebalance-Skills gefunden. Bitte in den Einstellungen hinzufügen."
-  select_skill: "Strategie auswählen und 'Portfolio analysieren' klicken."
-  result_header: "Empfehlungen — {skill}"
+  select_or_start: "Vergangene Analyse links auswählen oder neue starten."
+  thinking: "Analysiere…"
+  chat_placeholder: "Rückfrage zur Analyse…"
+  session_not_found: "Session nicht gefunden."
 
 news_chat:
   title: "News Digest"
   subtitle: "Aktuelle Nachrichten für alle Portfoliopositionen"
   cloud_notice: "☁️ Dieser Assistent nutzt die Claude API (Anthropic). Ticker-Symbole werden extern verarbeitet."
-  settings_header: "Digest-Einstellungen"
+  new_run: "Neuer Digest"
   skill_label: "Filter-Strategie"
-  run_button: "News Digest starten"
-  thinking: "Suche nach Nachrichten…"
+  focus_label: "Fokus (optional)"
+  focus_placeholder: "z.B. 'Fokus auf meine Tech-Positionen' · 'Gibt es Gründe zur Sorge?'"
+  start_button: "News Digest starten"
+  past_runs: "Vergangene Digests"
+  no_runs: "Noch keine Digests vorhanden."
   no_skill: "Keine News-Skills gefunden. Bitte in den Einstellungen hinzufügen."
   empty_portfolio: "Portfolio ist leer. Zuerst Positionen im Portfolio-Chat hinzufügen."
-  select_skill: "Strategie auswählen und 'News Digest starten' klicken."
-  result_header: "News Digest — {skill}"
+  select_or_start: "Vergangenen Digest links auswählen oder neuen starten."
+  thinking: "Suche nach Nachrichten…"
+  chat_placeholder: "Rückfrage zum Digest…"
+  run_not_found: "Digest nicht gefunden."
   positions_found: "Positionen"
-  history_header: "Vergangene Digests"
   history_tickers: "Ticker"
-  no_history: "Noch keine Digests vorhanden."
 
 search_chat:
   title: "Investment Search"
@@ -242,3 +253,30 @@ legal:
 
 demo:
   banner: "⚠️ Demo-Modus aktiv — keine echten Daten"
+
+health:
+  title: "System-Status"
+  all_ok: "Alle Checks bestanden"
+  check_connectivity: "Ollama-Verbindung prüfen"
+  sidebar_status_ok: "System OK"
+  sidebar_status_warning: "Setup-Hinweise vorhanden — Details in den Einstellungen"
+  sidebar_status_error: "Setup-Problem erkannt — Details in den Einstellungen"
+  checks:
+    ollama_remote:
+      title: "Lokale Agents nicht privat"
+      description: "OLLAMA_HOST zeigt auf einen Remote-Server ({detail}). Portfolio-Daten verlassen dein lokales System."
+    langfuse_cloud:
+      title: "Langfuse sendet Daten extern"
+      description: "Traces werden an {detail} gesendet. Prompts können Portfolio-Daten enthalten."
+    anthropic_proxy:
+      title: "Corporate Proxy aktiv"
+      description: "Alle Claude-Anfragen laufen über {detail}. Der Proxy-Betreiber kann Anfragen einsehen."
+    demo_mode:
+      title: "Demo-Modus aktiv"
+      description: "Daten werden in der Demo-Datenbank gespeichert und gehen beim Reset verloren. Für echte Daten DEMO_MODE=false setzen und neu starten."
+    ollama_ok:
+      title: "Ollama erreichbar"
+      description: "Verbindung zu {detail} erfolgreich."
+    ollama_unreachable:
+      title: "Ollama nicht erreichbar"
+      description: "Verbindung zu {detail} fehlgeschlagen. Lokale Agents (Portfolio Chat, Invest/Rebalance) funktionieren nicht."

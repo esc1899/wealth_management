@@ -1,6 +1,5 @@
 """
-News Chat — recent news digest for portfolio positions using Claude + web search.
-Results are persisted and accessible from the sidebar history.
+News Chat — conversational news digest for portfolio positions using Claude + web search.
 """
 
 import asyncio
@@ -19,48 +18,12 @@ agent = get_news_agent()
 news_repo = get_news_repo()
 positions_repo = get_positions_repo()
 
-# ------------------------------------------------------------------
-# Load portfolio tickers
-# ------------------------------------------------------------------
-
 portfolio = positions_repo.get_portfolio()
-ticker_map: dict[str, str] = {
-    p.ticker: p.name for p in portfolio if p.ticker
-}
+ticker_map: dict[str, str] = {p.ticker: p.name for p in portfolio if p.ticker}
 tickers = list(ticker_map.keys())
 
-
-# ------------------------------------------------------------------
-# Sidebar — past runs
-# ------------------------------------------------------------------
-
-def _render_sidebar():
-    past_runs = news_repo.list_runs(limit=30)
-    if not past_runs:
-        st.sidebar.caption(t("news_chat.no_history"))
-        return
-
-    st.sidebar.subheader(t("news_chat.history_header"))
-    for run in past_runs:
-        date_str = run.created_at.strftime("%Y-%m-%d %H:%M")
-        ticker_count = len(run.tickers.split(", ")) if run.tickers else 0
-        label = f"{date_str} · {run.skill_name} · {ticker_count} {t('news_chat.history_tickers')}"
-        col_btn, col_del = st.sidebar.columns([5, 1])
-        if col_btn.button(label, key=f"run_{run.id}", use_container_width=True):
-            st.session_state["news_result"] = run.result
-            st.session_state["news_skill"] = run.skill_name
-            st.rerun()
-        if col_del.button("🗑", key=f"del_{run.id}"):
-            news_repo.delete_run(run.id)
-            if st.session_state.get("news_run_id") == run.id:
-                st.session_state.pop("news_result", None)
-                st.session_state.pop("news_skill", None)
-                st.session_state.pop("news_run_id", None)
-            st.rerun()
-
-
-_render_sidebar()
-
+if "nc_run_id" not in st.session_state:
+    st.session_state.nc_run_id = None
 
 # ------------------------------------------------------------------
 # Helper: render digest as expandable sections
@@ -68,7 +31,6 @@ _render_sidebar()
 
 def _render_digest(result: str):
     """Split markdown digest by ## sections and render each as an expander."""
-    # Split on section headers — each position gets its own ## block
     sections = []
     current: list[str] = []
     for line in result.splitlines():
@@ -81,7 +43,6 @@ def _render_digest(result: str):
         sections.append("\n".join(current))
 
     if not sections or (len(sections) == 1 and not sections[0].startswith("## ")):
-        # No sections found — fall back to plain markdown
         st.markdown(result)
         return
 
@@ -89,10 +50,7 @@ def _render_digest(result: str):
         lines = section.strip().splitlines()
         if not lines:
             continue
-
-        header = lines[0].lstrip("# ").strip()  # e.g. "AAPL — Apple Inc."
-
-        # Pick assessment emoji for the expander label
+        header = lines[0].lstrip("# ").strip()
         body = "\n".join(lines[1:])
         if "🔴" in body:
             emoji = "🔴"
@@ -100,74 +58,139 @@ def _render_digest(result: str):
             emoji = "🟡"
         else:
             emoji = "🟢"
-
         with st.expander(f"{emoji} {header}", expanded=False):
             st.markdown(body)
 
 
 # ------------------------------------------------------------------
-# Controls
+# Layout: left sidebar | right chat
 # ------------------------------------------------------------------
 
-col_controls, col_result = st.columns([1, 2])
+col_sidebar, col_chat = st.columns([1, 2])
 
-with col_controls:
-    st.subheader(t("news_chat.settings_header"))
+# ------------------------------------------------------------------
+# Left: new digest form + past runs
+# ------------------------------------------------------------------
+
+with col_sidebar:
+    st.subheader(t("news_chat.new_run"))
 
     if not tickers:
         st.warning(t("news_chat.empty_portfolio"))
-        st.stop()
-
-    st.caption(f"{t('news_chat.positions_found')}: {', '.join(tickers)}")
-
-    # Skill selector
-    news_skills = get_skills_repo().get_by_area("news")
-    if news_skills:
-        skill_names = [s.name for s in news_skills]
-        _skill_map = {s.name: s for s in news_skills}
-        selected_skill_name = st.selectbox(t("news_chat.skill_label"), skill_names)
-        selected_skill = _skill_map[selected_skill_name]
-        skill_prompt = selected_skill.prompt
     else:
-        st.warning(t("news_chat.no_skill"))
-        selected_skill_name = "Default"
-        skill_prompt = ""
+        st.caption(f"{t('news_chat.positions_found')}: {', '.join(tickers)}")
 
-    if st.button(t("news_chat.run_button"), use_container_width=True, type="primary"):
-        with st.spinner(t("news_chat.thinking")):
-            try:
-                result = asyncio.run(
-                    agent.run_digest(
-                        tickers=tickers,
-                        ticker_names=ticker_map,
-                        skill_name=selected_skill_name,
-                        skill_prompt=skill_prompt,
-                    )
-                )
-                run = news_repo.save_run(
-                    skill_name=selected_skill_name,
-                    tickers=tickers,
-                    result=result,
-                )
-                st.session_state["news_result"] = result
-                st.session_state["news_skill"] = selected_skill_name
-                st.session_state["news_run_id"] = run.id
-            except Exception as exc:
-                st.error(f"⚠️ {t('common.agent_error')}: {exc}")
-                st.session_state["news_result"] = f"⚠️ {t('common.agent_error')}: {exc}"
+        news_skills = get_skills_repo().get_by_area("news")
 
-# ------------------------------------------------------------------
-# Result panel
-# ------------------------------------------------------------------
+        with st.form("new_digest_form"):
+            if news_skills:
+                skill_names = [s.name for s in news_skills]
+                _skill_map = {s.name: s for s in news_skills}
+                skill_choice = st.selectbox(t("news_chat.skill_label"), skill_names)
+            else:
+                st.warning(t("news_chat.no_skill"))
+                skill_choice = None
 
-with col_result:
-    if "news_result" in st.session_state:
-        st.subheader(
-            t("news_chat.result_header").format(
-                skill=st.session_state.get("news_skill", "")
+            focus_input = st.text_input(
+                t("news_chat.focus_label"),
+                placeholder=t("news_chat.focus_placeholder"),
+            ).strip()
+
+            submitted = st.form_submit_button(
+                t("news_chat.start_button"), use_container_width=True
             )
-        )
-        _render_digest(st.session_state["news_result"])
-        st.caption(t("common.ai_disclaimer"))
+
+        if submitted and skill_choice:
+            selected_skill = _skill_map[skill_choice]
+            with st.spinner(t("news_chat.thinking")):
+                try:
+                    run, _ = asyncio.run(
+                        agent.start_run(
+                            tickers=tickers,
+                            ticker_names=ticker_map,
+                            skill_name=selected_skill.name,
+                            skill_prompt=selected_skill.prompt,
+                            user_context=focus_input,
+                            repo=news_repo,
+                        )
+                    )
+                    st.session_state.nc_run_id = run.id
+                except Exception as exc:
+                    st.error(f"⚠️ {t('common.agent_error')}: {exc}")
+            st.rerun()
+
+    st.divider()
+    st.subheader(t("news_chat.past_runs"))
+
+    past_runs = news_repo.list_runs(limit=30)
+    if not past_runs:
+        st.info(t("news_chat.no_runs"))
     else:
-        st.info(t("news_chat.select_skill"))
+        for run in past_runs:
+            date_str = run.created_at.strftime("%d.%m.%Y %H:%M")
+            ticker_count = len(run.tickers.split(", ")) if run.tickers else 0
+            label = f"**{run.skill_name}**  \n{date_str} · {ticker_count} {t('news_chat.history_tickers')}"
+            active = st.session_state.nc_run_id == run.id
+            col_btn, col_del = st.columns([5, 1])
+            if col_btn.button(
+                label,
+                key=f"nc_run_{run.id}",
+                use_container_width=True,
+                type="primary" if active else "secondary",
+            ):
+                st.session_state.nc_run_id = run.id
+                st.rerun()
+            if col_del.button("🗑", key=f"nc_del_{run.id}"):
+                news_repo.delete_run(run.id)
+                if st.session_state.nc_run_id == run.id:
+                    st.session_state.nc_run_id = None
+                st.rerun()
+
+# ------------------------------------------------------------------
+# Right: chat interface
+# ------------------------------------------------------------------
+
+with col_chat:
+    run_id = st.session_state.nc_run_id
+
+    if run_id is None:
+        st.info(t("news_chat.select_or_start"))
+    else:
+        run = news_repo.get_run(run_id)
+        if run is None:
+            st.warning(t("news_chat.run_not_found"))
+            st.session_state.nc_run_id = None
+        else:
+            st.markdown(f"### {run.skill_name}")
+            st.caption(
+                f"{run.created_at.strftime('%d.%m.%Y %H:%M')} · "
+                f"{run.tickers}"
+            )
+
+            messages = news_repo.get_messages(run_id)
+
+            for i, msg in enumerate(messages):
+                role = "user" if msg.role == "user" else "assistant"
+                with st.chat_message(role):
+                    # First assistant message = the digest → render with expanders
+                    if role == "assistant" and i == 1:
+                        _render_digest(msg.content)
+                    else:
+                        st.markdown(msg.content)
+                    if role == "assistant":
+                        st.caption(t("common.ai_disclaimer"))
+
+            if prompt := st.chat_input(t("news_chat.chat_placeholder")):
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+                with st.chat_message("assistant"):
+                    with st.spinner(t("news_chat.thinking")):
+                        try:
+                            response = asyncio.run(
+                                agent.chat(run_id, prompt, news_repo)
+                            )
+                        except Exception as exc:
+                            response = f"⚠️ {t('common.agent_error')}: {exc}"
+                    st.markdown(response)
+                    st.caption(t("common.ai_disclaimer"))
+                st.rerun()

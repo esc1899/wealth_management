@@ -273,6 +273,40 @@ class NewsRun(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Rebalance models
+# ---------------------------------------------------------------------------
+
+class RebalanceSession(BaseModel):
+    """A rebalancing analysis session — stores portfolio snapshot for follow-up context."""
+
+    id: Optional[int] = None
+    skill_name: str
+    skill_prompt: str
+    portfolio_snapshot: str   # pre-built text snapshot stored for follow-up messages
+    created_at: datetime
+
+
+class RebalanceMessage(BaseModel):
+    """A single message in a rebalance session."""
+
+    id: Optional[int] = None
+    session_id: int
+    role: str       # 'user' or 'assistant'
+    content: str
+    created_at: datetime
+
+
+class NewsMessage(BaseModel):
+    """A follow-up message in a news digest run."""
+
+    id: Optional[int] = None
+    run_id: int
+    role: str       # 'user' or 'assistant'
+    content: str
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
 # Skills model
 # ---------------------------------------------------------------------------
 

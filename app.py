@@ -12,6 +12,7 @@ st.set_page_config(
 )
 
 from config import config  # noqa: E402
+from core.health import Severity, is_local_url, run_static_checks  # noqa: E402
 from core.i18n import t, set_language, current_language, SUPPORTED_LANGUAGES  # noqa: E402
 
 # Fail fast if required config is missing
@@ -53,13 +54,18 @@ if not st.session_state.get("legal_accepted"):
     _legal_dialog()
     st.stop()
 
+_assistant_group = (
+    t("nav.group_assistant") if is_local_url(config.OLLAMA_HOST)
+    else t("nav.group_assistant_remote")
+)
+
 pg = st.navigation({
     t("nav.group_portfolio"): [
         st.Page("pages/dashboard.py",       title=t("nav.dashboard"),        icon=":material/dashboard:"),
         st.Page("pages/marktdaten.py",      title=t("nav.market_data"),      icon=":material/trending_up:"),
         st.Page("pages/analyse.py",         title=t("nav.analysis"),         icon=":material/bar_chart:"),
     ],
-    t("nav.group_assistant"): [
+    _assistant_group: [
         st.Page("pages/portfolio_chat.py",  title=t("nav.portfolio_chat"),   icon=":material/chat:"),
         st.Page("pages/rebalance_chat.py",  title=t("nav.rebalance_chat"),   icon=":material/balance:"),
     ],
@@ -70,6 +76,19 @@ pg = st.navigation({
         st.Page("pages/settings.py",        title=t("nav.settings"),         icon=":material/settings:"),
     ],
 })
+
+# Sidebar: always-visible system status indicator ("Ampel")
+_health_checks = run_static_checks(config)
+_has_errors   = any(c.severity == Severity.ERROR   for c in _health_checks)
+_has_warnings = any(c.severity == Severity.WARNING for c in _health_checks)
+
+with st.sidebar:
+    if _has_errors:
+        st.error(t("health.sidebar_status_error"), icon=":material/error:")
+    elif _has_warnings:
+        st.warning(t("health.sidebar_status_warning"), icon=":material/warning:")
+    else:
+        st.success(t("health.sidebar_status_ok"), icon=":material/check_circle:")
 
 # Language switcher in sidebar
 with st.sidebar:

@@ -2,24 +2,30 @@
 Rebalance Agent — portfolio rebalancing analysis using local Ollama LLM.
 Private 🔒 — all portfolio data stays local, nothing is sent to external APIs.
 
-Flow per analyze() call:
+Flow per start_session() call:
   1. Load all portfolio positions from DB
   2. Fetch current market prices from DB
-  3. Build a structured portfolio snapshot (positions, values, weights)
-  4. Send to local LLM with the selected skill strategy
-  5. Return the analysis as a markdown string
+  3. Build a structured portfolio snapshot (stored in DB for follow-up context)
+  4. Send to local LLM with the selected skill strategy + optional user context
+  5. Persist user + assistant messages and return the session
+
+Flow per chat() call:
+  1. Load session (for portfolio snapshot + skill) and message history from DB
+  2. Send full conversation to LLM
+  3. Persist and return the assistant reply
 """
 
 from __future__ import annotations
 
 from datetime import date
-from typing import Optional
+from typing import Optional, Tuple
 
 from core.llm.base import Message, Role
 from core.llm.local import OllamaProvider
 from core.storage.market_data import MarketDataRepository
-from core.storage.models import Position
+from core.storage.models import Position, RebalanceSession
 from core.storage.positions import PositionsRepository
+from core.storage.rebalance import RebalanceRepository
 
 # ------------------------------------------------------------------
 # System prompt
@@ -40,8 +46,8 @@ Rules:
 
 class RebalanceAgent:
     """
-    Stateless agent: each call to analyze() is independent.
-    Uses local Ollama LLM (private 🔒).
+    Conversational agent: start_session() triggers the initial analysis,
+    chat() handles follow-up questions. Uses local Ollama LLM (private 🔒).
     """
 
     def __init__(
@@ -54,36 +60,97 @@ class RebalanceAgent:
         self._market = market_repo
         self._llm = llm
 
-    async def analyze(self, skill_name: str, skill_prompt: str) -> str:
+    async def start_session(
+        self,
+        skill_name: str,
+        skill_prompt: str,
+        user_context: str,
+        repo: RebalanceRepository,
+    ) -> Tuple[RebalanceSession, str]:
         """
-        Build a portfolio snapshot and run a rebalancing analysis.
+        Build portfolio snapshot, create a session in DB, run initial analysis.
 
         Args:
-            skill_name:   Display name of the strategy (for context)
-            skill_prompt: The strategy prompt that defines how to analyze
+            skill_name:   Display name of the strategy
+            skill_prompt: The strategy prompt
+            user_context: Optional user input ("Ich möchte €2.000 investieren")
+            repo:         RebalanceRepository for persistence
+
+        Returns:
+            (session, assistant_reply)
         """
         portfolio = self._positions.get_portfolio()
         if not portfolio:
-            return "Portfolio is empty. Add positions in Portfolio Chat first."
+            snapshot = "Portfolio is empty."
+        else:
+            snapshot = self._build_portfolio_context(portfolio)
 
-        portfolio_text = self._build_portfolio_context(portfolio)
+        session = repo.create_session(
+            skill_name=skill_name,
+            skill_prompt=skill_prompt,
+            portfolio_snapshot=snapshot,
+        )
+
+        user_message = user_context.strip() if user_context.strip() else (
+            "Please analyze my portfolio and provide rebalancing recommendations according to the strategy."
+        )
+        repo.add_message(session.id, "user", user_message)
 
         system = (
             SYSTEM_PROMPT.format(today=date.today().isoformat())
             + f"\n\n## Strategy: {skill_name}\n{skill_prompt}"
+            + f"\n\n## Portfolio\n{snapshot}"
         )
         messages = [
             Message(role=Role.SYSTEM, content=system),
+            Message(role=Role.USER, content=user_message),
+        ]
+        reply = await self._llm.chat(messages, max_tokens=2048)
+
+        repo.add_message(session.id, "assistant", reply)
+        return session, reply
+
+    async def chat(
+        self,
+        session_id: int,
+        user_message: str,
+        repo: RebalanceRepository,
+    ) -> str:
+        """
+        Send a follow-up message in an existing session.
+
+        Args:
+            session_id:   ID of the rebalance session
+            user_message: The user's follow-up question
+            repo:         RebalanceRepository for persistence
+
+        Returns:
+            Assistant reply string
+        """
+        session = repo.get_session(session_id)
+        if session is None:
+            raise ValueError(f"Session {session_id} not found")
+
+        repo.add_message(session_id, "user", user_message)
+
+        system = (
+            SYSTEM_PROMPT.format(today=date.today().isoformat())
+            + f"\n\n## Strategy: {session.skill_name}\n{session.skill_prompt}"
+            + f"\n\n## Portfolio\n{session.portfolio_snapshot}"
+        )
+
+        history = repo.get_messages(session_id)
+        messages = [Message(role=Role.SYSTEM, content=system)] + [
             Message(
-                role=Role.USER,
-                content=(
-                    "Please analyze my portfolio and provide rebalancing "
-                    f"recommendations according to the strategy.\n\n{portfolio_text}"
-                ),
-            ),
+                role=Role.USER if m.role == "user" else Role.ASSISTANT,
+                content=m.content,
+            )
+            for m in history
         ]
 
-        return await self._llm.chat(messages, max_tokens=2048)
+        reply = await self._llm.chat(messages, max_tokens=2048)
+        repo.add_message(session_id, "assistant", reply)
+        return reply
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -91,7 +158,6 @@ class RebalanceAgent:
 
     def _build_portfolio_context(self, positions: list[Position]) -> str:
         """Format portfolio positions as readable context for the LLM."""
-        # Compute values and total
         rows: list[tuple[Position, Optional[float], Optional[float]]] = []
         total_value = 0.0
 
@@ -131,6 +197,8 @@ class RebalanceAgent:
         if total_value > 0:
             lines.append(f"\n**Total portfolio value: €{total_value:,.0f}**")
         else:
-            lines.append("\n*No current price data available — refresh on Market Data page first.*")
+            lines.append(
+                "\n*No current price data available — refresh on Market Data page first.*"
+            )
 
         return "\n".join(lines)
