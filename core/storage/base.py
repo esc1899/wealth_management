@@ -157,6 +157,16 @@ def init_db(conn: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL
         )""",
         "CREATE INDEX IF NOT EXISTS idx_rebalance_messages_session ON rebalance_messages(session_id)",
+        """CREATE TABLE IF NOT EXISTS llm_usage (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent        TEXT NOT NULL,
+            model        TEXT NOT NULL,
+            input_tokens INTEGER NOT NULL,
+            output_tokens INTEGER NOT NULL,
+            created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_llm_usage_agent ON llm_usage(agent)",
+        "CREATE INDEX IF NOT EXISTS idx_llm_usage_created ON llm_usage(created_at)",
     ]:
         conn.execute(stmt)
     conn.commit()

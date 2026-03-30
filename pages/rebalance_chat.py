@@ -15,12 +15,12 @@ st.set_page_config(page_title="Invest / Rebalance", page_icon="⚖️", layout="
 st.title(f"⚖️ {t('rebalance_chat.title')}")
 st.caption(t("rebalance_chat.subtitle"))
 
-if is_local_url(config.OLLAMA_HOST):
-    st.info(t("rebalance_chat.private_notice"), icon="🔒")
-else:
-    st.warning(t("rebalance_chat.remote_notice").format(host=config.OLLAMA_HOST), icon="⚠️")
-
 agent = get_rebalance_agent()
+
+if is_local_url(config.OLLAMA_HOST):
+    st.info(t("rebalance_chat.private_notice").format(model=agent._llm.model), icon="🔒")
+else:
+    st.warning(t("rebalance_chat.remote_notice").format(host=config.OLLAMA_HOST, model=agent._llm.model), icon="⚠️")
 repo = get_rebalance_repo()
 
 if "rb_session_id" not in st.session_state:

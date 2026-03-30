@@ -6,7 +6,7 @@ Both local (Ollama) and cloud (Claude) providers implement this interface.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Callable, Optional
 
 
 class Role(str, Enum):
@@ -21,8 +21,18 @@ class Message:
     content: str
 
 
+UsageCallback = Callable[[int, int], None]  # (input_tokens, output_tokens)
+
+
 class LLMProvider(ABC):
     """Common interface for all LLM backends."""
+
+    # Set by state.py after construction to record token usage.
+    on_usage: Optional[UsageCallback] = None
+
+    @property
+    def model(self) -> str:
+        return self._model  # type: ignore[attr-defined]
 
     @abstractmethod
     async def chat(

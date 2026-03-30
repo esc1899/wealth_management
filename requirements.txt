@@ -22,6 +22,7 @@ pytest-mock>=3.14.0
 streamlit>=1.50.0
 plotly>=5.0.0
 pandas>=2.0.0
+openpyxl>=3.1.0
 
 # Scheduling
 apscheduler>=3.10.0

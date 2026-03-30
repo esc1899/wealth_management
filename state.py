@@ -27,6 +27,7 @@ from core.storage.rebalance import RebalanceRepository
 from core.storage.research import ResearchRepository
 from core.storage.search import SearchRepository
 from core.storage.skills import SkillsRepository
+from core.storage.usage import UsageRepository
 from core.strategy_config import get_strategy_registry
 from monitoring.langfuse_client import create_langfuse_client
 
@@ -62,7 +63,7 @@ def get_asset_classes() -> AssetClassRegistry:
 
 @st.cache_resource
 def get_portfolio_agent() -> PortfolioAgent:
-    llm = OllamaProvider(host=config.OLLAMA_HOST, model=config.OLLAMA_MODEL)
+    llm = _make_ollama_provider("portfolio_chat")
     return PortfolioAgent(positions_repo=get_positions_repo(), llm=llm)
 
 
@@ -104,6 +105,11 @@ def get_search_repo() -> SearchRepository:
 
 
 @st.cache_resource
+def get_usage_repo() -> UsageRepository:
+    return UsageRepository(get_db_connection())
+
+
+@st.cache_resource
 def get_skills_repo() -> SkillsRepository:
     repo = SkillsRepository(get_db_connection())
     _seed_default_skills(repo)
@@ -121,17 +127,25 @@ def _seed_default_skills(repo: SkillsRepository) -> None:
         repo.seed_if_empty(area, skills_list or [])
 
 
-def _make_claude_provider(model: str) -> ClaudeProvider:
-    return ClaudeProvider(
+def _make_claude_provider(model: str, agent_name: str) -> ClaudeProvider:
+    provider = ClaudeProvider(
         api_key=config.ANTHROPIC_API_KEY,
         base_url=config.ANTHROPIC_BASE_URL,
         model=model,
     )
+    provider.on_usage = lambda i, o: get_usage_repo().record(agent_name, model, i, o)
+    return provider
+
+
+def _make_ollama_provider(agent_name: str) -> "OllamaProvider":
+    provider = OllamaProvider(host=config.OLLAMA_HOST, model=config.OLLAMA_MODEL)
+    provider.on_usage = lambda i, o: get_usage_repo().record(agent_name, config.OLLAMA_MODEL, i, o)
+    return provider
 
 
 @st.cache_resource
 def get_research_agent() -> ResearchAgent:
-    llm = _make_claude_provider("claude-haiku-4-5-20251001")
+    llm = _make_claude_provider("claude-haiku-4-5-20251001", "research_chat")
     return ResearchAgent(
         positions_repo=get_positions_repo(),
         research_repo=get_research_repo(),
@@ -142,13 +156,13 @@ def get_research_agent() -> ResearchAgent:
 
 @st.cache_resource
 def get_news_agent() -> NewsAgent:
-    llm = _make_claude_provider("claude-haiku-4-5-20251001")
+    llm = _make_claude_provider("claude-haiku-4-5-20251001", "news_digest")
     return NewsAgent(llm=llm)
 
 
 @st.cache_resource
 def get_search_agent() -> SearchAgent:
-    llm = _make_claude_provider("claude-sonnet-4-6")
+    llm = _make_claude_provider("claude-sonnet-4-6", "investment_search")
     return SearchAgent(
         positions_repo=get_positions_repo(),
         search_repo=get_search_repo(),
@@ -158,7 +172,7 @@ def get_search_agent() -> SearchAgent:
 
 @st.cache_resource
 def get_rebalance_agent() -> RebalanceAgent:
-    llm = OllamaProvider(host=config.OLLAMA_HOST, model=config.OLLAMA_MODEL)
+    llm = _make_ollama_provider("rebalance_chat")
     return RebalanceAgent(
         positions_repo=get_positions_repo(),
         market_repo=get_market_repo(),

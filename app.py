@@ -61,9 +61,10 @@ _assistant_group = (
 
 pg = st.navigation({
     t("nav.group_portfolio"): [
-        st.Page("pages/dashboard.py",       title=t("nav.dashboard"),        icon=":material/dashboard:"),
-        st.Page("pages/marktdaten.py",      title=t("nav.market_data"),      icon=":material/trending_up:"),
-        st.Page("pages/analyse.py",         title=t("nav.analysis"),         icon=":material/bar_chart:"),
+        st.Page("pages/dashboard.py",         title=t("nav.dashboard"),          icon=":material/dashboard:"),
+        st.Page("pages/marktdaten.py",        title=t("nav.market_data"),        icon=":material/trending_up:"),
+        st.Page("pages/analyse.py",           title=t("nav.analysis"),           icon=":material/bar_chart:"),
+        st.Page("pages/import_positions.py",  title=t("nav.import_positions"),   icon=":material/upload_file:"),
     ],
     _assistant_group: [
         st.Page("pages/portfolio_chat.py",  title=t("nav.portfolio_chat"),   icon=":material/chat:"),
@@ -73,6 +74,9 @@ pg = st.navigation({
         st.Page("pages/research_chat.py",   title=t("nav.research_chat"),    icon=":material/search:"),
         st.Page("pages/news_chat.py",       title=t("nav.news_chat"),        icon=":material/newspaper:"),
         st.Page("pages/search_chat.py",     title=t("nav.search_chat"),      icon=":material/manage_search:"),
+    ],
+    t("nav.group_system"): [
+        st.Page("pages/statistics.py",      title=t("nav.statistics"),       icon=":material/bar_chart:"),
         st.Page("pages/settings.py",        title=t("nav.settings"),         icon=":material/settings:"),
     ],
 })

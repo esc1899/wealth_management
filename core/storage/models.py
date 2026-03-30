@@ -307,6 +307,21 @@ class NewsMessage(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# LLM usage model
+# ---------------------------------------------------------------------------
+
+class UsageRecord(BaseModel):
+    """Token usage for a single LLM call."""
+
+    id: Optional[int] = None
+    agent: str          # e.g. 'portfolio_chat', 'news_agent'
+    model: str          # e.g. 'qwen3:8b', 'claude-haiku-4-5-20251001'
+    input_tokens: int
+    output_tokens: int
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
 # Skills model
 # ---------------------------------------------------------------------------
 

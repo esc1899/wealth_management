@@ -12,9 +12,8 @@ from state import get_search_agent, get_skills_repo
 st.set_page_config(page_title="Investment Search", page_icon="🔎", layout="wide")
 st.title(f"🔎 {t('search_chat.title')}")
 st.caption(t("search_chat.subtitle"))
-st.info(t("search_chat.cloud_notice"), icon="ℹ️")
-
 agent = get_search_agent()
+st.info(t("search_chat.cloud_notice").format(model=agent._llm.model), icon="ℹ️")
 
 # Load search skills from DB
 search_skills = get_skills_repo().get_by_area("search")

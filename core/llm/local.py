@@ -87,6 +87,11 @@ class OllamaProvider(LLMProvider):
             )
             for tc in message.get("tool_calls", [])
         ]
+        if self.on_usage:
+            self.on_usage(
+                data.get("prompt_eval_count", 0),
+                data.get("eval_count", 0),
+            )
         return OllamaResponse(
             content=message.get("content", ""),
             tool_calls=tool_calls,

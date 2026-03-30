@@ -23,6 +23,48 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Demo Mode** — pre-seeded demo database for testing and demonstration
 - **Bilingual UI** — German / English
 
+## What You Can Learn Here
+
+This project is a hands-on introduction to building real AI-powered applications. By setting it up and using it you will encounter — and have to solve — most of the practical challenges that come up in production AI projects.
+
+### Running a local LLM with Ollama
+
+You will install Ollama and pull a model (e.g. `qwen3:8b`). This teaches you what it means for an LLM to run *on your hardware*: how model size relates to RAM and performance, what a "context window" feels like in practice, and why a local model can be slower on first call (model load). You will develop an intuition for when a local model is good enough and when you need something more capable.
+
+### Using a cloud LLM API
+
+The research and news features use the Anthropic Claude API. You will get an API key, set it in `.env`, and see tokens being consumed in the Statistics page. This makes abstract concepts concrete: what is a token, what does a call cost, why does model choice (Haiku vs. Sonnet) matter for cost and quality.
+
+### Privacy and where your data goes
+
+The app has a live privacy indicator on every agent page. You will see the difference between a locally running model (your portfolio data never leaves your machine) and a cloud API call (your tickers go to Anthropic's servers). This is not theoretical — the setup health checks will warn you if something is not as private as you expect.
+
+### Keeping secrets with `.env`
+
+API keys, encryption keys, and database paths live in `.env`, which is gitignored. You will learn why this file must never be committed, what happens if it leaks, and how to manage different configs for home vs. work using environment profiles.
+
+### Encrypted local storage
+
+Portfolio data (quantities, prices, notes) is encrypted at rest with a Fernet key you generate yourself. You will see what "encrypted at rest" means in practice: who holds the key, what an attacker gets without it, and why demo mode deliberately skips encryption.
+
+### Skills as reusable prompts
+
+The Skills system lets you save and edit prompt templates for each agent. This is a lightweight version of prompt engineering in production: you will learn that a well-written system prompt dramatically changes the quality of LLM output, and that externalising prompts from code makes them easier to iterate on.
+
+### Monitoring with Langfuse
+
+Optionally connect Langfuse to trace every LLM call. You will see the full prompt, the response, latency, and token counts — exactly what observability looks like for AI applications.
+
+### Understanding agent design trade-offs
+
+The app has five agents with different characteristics: stateful vs. stateless, local vs. cloud, one-shot vs. conversational. Comparing how Portfolio Chat, Rebalance, Research Chat, and News Digest are built shows you the practical trade-offs: privacy, cost, speed, and capability.
+
+### The trust question
+
+You will face a real question: *am I comfortable putting my actual portfolio into a system that sometimes sends data to a cloud API?* The app is designed to make this trade-off explicit rather than hiding it. Working through that question is itself a valuable exercise in responsible AI use.
+
+---
+
 ## Tech Stack
 
 - Python 3.9+, Streamlit
