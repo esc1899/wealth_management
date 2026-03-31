@@ -29,12 +29,14 @@ if config.DEMO_MODE:
 from state import (  # noqa: E402
     get_market_agent, get_news_agent, get_portfolio_agent,
     get_rebalance_agent, get_research_agent, get_search_agent,
+    get_storychecker_agent,
 )
 get_portfolio_agent()
 get_market_agent()
 get_research_agent()
 get_news_agent()
 get_search_agent()
+get_storychecker_agent()
 get_rebalance_agent()
 
 @st.dialog("Disclaimer & Privacy Notice", width="large")
@@ -74,6 +76,7 @@ pg = st.navigation({
         st.Page("pages/research_chat.py",   title=t("nav.research_chat"),    icon=":material/search:"),
         st.Page("pages/news_chat.py",       title=t("nav.news_chat"),        icon=":material/newspaper:"),
         st.Page("pages/search_chat.py",     title=t("nav.search_chat"),      icon=":material/manage_search:"),
+        st.Page("pages/storychecker.py",    title=t("nav.storychecker"),     icon=":material/fact_check:"),
     ],
     t("nav.group_system"): [
         st.Page("pages/statistics.py",      title=t("nav.statistics"),       icon=":material/bar_chart:"),

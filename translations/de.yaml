@@ -34,6 +34,7 @@ nav:
   research_chat: "Research Chat"
   news_chat: "News Digest"
   search_chat: "Investment Search"
+  storychecker: "Story Checker"
   settings: "Einstellungen"
   group_portfolio: "Portfolio"
   group_assistant: "Assistent 🔒"
@@ -334,6 +335,26 @@ import_positions:
   lookup_apply: "Übernehmen"
   single_save: "Position speichern"
   single_saved: "Position gespeichert."
+
+storychecker:
+  title: "Story Checker"
+  subtitle: "Investment-Thesen gegen Anlage-Strategien prüfen"
+  cloud_notice: "Dieser Agent läuft in der Cloud ({model}). Nur Watchlist-Positionen werden gesendet – keine Kaufpreise oder Portfolio-Daten."
+  what_is_this: "Was ist der Story Checker?"
+  explanation: |
+    Der **Story Checker** bewertet deine Investment-Thesen systematisch. Hinterlege für eine Watchlist-Position eine *Story* (Positionen-Seite → Position auswählen → Detail-Dialog → Story-Feld), wähle dann eine Anlage-Strategie – und Claude prüft, ob deine These wirklich dazu passt.
+
+    **Ergebnis:** Ampel-Urteil (🟢 / 🟡 / 🔴) + strukturierte Analyse mit Stärken, Risiken und Strategie-Konsistenz.
+  pick_position: "Position wählen"
+  pick_strategy: "Anlage-Strategie"
+  show_story: "Hinterlegte Story anzeigen"
+  run_button: "Analyse starten"
+  thinking: "Analysiere These…"
+  no_stories: "Keine Watchlist-Positionen mit Story gefunden."
+  no_stories_hint: "Tipp: Positionen-Seite → Watchlist-Position → Detail-Dialog → Story-Feld ausfüllen."
+  result_caption: "Analyse für {name} · Strategie: {strategy}"
+  select_to_start: "Position und Strategie wählen, dann auf 'Analyse starten' klicken."
+  error: "Fehler bei der Analyse"
 
 positionen:
   title: "Positionen verwalten"

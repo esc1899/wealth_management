@@ -34,6 +34,7 @@ nav:
   research_chat: "Research Chat"
   news_chat: "News Digest"
   search_chat: "Investment Search"
+  storychecker: "Story Checker"
   settings: "Settings"
   group_portfolio: "Portfolio"
   group_assistant: "Assistant 🔒"
@@ -334,6 +335,26 @@ import_positions:
   lookup_apply: "Apply"
   single_save: "Save Position"
   single_saved: "Position saved."
+
+storychecker:
+  title: "Story Checker"
+  subtitle: "Validate investment theses against investment strategies"
+  cloud_notice: "This agent runs in the cloud ({model}). Only watchlist positions are sent — no purchase prices or portfolio data."
+  what_is_this: "What is the Story Checker?"
+  explanation: |
+    The **Story Checker** evaluates your investment theses systematically. Add a *Story* to a watchlist position (Positions page → select position → Detail dialog → Story field), then choose an investment strategy — Claude checks whether your thesis actually fits.
+
+    **Result:** Traffic light verdict (🟢 / 🟡 / 🔴) + structured analysis covering strengths, risks, and strategy consistency.
+  pick_position: "Select position"
+  pick_strategy: "Investment strategy"
+  show_story: "Show stored story"
+  run_button: "Run analysis"
+  thinking: "Analysing thesis…"
+  no_stories: "No watchlist positions with a story found."
+  no_stories_hint: "Tip: Positions page → select a watchlist position → Detail dialog → fill in the Story field."
+  result_caption: "Analysis for {name} · Strategy: {strategy}"
+  select_to_start: "Select a position and strategy, then click 'Run analysis'."
+  error: "Error during analysis"
 
 positionen:
   title: "Manage Positions"
