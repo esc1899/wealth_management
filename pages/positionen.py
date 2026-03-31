@@ -13,7 +13,7 @@ from core.asset_class_config import get_asset_class_registry
 from core.figi import RELEVANT_EXCH, openfigi_lookup, to_yahoo_ticker
 from core.i18n import t
 from core.storage.models import Position
-from state import get_app_config_repo, get_positions_repo
+from state import get_app_config_repo, get_positions_repo, get_skills_repo
 
 st.set_page_config(page_title="Positionen", page_icon="📋", layout="wide")
 st.title(f"📋 {t('positionen.title')}")
@@ -395,6 +395,19 @@ if _ss("_pos_show_form"):
             height=80,
         )
 
+        # Anlage-Idee selector — only visible when a story is being written
+        _sc_skills = get_skills_repo().get_by_area("storychecker")
+        _sc_skill_options = [""] + [s.name for s in _sc_skills]
+        _current_skill = (editing.story_skill or "") if editing else ""
+        _skill_idx = _sc_skill_options.index(_current_skill) if _current_skill in _sc_skill_options else 0
+        form_story_skill = st.selectbox(
+            t("positionen.story_skill_label"),
+            options=_sc_skill_options,
+            index=_skill_idx,
+            help=t("positionen.story_skill_help"),
+            disabled=not bool(form_story),
+        )
+
         # ── Festgeld extra fields ──────────────────────────────────────────────
         existing_extra = (editing.extra_data or {}) if editing else {}
         if selected_ac == "Festgeld":
@@ -477,6 +490,7 @@ if _ss("_pos_show_form"):
                 in_portfolio=in_portfolio,
                 empfehlung=form_empfehlung or None,
                 story=(form_story or "").strip() or None,
+                story_skill=form_story_skill or None,
                 added_date=editing.added_date if editing else date.today(),
             )
             if editing:

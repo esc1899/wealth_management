@@ -342,18 +342,26 @@ storychecker:
   cloud_notice: "Dieser Agent läuft in der Cloud ({model}). Nur Watchlist-Positionen werden gesendet – keine Kaufpreise oder Portfolio-Daten."
   what_is_this: "Was ist der Story Checker?"
   explanation: |
-    Der **Story Checker** bewertet deine Investment-Thesen systematisch. Hinterlege für eine Watchlist-Position eine *Story* (Positionen-Seite → Position auswählen → Detail-Dialog → Story-Feld), wähle dann eine Anlage-Strategie – und Claude prüft, ob deine These wirklich dazu passt.
+    Der **Story Checker** prüft ob deine Investment-Thesen noch aktuell sind. Hinterlege für eine Watchlist-Position eine *Story* (Positionen-Seite → Position bearbeiten → Story-Feld) und wähle dabei eine *Anlage-Idee* (z.B. "Megatrend-Play", "Qualitäts-Compounder"). Claude sucht dann aktuelle News und Daten zur Firma und bewertet: **Hält die These noch stand?**
 
-    **Ergebnis:** Ampel-Urteil (🟢 / 🟡 / 🔴) + strukturierte Analyse mit Stärken, Risiken und Strategie-Konsistenz.
+    **Ergebnis:** Ampel-Urteil (🟢 Intakt / 🟡 Gemischt / 🔴 Gefährdet) + Analyse mit Bestätigungen, Schwächepunkten und aktuellen Entwicklungen. Rückfragen per Chat möglich.
+  new_check: "Neuen Check starten"
+  past_checks: "Vergangene Checks"
+  no_checks: "Noch keine Checks."
   pick_position: "Position wählen"
-  pick_strategy: "Anlage-Strategie"
+  pick_skill: "Anlage-Idee"
   show_story: "Hinterlegte Story anzeigen"
-  run_button: "Analyse starten"
-  thinking: "Analysiere These…"
+  run_button: "Story Check starten"
+  thinking: "Suche nach aktuellen Infos und analysiere…"
+  thinking_followup: "Analysiere…"
   no_stories: "Keine Watchlist-Positionen mit Story gefunden."
-  no_stories_hint: "Tipp: Positionen-Seite → Watchlist-Position → Detail-Dialog → Story-Feld ausfüllen."
-  result_caption: "Analyse für {name} · Strategie: {strategy}"
-  select_to_start: "Position und Strategie wählen, dann auf 'Analyse starten' klicken."
+  no_stories_hint: "Tipp: Positionen-Seite → Watchlist-Position bearbeiten → Story-Feld ausfüllen."
+  no_skills: "Keine Story-Checker-Skills gefunden. Bitte in den Einstellungen hinzufügen."
+  skill_caption: "Anlage-Idee"
+  started_caption: "Gestartet"
+  chat_placeholder: "Rückfrage zur Analyse…"
+  select_to_start: "Links eine vergangene Analyse auswählen oder neuen Check starten."
+  session_not_found: "Session nicht gefunden."
   error: "Fehler bei der Analyse"
 
 positionen:
@@ -398,6 +406,8 @@ positionen:
   empfehlung: "Empfehlung"
   story_label: "Investment-These"
   story_placeholder: "Warum hältst du diese Position?"
+  story_skill_label: "Anlage-Idee"
+  story_skill_help: "Welche Art von Investment-Idee steckt hinter dieser Story? Der Story Checker nutzt das als Kontext."
   detail_title: "Positionsdetails"
   edit_button_detail: "Bearbeiten"
   update_value_header: "Schätzwert aktualisieren"

@@ -1,94 +1,75 @@
 """
-Story Checker Agent — validates investment theses against established strategies.
+Story Checker Agent — checks if an investment thesis is still intact.
 
 Cloud-only (ClaudeProvider). Watchlist positions only — no portfolio quantities
 or purchase prices are passed to the API.
 
-One-shot analysis: no sessions, no persistent history. Call analyze() directly.
+Uses Anthropic's built-in web search to find current news and data about the
+company, then evaluates whether the original investment thesis still holds.
+
+Persistent sessions: start_session() kicks off a new check, chat() allows
+follow-up questions within the same session.
 """
 
 from __future__ import annotations
 
 from core.llm.claude import ClaudeProvider
-from core.storage.models import Position
+from core.storage.models import Position, StorycheckerSession
+from core.storage.storychecker import StorycheckerRepository
 
 # ------------------------------------------------------------------
-# Strategy definitions
+# Tools
 # ------------------------------------------------------------------
 
-STRATEGIES: dict[str, str] = {
-    "Value Investing": (
-        "Graham/Buffett: Kaufe nur zu einem Preis deutlich unter dem inneren Wert "
-        "(Sicherheitsmarge). Verlässliche Gewinne, starke Bilanz, niedriges KGV/KBV, "
-        "stabile freie Cash Flows, robuste Geschäftsmodelle."
-    ),
-    "Growth": (
-        "Fokus auf überdurchschnittliches Umsatz- und Gewinnwachstum (>15 % p.a.). "
-        "Großer adressierbarer Markt (TAM), starkes Produkt, Skalierbarkeit, "
-        "Netzwerkeffekte, disruptives Potenzial."
-    ),
-    "Dividende": (
-        "Regelmäßige, steigende Dividendenausschüttung (Dividend Aristocrats). "
-        "Payout Ratio < 75 %, solide freie Cashflows, niedrige Verschuldung, "
-        "stabile Branche, langfristig verlässliche Ausschüttungen."
-    ),
-    "Momentum": (
-        "Starke relative Kursstärke gegenüber dem Markt (RS-Rating > 80, nahe 52-Wochen-Hoch). "
-        "Positiver Preistrend, Volumenbestätigung, kaum belastende Katalysatoren am Horizont, "
-        "breite institutionelle Nachfrage."
-    ),
-    "GARP": (
-        "Growth at a Reasonable Price: solides Wachstum kombiniert mit vernünftiger Bewertung. "
-        "PEG-Ratio < 1,5, KGV relativ zum Wachstum attraktiv, keine Überbewertung trotz "
-        "Wachstumsgeschichte."
-    ),
-    "ESG": (
-        "Umwelt- (E), Sozial- (S) und Governance- (G) Kriterien erfüllt. "
-        "Hohes Nachhaltigkeitsrating (z.B. MSCI ESG A/AA), keine Ausschlusskriterien "
-        "(Waffen, Tabak, Kohle, Glücksspiel), transparente Berichterstattung, "
-        "ambitionierte Klimaziele."
-    ),
-}
+# Server-side web search — Anthropic executes this, no client handling needed
+WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search"}
+
+MAX_TOOL_ITERATIONS = 8
 
 # ------------------------------------------------------------------
 # System prompt
 # ------------------------------------------------------------------
 
-BASE_SYSTEM_PROMPT = """Du bist ein kritischer Investment-Analyst der Investment-Thesen prüft.
+BASE_SYSTEM_PROMPT = """Du bist ein kritischer Investment-Analyst der prüft ob eine Investment-These noch intakt ist.
 
-Du erhältst eine Watchlist-Position (Name, Ticker, Asset-Klasse, ggf. aktuelle Empfehlung \
-und die hinterlegte Investment-These) sowie eine gewählte Anlage-Strategie. \
-Deine Aufgabe: prüfe ob die These konsistent mit der Strategie ist.
+Du erhältst:
+- Name und Ticker des Unternehmens
+- Die ursprüngliche Investment-These (Story) des Nutzers
+- Die verfolgte Anlage-Idee (z.B. "Megatrend-Play", "Qualitäts-Compounder")
+- Spezifische Prüfkriterien zur Anlage-Idee
 
-Antworte IMMER in exakt diesem Format (Markdown):
+Deine Aufgabe: Nutze web_search um aktuelle Informationen zur Firma zu finden
+(News, Quartalszahlen, Management-Aussagen, Wettbewerb). Beurteile dann ob die
+These noch hält — nicht ob sie theoretisch "gut" ist, sondern ob sie heute noch zutrifft.
 
-## Bewertung: {NAME} ({TICKER})
+Antworte auf die erste Anfrage IMMER in diesem Format:
 
-**Strategie:** {STRATEGIE} · **Urteil:** {AMPEL}
+## Story-Check: {NAME} ({TICKER})
+**Anlage-Idee:** {SKILL} · **Urteil:** {AMPEL}
 
 > {EIN-SATZ-FAZIT}
 
-### Stärken
+### Was bestätigt die These
 - ...
 
-### Risiken & Red Flags
+### Was schwächt die These
 - ...
 
-### Strategie-Konsistenz
-{2–3 Sätze: Passt die These zur Strategie? Warum / warum nicht? Konkrete Bezüge zur Strategie-Definition.}
+### Aktuelle Entwicklungen
+- ...
 
 ### Fazit
-{1–2 Sätze abschließendes Urteil mit konkreter Begründung.}
+{2–3 Sätze mit konkretem Urteil und Begründung.}
 
 ---
 
 Ampel-Regeln (genau eines wählen):
-- 🟢 **Passt** — These ist konsistent mit der Strategie, keine wesentlichen Widersprüche
-- 🟡 **Bedingt** — Teilweise passend, aber wichtige Aspekte fehlen oder widersprechen der Strategie
-- 🔴 **Passt nicht** — These widerspricht der Strategie fundamental oder enthält schwere Red Flags
+- 🟢 **Intakt** — These hält stand, keine wesentlichen Gegenargumente
+- 🟡 **Gemischt** — Teils bestätigt, teils geschwächt; Beobachtung empfohlen
+- 🔴 **Gefährdet** — Wesentliche Thesen-Aspekte sind nicht mehr gültig oder neue Risiken
 
-Sei kritisch und präzise. Keine unverbindlichen Relativierungen. Antworte ausschließlich auf Deutsch. \
-Maximal 400 Wörter."""
+Sei direkt und konkret. Keine Allgemeinplätze. Antworte auf Deutsch.
+Bei Rückfragen im Chat: kurz und präzise antworten, kein neues Ampel-Urteil."""
 
 
 # ------------------------------------------------------------------
@@ -98,24 +79,105 @@ Maximal 400 Wörter."""
 
 class StorycheckerAgent:
     """
-    Stateless cloud agent that checks an investment thesis against a strategy.
-    No DB sessions — results live in Streamlit session_state.
+    Cloud agent that checks whether an investment thesis is still valid.
+    Sessions are persisted in DB; supports multi-turn follow-up chat.
     """
 
-    def __init__(self, llm: ClaudeProvider) -> None:
+    def __init__(
+        self,
+        positions_repo,  # PositionsRepository — kept for future use
+        storychecker_repo: StorycheckerRepository,
+        llm: ClaudeProvider,
+    ) -> None:
+        self._positions = positions_repo
+        self._storychecker = storychecker_repo
         self._llm = llm
 
-    async def analyze(self, position: Position, strategy: str) -> str:
-        """Analyze position story against strategy. Returns formatted markdown."""
-        strategy_desc = STRATEGIES.get(strategy, strategy)
-        user_msg = _build_user_message(position, strategy, strategy_desc)
-        response = await self._llm.chat_with_tools(
-            messages=[{"role": "user", "content": user_msg}],
-            tools=[],
-            system=BASE_SYSTEM_PROMPT,
-            max_tokens=1024,
+    # ------------------------------------------------------------------
+    # Session management
+    # ------------------------------------------------------------------
+
+    def start_session(
+        self,
+        position: Position,
+        skill_name: str,
+        skill_prompt: str,
+    ) -> StorycheckerSession:
+        """Create a new session and run the initial story check."""
+        session = self._storychecker.create_session(
+            position_id=position.id,
+            ticker=position.ticker,
+            position_name=position.name,
+            skill_name=skill_name,
+            skill_prompt=skill_prompt,
         )
+        # Auto-send the initial analysis request
+        initial_msg = _build_initial_message(position, skill_name, skill_prompt)
+        self._storychecker.add_message(session.id, "user", initial_msg)
+        self._run_llm(session.id, [{"role": "user", "content": initial_msg}])
+        return session
+
+    def chat(self, session_id: int, user_message: str) -> str:
+        """Send a follow-up message and return the assistant reply."""
+        self._storychecker.add_message(session_id, "user", user_message)
+        api_messages = self._build_api_messages(session_id)
+        return self._run_llm(session_id, api_messages)
+
+    def get_session(self, session_id: int) -> StorycheckerSession | None:
+        return self._storychecker.get_session(session_id)
+
+    def list_sessions(self, limit: int = 50):
+        return self._storychecker.list_sessions(limit=limit)
+
+    def get_messages(self, session_id: int):
+        return self._storychecker.get_messages(session_id)
+
+    def delete_session(self, session_id: int) -> None:
+        self._storychecker.delete_session(session_id)
+
+    # ------------------------------------------------------------------
+    # Internal
+    # ------------------------------------------------------------------
+
+    def _run_llm(self, session_id: int, api_messages: list[dict]) -> str:
+        """Run the tool-calling loop and persist the final assistant response."""
+        import asyncio
+        return asyncio.get_event_loop().run_until_complete(
+            self._run_llm_async(session_id, api_messages)
+        )
+
+    async def _run_llm_async(self, session_id: int, api_messages: list[dict]) -> str:
+        messages = list(api_messages)
+        for _ in range(MAX_TOOL_ITERATIONS):
+            response = await self._llm.chat_with_tools(
+                messages=messages,
+                tools=[WEB_SEARCH_TOOL],
+                system=BASE_SYSTEM_PROMPT,
+                max_tokens=2048,
+            )
+            # Web search is server-side — no client tool calls to handle.
+            # Loop exits when there are no remaining tool calls (stop_reason != "tool_use")
+            # or when content is present and no client-side tools remain.
+            if response.stop_reason != "tool_use" or not response.tool_calls:
+                if response.content:
+                    self._storychecker.add_message(session_id, "assistant", response.content)
+                    return response.content
+                # Unexpected: no content — append raw blocks and continue
+                messages.append({"role": "assistant", "content": response.raw_blocks})
+            else:
+                # Client-side tool calls (none expected for web_search, but handle gracefully)
+                messages.append({"role": "assistant", "content": response.raw_blocks})
+        # Fallback: return whatever content we have
+        self._storychecker.add_message(session_id, "assistant", response.content)
         return response.content
+
+    def _build_api_messages(self, session_id: int) -> list[dict]:
+        db_messages = self._storychecker.get_messages(session_id)
+        return [
+            {"role": m.role, "content": m.content}
+            for m in db_messages
+            if m.role in ("user", "assistant")
+        ]
 
 
 # ------------------------------------------------------------------
@@ -123,21 +185,29 @@ class StorycheckerAgent:
 # ------------------------------------------------------------------
 
 
-def _build_user_message(position: Position, strategy: str, strategy_desc: str) -> str:
+def _build_initial_message(position: Position, skill_name: str, skill_prompt: str) -> str:
     ticker_str = f" ({position.ticker})" if position.ticker else ""
     lines = [
-        f"## Position: {position.name}{ticker_str}",
+        f"Bitte prüfe ob die folgende Investment-These noch intakt ist.",
+        f"",
+        f"**Unternehmen:** {position.name}{ticker_str}",
         f"**Asset-Klasse:** {position.asset_class}",
     ]
     if position.empfehlung:
         lines.append(f"**Aktuelle Empfehlung:** {position.empfehlung}")
-    if position.story:
-        lines.append(f"\n**Investment-These:**\n{position.story}")
-    else:
-        lines.append("\n**Investment-These:** (keine Story hinterlegt — prüfe bitte anhand des Namens und der Asset-Klasse)")
 
-    lines.append(f"\n---\n**Zu prüfende Strategie:** {strategy}")
-    lines.append(f"**Strategie-Beschreibung:** {strategy_desc}")
-    lines.append("\nBitte erstelle jetzt deine Bewertung im vorgegebenen Format.")
+    if position.story:
+        lines.append(f"")
+        lines.append(f"**Investment-These (Story):**")
+        lines.append(position.story)
+    else:
+        lines.append(f"")
+        lines.append(f"**Investment-These:** (keine Story hinterlegt — bitte allgemein für {position.name} prüfen)")
+
+    lines.append(f"")
+    lines.append(f"**Anlage-Idee:** {skill_name}")
+    lines.append(f"**Prüfkriterien:** {skill_prompt}")
+    lines.append(f"")
+    lines.append(f"Bitte suche aktuelle Informationen und erstelle deine Bewertung.")
 
     return "\n".join(lines)

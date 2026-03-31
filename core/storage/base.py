@@ -130,6 +130,23 @@ def init_db(conn: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL
         )""",
         "CREATE INDEX IF NOT EXISTS idx_search_messages_session ON search_messages(session_id)",
+        """CREATE TABLE IF NOT EXISTS storychecker_sessions (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            position_id   INTEGER NOT NULL,
+            ticker        TEXT,
+            position_name TEXT NOT NULL,
+            skill_name    TEXT NOT NULL,
+            skill_prompt  TEXT NOT NULL,
+            created_at    TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS storychecker_messages (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL REFERENCES storychecker_sessions(id),
+            role       TEXT NOT NULL,
+            content    TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_storychecker_messages_session ON storychecker_messages(session_id)",
         """CREATE TABLE IF NOT EXISTS news_runs (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             skill_name TEXT NOT NULL,
@@ -186,6 +203,8 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE positions ADD COLUMN empfehlung TEXT")
     if "story" not in existing_pos:
         conn.execute("ALTER TABLE positions ADD COLUMN story TEXT")
+    if "story_skill" not in existing_pos:
+        conn.execute("ALTER TABLE positions ADD COLUMN story_skill TEXT")
 
     existing_skills = {row[1] for row in conn.execute("PRAGMA table_info(skills)")}
     if "hidden" not in existing_skills:

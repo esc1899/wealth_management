@@ -16,6 +16,7 @@ from agents.rebalance_agent import RebalanceAgent
 from agents.research_agent import ResearchAgent
 from agents.search_agent import SearchAgent
 from agents.storychecker_agent import StorycheckerAgent
+from core.storage.storychecker import StorycheckerRepository
 from core.asset_class_config import get_asset_class_registry, AssetClassRegistry
 from core.llm.claude import ClaudeProvider
 from core.llm.local import OllamaProvider
@@ -204,10 +205,19 @@ def get_search_agent(claude_model: str = "") -> SearchAgent:
 
 
 @st.cache_resource
+def get_storychecker_repo() -> StorycheckerRepository:
+    return StorycheckerRepository(get_db_connection())
+
+
+@st.cache_resource
 def get_storychecker_agent(claude_model: str = "") -> StorycheckerAgent:
     model = claude_model or _DEFAULT_CLAUDE_MODEL
     llm = _make_claude_provider(model, "storychecker")
-    return StorycheckerAgent(llm=llm)
+    return StorycheckerAgent(
+        positions_repo=get_positions_repo(),
+        storychecker_repo=get_storychecker_repo(),
+        llm=llm,
+    )
 
 
 @st.cache_resource

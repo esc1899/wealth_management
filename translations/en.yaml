@@ -342,18 +342,26 @@ storychecker:
   cloud_notice: "This agent runs in the cloud ({model}). Only watchlist positions are sent — no purchase prices or portfolio data."
   what_is_this: "What is the Story Checker?"
   explanation: |
-    The **Story Checker** evaluates your investment theses systematically. Add a *Story* to a watchlist position (Positions page → select position → Detail dialog → Story field), then choose an investment strategy — Claude checks whether your thesis actually fits.
+    The **Story Checker** checks whether your investment theses are still valid. Add a *Story* to a watchlist position (Positions page → edit position → Story field) and select an *Investment Idea* (e.g. "Megatrend Play", "Quality Compounder"). Claude then searches for current news and data about the company and assesses: **Does the thesis still hold?**
 
-    **Result:** Traffic light verdict (🟢 / 🟡 / 🔴) + structured analysis covering strengths, risks, and strategy consistency.
+    **Result:** Traffic light verdict (🟢 Intact / 🟡 Mixed / 🔴 At Risk) + analysis with confirmations, weaknesses, and recent developments. Follow-up questions via chat.
+  new_check: "Start new check"
+  past_checks: "Past checks"
+  no_checks: "No checks yet."
   pick_position: "Select position"
-  pick_strategy: "Investment strategy"
+  pick_skill: "Investment idea"
   show_story: "Show stored story"
-  run_button: "Run analysis"
-  thinking: "Analysing thesis…"
+  run_button: "Start story check"
+  thinking: "Searching for current information and analysing…"
+  thinking_followup: "Analysing…"
   no_stories: "No watchlist positions with a story found."
-  no_stories_hint: "Tip: Positions page → select a watchlist position → Detail dialog → fill in the Story field."
-  result_caption: "Analysis for {name} · Strategy: {strategy}"
-  select_to_start: "Select a position and strategy, then click 'Run analysis'."
+  no_stories_hint: "Tip: Positions page → edit a watchlist position → fill in the Story field."
+  no_skills: "No Story Checker skills found. Please add them in Settings."
+  skill_caption: "Investment idea"
+  started_caption: "Started"
+  chat_placeholder: "Follow-up question…"
+  select_to_start: "Select a past analysis on the left or start a new check."
+  session_not_found: "Session not found."
   error: "Error during analysis"
 
 positionen:
@@ -397,6 +405,8 @@ positionen:
   lookup_apply: "Apply"
   empfehlung: "Recommendation"
   story_label: "Investment Thesis"
+  story_skill_label: "Investment Idea"
+  story_skill_help: "What type of investment idea is behind this story? The Story Checker uses this as context."
   story_placeholder: "Why do you hold this position?"
   detail_title: "Position Details"
   edit_button_detail: "Edit"

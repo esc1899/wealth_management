@@ -34,8 +34,8 @@ class PositionsRepository:
                 notes, extra_data,
                 recommendation_source, strategy,
                 added_date, in_portfolio,
-                empfehlung, story
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                empfehlung, story, story_skill
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             self._serialize(position),
         )
@@ -76,7 +76,7 @@ class PositionsRepository:
                 notes=?, extra_data=?,
                 recommendation_source=?, strategy=?,
                 added_date=?, in_portfolio=?,
-                empfehlung=?, story=?
+                empfehlung=?, story=?, story_skill=?
             WHERE id=?
             """,
             self._serialize(position) + (position.id,),
@@ -154,6 +154,7 @@ class PositionsRepository:
             1 if p.in_portfolio else 0,
             p.empfehlung,
             self._enc.encrypt(p.story) if p.story else None,
+            p.story_skill,
         )
 
     def _deserialize(self, row: sqlite3.Row) -> Position:
@@ -178,4 +179,5 @@ class PositionsRepository:
             in_portfolio=bool(row["in_portfolio"]),
             empfehlung=row["empfehlung"] if "empfehlung" in keys else None,
             story=self._enc.decrypt(row["story"]) if ("story" in keys and row["story"]) else None,
+            story_skill=row["story_skill"] if "story_skill" in keys else None,
         )

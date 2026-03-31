@@ -159,6 +159,60 @@ skills:
         - Themes: ESG, Technology, Emerging Markets, Global — as requested by the user
         Output: ranked list with ticker/ISIN, name, TER, 1y/3y/5y performance, AUM, theme match
 
+  # ── Story Checker ───────────────────────────────────────────────────────────
+  # Anlage-Ideen for the StorycheckerAgent (Cloud ☁️, Claude API + web search).
+  # These describe the investment thesis type — the Storychecker checks if it's
+  # still intact based on current news and data.
+
+  storychecker:
+    - name: "Megatrend-Play"
+      description: "Positionierung auf einen strukturellen Wachstumstrend (KI, Energie, etc.)"
+      prompt: |
+        Prüfe ob das Unternehmen noch gut auf den adressierten Megatrend positioniert ist.
+        Worauf du achten solltest: Wächst der adressierte Markt noch? Gibt es neue starke
+        Wettbewerber? Regulatorische Gegenwinds? Jüngste Produkt- oder Partnerschaftsankündigungen?
+        Liefert das Unternehmen konkret auf den Trend ein?
+
+    - name: "Qualitäts-Compounder"
+      description: "Hohe ROIC, Preissetzungsmacht, langfristig stabiles Wachstum"
+      prompt: |
+        Prüfe ob das Unternehmen weiterhin ein Qualitäts-Compounder ist.
+        Worauf du achten solltest: Aktuelle Margentrends (Expansion oder Kompression?),
+        Preissetzungsmacht (Preiserhöhungen möglich?), Veränderungen im Wettbewerb,
+        Management-Aussagen zur Profitabilität, ROIC-Entwicklung in jüngsten Quartalen.
+
+    - name: "Dividendenwachstum"
+      description: "Verlässlich steigende Dividende, solide Free Cash Flows"
+      prompt: |
+        Prüfe ob das Unternehmen seinen Dividendenwachstumspfad halten kann.
+        Worauf du achten solltest: Aktuelle Ausschüttungsquote vs. Free Cash Flow,
+        Verschuldungsentwicklung, jüngste Dividendenankündigungen oder -kürzungen,
+        Guidance zur Dividendenpolitik, Cashflow-Trends der letzten Quartale.
+
+    - name: "Turnaround / Recovery"
+      description: "Unternehmen in Restrukturierung — ist der Turnaround noch on track?"
+      prompt: |
+        Prüfe ob der Turnaround noch auf Kurs ist.
+        Worauf du achten solltest: Margenverbesserung in jüngsten Quartalen,
+        Fortschritt beim Schuldenabbau, Management-Execution vs. kommunizierten Zielen,
+        jüngste Quartalszahlen im Vergleich zu Erwartungen, operative Kennzahlen.
+
+    - name: "Marktführer / Moat"
+      description: "Struktureller Wettbewerbsvorteil und Marktführerschaft"
+      prompt: |
+        Prüfe ob der Wettbewerbsvorteil (Moat) noch intakt ist.
+        Worauf du achten solltest: Neue Wettbewerber oder Technologie-Disruptoren,
+        Marktanteilsveränderungen, Pricing Power (wird sie noch ausgeübt?),
+        Wechselkosten für Kunden, aktuelle News zur Wettbewerbssituation.
+
+    - name: "Generisch"
+      description: "Keine spezifische Anlage-Idee — allgemeine Thesis-Prüfung"
+      prompt: |
+        Prüfe die Investment-These allgemein auf Aktualität.
+        Suche nach aktuellen News, jüngsten Quartalszahlen, wesentlichen
+        Veränderungen beim Unternehmen (Management, Strategie, Markt) und
+        Analystenmeinungen. Hat sich seit Erstellen der These etwas Wesentliches geändert?
+
 # ── System Skills (hidden=true, injected silently into agents) ─────────────────
 # These skills are NOT shown in the UI. They carry internal rules for the LLM.
 # seed_system_skills() seeds these with hidden=1 on every startup (INSERT OR IGNORE).

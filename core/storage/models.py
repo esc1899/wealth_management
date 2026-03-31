@@ -167,6 +167,7 @@ class Position(BaseModel):
     # Analysis (empfehlung plain text; story encrypted at rest)
     empfehlung: Optional[str] = None
     story: Optional[str] = None
+    story_skill: Optional[str] = None  # Anlage-Idee label, plain text
 
     # State
     in_portfolio: bool = False
@@ -255,6 +256,32 @@ class SearchSession(BaseModel):
 
 class SearchMessage(BaseModel):
     """A single message in a search session."""
+
+    id: Optional[int] = None
+    session_id: int
+    role: str       # 'user' or 'assistant'
+    content: str
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Storychecker models
+# ---------------------------------------------------------------------------
+
+class StorycheckerSession(BaseModel):
+    """A story-check session for validating an investment thesis."""
+
+    id: Optional[int] = None
+    position_id: int
+    ticker: Optional[str] = None
+    position_name: str
+    skill_name: str
+    skill_prompt: str
+    created_at: datetime
+
+
+class StorycheckerMessage(BaseModel):
+    """A single message in a storychecker session."""
 
     id: Optional[int] = None
     session_id: int
