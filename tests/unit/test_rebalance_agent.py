@@ -3,14 +3,13 @@ Unit tests for RebalanceAgent.
 LLM and repositories are mocked — no external calls.
 """
 
-from datetime import date
+from datetime import date, datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from agents.rebalance_agent import RebalanceAgent
 from core.storage.models import Position, PriceRecord
-from datetime import datetime, timezone
 
 
 # ------------------------------------------------------------------
@@ -76,6 +75,20 @@ def mock_llm():
 
 
 @pytest.fixture
+def mock_repo():
+    repo = MagicMock()
+    session = MagicMock()
+    session.id = 1
+    session.skill_name = "Farmer Strategy"
+    session.skill_prompt = "Sow, harvest, prune."
+    session.portfolio_snapshot = ""
+    repo.create_session.return_value = session
+    repo.get_session.return_value = session
+    repo.get_messages.return_value = []
+    return repo
+
+
+@pytest.fixture
 def agent(mock_positions_repo, mock_market_repo, mock_llm):
     return RebalanceAgent(
         positions_repo=mock_positions_repo,
@@ -85,24 +98,28 @@ def agent(mock_positions_repo, mock_market_repo, mock_llm):
 
 
 # ------------------------------------------------------------------
-# analyze
+# start_session
 # ------------------------------------------------------------------
 
 class TestAnalyze:
     @pytest.mark.asyncio
-    async def test_returns_llm_response(self, agent, mock_llm):
-        result = await agent.analyze("Farmer Strategy", "Sow, harvest, prune.")
+    async def test_returns_llm_response(self, agent, mock_llm, mock_repo):
+        _, result = await agent.start_session("Farmer Strategy", "Sow, harvest, prune.", user_context="", repo=mock_repo)
         assert "AAPL" in result or "harvest" in result
 
     @pytest.mark.asyncio
-    async def test_empty_portfolio_returns_message(self, agent, mock_positions_repo):
+    async def test_empty_portfolio_returns_message(self, agent, mock_positions_repo, mock_llm, mock_repo):
         mock_positions_repo.get_portfolio.return_value = []
-        result = await agent.analyze("Farmer Strategy", "Analyze.")
-        assert "empty" in result.lower()
+        _, result = await agent.start_session("Farmer Strategy", "Analyze.", user_context="", repo=mock_repo)
+        # LLM still gets called; portfolio_snapshot says "Portfolio is empty."
+        call_args = mock_llm.chat.call_args
+        messages = call_args[0][0]
+        system_msg = next((m for m in messages if m.role.value == "system"), None)
+        assert "empty" in system_msg.content.lower()
 
     @pytest.mark.asyncio
-    async def test_calls_llm_with_portfolio_context(self, agent, mock_llm):
-        await agent.analyze("Farmer Strategy", "Sow, harvest, prune.")
+    async def test_calls_llm_with_portfolio_context(self, agent, mock_llm, mock_repo):
+        await agent.start_session("Farmer Strategy", "Sow, harvest, prune.", user_context="", repo=mock_repo)
         call_args = mock_llm.chat.call_args
         messages = call_args[0][0]
         all_content = " ".join(m.content for m in messages)
@@ -110,8 +127,8 @@ class TestAnalyze:
         assert "MSFT" in all_content
 
     @pytest.mark.asyncio
-    async def test_system_contains_skill_name(self, agent, mock_llm):
-        await agent.analyze("Farmer Strategy", "Sow, harvest, prune.")
+    async def test_system_contains_skill_name(self, agent, mock_llm, mock_repo):
+        await agent.start_session("Farmer Strategy", "Sow, harvest, prune.", user_context="", repo=mock_repo)
         call_args = mock_llm.chat.call_args
         messages = call_args[0][0]
         system_msg = next((m for m in messages if m.role.value == "system"), None)
@@ -119,27 +136,26 @@ class TestAnalyze:
         assert "Farmer Strategy" in system_msg.content
 
     @pytest.mark.asyncio
-    async def test_portfolio_context_includes_values(self, agent, mock_llm):
-        await agent.analyze("Farmer Strategy", "Analyze.")
+    async def test_portfolio_context_includes_values(self, agent, mock_llm, mock_repo):
+        await agent.start_session("Farmer Strategy", "Analyze.", user_context="", repo=mock_repo)
         call_args = mock_llm.chat.call_args
         messages = call_args[0][0]
-        user_msg = next((m for m in messages if m.role.value == "user"), None)
-        assert user_msg is not None
+        # Portfolio snapshot is in the system message
+        system_msg = next((m for m in messages if m.role.value == "system"), None)
         # 10 AAPL × €175 = €1,750
-        assert "1,750" in user_msg.content or "175" in user_msg.content
+        assert "1,750" in system_msg.content or "175" in system_msg.content
 
     @pytest.mark.asyncio
-    async def test_portfolio_context_includes_weights(self, agent, mock_llm):
+    async def test_portfolio_context_includes_weights(self, agent, mock_llm, mock_repo):
         """Total = 10*175 + 5*380 = 1750 + 1900 = 3650. AAPL = 47.9%, MSFT = 52.1%"""
-        await agent.analyze("Farmer Strategy", "Analyze.")
+        await agent.start_session("Farmer Strategy", "Analyze.", user_context="", repo=mock_repo)
         call_args = mock_llm.chat.call_args
         messages = call_args[0][0]
-        user_msg = next((m for m in messages if m.role.value == "user"), None)
-        # Should include percentage weights
-        assert "%" in user_msg.content
+        system_msg = next((m for m in messages if m.role.value == "system"), None)
+        assert "%" in system_msg.content
 
     @pytest.mark.asyncio
-    async def test_positions_without_price_handled_gracefully(self, agent, mock_market_repo, mock_llm):
-        mock_market_repo.get_price.return_value = None  # no prices
-        result = await agent.analyze("Farmer Strategy", "Analyze.")
+    async def test_positions_without_price_handled_gracefully(self, agent, mock_market_repo, mock_llm, mock_repo):
+        mock_market_repo.get_price.return_value = None
+        _, result = await agent.start_session("Farmer Strategy", "Analyze.", user_context="", repo=mock_repo)
         assert result  # should not raise

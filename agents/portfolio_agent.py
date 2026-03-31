@@ -49,7 +49,11 @@ Non-watchlist asset classes (Festgeld, Bargeld, Anleihe, Immobilie, Grundstück)
 - Always add these as portfolio positions (in_portfolio=True), never as watchlist entries
 - ticker is not required for these types
 
-If purchase price is not stated, omit it.
+Before calling add_portfolio_entry or add_to_watchlist, verify you have all key data:
+- For auto-fetch types: ticker is required — ask the user if unknown
+- Purchase price and date: if not stated, ask once before saving ("Kaufpreis und -datum fehlen — soll ich die Position trotzdem ohne diese Angaben anlegen?")
+- Only skip asking if the user explicitly says to add without that data
+
 For company names you don't know, use the ticker as the name."""
 
 TOOLS: list[dict] = [

@@ -230,9 +230,12 @@ def _compute_quantity(price_eur: float, unit: str, ticker: str) -> float:
         qty = TARGET_EUR / price_eur
         return float(round(qty))  # whole oz
     else:
-        # Stück (stocks, ETFs) — whole numbers
+        # Stück (stocks, ETFs, crypto) — whole numbers; fractional if price too high
         qty = TARGET_EUR / price_eur
-        return float(round(qty))
+        rounded = round(qty)
+        if rounded == 0:
+            return round(qty, 4)  # e.g. Bitcoin: 0.314 BTC
+        return float(rounded)
 
 
 def _purchase_price_per_unit(price_eur: float, unit: str) -> float:
