@@ -54,28 +54,34 @@ def agent():
 
 class TestFetchAllNow:
     def test_empty_portfolio_returns_zero_fetched(self, agent):
-        agent._positions.get_tickers_for_price_fetch.return_value = []
+        agent._positions.get_portfolio.return_value = []
+        agent._positions.get_watchlist.return_value = []
         result = agent.fetch_all_now()
         assert result.fetched == 0
         agent._fetcher.fetch_current_prices.assert_not_called()
 
     def test_collects_symbols_from_portfolio(self, agent):
-        agent._positions.get_tickers_for_price_fetch.return_value = ["AAPL", "MSFT"]
+        agent._positions.get_portfolio.return_value = [
+            _make_position("AAPL"), _make_position("MSFT"),
+        ]
+        agent._positions.get_watchlist.return_value = []
         agent._fetcher.fetch_current_prices.return_value = ([], [])
         agent.fetch_all_now()
         called_symbols = agent._fetcher.fetch_current_prices.call_args[0][0]
         assert set(called_symbols) == {"AAPL", "MSFT"}
 
     def test_deduplicates_symbols(self, agent):
-        # get_tickers_for_price_fetch already deduplicates
-        agent._positions.get_tickers_for_price_fetch.return_value = ["AAPL"]
+        # Same ticker in portfolio and watchlist → deduplicated
+        agent._positions.get_portfolio.return_value = [_make_position("AAPL")]
+        agent._positions.get_watchlist.return_value = [_make_position("AAPL")]
         agent._fetcher.fetch_current_prices.return_value = ([], [])
         agent.fetch_all_now()
         called_symbols = agent._fetcher.fetch_current_prices.call_args[0][0]
         assert called_symbols.count("AAPL") == 1
 
     def test_stores_fetched_prices(self, agent):
-        agent._positions.get_tickers_for_price_fetch.return_value = ["AAPL"]
+        agent._positions.get_portfolio.return_value = [_make_position("AAPL")]
+        agent._positions.get_watchlist.return_value = []
         record = _make_price_record("AAPL")
         agent._fetcher.fetch_current_prices.return_value = ([record], [])
         result = agent.fetch_all_now()
@@ -83,24 +89,42 @@ class TestFetchAllNow:
         assert result.fetched == 1
 
     def test_failed_symbols_in_result(self, agent):
-        agent._positions.get_tickers_for_price_fetch.return_value = ["AAPL"]
+        agent._positions.get_portfolio.return_value = [_make_position("AAPL")]
+        agent._positions.get_watchlist.return_value = []
         agent._fetcher.fetch_current_prices.return_value = ([], ["AAPL"])
         result = agent.fetch_all_now()
         assert "AAPL" in result.failed
         assert result.fetched == 0
 
     def test_fetch_history_when_requested(self, agent):
-        agent._positions.get_tickers_for_price_fetch.return_value = ["AAPL"]
+        agent._positions.get_portfolio.return_value = [_make_position("AAPL")]
+        agent._positions.get_watchlist.return_value = []
         agent._fetcher.fetch_current_prices.return_value = ([], [])
         agent._fetcher.fetch_historical.return_value = []
         agent.fetch_all_now(fetch_history=True)
         agent._fetcher.fetch_historical.assert_called_once_with("AAPL", period="1y")
 
     def test_no_history_fetch_by_default(self, agent):
-        agent._positions.get_tickers_for_price_fetch.return_value = ["AAPL"]
+        agent._positions.get_portfolio.return_value = [_make_position("AAPL")]
+        agent._positions.get_watchlist.return_value = []
         agent._fetcher.fetch_current_prices.return_value = ([], [])
         agent.fetch_all_now(fetch_history=False)
         agent._fetcher.fetch_historical.assert_not_called()
+
+    def test_manual_types_excluded_from_fetch(self, agent):
+        """Positions with auto_fetch=False (Immobilie, Festgeld) must not be fetched."""
+        immobilie = Position(
+            id=2, ticker=None, name="Wohnung",
+            asset_class="Immobilie", investment_type="Immobilien",
+            quantity=1.0, unit="Stück",
+            purchase_price=300000.0, purchase_date=date(2020, 1, 1),
+            added_date=date(2020, 1, 1), in_portfolio=True,
+        )
+        agent._positions.get_portfolio.return_value = [immobilie]
+        agent._positions.get_watchlist.return_value = []
+        result = agent.fetch_all_now()
+        agent._fetcher.fetch_current_prices.assert_not_called()
+        assert result.fetched == 0
 
 
 class TestGetPortfolioValuation:

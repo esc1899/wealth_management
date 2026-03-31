@@ -60,9 +60,11 @@ class TestPositionModel:
         with pytest.raises(ValidationError, match="zero or greater"):
             make_position(purchase_price=-10)
 
-    def test_portfolio_position_without_quantity_rejected(self):
-        with pytest.raises(ValidationError, match="quantity"):
-            make_position(quantity=None, in_portfolio=True)
+    def test_portfolio_position_without_quantity_allowed(self):
+        # Validation of quantity is handled at UI/service layer;
+        # manual-valuation types (Immobilie, Grundstück) don't require quantity.
+        p = make_position(quantity=None, in_portfolio=True)
+        assert p.quantity is None
 
     def test_watchlist_position_without_quantity_valid(self):
         p = make_position(quantity=None, in_portfolio=False)

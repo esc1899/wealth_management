@@ -1,5 +1,5 @@
 """
-Settings — manage and AI-generate skills.
+Settings — manage and AI-generate skills, model selection, empfehlung labels.
 """
 
 import asyncio
@@ -8,11 +8,11 @@ import streamlit as st
 
 from config import config
 from core.health import Severity, check_ollama_connectivity, run_static_checks
-from core.i18n import t
+from core.i18n import SUPPORTED_LANGUAGES, current_language, set_language, t
 from core.llm.local import OllamaProvider
 from core.llm.base import Message, Role
 from core.storage.models import Skill
-from state import get_skills_repo
+from state import get_app_config_repo, get_skills_repo
 
 st.set_page_config(page_title="Einstellungen", page_icon="⚙️", layout="wide")
 st.title(t("settings.title"))
@@ -220,3 +220,117 @@ if "gen_result" in st.session_state and st.session_state["gen_result"]:
                 st.rerun()
             except Exception as exc:
                 st.error(f"{t('settings.save_error')}: {exc}")
+
+st.divider()
+
+# ------------------------------------------------------------------
+# Section: Language selection
+# ------------------------------------------------------------------
+
+st.subheader(t("settings.language_label"))
+
+lang_options = list(SUPPORTED_LANGUAGES.keys())
+lang_labels = list(SUPPORTED_LANGUAGES.values())
+current_lang = current_language()
+lang_idx = lang_options.index(current_lang) if current_lang in lang_options else 0
+
+chosen_lang = st.radio(
+    t("settings.language_label"),
+    options=lang_options,
+    format_func=lambda k: SUPPORTED_LANGUAGES[k],
+    index=lang_idx,
+    horizontal=True,
+    label_visibility="collapsed",
+)
+if chosen_lang != current_lang:
+    set_language(chosen_lang)
+    st.rerun()
+
+st.divider()
+
+# ------------------------------------------------------------------
+# Section: Model selection
+# ------------------------------------------------------------------
+
+app_config = get_app_config_repo()
+
+st.subheader(t("settings.model_selection_header"))
+
+_CLAUDE_MODELS = [
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
+    "claude-opus-4-6",
+]
+
+# Fetch available Ollama models
+import requests as _requests
+
+def _get_ollama_model_list() -> list[str]:
+    try:
+        url = f"{config.OLLAMA_HOST.rstrip('/')}/api/tags"
+        resp = _requests.get(url, timeout=3)
+        if resp.status_code == 200:
+            data = resp.json()
+            return [m["name"] for m in data.get("models", [])]
+    except Exception:
+        pass
+    return []
+
+_ollama_models = _get_ollama_model_list()
+_saved_ollama = app_config.get("model_ollama") or config.OLLAMA_MODEL
+_saved_claude = app_config.get("model_claude") or "claude-haiku-4-5-20251001"
+
+if not _ollama_models:
+    st.caption(t("settings.ollama_unavailable"))
+    _ollama_models = [_saved_ollama] if _saved_ollama else [config.OLLAMA_MODEL]
+
+_ollama_idx = _ollama_models.index(_saved_ollama) if _saved_ollama in _ollama_models else 0
+_claude_idx = _CLAUDE_MODELS.index(_saved_claude) if _saved_claude in _CLAUDE_MODELS else 0
+
+col_m1, col_m2 = st.columns(2)
+with col_m1:
+    sel_ollama = st.selectbox(
+        t("settings.ollama_model_label"),
+        options=_ollama_models,
+        index=_ollama_idx,
+        key="_settings_ollama_model",
+    )
+with col_m2:
+    sel_claude = st.selectbox(
+        t("settings.claude_model_label"),
+        options=_CLAUDE_MODELS,
+        index=_claude_idx,
+        key="_settings_claude_model",
+    )
+
+if st.button(t("settings.save_models_button"), key="_save_models_btn"):
+    app_config.set("model_ollama", sel_ollama)
+    app_config.set("model_claude", sel_claude)
+    st.success(t("settings.models_saved"))
+
+st.divider()
+
+# ------------------------------------------------------------------
+# Section: Empfehlung labels
+# ------------------------------------------------------------------
+
+st.subheader(t("settings.empfehlung_labels_header"))
+
+_DEFAULT_EMPFEHLUNG = ["Kaufen", "Halten", "Verkaufen", "Beobachten"]
+_current_labels: list[str] = app_config.get_json("empfehlung_labels", _DEFAULT_EMPFEHLUNG)
+
+labels_text = st.text_area(
+    t("settings.empfehlung_labels_label"),
+    value="\n".join(_current_labels),
+    height=130,
+    help=t("settings.empfehlung_labels_help"),
+    key="_settings_empf_labels",
+)
+
+if st.button(t("settings.save_labels_button"), key="_save_labels_btn"):
+    parsed = [l.strip() for l in labels_text.splitlines() if l.strip()]
+    if not parsed:
+        st.error(t("settings.labels_empty_error"))
+    else:
+        app_config.set_json("empfehlung_labels", parsed)
+        st.success(t("settings.labels_saved"))

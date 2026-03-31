@@ -31,6 +31,10 @@ class AssetClassConfig(BaseModel):
     visible_fields: List[str]
     price_source: str
     requires_ticker: bool = True
+    auto_fetch: bool = True
+    watchlist_eligible: bool = True
+    manual_valuation: bool = False
+    extra_fields: List[str] = []
 
     @field_validator("visible_fields")
     @classmethod
@@ -77,6 +81,18 @@ class AssetClassRegistry:
             name for name, cfg in self._classes.items()
             if cfg.investment_type == investment_type
         ]
+
+    def watchlist_eligible_names(self) -> List[str]:
+        """Asset class names that can appear on the watchlist."""
+        return [n for n, cfg in self._classes.items() if cfg.watchlist_eligible]
+
+    def auto_fetch_names(self) -> List[str]:
+        """Asset class names whose prices are fetched automatically via yfinance."""
+        return [n for n, cfg in self._classes.items() if cfg.auto_fetch]
+
+    def manual_valuation_names(self) -> List[str]:
+        """Asset class names that require manual valuation (Immobilie, Grundstück)."""
+        return [n for n, cfg in self._classes.items() if cfg.manual_valuation]
 
 
 def load_asset_classes(path: str = _DEFAULT_CONFIG_PATH) -> AssetClassRegistry:

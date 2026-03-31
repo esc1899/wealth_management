@@ -12,7 +12,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from agents.market_data_fetcher import MarketDataFetcher
-from core.storage.base import build_encryption_service, get_connection, init_db
+from core.asset_class_config import get_asset_class_registry
+from core.storage.base import build_encryption_service, get_connection, init_db, migrate_db
 from core.storage.market_data import MarketDataRepository
 from core.storage.positions import PositionsRepository
 
@@ -35,7 +36,7 @@ class PortfolioValuation:
     name: str
     asset_class: str
     investment_type: str
-    quantity: float
+    quantity: Optional[float]
     unit: str
     purchase_price_eur: Optional[float]
     current_price_eur: Optional[float]
@@ -68,7 +69,18 @@ class MarketDataAgent:
 
     def fetch_all_now(self, fetch_history: bool = False) -> FetchResult:
         result = FetchResult()
-        symbols = self._positions.get_tickers_for_price_fetch()
+
+        # Only fetch prices for asset classes with auto_fetch=True
+        registry = get_asset_class_registry()
+        auto_fetch_classes = set(registry.auto_fetch_names())
+
+        all_positions = self._positions.get_portfolio() + self._positions.get_watchlist()
+        symbols = list({
+            p.ticker.upper()
+            for p in all_positions
+            if p.ticker and p.asset_class in auto_fetch_classes
+        })
+
         if not symbols:
             return result
 
@@ -99,9 +111,66 @@ class MarketDataAgent:
             positions = positions + self._positions.get_watchlist()
         valuations = []
 
+        registry = get_asset_class_registry()
+
         for pos in positions:
+            cfg = registry.get(pos.asset_class)
+            is_auto_fetch = cfg.auto_fetch if cfg else True
+
+            if not is_auto_fetch:
+                # Manual valuation: use estimated_value from extra_data, or cost basis
+                extra = pos.extra_data or {}
+                est_val = extra.get("estimated_value")
+
+                if est_val is not None:
+                    current_value = float(est_val)
+                    current_price = (current_value / pos.quantity) if pos.quantity else current_value
+                elif pos.purchase_price is not None and pos.quantity is not None:
+                    current_value = pos.purchase_price * pos.quantity
+                    current_price = pos.purchase_price
+                elif pos.purchase_price is not None:
+                    current_value = pos.purchase_price
+                    current_price = pos.purchase_price
+                else:
+                    current_value = None
+                    current_price = None
+
+                cost_basis = (
+                    pos.purchase_price * pos.quantity
+                    if pos.purchase_price is not None and pos.quantity is not None
+                    else pos.purchase_price
+                )
+                pnl_eur = (
+                    (current_value - cost_basis)
+                    if current_value is not None and cost_basis is not None
+                    else None
+                )
+                pnl_pct = (
+                    (pnl_eur / cost_basis * 100)
+                    if pnl_eur is not None and cost_basis is not None and cost_basis > 0
+                    else None
+                )
+
+                valuations.append(PortfolioValuation(
+                    symbol=pos.ticker or pos.name[:10],
+                    name=pos.name,
+                    asset_class=pos.asset_class,
+                    investment_type=pos.investment_type,
+                    quantity=pos.quantity,
+                    unit=pos.unit,
+                    purchase_price_eur=pos.purchase_price,
+                    current_price_eur=current_price,
+                    current_value_eur=current_value,
+                    cost_basis_eur=cost_basis,
+                    pnl_eur=pnl_eur,
+                    pnl_pct=pnl_pct,
+                    fetched_at=None,
+                    in_portfolio=pos.in_portfolio,
+                ))
+                continue
+
             if not pos.ticker:
-                continue  # skip positions pending ticker resolution
+                continue  # skip auto-fetch positions pending ticker resolution
 
             price_record = self._market.get_price(pos.ticker)
             current_price = price_record.price_eur if price_record else None
@@ -160,6 +229,7 @@ class MarketDataAgent:
     def _scheduled_fetch(self) -> None:
         conn = get_connection(self._db_path)
         init_db(conn)
+        migrate_db(conn)
         enc = build_encryption_service(self._encryption_key, "data/salt.bin")
         market_repo = MarketDataRepository(conn)
         positions_repo = PositionsRepository(conn, enc)

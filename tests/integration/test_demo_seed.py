@@ -3,7 +3,7 @@ Integration tests for the demo database seeder.
 
 - Runs the seeder against an in-memory SQLite DB (no file I/O).
 - Mocks yfinance so no real network calls are made.
-- Verifies all 17 positions are inserted with positive quantities and prices.
+- Verifies all 20 positions are inserted with positive quantities and prices.
 - Verifies values are stored as plain strings (no encryption).
 """
 
@@ -50,6 +50,7 @@ MOCK_PRICES: dict[str, float] = {
     "REET":    25.0,
     "GC=F":  1850.0,
     "SI=F":    24.0,
+    "BTC-USD": 35000.0,
     # FX pairs
     "EURUSD=X": 1.10,
     "GBPUSD=X": 1.28,
@@ -112,7 +113,7 @@ class TestDemoSeed:
         from scripts.seed_demo import seed
         inserted = seed(conn=in_memory_conn)
 
-        assert len(inserted) == 17, f"Expected 17 positions, got {len(inserted)}"
+        assert len(inserted) == 20, f"Expected 20 positions, got {len(inserted)}"
 
     @patch("yfinance.download", side_effect=_mock_download)
     @patch("yfinance.Ticker")
@@ -164,7 +165,7 @@ class TestDemoSeed:
             "SELECT quantity, purchase_price FROM positions WHERE in_portfolio=1"
         ).fetchall()
 
-        assert len(rows) == 17
+        assert len(rows) == 20
 
         for row in rows:
             # Plain float strings must be directly parseable — Fernet tokens would fail
@@ -187,7 +188,12 @@ class TestDemoSeed:
         from scripts.seed_demo import seed
         inserted = seed(conn=in_memory_conn)
 
+        # Exclude manual positions (Festgeld, Immobilie) which have a fixed purchase value,
+        # not the ~€10k target used for auto-fetch positions.
+        _manual_names = {"Festgeld DKB 3J", "Eigentumswohnung München"}
         for pos in inserted:
+            if pos["name"] in _manual_names:
+                continue
             total = pos["quantity"] * pos["purchase_price"]
             # Allow wider tolerance due to whole-number rounding (high-price stocks can deviate more)
             assert 8_000 <= total <= 12_000, (

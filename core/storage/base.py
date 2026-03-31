@@ -58,7 +58,9 @@ def init_db(conn: sqlite3.Connection) -> None:
             recommendation_source TEXT,
             strategy              TEXT,
             added_date            TEXT NOT NULL,
-            in_portfolio          INTEGER NOT NULL DEFAULT 0
+            in_portfolio          INTEGER NOT NULL DEFAULT 0,
+            empfehlung            TEXT,
+            story                 TEXT
         )""",
         "CREATE INDEX IF NOT EXISTS idx_positions_ticker ON positions(ticker)",
         "CREATE INDEX IF NOT EXISTS idx_positions_in_portfolio ON positions(in_portfolio)",
@@ -108,6 +110,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             description TEXT,
             prompt      TEXT NOT NULL,
             created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            hidden      INTEGER NOT NULL DEFAULT 0,
             UNIQUE(name, area)
         )"""
     )
@@ -167,8 +170,28 @@ def init_db(conn: sqlite3.Connection) -> None:
         )""",
         "CREATE INDEX IF NOT EXISTS idx_llm_usage_agent ON llm_usage(agent)",
         "CREATE INDEX IF NOT EXISTS idx_llm_usage_created ON llm_usage(created_at)",
+        """CREATE TABLE IF NOT EXISTS app_config (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )""",
     ]:
         conn.execute(stmt)
+    conn.commit()
+
+
+def migrate_db(conn: sqlite3.Connection) -> None:
+    """Apply schema migrations for columns/tables added after initial release."""
+    existing_pos = {row[1] for row in conn.execute("PRAGMA table_info(positions)")}
+    if "empfehlung" not in existing_pos:
+        conn.execute("ALTER TABLE positions ADD COLUMN empfehlung TEXT")
+    if "story" not in existing_pos:
+        conn.execute("ALTER TABLE positions ADD COLUMN story TEXT")
+
+    existing_skills = {row[1] for row in conn.execute("PRAGMA table_info(skills)")}
+    if "hidden" not in existing_skills:
+        conn.execute(
+            "ALTER TABLE skills ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0"
+        )
     conn.commit()
 
 

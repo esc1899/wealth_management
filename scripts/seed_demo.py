@@ -27,16 +27,16 @@ import yfinance as yf
 
 DEMO_POSITIONS = [
     # Stocks — asset_class="Aktie", investment_type="Wertpapiere", unit="Stück"
-    dict(name="Apple",         ticker="AAPL",    asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2020-03-16"),
-    dict(name="Microsoft",     ticker="MSFT",    asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2019-08-12"),
+    dict(name="Apple",         ticker="AAPL",    asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2020-03-16", empfehlung="Halten"),
+    dict(name="Microsoft",     ticker="MSFT",    asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2019-08-12", empfehlung="Kaufen",  story="Cloud-Dominanz mit Azure, starkes Wachstum im KI-Bereich."),
     dict(name="Amazon",        ticker="AMZN",    asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2021-04-01"),
     dict(name="Nestlé",        ticker="NESN.SW", asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2020-06-15"),
-    dict(name="ASML",          ticker="ASML",    asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2021-09-01"),
+    dict(name="ASML",          ticker="ASML",    asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2021-09-01", empfehlung="Kaufen",  story="Monopolstellung bei EUV-Lithographie — unverzichtbar für die globale Chipproduktion."),
     dict(name="Siemens",       ticker="SIE.DE",  asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2022-01-10"),
     dict(name="Toyota",        ticker="TM",      asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2020-11-02"),
-    dict(name="TSMC",          ticker="TSM",     asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2021-07-15"),
+    dict(name="TSMC",          ticker="TSM",     asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2021-07-15", empfehlung="Halten"),
     dict(name="Novo Nordisk",  ticker="NVO",     asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2022-05-02"),
-    dict(name="Alibaba",       ticker="BABA",    asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2020-09-01"),
+    dict(name="Alibaba",       ticker="BABA",    asset_class="Aktie",        investment_type="Wertpapiere", unit="Stück",    purchase_date="2020-09-01", empfehlung="Beobachten"),
     # ETFs / Funds
     dict(name="iShares Core MSCI World",        ticker="IWDA.AS", asset_class="Aktienfonds",    investment_type="Wertpapiere", unit="Stück", purchase_date="2020-05-04"),
     dict(name="Vanguard FTSE All-World",        ticker="VWRL.AS", asset_class="Aktienfonds",    investment_type="Wertpapiere", unit="Stück", purchase_date="2021-03-15"),
@@ -46,6 +46,18 @@ DEMO_POSITIONS = [
     dict(name="Gold (Unzen)",  ticker="GC=F", asset_class="Edelmetall", investment_type="Edelmetalle", unit="Troy Oz", purchase_date="2021-01-04"),
     dict(name="Gold (Gramm)",  ticker="GC=F", asset_class="Edelmetall", investment_type="Edelmetalle", unit="g",       purchase_date="2020-07-20"),
     dict(name="Silber (Gramm)",ticker="SI=F", asset_class="Edelmetall", investment_type="Edelmetalle", unit="g",       purchase_date="2022-02-14"),
+    # Crypto
+    dict(name="Bitcoin",       ticker="BTC-USD", asset_class="Kryptowährung", investment_type="Krypto", unit="Stück", purchase_date="2021-01-04", empfehlung="Halten", story="Digitales Gold — langfristiger Wertspeicher als Beimischung."),
+    # Fixed deposit (no ticker, no yfinance)
+    dict(name="Festgeld DKB 3J", ticker=None, asset_class="Festgeld", investment_type="Geld", unit="Stück",
+         purchase_date="2023-03-01", quantity=10000.0, purchase_price=10000.0,
+         extra_data={"interest_rate": 3.5, "maturity_date": "2026-03-01", "bank": "DKB"},
+         notes="3 Jahre Laufzeit, 3,5 % p.a."),
+    # Real estate (no ticker, manual valuation)
+    dict(name="Eigentumswohnung München", ticker=None, asset_class="Immobilie", investment_type="Immobilien", unit="Stück",
+         purchase_date="2018-06-15", quantity=1.0, purchase_price=320000.0,
+         extra_data={"estimated_value": 410000.0, "valuation_date": "2024-11-01"},
+         notes="3-Zimmer-Wohnung, 75 qm, Maxvorstadt"),
 ]
 
 # Fallback prices in USD if yfinance fails (approximate historical prices)
@@ -66,6 +78,7 @@ FALLBACK_PRICES_USD: dict[str, float] = {
     "REET":    25.0,
     "GC=F":  1850.0,
     "SI=F":    24.0,
+    "BTC-USD": 35000.0,
 }
 
 TROY_OZ_TO_GRAM = 31.1035
@@ -253,7 +266,13 @@ def _init_db(conn: sqlite3.Connection) -> None:
             recommendation_source TEXT,
             strategy              TEXT,
             added_date            TEXT NOT NULL,
-            in_portfolio          INTEGER NOT NULL DEFAULT 0
+            in_portfolio          INTEGER NOT NULL DEFAULT 0,
+            empfehlung            TEXT,
+            story                 TEXT
+        )""",
+        """CREATE TABLE IF NOT EXISTS app_config (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
         )""",
         "CREATE INDEX IF NOT EXISTS idx_positions_ticker ON positions(ticker)",
         "CREATE INDEX IF NOT EXISTS idx_positions_in_portfolio ON positions(in_portfolio)",
@@ -352,27 +371,45 @@ def seed(db_path: str = "data/demo.db", conn: Optional[sqlite3.Connection] = Non
     inserted: list[dict] = []
     today = date.today().isoformat()
 
+    import json as _json
+
     for pos in DEMO_POSITIONS:
-        ticker = pos["ticker"]
+        ticker = pos.get("ticker")
         name   = pos["name"]
         unit   = pos["unit"]
         purchase_date = pos["purchase_date"]
+        empfehlung = pos.get("empfehlung")
+        story = pos.get("story")
+        extra_data_raw = pos.get("extra_data")
 
-        print(f"  Seeding {name} ({ticker}, {purchase_date}) ...", end=" ", flush=True)
+        print(f"  Seeding {name} ({ticker or 'no-ticker'}, {purchase_date}) ...", end=" ", flush=True)
 
-        # --- fetch historical price ---
-        price_native = _fetch_price_on_date(ticker, purchase_date)
-        used_fallback = False
-        if price_native is None:
-            price_native = FALLBACK_PRICES_USD.get(ticker, 100.0)
-            used_fallback = True
-            print(f"[fallback {price_native}]", end=" ", flush=True)
+        # Manual positions: quantity and price provided directly
+        if ticker is None or pos.get("quantity") is not None:
+            quantity = pos.get("quantity", 1.0)
+            purchase_price = pos.get("purchase_price", 0.0)
+            price_eur = purchase_price
+            used_fallback = False
+            print(f"manual qty={quantity} @ €{purchase_price:.2f}")
+        else:
+            # --- fetch historical price ---
+            price_native = _fetch_price_on_date(ticker, purchase_date)
+            used_fallback = False
+            if price_native is None:
+                price_native = FALLBACK_PRICES_USD.get(ticker, 100.0)
+                used_fallback = True
+                print(f"[fallback {price_native}]", end=" ", flush=True)
 
-        currency = _detect_currency(ticker)
-        price_eur = _price_to_eur(price_native, currency, purchase_date)
+            currency = _detect_currency(ticker)
+            price_eur = _price_to_eur(price_native, currency, purchase_date)
 
-        quantity = _compute_quantity(price_eur, unit, ticker)
-        purchase_price = _purchase_price_per_unit(price_eur, unit)
+            quantity = _compute_quantity(price_eur, unit, ticker)
+            purchase_price = _purchase_price_per_unit(price_eur, unit)
+            approx_value = quantity * purchase_price
+            print(f"qty={quantity} @ €{purchase_price:.4f} ≈ €{approx_value:,.0f}")
+
+        extra_data_str = _json.dumps(extra_data_raw) if extra_data_raw else None
+        notes = pos.get("notes")
 
         # Store values as plain strings (no encryption in demo mode)
         conn.execute(
@@ -383,26 +420,29 @@ def seed(db_path: str = "data/demo.db", conn: Optional[sqlite3.Connection] = Non
                 quantity, unit, purchase_price, purchase_date,
                 notes, extra_data,
                 recommendation_source, strategy,
-                added_date, in_portfolio
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                added_date, in_portfolio,
+                empfehlung, story
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 pos["asset_class"],
                 pos["investment_type"],
                 name,
-                None,   # isin
-                None,   # wkn
+                None,         # isin
+                None,         # wkn
                 ticker,
                 str(quantity),
                 unit,
                 str(purchase_price),
                 purchase_date,
-                None,   # notes
-                None,   # extra_data
-                None,   # recommendation_source
-                None,   # strategy
+                notes,
+                extra_data_str,
+                None,         # recommendation_source
+                None,         # strategy
                 today,
-                1,      # in_portfolio
+                1,            # in_portfolio
+                empfehlung,
+                story,
             ),
         )
         conn.commit()
@@ -418,13 +458,12 @@ def seed(db_path: str = "data/demo.db", conn: Optional[sqlite3.Connection] = Non
             "used_fallback": used_fallback,
         })
 
-        approx_value = quantity * purchase_price
-        print(f"qty={quantity} @ €{purchase_price:.4f} ≈ €{approx_value:,.0f}")
-
     # --- fetch current prices and store in current_prices ---
     print("\nFetching current market prices ...")
     seen_tickers: set[str] = set()
     for pos in DEMO_POSITIONS:
+        if not pos.get("ticker"):
+            continue
         ticker = pos["ticker"].upper()
         if ticker in seen_tickers:
             continue

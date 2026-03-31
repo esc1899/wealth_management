@@ -1,12 +1,22 @@
 # Asset class configuration
 # Each class defines: investment type, default unit, visible fields, price source.
 # Add new classes here — no code change required.
+#
+# Flags:
+#   auto_fetch: true  — price is fetched automatically via yfinance (requires ticker)
+#   auto_fetch: false — price must be entered manually (estimated_value in extra_data)
+#   watchlist_eligible: true  — position can appear on the watchlist
+#   watchlist_eligible: false — portfolio-only (Festgeld, Immobilien, etc.)
+#   manual_valuation: true — "Schätzwert aktualisieren" button shown in detail view
+#   extra_fields — type-specific fields stored in extra_data (JSON, encrypted)
 
 asset_classes:
 
   Aktie:
     investment_type: Wertpapiere
     default_unit: Stück
+    auto_fetch: true
+    watchlist_eligible: true
     visible_fields:
       - isin
       - wkn
@@ -23,6 +33,8 @@ asset_classes:
   Aktienfonds:
     investment_type: Wertpapiere
     default_unit: Stück
+    auto_fetch: true
+    watchlist_eligible: true
     visible_fields:
       - isin
       - wkn
@@ -38,6 +50,8 @@ asset_classes:
   Rentenfonds:
     investment_type: Renten
     default_unit: Stück
+    auto_fetch: true
+    watchlist_eligible: true
     visible_fields:
       - isin
       - wkn
@@ -53,6 +67,8 @@ asset_classes:
   Immobilienfonds:
     investment_type: Immobilien
     default_unit: Stück
+    auto_fetch: true
+    watchlist_eligible: true
     visible_fields:
       - isin
       - wkn
@@ -71,6 +87,8 @@ asset_classes:
     unit_options:
       - Troy Oz
       - g
+    auto_fetch: true
+    watchlist_eligible: true
     visible_fields:
       - ticker
       - quantity
@@ -80,3 +98,93 @@ asset_classes:
       - notes
     price_source: yfinance
     requires_ticker: true
+
+  Kryptowährung:
+    investment_type: Krypto
+    default_unit: Stück
+    auto_fetch: true
+    watchlist_eligible: true
+    visible_fields:
+      - ticker
+      - quantity
+      - purchase_price
+      - purchase_date
+      - notes
+    price_source: yfinance
+    requires_ticker: true
+
+  Anleihe:
+    investment_type: Renten
+    default_unit: Stück
+    auto_fetch: false
+    watchlist_eligible: false
+    manual_valuation: false
+    visible_fields:
+      - isin
+      - wkn
+      - quantity
+      - purchase_price
+      - purchase_date
+      - notes
+    price_source: manual
+    requires_ticker: false
+
+  Festgeld:
+    investment_type: Geld
+    default_unit: Stück
+    auto_fetch: false
+    watchlist_eligible: false
+    manual_valuation: false
+    extra_fields:
+      - interest_rate
+      - maturity_date
+      - bank
+    visible_fields:
+      - quantity
+      - purchase_price
+      - purchase_date
+      - notes
+    price_source: manual
+    requires_ticker: false
+
+  Bargeld:
+    investment_type: Geld
+    default_unit: Stück
+    auto_fetch: false
+    watchlist_eligible: false
+    manual_valuation: false
+    visible_fields:
+      - quantity
+      - notes
+    price_source: manual
+    requires_ticker: false
+
+  Immobilie:
+    investment_type: Immobilien
+    default_unit: Stück
+    auto_fetch: false
+    watchlist_eligible: false
+    manual_valuation: true
+    extra_fields:
+      - estimated_value
+      - valuation_date
+    visible_fields:
+      - purchase_price
+      - purchase_date
+      - notes
+    price_source: manual
+    requires_ticker: false
+
+  Grundstück:
+    investment_type: Immobilien
+    default_unit: Stück
+    auto_fetch: false
+    watchlist_eligible: false
+    manual_valuation: true
+    extra_fields:
+      - estimated_value
+      - valuation_date
+    visible_fields:
+      - notes
+    price_source: manual
+    requires_ticker: false

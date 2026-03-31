@@ -164,6 +164,10 @@ class Position(BaseModel):
     strategy: Optional[str] = None
     added_date: date
 
+    # Analysis (empfehlung plain text; story encrypted at rest)
+    empfehlung: Optional[str] = None
+    story: Optional[str] = None
+
     # State
     in_portfolio: bool = False
 
@@ -198,8 +202,9 @@ class Position(BaseModel):
 
     @model_validator(mode="after")
     def portfolio_requires_quantity(self) -> "Position":
-        if self.in_portfolio and self.quantity is None:
-            raise ValueError("Portfolio positions must have a quantity")
+        # Quantity is optional for manual-valuation asset classes (Immobilie, Grundstück)
+        # that track value via extra_data.estimated_value or purchase_price instead.
+        # Validation of required fields per asset type is handled at the service/UI layer.
         return self
 
 
@@ -334,3 +339,11 @@ class Skill(BaseModel):
     description: Optional[str] = None
     prompt: str
     created_at: Optional[str] = None
+    hidden: bool = False  # True = system skill, injected silently, not shown in UI
+
+
+class AppConfig(BaseModel):
+    """Key-value store for runtime application configuration."""
+
+    key: str
+    value: str

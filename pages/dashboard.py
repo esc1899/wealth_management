@@ -3,6 +3,8 @@ Dashboard — portfolio overview with current valuations and P&L.
 Positions grouped by investment type (only types present in portfolio shown).
 """
 
+from datetime import date
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -10,15 +12,41 @@ import streamlit as st
 from core.i18n import t
 from state import get_market_agent
 
+# ---------------------------------------------------------------------------
+# Easter Egg dialog (defined at module level — Streamlit requirement)
+# ---------------------------------------------------------------------------
+
+_EASTER_SUNDAY = date(2026, 4, 20)
+_EGG_ACTIVE_UNTIL = date(2026, 4, 21)
+
+
+@st.dialog(t("dashboard.easter_egg_title"))
+def _show_easter_egg():
+    today = date.today()
+    if today < _EGG_ACTIVE_UNTIL:
+        days_left = (_EASTER_SUNDAY - today).days
+        st.markdown(t("dashboard.easter_egg_countdown").format(days=days_left))
+    else:
+        st.markdown(t("dashboard.easter_egg_after"))
+
 st.set_page_config(page_title="Dashboard", page_icon="📊", layout="wide")
 st.title(f"📊 {t('dashboard.title')}")
 st.caption("Agentic Wealth Manager")
 
 market_agent = get_market_agent()
 
-col_title, col_refresh = st.columns([5, 1])
+# Easter egg: open dialog after 3 clicks on hidden button
+if st.session_state.get("_egg_clicks", 0) >= 3:
+    st.session_state["_egg_clicks"] = 0
+    _show_easter_egg()
+
+col_title, col_refresh, col_egg = st.columns([5, 1, 0.15])
 with col_refresh:
     if st.button(f"🔄 {t('common.refresh')}"):
+        st.rerun()
+with col_egg:
+    if st.button("·", key="_egg_btn", help=""):
+        st.session_state["_egg_clicks"] = st.session_state.get("_egg_clicks", 0) + 1
         st.rerun()
 
 try:

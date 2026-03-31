@@ -29,7 +29,7 @@ cp .env.example .env
 # edit .env with your values (see Configuration section below)
 
 # 5. Pull an Ollama model (used by Portfolio Chat and Rebalance)
-ollama pull llama3.2
+ollama pull qwen3:8b
 
 # 6. Start the app
 streamlit run app.py
@@ -66,7 +66,8 @@ ANTHROPIC_BASE_URL=https://your-llm-proxy.example.com
 
 ```env
 OLLAMA_HOST=http://localhost:11434   # default — change if Ollama runs elsewhere
-OLLAMA_MODEL=llama3.2               # any model you have pulled
+OLLAMA_MODEL=qwen3:8b               # default model for Portfolio Chat and Rebalance
+                                    # (can be changed at runtime in Settings)
 ```
 
 ### Optional
@@ -95,7 +96,7 @@ to keep machine-specific overrides separate from your shared base config.
 **Setup:**
 
 1. Create a base `.env` with shared defaults
-2. Create `.env.work` with only the values that differ on the work machine:
+2. Create `.env.work` with only the values that differ:
 
 ```env
 # .env.work
@@ -110,17 +111,16 @@ DB_PATH=data/work.db
 ENV_PROFILE=work streamlit run app.py
 ```
 
-`.env.work` values override `.env`. All other values fall back to `.env`.
-
 ---
 
 ## Demo Mode
 
-Demo mode loads a pre-seeded portfolio database with 17 realistic positions.
-Useful for testing or demonstration without entering real data.
+Demo mode loads a pre-seeded portfolio database with 20 realistic positions
+(stocks, ETFs, precious metals, crypto, a fixed deposit, and a property).
+No `ENCRYPTION_KEY` is required in demo mode.
 
 ```bash
-# Seed the demo database (fetches real historical prices)
+# Seed the demo database (fetches real historical prices via yfinance)
 python scripts/seed_demo.py
 
 # Start in demo mode
@@ -132,7 +132,31 @@ To recreate the demo database on a different machine:
 DEMO_DB_PATH=data/demo.db python scripts/seed_demo.py
 ```
 
-No `ENCRYPTION_KEY` is required in demo mode.
+---
+
+## Model Selection at Runtime
+
+After starting the app, go to **Settings → Model Selection** to choose:
+
+- **Ollama model** — list populated live from your local Ollama instance
+- **Claude model** — select from Haiku / Sonnet / Opus
+
+Settings are persisted in the database and survive restarts.
+The `OLLAMA_MODEL` env var sets the startup default; the Settings UI overrides it.
+
+---
+
+## Ollama Model Recommendations
+
+| Model | Size | Notes |
+|---|---|---|
+| `qwen3:8b` | 8B | Recommended — good tool use, strong instruction following |
+| `llama3.1:8b` | 8B | Good general-purpose alternative |
+| `llama3.2` | 2B | Fast, lower quality — for resource-constrained setups |
+
+```bash
+ollama pull qwen3:8b
+```
 
 ---
 
@@ -160,26 +184,11 @@ Omit both keys to disable monitoring entirely.
 
 ---
 
-## Ollama Model Selection
+## Schema Migrations
 
-The Portfolio Chat and Rebalance agent use the model configured in `OLLAMA_MODEL`.
-
-Recommended models:
-
-| Model | Size | Notes |
-|---|---|---|
-| `llama3.2` | 2B | Fast, good for structured tasks |
-| `qwen3:8b` | 8B | Better reasoning, higher quality |
-| `llama3.1:8b` | 8B | Good general-purpose model |
-
-```bash
-ollama pull qwen3:8b
-```
-
-Then update `.env`:
-```env
-OLLAMA_MODEL=qwen3:8b
-```
+The database schema is updated automatically on startup. No manual migration steps are needed.
+New columns (`empfehlung`, `story`, `skills.hidden`) are added via `migrate_db()` on first run
+against an existing database.
 
 ---
 
@@ -188,11 +197,8 @@ OLLAMA_MODEL=qwen3:8b
 ```bash
 git pull
 pip install -r requirements.txt   # update dependencies if needed
-streamlit run app.py
+streamlit run app.py              # migration runs automatically on startup
 ```
-
-The database schema is updated automatically on startup (`CREATE TABLE IF NOT EXISTS`).
-No manual migration steps are needed for new tables.
 
 ---
 
@@ -201,14 +207,20 @@ No manual migration steps are needed for new tables.
 **App shows "Configuration error: ENCRYPTION_KEY is not set"**
 → Run the generate command shown in the error message and add the key to `.env`.
 
-**Portfolio Chat fails with connection error**
+**Portfolio Chat / Rebalance fails with connection error**
 → Make sure Ollama is running: `ollama serve`
+→ Check Settings → System Status for a connectivity check.
 
 **Research / News / Search Chat fails with API error**
 → Check that `ANTHROPIC_API_KEY` or `ANTHROPIC_BASE_URL` is set in `.env`.
 
 **Prices not updating**
 → Click **Refresh Now** on the Market Data page. Check that tickers are valid yfinance symbols.
+→ Positions without a ticker (Festgeld, Immobilie, etc.) cannot be auto-priced — this is expected.
 
 **Demo mode not working**
 → Run `python scripts/seed_demo.py` first to create the demo database.
+
+**Watchlist button unavailable for a position type**
+→ Asset types without auto-fetch (Festgeld, Anleihe, Immobilie, etc.) are portfolio-only
+  and cannot be added to the watchlist — this is by design.

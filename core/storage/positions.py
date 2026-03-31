@@ -33,8 +33,9 @@ class PositionsRepository:
                 quantity, unit, purchase_price, purchase_date,
                 notes, extra_data,
                 recommendation_source, strategy,
-                added_date, in_portfolio
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                added_date, in_portfolio,
+                empfehlung, story
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             self._serialize(position),
         )
@@ -74,7 +75,8 @@ class PositionsRepository:
                 quantity=?, unit=?, purchase_price=?, purchase_date=?,
                 notes=?, extra_data=?,
                 recommendation_source=?, strategy=?,
-                added_date=?, in_portfolio=?
+                added_date=?, in_portfolio=?,
+                empfehlung=?, story=?
             WHERE id=?
             """,
             self._serialize(position) + (position.id,),
@@ -150,9 +152,12 @@ class PositionsRepository:
             p.strategy,
             p.added_date.isoformat(),
             1 if p.in_portfolio else 0,
+            p.empfehlung,
+            self._enc.encrypt(p.story) if p.story else None,
         )
 
     def _deserialize(self, row: sqlite3.Row) -> Position:
+        keys = row.keys()
         return Position(
             id=row["id"],
             asset_class=row["asset_class"],
@@ -171,4 +176,6 @@ class PositionsRepository:
             strategy=row["strategy"],
             added_date=date.fromisoformat(row["added_date"]),
             in_portfolio=bool(row["in_portfolio"]),
+            empfehlung=row["empfehlung"] if "empfehlung" in keys else None,
+            story=self._enc.decrypt(row["story"]) if ("story" in keys and row["story"]) else None,
         )

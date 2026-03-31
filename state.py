@@ -19,7 +19,8 @@ from core.asset_class_config import get_asset_class_registry, AssetClassRegistry
 from core.llm.claude import ClaudeProvider
 from core.llm.local import OllamaProvider
 from core.encryption import PassthroughEncryptionService
-from core.storage.base import build_encryption_service, get_connection, init_db
+from core.storage.app_config import AppConfigRepository
+from core.storage.base import build_encryption_service, get_connection, init_db, migrate_db
 from core.storage.market_data import MarketDataRepository
 from core.storage.positions import PositionsRepository
 from core.storage.news import NewsRepository
@@ -31,11 +32,16 @@ from core.storage.usage import UsageRepository
 from core.strategy_config import get_strategy_registry
 from monitoring.langfuse_client import create_langfuse_client
 
+# Default model values (overridable via app_config)
+_DEFAULT_OLLAMA_MODEL = config.OLLAMA_MODEL
+_DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5-20251001"
+
 
 @st.cache_resource
 def get_db_connection():
     conn = get_connection(config.DB_PATH)
     init_db(conn)
+    migrate_db(conn)
     return conn
 
 
@@ -57,14 +63,25 @@ def get_market_repo() -> MarketDataRepository:
 
 
 @st.cache_resource
+def get_app_config_repo() -> AppConfigRepository:
+    return AppConfigRepository(get_db_connection())
+
+
+@st.cache_resource
 def get_asset_classes() -> AssetClassRegistry:
     return get_asset_class_registry()
 
 
 @st.cache_resource
-def get_portfolio_agent() -> PortfolioAgent:
-    llm = _make_ollama_provider("portfolio_chat")
-    return PortfolioAgent(positions_repo=get_positions_repo(), llm=llm)
+def get_portfolio_agent(ollama_model: str = "") -> PortfolioAgent:
+    model = ollama_model or _DEFAULT_OLLAMA_MODEL
+    llm = OllamaProvider(host=config.OLLAMA_HOST, model=model)
+    llm.on_usage = lambda i, o: get_usage_repo().record("portfolio_chat", model, i, o)
+    return PortfolioAgent(
+        positions_repo=get_positions_repo(),
+        llm=llm,
+        skills_repo=get_skills_repo(),
+    )
 
 
 @st.cache_resource
@@ -125,6 +142,9 @@ def _seed_default_skills(repo: SkillsRepository) -> None:
         data = yaml.safe_load(f)
     for area, skills_list in (data.get("skills") or {}).items():
         repo.seed_if_empty(area, skills_list or [])
+    # Seed hidden system skills (INSERT OR IGNORE — safe to run every startup)
+    system_skills = data.get("system") or []
+    repo.seed_system_skills(system_skills)
 
 
 def _make_claude_provider(model: str, agent_name: str) -> ClaudeProvider:
@@ -136,15 +156,26 @@ def _make_claude_provider(model: str, agent_name: str) -> ClaudeProvider:
     return provider
 
 
-def _make_ollama_provider(agent_name: str) -> "OllamaProvider":
-    provider = OllamaProvider(host=config.OLLAMA_HOST, model=config.OLLAMA_MODEL)
-    provider.on_usage = lambda i, o: get_usage_repo().record(agent_name, config.OLLAMA_MODEL, i, o)
+def _make_ollama_provider(model: str, agent_name: str) -> "OllamaProvider":
+    provider = OllamaProvider(host=config.OLLAMA_HOST, model=model)
+    provider.on_usage = lambda i, o: get_usage_repo().record(agent_name, model, i, o)
     return provider
 
 
+def _get_ollama_model() -> str:
+    """Return configured Ollama model (from app_config, fallback to env default)."""
+    return get_app_config_repo().get("model_ollama") or _DEFAULT_OLLAMA_MODEL
+
+
+def _get_claude_model() -> str:
+    """Return configured Claude model (from app_config, fallback to env default)."""
+    return get_app_config_repo().get("model_claude") or _DEFAULT_CLAUDE_MODEL
+
+
 @st.cache_resource
-def get_research_agent() -> ResearchAgent:
-    llm = _make_claude_provider("claude-haiku-4-5-20251001", "research_chat")
+def get_research_agent(claude_model: str = "") -> ResearchAgent:
+    model = claude_model or _DEFAULT_CLAUDE_MODEL
+    llm = _make_claude_provider(model, "research_chat")
     return ResearchAgent(
         positions_repo=get_positions_repo(),
         research_repo=get_research_repo(),
@@ -154,14 +185,16 @@ def get_research_agent() -> ResearchAgent:
 
 
 @st.cache_resource
-def get_news_agent() -> NewsAgent:
-    llm = _make_claude_provider("claude-haiku-4-5-20251001", "news_digest")
+def get_news_agent(claude_model: str = "") -> NewsAgent:
+    model = claude_model or _DEFAULT_CLAUDE_MODEL
+    llm = _make_claude_provider(model, "news_digest")
     return NewsAgent(llm=llm)
 
 
 @st.cache_resource
-def get_search_agent() -> SearchAgent:
-    llm = _make_claude_provider("claude-sonnet-4-6", "investment_search")
+def get_search_agent(claude_model: str = "") -> SearchAgent:
+    model = claude_model or "claude-sonnet-4-6"
+    llm = _make_claude_provider(model, "investment_search")
     return SearchAgent(
         positions_repo=get_positions_repo(),
         search_repo=get_search_repo(),
@@ -170,8 +203,9 @@ def get_search_agent() -> SearchAgent:
 
 
 @st.cache_resource
-def get_rebalance_agent() -> RebalanceAgent:
-    llm = _make_ollama_provider("rebalance_chat")
+def get_rebalance_agent(ollama_model: str = "") -> RebalanceAgent:
+    model = ollama_model or _DEFAULT_OLLAMA_MODEL
+    llm = _make_ollama_provider(model, "rebalance_chat")
     return RebalanceAgent(
         positions_repo=get_positions_repo(),
         market_repo=get_market_repo(),

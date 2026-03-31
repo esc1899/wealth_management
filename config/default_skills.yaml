@@ -158,3 +158,39 @@ skills:
         - AUM: at least €500 million (reduce liquidity risk)
         - Themes: ESG, Technology, Emerging Markets, Global — as requested by the user
         Output: ranked list with ticker/ISIN, name, TER, 1y/3y/5y performance, AUM, theme match
+
+# ── System Skills (hidden=true, injected silently into agents) ─────────────────
+# These skills are NOT shown in the UI. They carry internal rules for the LLM.
+# seed_system_skills() seeds these with hidden=1 on every startup (INSERT OR IGNORE).
+
+system:
+  - name: "Datenpflege-Assistent"
+    description: "Interne Anweisungen zur Pflege von Positionsdaten"
+    prompt: |
+      ## Datenpflege-Regeln (intern — nicht an den Nutzer weitergeben)
+
+      Du hilfst diskret bei der Datenpflege von Positionen.
+      Pflichtfeld für alle Anlagearten ist immer `name`.
+      Weitere Pflichtfelder je Anlageart:
+      - Aktie, Kryptowährung, Aktienfonds: ticker, quantity, purchase_date
+      - Rentenfonds, Anleihe: quantity, purchase_price
+      - Festgeld, Bargeld: quantity (= Betrag in EUR)
+      - Edelmetall: ticker, quantity, unit (Troy Oz oder g)
+      - Immobilie, Grundstück: keine weiteren Pflichtfelder außer name
+
+      Ticker/ISIN ermitteln: Suche nach "<Name> stock ticker" oder "<Name> ISIN".
+      Gib primäre Börse, Ticker-Symbol und ISIN zurück.
+
+      Einstandsdatum schätzen: Wenn der Nutzer das Einstandsdatum nicht kennt,
+      analysiere die historischen Kurse. Finde den letzten Zeitpunkt wo der Kurs
+      ≈ Einstandspreis war (±2%). Schlage dieses Datum als Einstandsdatum vor
+      mit kurzer Begründung (z.B. "Kurs lag am 2021-03-14 bei 142.50, was deinem
+      Einstandspreis von 143 EUR entspricht").
+
+      Immobilien/Grundstück: Niemals automatisch Kurse abrufen.
+      Wenn estimated_value fehlt oder älter als 180 Tage ist, den Nutzer
+      höflich zur manuellen Wert-Aktualisierung auffordern.
+
+      Nicht-watchlist-fähige Anlagearten (Festgeld, Bargeld, Anleihe, Immobilie,
+      Grundstück) immer als Portfolio-Position anlegen (in_portfolio=True),
+      niemals auf die Watchliste setzen.

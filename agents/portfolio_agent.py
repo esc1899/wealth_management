@@ -11,19 +11,43 @@ from core.llm.base import Message, Role
 from core.llm.local import OllamaProvider
 from core.storage.models import Position
 from core.storage.positions import PositionsRepository
+from core.storage.skills import SkillsRepository
+
+# All asset classes that support auto-fetch (eligible for watchlist)
+_WATCHLIST_CLASSES = [
+    "Aktie", "Aktienfonds", "Rentenfonds", "Immobilienfonds", "Edelmetall", "Kryptowährung",
+]
+
+# All known asset classes (portfolio accepts all)
+_ALL_CLASSES = [
+    "Aktie", "Aktienfonds", "Rentenfonds", "Immobilienfonds", "Edelmetall",
+    "Kryptowährung", "Anleihe", "Festgeld", "Bargeld", "Immobilie", "Grundstück",
+]
 
 SYSTEM_PROMPT = """You are a portfolio management assistant.
 The user describes financial transactions or watchlist changes in natural language.
 Always call the appropriate tool — never answer in plain text when a tool applies.
 Today's date is {today}.
 
-Asset classes: Aktie, Aktienfonds, Immobilienfonds, Edelmetall
-Units: Stück (for securities), Troy Oz or g (for precious metals)
+Asset classes: {asset_classes}
+Units: Stück (for securities and real estate), Troy Oz or g (for precious metals), EUR (for cash/deposits)
 
 Physical precious metal coins:
 - Krügerrand, Maple Leaf, Britannia, Philharmoniker = 1 troy oz gold → ticker GC=F, asset_class Edelmetall, unit Troy Oz
 - Silver Maple Leaf, Silver Britannia = 1 troy oz silver → ticker SI=F, asset_class Edelmetall, unit Troy Oz
 - quantity = number of coins
+
+Auto-fetch asset classes (Aktie, Aktienfonds, Rentenfonds, Immobilienfonds, Edelmetall, Kryptowährung):
+- Always provide the Yahoo Finance ticker symbol (e.g. SAP.DE, AAPL, BTC-USD, IWDA.AS)
+- German stocks: append .DE (e.g. SAP.DE, SIE.DE, ALV.DE, MUV2.DE)
+- Swiss stocks: append .SW (e.g. NESN.SW)
+- UK stocks: append .L (e.g. SHEL.L)
+- US stocks: no suffix (e.g. AAPL, MSFT)
+- If you do not know the correct Yahoo Finance ticker, ask the user before calling the tool
+
+Non-watchlist asset classes (Festgeld, Bargeld, Anleihe, Immobilie, Grundstück):
+- Always add these as portfolio positions (in_portfolio=True), never as watchlist entries
+- ticker is not required for these types
 
 If purchase price is not stated, omit it.
 For company names you don't know, use the ticker as the name."""
@@ -37,18 +61,20 @@ TOOLS: list[dict] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "ticker":         {"type": "string", "description": "Ticker/yfinance symbol, e.g. AAPL, SAP.DE"},
+                    "ticker":         {"type": "string", "description": "Ticker/yfinance symbol, e.g. AAPL, SAP.DE (optional for non-auto-fetch types)"},
                     "name":           {"type": "string", "description": "Full asset name"},
-                    "asset_class":    {"type": "string", "enum": ["Aktie", "Aktienfonds", "Immobilienfonds", "Edelmetall"]},
-                    "quantity":       {"type": "number"},
-                    "unit":           {"type": "string", "description": "Stück, Troy Oz, or g"},
-                    "purchase_price": {"type": "number", "description": "Price per unit (optional)"},
+                    "asset_class":    {"type": "string", "enum": _ALL_CLASSES},
+                    "quantity":       {"type": "number", "description": "Number of units (optional for Immobilie/Grundstück)"},
+                    "unit":           {"type": "string", "description": "Stück, Troy Oz, g, or EUR"},
+                    "purchase_price": {"type": "number", "description": "Price per unit in EUR (optional)"},
                     "purchase_date":  {"type": "string", "description": "ISO date, e.g. 2024-01-15"},
                     "isin":           {"type": "string"},
                     "wkn":            {"type": "string"},
                     "notes":          {"type": "string"},
+                    "empfehlung":     {"type": "string", "description": "User recommendation label, e.g. Kaufen, Halten, Verkaufen"},
+                    "story":          {"type": "string", "description": "Investment thesis or rationale"},
                 },
-                "required": ["ticker", "name", "asset_class", "quantity", "unit", "purchase_date"],
+                "required": ["name", "asset_class", "unit"],
             },
         },
     },
@@ -76,15 +102,17 @@ TOOLS: list[dict] = [
         "type": "function",
         "function": {
             "name": "add_to_watchlist",
-            "description": "Add an asset to the watchlist.",
+            "description": "Add an asset to the watchlist. Only supported for auto-fetch asset classes.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "ticker":      {"type": "string"},
+                    "ticker":      {"type": "string", "description": "Ticker/yfinance symbol"},
                     "name":        {"type": "string"},
-                    "asset_class": {"type": "string", "enum": ["Aktie", "Aktienfonds", "Immobilienfonds", "Edelmetall"]},
+                    "asset_class": {"type": "string", "enum": _WATCHLIST_CLASSES},
                     "unit":        {"type": "string"},
                     "notes":       {"type": "string"},
+                    "empfehlung":  {"type": "string", "description": "User recommendation label"},
+                    "story":       {"type": "string", "description": "Investment thesis"},
                 },
                 "required": ["ticker", "name", "asset_class", "unit"],
             },
@@ -130,9 +158,15 @@ TOOLS: list[dict] = [
 
 
 class PortfolioAgent:
-    def __init__(self, positions_repo: PositionsRepository, llm: OllamaProvider):
+    def __init__(
+        self,
+        positions_repo: PositionsRepository,
+        llm: OllamaProvider,
+        skills_repo: Optional[SkillsRepository] = None,
+    ):
         self._positions = positions_repo
         self._llm = llm
+        self._skills_repo = skills_repo
 
     # ------------------------------------------------------------------
     # Public API for other agents
@@ -167,7 +201,17 @@ class PortfolioAgent:
     # ------------------------------------------------------------------
 
     async def chat(self, user_message: str) -> str:
-        system = SYSTEM_PROMPT.format(today=date.today().isoformat())
+        registry = get_asset_class_registry()
+        system = SYSTEM_PROMPT.format(
+            today=date.today().isoformat(),
+            asset_classes=", ".join(registry.all_names()),
+        )
+        # Inject hidden system skills (Datenpflege-Assistent etc.)
+        if self._skills_repo:
+            system_skills = self._skills_repo.get_system_skills()
+            for s in system_skills:
+                system += f"\n\n{s.prompt}"
+
         messages = [
             Message(role=Role.SYSTEM, content=system),
             Message(role=Role.USER, content=user_message),
@@ -222,23 +266,26 @@ class PortfolioAgent:
         registry = get_asset_class_registry()
         asset_class = args["asset_class"]
         cfg = registry.require(asset_class)
+        purchase_date_raw = args.get("purchase_date")
         position = Position(
-            ticker=args["ticker"],
+            ticker=args.get("ticker") or None,
             name=args["name"],
             asset_class=asset_class,
             investment_type=cfg.investment_type,
-            quantity=args["quantity"],
+            quantity=args.get("quantity") or None,
             unit=args.get("unit", cfg.default_unit),
             purchase_price=args.get("purchase_price") or None,
-            purchase_date=date.fromisoformat(args["purchase_date"]),
+            purchase_date=date.fromisoformat(purchase_date_raw) if purchase_date_raw else None,
             isin=args.get("isin"),
             wkn=args.get("wkn"),
             notes=args.get("notes"),
+            empfehlung=args.get("empfehlung"),
+            story=args.get("story"),
             added_date=date.today(),
             in_portfolio=True,
         )
         saved = self._positions.add(position)
-        return {"success": True, "id": saved.id, "ticker": saved.ticker}
+        return {"success": True, "id": saved.id, "ticker": saved.ticker, "name": saved.name}
 
     def _tool_remove_portfolio(self, args: dict) -> dict:
         deleted = self._positions.delete(args["entry_id"])
@@ -257,6 +304,7 @@ class PortfolioAgent:
                     "unit": e.unit,
                     "purchase_price": e.purchase_price,
                     "purchase_date": e.purchase_date.isoformat() if e.purchase_date else None,
+                    "empfehlung": e.empfehlung,
                 }
                 for e in entries
             ]
@@ -273,6 +321,8 @@ class PortfolioAgent:
             investment_type=cfg.investment_type,
             unit=args.get("unit", cfg.default_unit),
             notes=args.get("notes"),
+            empfehlung=args.get("empfehlung"),
+            story=args.get("story"),
             added_date=date.today(),
             in_portfolio=False,
             recommendation_source="user",
@@ -311,8 +361,8 @@ class PortfolioAgent:
                     "asset_class": e.asset_class,
                     "unit": e.unit,
                     "added_date": e.added_date.isoformat(),
-                    "recommendation_source": e.recommendation_source,
-                    "notes": e.notes,
+                    "empfehlung": e.empfehlung,
+                    "story": e.story,
                 }
                 for e in entries
             ]
