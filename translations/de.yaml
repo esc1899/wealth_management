@@ -59,7 +59,7 @@ dashboard:
   prices_last_fetched: "Kurse zuletzt abgerufen"
   no_price_data: "Noch keine Kursdaten. Bitte auf der Marktdaten-Seite aktualisieren."
   easter_egg_title: "Ein Gedanke zum Tag"
-  easter_egg_countdown: "Noch {days} Tage bis Ostersonntag (20. April 2026)."
+  easter_egg_countdown: "Noch {days} Tage bis Ostersonntag (5. April 2026)."
   easter_egg_after: "Danke fürs Suchen. Bis nächstes Jahr! 🐣"
 
 portfolio_chat:

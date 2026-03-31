@@ -16,8 +16,8 @@ from state import get_market_agent
 # Easter Egg dialog (defined at module level — Streamlit requirement)
 # ---------------------------------------------------------------------------
 
-_EASTER_SUNDAY = date(2026, 4, 20)
-_EGG_ACTIVE_UNTIL = date(2026, 4, 21)
+_EASTER_SUNDAY = date(2026, 4, 5)
+_EGG_ACTIVE_UNTIL = date(2026, 4, 6)
 
 
 @st.dialog(t("dashboard.easter_egg_title"))
