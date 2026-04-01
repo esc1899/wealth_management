@@ -1,8 +1,8 @@
 """
 Story Checker — checks whether investment theses are still intact.
 
-Cloud ☁️ agent: only watchlist positions are sent to the API.
-No portfolio quantities, purchase prices, or portfolio positions are exposed.
+Cloud ☁️ agent: only the investment thesis text (story) is sent to the API.
+No quantities or purchase prices are exposed.
 Uses built-in web search to find current news before assessing the thesis.
 """
 
@@ -26,8 +26,7 @@ with st.expander(t("storychecker.what_is_this"), expanded=True):
 # Load data
 # ------------------------------------------------------------------
 
-all_watchlist = get_positions_repo().get_watchlist()
-positions_with_story = [p for p in all_watchlist if p.story]
+positions_with_story = [p for p in get_positions_repo().get_all() if p.story]
 storychecker_skills = get_skills_repo().get_by_area("storychecker")
 _skill_map = {s.name: s for s in storychecker_skills}
 

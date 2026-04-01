@@ -19,10 +19,19 @@ st.set_page_config(page_title="Positionen", page_icon="📋", layout="wide")
 st.title(f"📋 {t('positionen.title')}")
 st.caption(t("positionen.subtitle"))
 
+if st.session_state.pop("_pos_just_saved", None):
+    st.success(t("positionen.saved"))
+
 registry = get_asset_class_registry()
 repo = get_positions_repo()
 app_config = get_app_config_repo()
 analyses_repo = get_analyses_repo()
+
+def _fmtnum(value: float, decimals: int = 2) -> str:
+    """Format a number in German locale style (1.234,56)."""
+    formatted = f"{value:,.{decimals}f}"
+    return formatted.replace(",", "X").replace(".", ",").replace("X", ".")
+
 
 _DEFAULT_EMPFEHLUNG_LABELS = ["Kaufen", "Halten", "Verkaufen", "Beobachten"]
 _empfehlung_labels: list[str] = app_config.get_json("empfehlung_labels", _DEFAULT_EMPFEHLUNG_LABELS)
@@ -41,7 +50,7 @@ def _set(**kwargs):
 def _clear_form():
     for k in [
         "_pos_edit_id", "_pos_show_form", "_pos_confirm_del",
-        "_pos_ticker", "_pos_figi_results",
+        "_pos_ticker", "_pos_name", "_pos_figi_results",
         "_pos_isin", "_pos_wkn", "_pos_asset_class",
     ]:
         st.session_state.pop(k, None)
@@ -88,17 +97,22 @@ def _show_detail(pos_id: int):
 
     if pos.quantity is not None:
         col_e, col_f = st.columns(2)
-        col_e.markdown(f"**{t('positionen.col_quantity')}:** {pos.quantity:,.4f}".rstrip("0").rstrip("."))
+        col_e.markdown(f"**{t('positionen.col_quantity')}:** {_fmtnum(pos.quantity, 4).rstrip('0').rstrip(',')}")
         col_f.markdown(
             f"**{t('positionen.col_purchase_price')}:** "
-            f"{pos.purchase_price:,.2f} €" if pos.purchase_price else f"**{t('positionen.col_purchase_price')}:** —"
+            f"{_fmtnum(pos.purchase_price)} €" if pos.purchase_price else f"**{t('positionen.col_purchase_price')}:** —"
         )
 
     if pos.purchase_date:
         st.markdown(f"**{t('positionen.col_purchase_date')}:** {pos.purchase_date.isoformat()}")
 
-    if pos.empfehlung:
-        st.markdown(f"**{t('positionen.empfehlung')}:** {pos.empfehlung}")
+    if pos.empfehlung or pos.recommendation_source:
+        rec_parts = []
+        if pos.empfehlung:
+            rec_parts.append(pos.empfehlung)
+        if pos.recommendation_source:
+            rec_parts.append(f"{t('positionen.empfohlen_von')}: {pos.recommendation_source}")
+        st.markdown(f"**{t('positionen.empfehlung')}:** {' · '.join(rec_parts)}")
 
     if pos.story:
         st.markdown(f"**{t('positionen.story_label')}:**")
@@ -269,6 +283,8 @@ if _ss("_pos_show_form"):
             if st.button(t("positionen.lookup_apply")):
                 chosen = figi_results[chosen_idx]
                 _set(_pos_ticker=to_yahoo_ticker(chosen))
+                if chosen.get("name") and not _ss("_pos_name"):
+                    _set(_pos_name=chosen["name"])
                 st.session_state.pop("_pos_figi_results", None)
                 st.rerun()
     else:
@@ -285,7 +301,7 @@ if _ss("_pos_show_form"):
         with col_a:
             form_name = st.text_input(
                 t("positionen.col_name") + " *",
-                value=editing.name if editing else "",
+                value=_ss("_pos_name", editing.name if editing else "") or "",
             )
 
         # Ticker (only for auto_fetch types)
@@ -328,6 +344,15 @@ if _ss("_pos_show_form"):
                 options=empf_opts,
                 index=empf_idx,
                 format_func=lambda x: x if x else "—",
+            )
+
+        # Empfohlen von (recommendation source — free text)
+        col_rec, _ = st.columns(2)
+        with col_rec:
+            form_rec_source = st.text_input(
+                t("positionen.empfohlen_von"),
+                value=(editing.recommendation_source or "") if editing else "",
+                placeholder=t("positionen.empfohlen_von_placeholder"),
             )
 
         # Quantity (optional for manual_valuation types; hidden for Grundstück)
@@ -414,7 +439,6 @@ if _ss("_pos_show_form"):
             options=_sc_skill_options,
             index=_skill_idx,
             help=t("positionen.story_skill_help"),
-            disabled=not bool(form_story),
         )
 
         # ── Festgeld extra fields ──────────────────────────────────────────────
@@ -501,6 +525,7 @@ if _ss("_pos_show_form"):
                 in_portfolio=in_portfolio,
                 in_watchlist=in_watchlist,
                 empfehlung=form_empfehlung or None,
+                recommendation_source=(form_rec_source or "").strip() or None,
                 story=(form_story or "").strip() or None,
                 story_skill=form_story_skill or None,
                 added_date=editing.added_date if editing else date.today(),
@@ -511,7 +536,7 @@ if _ss("_pos_show_form"):
             else:
                 repo.add(Position(**pos_data))
             _clear_form()
-            st.success(t("positionen.saved"))
+            st.session_state["_pos_just_saved"] = True
             st.rerun()
 
     st.divider()
@@ -539,19 +564,15 @@ if confirm_id is not None:
 # Position tables
 # ---------------------------------------------------------------------------
 
-tab_portfolio, tab_watchlist = st.tabs([
-    t("positionen.tab_portfolio"),
-    t("positionen.tab_watchlist"),
-])
-
-
 _VERDICT_ICON = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴"}
 
 
-def _render_table(positions: list[Position], empty_key: str):
+def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
     if not positions:
         st.info(t(empty_key))
         return
+
+    positions = sorted(positions, key=lambda p: p.name.lower())
 
     verdicts = analyses_repo.get_latest_bulk(
         [p.id for p in positions if p.id], "storychecker"
@@ -578,28 +599,30 @@ def _render_table(positions: list[Position], empty_key: str):
         cols[2].write(pos.isin or pos.wkn or "—")
         cols[3].write(pos.asset_class)
         cols[4].write(
-            f"{pos.quantity:,.2f}".rstrip("0").rstrip(".")
+            _fmtnum(pos.quantity).rstrip("0").rstrip(",")
             if pos.quantity else "—"
         )
         cols[5].write(pos.unit)
         cols[6].write(
-            f"{pos.purchase_price:,.2f} €" if pos.purchase_price else "—"
+            f"{_fmtnum(pos.purchase_price)} €" if pos.purchase_price else "—"
         )
-        if cols[7].button("🔍", key=f"det_{pos.id}", help=t("positionen.detail_tooltip")):
+        if cols[7].button("🔍", key=f"{key_prefix}_det_{pos.id}", help=t("positionen.detail_tooltip")):
             _set(_pos_detail_id=pos.id)
             st.rerun()
-        if cols[8].button("✏️", key=f"edit_{pos.id}", help=t("positionen.edit_tooltip")):
+        if cols[8].button("✏️", key=f"{key_prefix}_edit_{pos.id}", help=t("positionen.edit_tooltip")):
             _clear_form()
             _set(_pos_show_form=True, _pos_edit_id=pos.id)
             st.rerun()
-        if cols[9].button("🗑️", key=f"del_{pos.id}", help=t("positionen.delete_tooltip")):
+        if cols[9].button("🗑️", key=f"{key_prefix}_del_{pos.id}", help=t("positionen.delete_tooltip")):
             _set(_pos_confirm_del=pos.id)
             st.rerun()
 
 
-with tab_portfolio:
-    _render_table(repo.get_portfolio(), "positionen.empty_portfolio")
+st.subheader(t("positionen.tab_portfolio"))
+_render_table(repo.get_portfolio(), "positionen.empty_portfolio", "pf")
 
-with tab_watchlist:
-    _render_table(repo.get_watchlist(), "positionen.empty_watchlist")
+st.divider()
+
+st.subheader(t("positionen.tab_watchlist"))
+_render_table(repo.get_watchlist(), "positionen.empty_watchlist", "wl")
 

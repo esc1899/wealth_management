@@ -132,6 +132,10 @@ class MarketDataAgent:
                 elif pos.purchase_price is not None:
                     current_value = pos.purchase_price
                     current_price = pos.purchase_price
+                elif pos.unit == "€" and pos.quantity is not None:
+                    # Bargeld: quantity IS the value in €
+                    current_value = float(pos.quantity)
+                    current_price = 1.0
                 else:
                     current_value = None
                     current_price = None

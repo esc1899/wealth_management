@@ -415,6 +415,8 @@ positionen:
   lookup_pick: "Börsenplatz wählen"
   lookup_apply: "Übernehmen"
   empfehlung: "Empfehlung"
+  empfohlen_von: "Empfohlen von"
+  empfohlen_von_placeholder: "z.B. Newsletter, Analyst, ..."
   story_label: "Investment-These"
   story_placeholder: "Warum hältst du diese Position?"
   story_skill_label: "Anlage-Idee"

@@ -134,11 +134,13 @@ asset_classes:
     default_unit: Stück
     auto_fetch: false
     watchlist_eligible: false
-    manual_valuation: false
+    manual_valuation: true
     extra_fields:
       - interest_rate
       - maturity_date
       - bank
+      - estimated_value
+      - valuation_date
     visible_fields:
       - quantity
       - purchase_price
@@ -149,10 +151,13 @@ asset_classes:
 
   Bargeld:
     investment_type: Geld
-    default_unit: Stück
+    default_unit: €
     auto_fetch: false
     watchlist_eligible: false
-    manual_valuation: false
+    manual_valuation: true
+    extra_fields:
+      - estimated_value
+      - valuation_date
     visible_fields:
       - quantity
       - notes

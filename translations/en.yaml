@@ -415,6 +415,8 @@ positionen:
   lookup_pick: "Choose exchange"
   lookup_apply: "Apply"
   empfehlung: "Recommendation"
+  empfohlen_von: "Recommended by"
+  empfohlen_von_placeholder: "e.g. Newsletter, Analyst, ..."
   story_label: "Investment Thesis"
   story_skill_label: "Investment Idea"
   story_skill_help: "What type of investment idea is behind this story? The Story Checker uses this as context."
