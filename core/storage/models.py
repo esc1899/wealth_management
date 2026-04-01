@@ -130,8 +130,9 @@ class HistoricalPrice(BaseModel):
 class Position(BaseModel):
     """
     Unified model for both portfolio positions and watchlist entries.
-    in_portfolio=False  → watchlist entry (quantity may be None)
-    in_portfolio=True   → portfolio position (quantity required)
+    in_portfolio=True  → portfolio position (quantity required)
+    in_watchlist=True  → watchlist entry (visible to cloud agents)
+    Both flags can be True simultaneously.
 
     Encrypted at rest: quantity, purchase_price, notes, extra_data.
     The repository handles encryption/decryption transparently.
@@ -171,6 +172,7 @@ class Position(BaseModel):
 
     # State
     in_portfolio: bool = False
+    in_watchlist: bool = False
 
     @field_validator("ticker")
     @classmethod
@@ -301,6 +303,23 @@ class NewsRun(BaseModel):
     skill_name: str
     tickers: str       # comma-separated ticker symbols
     result: str        # full markdown digest
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Position analyses model
+# ---------------------------------------------------------------------------
+
+class PositionAnalysis(BaseModel):
+    """A persisted analysis result for a position (e.g. from Storychecker)."""
+
+    id: Optional[int] = None
+    position_id: int
+    agent: str              # e.g. 'storychecker'
+    skill_name: str
+    verdict: Optional[str] = None   # 'intact', 'gemischt', 'gefaehrdet', 'unknown'
+    summary: Optional[str] = None   # one-sentence summary
+    session_id: Optional[int] = None  # reference to agent session
     created_at: datetime
 
 

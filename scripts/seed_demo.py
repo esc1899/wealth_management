@@ -13,13 +13,15 @@ from __future__ import annotations
 import os
 import sqlite3
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 # Allow imports from project root
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import yfinance as yf
+
+from core.storage.base import init_db, migrate_db
 
 # ---------------------------------------------------------------------------
 # Demo position definitions
@@ -50,7 +52,7 @@ DEMO_POSITIONS = [
     dict(name="Bitcoin",       ticker="BTC-USD", asset_class="Kryptowährung", investment_type="Krypto", unit="Stück", purchase_date="2021-01-04", empfehlung="Halten", story="Digitales Gold — langfristiger Wertspeicher als Beimischung."),
     # Fixed deposit (no ticker, no yfinance)
     dict(name="Festgeld DKB 3J", ticker=None, asset_class="Festgeld", investment_type="Geld", unit="Stück",
-         purchase_date="2023-03-01", quantity=10000.0, purchase_price=10000.0,
+         purchase_date="2023-03-01", quantity=10.0, purchase_price=10000.0,
          extra_data={"interest_rate": 3.5, "maturity_date": "2026-03-01", "bank": "DKB"},
          notes="3 Jahre Laufzeit, 3,5 % p.a."),
     # Real estate (no ticker, manual valuation)
@@ -246,64 +248,6 @@ def _purchase_price_per_unit(price_eur: float, unit: str) -> float:
 
 
 # ---------------------------------------------------------------------------
-# DB setup
-# ---------------------------------------------------------------------------
-
-def _init_db(conn: sqlite3.Connection) -> None:
-    """Create tables (copied from core/storage/base.py)."""
-    statements = [
-        """CREATE TABLE IF NOT EXISTS positions (
-            id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-            asset_class           TEXT NOT NULL,
-            investment_type       TEXT NOT NULL,
-            name                  TEXT NOT NULL,
-            isin                  TEXT,
-            wkn                   TEXT,
-            ticker                TEXT,
-            quantity              TEXT,
-            unit                  TEXT NOT NULL,
-            purchase_price        TEXT,
-            purchase_date         TEXT,
-            notes                 TEXT,
-            extra_data            TEXT,
-            recommendation_source TEXT,
-            strategy              TEXT,
-            added_date            TEXT NOT NULL,
-            in_portfolio          INTEGER NOT NULL DEFAULT 0,
-            empfehlung            TEXT,
-            story                 TEXT
-        )""",
-        """CREATE TABLE IF NOT EXISTS app_config (
-            key   TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        )""",
-        "CREATE INDEX IF NOT EXISTS idx_positions_ticker ON positions(ticker)",
-        "CREATE INDEX IF NOT EXISTS idx_positions_in_portfolio ON positions(in_portfolio)",
-        """CREATE TABLE IF NOT EXISTS current_prices (
-            id                INTEGER PRIMARY KEY AUTOINCREMENT,
-            symbol            TEXT NOT NULL UNIQUE,
-            price_eur         REAL NOT NULL,
-            currency_original TEXT NOT NULL,
-            price_original    REAL NOT NULL,
-            exchange_rate     REAL NOT NULL,
-            fetched_at        TEXT NOT NULL
-        )""",
-        """CREATE TABLE IF NOT EXISTS historical_prices (
-            id        INTEGER PRIMARY KEY AUTOINCREMENT,
-            symbol    TEXT NOT NULL,
-            date      TEXT NOT NULL,
-            close_eur REAL NOT NULL,
-            volume    INTEGER,
-            UNIQUE(symbol, date)
-        )""",
-        "CREATE INDEX IF NOT EXISTS idx_hist_prices_symbol_date ON historical_prices(symbol, date)",
-    ]
-    for stmt in statements:
-        conn.execute(stmt)
-    conn.commit()
-
-
-# ---------------------------------------------------------------------------
 # Market data helpers (current prices for price_history)
 # ---------------------------------------------------------------------------
 
@@ -369,7 +313,8 @@ def seed(db_path: str = "data/demo.db", conn: Optional[sqlite3.Connection] = Non
         conn = sqlite3.connect(db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
 
-    _init_db(conn)
+    init_db(conn)
+    migrate_db(conn)
 
     inserted: list[dict] = []
     today = date.today().isoformat()
@@ -423,9 +368,9 @@ def seed(db_path: str = "data/demo.db", conn: Optional[sqlite3.Connection] = Non
                 quantity, unit, purchase_price, purchase_date,
                 notes, extra_data,
                 recommendation_source, strategy,
-                added_date, in_portfolio,
+                added_date, in_portfolio, in_watchlist,
                 empfehlung, story
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 pos["asset_class"],
@@ -444,6 +389,7 @@ def seed(db_path: str = "data/demo.db", conn: Optional[sqlite3.Connection] = Non
                 None,         # strategy
                 today,
                 1,            # in_portfolio
+                0,            # in_watchlist (demo positions are portfolio-only by default)
                 empfehlung,
                 story,
             ),
@@ -483,7 +429,7 @@ def seed(db_path: str = "data/demo.db", conn: Optional[sqlite3.Connection] = Non
                 (symbol, price_eur, currency_original, price_original, exchange_rate, fetched_at)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (ticker, price_eur, currency, price_original, exchange_rate, datetime.utcnow().isoformat()),
+            (ticker, price_eur, currency, price_original, exchange_rate, datetime.now(timezone.utc).isoformat()),
         )
         conn.commit()
         print(f"  {ticker}: €{price_eur:.4f} ({currency} {price_original:.4f})")

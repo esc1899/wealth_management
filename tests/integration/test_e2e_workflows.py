@@ -229,7 +229,7 @@ class TestWatchlistLifecycle:
         pos = Position(
             ticker="TSLA", name="Tesla", asset_class="Aktie",
             investment_type="Wertpapiere", unit="Stück",
-            added_date=date.today(), in_portfolio=False,
+            added_date=date.today(), in_portfolio=False, in_watchlist=True,
         )
         saved = positions.add(pos)
 
@@ -241,7 +241,7 @@ class TestWatchlistLifecycle:
         pos = Position(
             ticker="TSLA", name="Tesla", asset_class="Aktie",
             investment_type="Wertpapiere", unit="Stück",
-            added_date=date.today(), in_portfolio=False,
+            added_date=date.today(), in_portfolio=False, in_watchlist=True,
         )
         saved = positions.add(pos)
         positions.delete(saved.id)
@@ -253,7 +253,7 @@ class TestWatchlistLifecycle:
             positions.add(Position(
                 ticker=ticker, name=ticker, asset_class="Aktie",
                 investment_type="Wertpapiere", unit="Stück",
-                added_date=date.today(), in_portfolio=False,
+                added_date=date.today(), in_portfolio=False, in_watchlist=True,
             ))
         assert len(positions.get_watchlist()) == 3
 
@@ -271,7 +271,7 @@ class TestWatchlistLifecycle:
         positions.add(Position(
             ticker="MSFT", name="Microsoft", asset_class="Aktie",
             investment_type="Wertpapiere", unit="Stück",
-            added_date=date.today(), in_portfolio=False,
+            added_date=date.today(), in_portfolio=False, in_watchlist=True,
         ))
 
         portfolio_agent._tool_clear_watchlist()
@@ -284,7 +284,7 @@ class TestWatchlistLifecycle:
         wl = positions.add(Position(
             ticker="NVDA", name="Nvidia", asset_class="Aktie",
             investment_type="Wertpapiere", unit="Stück",
-            added_date=date.today(), in_portfolio=False,
+            added_date=date.today(), in_portfolio=False, in_watchlist=True,
         ))
         assert len(positions.get_portfolio()) == 0
 
@@ -293,10 +293,11 @@ class TestWatchlistLifecycle:
         )
 
         assert promoted.in_portfolio is True
+        assert promoted.in_watchlist is True   # stays on watchlist after promotion (can be in both)
         assert promoted.quantity == 3
         assert promoted.purchase_price == 800.0
         assert len(positions.get_portfolio()) == 1
-        assert len(positions.get_watchlist()) == 0
+        assert len(positions.get_watchlist()) == 1  # still on watchlist
 
 
 # ------------------------------------------------------------------
@@ -444,7 +445,7 @@ class TestMarketDataAllPositions:
         return positions.add(Position(
             ticker=ticker, name=ticker, asset_class="Aktie",
             investment_type="Wertpapiere", unit="Stück",
-            added_date=date.today(), in_portfolio=False,
+            added_date=date.today(), in_portfolio=False, in_watchlist=True,
         ))
 
     def _price(self, symbol: str, eur: float) -> PriceRecord:
@@ -566,7 +567,7 @@ class TestPortfolioAgentWithRealDB:
             positions.add(Position(
                 ticker=ticker, name=ticker, asset_class="Aktie",
                 investment_type="Wertpapiere", unit="Stück",
-                added_date=date.today(), in_portfolio=False,
+                added_date=date.today(), in_portfolio=False, in_watchlist=True,
             ))
         mock_llm.chat_with_tools = AsyncMock(side_effect=[
             OllamaResponse(content="", tool_calls=[ToolCall(
@@ -584,7 +585,7 @@ class TestPortfolioAgentWithRealDB:
         saved = positions.add(Position(
             ticker="TSLA", name="Tesla", asset_class="Aktie",
             investment_type="Wertpapiere", unit="Stück",
-            added_date=date.today(), in_portfolio=False,
+            added_date=date.today(), in_portfolio=False, in_watchlist=True,
         ))
         mock_llm.chat_with_tools = AsyncMock(side_effect=[
             OllamaResponse(content="", tool_calls=[ToolCall(

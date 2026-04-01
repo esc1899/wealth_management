@@ -66,6 +66,7 @@ def watchlist_position(**kwargs) -> Position:
         unit="Stück",
         added_date=date(2024, 1, 15),
         in_portfolio=False,
+        in_watchlist=True,
     )
     defaults.update(kwargs)
     return Position(**defaults)

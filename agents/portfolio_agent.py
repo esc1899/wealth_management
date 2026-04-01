@@ -196,6 +196,7 @@ class PortfolioAgent:
             notes=notes,
             added_date=date.today(),
             in_portfolio=False,
+            in_watchlist=True,
             recommendation_source="agent",
         )
         return self._positions.add(position)
@@ -329,6 +330,7 @@ class PortfolioAgent:
             story=args.get("story"),
             added_date=date.today(),
             in_portfolio=False,
+            in_watchlist=True,
             recommendation_source="user",
         )
         saved = self._positions.add(position)

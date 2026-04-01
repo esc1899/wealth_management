@@ -22,6 +22,7 @@ from typing import Optional, Tuple
 
 from core.llm.base import Message, Role
 from core.llm.local import OllamaProvider
+from core.storage.analyses import PositionAnalysesRepository
 from core.storage.market_data import MarketDataRepository
 from core.storage.models import Position, RebalanceSession
 from core.storage.positions import PositionsRepository
@@ -54,10 +55,12 @@ class RebalanceAgent:
         self,
         positions_repo: PositionsRepository,
         market_repo: MarketDataRepository,
+        analyses_repo: PositionAnalysesRepository,
         llm: OllamaProvider,
     ):
         self._positions = positions_repo
         self._market = market_repo
+        self._analyses = analyses_repo
         self._llm = llm
 
     async def start_session(
@@ -169,6 +172,10 @@ class RebalanceAgent:
                 total_value += value
             rows.append((pos, price_record.price_eur if price_record else None, value))
 
+        verdicts = self._analyses.get_latest_bulk(
+            [p.id for p in positions if p.id], "storychecker"
+        )
+
         lines = [f"**Portfolio snapshot — {date.today().isoformat()}**\n"]
 
         for pos, current_price, value in rows:
@@ -187,11 +194,21 @@ class RebalanceAgent:
             else:
                 qty_str = "?"
 
+            analysis = verdicts.get(pos.id)
+            verdict_str = ""
+            if analysis and analysis.verdict:
+                _icons = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴"}
+                icon = _icons.get(analysis.verdict, "")
+                verdict_str = f" | thesis: {icon} {analysis.verdict}"
+                if analysis.summary:
+                    verdict_str += f" — {analysis.summary}"
+
             lines.append(
                 f"- **{pos.ticker or pos.name}** ({pos.name}): "
                 f"{qty_str} {pos.unit} × {current_str} = {value_str} "
                 f"({weight} of portfolio) | "
                 f"purchase: {purchase} | class: {pos.asset_class}"
+                f"{verdict_str}"
             )
 
         if total_value > 0:

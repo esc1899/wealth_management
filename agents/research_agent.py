@@ -242,6 +242,7 @@ class ResearchAgent:
                 unit="Stück",
                 added_date=date.today(),
                 in_portfolio=False,
+                in_watchlist=True,
                 recommendation_source="research_agent",
                 strategy=session.strategy_name,
                 notes=notes,

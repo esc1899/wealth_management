@@ -14,6 +14,7 @@ follow-up questions within the same session.
 from __future__ import annotations
 
 from core.llm.claude import ClaudeProvider
+from core.storage.analyses import PositionAnalysesRepository
 from core.storage.models import Position, StorycheckerSession
 from core.storage.storychecker import StorycheckerRepository
 
@@ -87,10 +88,12 @@ class StorycheckerAgent:
         self,
         positions_repo,  # PositionsRepository — kept for future use
         storychecker_repo: StorycheckerRepository,
+        analyses_repo: PositionAnalysesRepository,
         llm: ClaudeProvider,
     ) -> None:
         self._positions = positions_repo
         self._storychecker = storychecker_repo
+        self._analyses = analyses_repo
         self._llm = llm
 
     # ------------------------------------------------------------------
@@ -114,7 +117,16 @@ class StorycheckerAgent:
         # Auto-send the initial analysis request
         initial_msg = _build_initial_message(position, skill_name, skill_prompt)
         self._storychecker.add_message(session.id, "user", initial_msg)
-        self._run_llm(session.id, [{"role": "user", "content": initial_msg}])
+        response = self._run_llm(session.id, [{"role": "user", "content": initial_msg}])
+        # Persist structured result for trend tracking
+        self._analyses.save(
+            position_id=position.id,
+            agent="storychecker",
+            skill_name=skill_name,
+            verdict=_extract_verdict(response),
+            summary=_extract_summary(response),
+            session_id=session.id,
+        )
         return session
 
     def chat(self, session_id: int, user_message: str) -> str:
@@ -183,6 +195,26 @@ class StorycheckerAgent:
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
+
+def _extract_verdict(text: str) -> str:
+    """Extract traffic-light verdict from the agent response."""
+    if "🟢" in text:
+        return "intact"
+    if "🟡" in text:
+        return "gemischt"
+    if "🔴" in text:
+        return "gefaehrdet"
+    return "unknown"
+
+
+def _extract_summary(text: str) -> str | None:
+    """Extract the one-sentence blockquote summary from the agent response."""
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("> ") and len(stripped) > 2:
+            return stripped[2:].strip()
+    return None
 
 
 def _build_initial_message(position: Position, skill_name: str, skill_prompt: str) -> str:

@@ -13,7 +13,7 @@ from core.asset_class_config import get_asset_class_registry
 from core.figi import RELEVANT_EXCH, openfigi_lookup, to_yahoo_ticker
 from core.i18n import t
 from core.storage.models import Position
-from state import get_app_config_repo, get_positions_repo, get_skills_repo
+from state import get_analyses_repo, get_app_config_repo, get_positions_repo, get_skills_repo
 
 st.set_page_config(page_title="Positionen", page_icon="📋", layout="wide")
 st.title(f"📋 {t('positionen.title')}")
@@ -22,6 +22,7 @@ st.caption(t("positionen.subtitle"))
 registry = get_asset_class_registry()
 repo = get_positions_repo()
 app_config = get_app_config_repo()
+analyses_repo = get_analyses_repo()
 
 _DEFAULT_EMPFEHLUNG_LABELS = ["Kaufen", "Halten", "Verkaufen", "Beobachten"]
 _empfehlung_labels: list[str] = app_config.get_json("empfehlung_labels", _DEFAULT_EMPFEHLUNG_LABELS)
@@ -371,15 +372,23 @@ if _ss("_pos_show_form"):
             else:
                 form_date = None
 
-        # in_portfolio checkbox (forced True for watchlist-ineligible types)
+        # Portfolio / Watchlist flags
         with col_h:
             if cfg.watchlist_eligible:
-                in_portfolio = st.checkbox(
-                    t("positionen.in_portfolio"),
-                    value=editing.in_portfolio if editing else True,
-                )
+                flag_col1, flag_col2 = st.columns(2)
+                with flag_col1:
+                    in_portfolio = st.checkbox(
+                        t("positionen.in_portfolio"),
+                        value=editing.in_portfolio if editing else True,
+                    )
+                with flag_col2:
+                    in_watchlist = st.checkbox(
+                        t("positionen.in_watchlist"),
+                        value=editing.in_watchlist if editing else False,
+                    )
             else:
                 in_portfolio = True
+                in_watchlist = False
 
         # Notes (always)
         form_notes = st.text_input(
@@ -454,6 +463,8 @@ if _ss("_pos_show_form"):
         errs = []
         if not form_name.strip():
             errs.append(t("positionen.error_name"))
+        if not in_portfolio and not in_watchlist:
+            errs.append(t("positionen.error_no_flag"))
         if form_qty is not None and form_qty <= 0 and in_portfolio and not cfg.manual_valuation:
             errs.append(t("positionen.error_quantity"))
 
@@ -488,6 +499,7 @@ if _ss("_pos_show_form"):
                 notes=(form_notes or "").strip() or None,
                 extra_data=extra if extra else None,
                 in_portfolio=in_portfolio,
+                in_watchlist=in_watchlist,
                 empfehlung=form_empfehlung or None,
                 story=(form_story or "").strip() or None,
                 story_skill=form_story_skill or None,
@@ -533,10 +545,17 @@ tab_portfolio, tab_watchlist = st.tabs([
 ])
 
 
+_VERDICT_ICON = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴"}
+
+
 def _render_table(positions: list[Position], empty_key: str):
     if not positions:
         st.info(t(empty_key))
         return
+
+    verdicts = analyses_repo.get_latest_bulk(
+        [p.id for p in positions if p.id], "storychecker"
+    )
 
     # Header row (10 columns: name, ticker, isin, class, qty, unit, price, detail, edit, del)
     hc = st.columns([3, 1, 2, 1, 1, 1, 1, 0.4, 0.4, 0.4])
@@ -552,7 +571,9 @@ def _render_table(positions: list[Position], empty_key: str):
 
     for pos in positions:
         cols = st.columns([3, 1, 2, 1, 1, 1, 1, 0.4, 0.4, 0.4])
-        cols[0].write(pos.name)
+        analysis = verdicts.get(pos.id)
+        verdict_badge = _VERDICT_ICON.get(analysis.verdict, "") if analysis else ""
+        cols[0].write(f"{verdict_badge} {pos.name}" if verdict_badge else pos.name)
         cols[1].write(pos.ticker or "—")
         cols[2].write(pos.isin or pos.wkn or "—")
         cols[3].write(pos.asset_class)
@@ -581,3 +602,4 @@ with tab_portfolio:
 
 with tab_watchlist:
     _render_table(repo.get_watchlist(), "positionen.empty_watchlist")
+

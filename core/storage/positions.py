@@ -33,9 +33,9 @@ class PositionsRepository:
                 quantity, unit, purchase_price, purchase_date,
                 notes, extra_data,
                 recommendation_source, strategy,
-                added_date, in_portfolio,
+                added_date, in_portfolio, in_watchlist,
                 empfehlung, story, story_skill
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             self._serialize(position),
         )
@@ -60,7 +60,7 @@ class PositionsRepository:
 
     def get_watchlist(self) -> List[Position]:
         rows = self._conn.execute(
-            "SELECT * FROM positions WHERE in_portfolio = 0"
+            "SELECT * FROM positions WHERE in_watchlist = 1"
         ).fetchall()
         return [self._deserialize(r) for r in rows]
 
@@ -75,7 +75,7 @@ class PositionsRepository:
                 quantity=?, unit=?, purchase_price=?, purchase_date=?,
                 notes=?, extra_data=?,
                 recommendation_source=?, strategy=?,
-                added_date=?, in_portfolio=?,
+                added_date=?, in_portfolio=?, in_watchlist=?,
                 empfehlung=?, story=?, story_skill=?
             WHERE id=?
             """,
@@ -110,6 +110,7 @@ class PositionsRepository:
             raise ValueError(f"Position {position_id} is already in the portfolio")
         updated = position.model_copy(update={
             "in_portfolio": True,
+            # in_watchlist intentionally preserved — position can be in both
             "quantity": quantity,
             "purchase_price": purchase_price,
             "purchase_date": purchase_date or date.today(),
@@ -152,6 +153,7 @@ class PositionsRepository:
             p.strategy,
             p.added_date.isoformat(),
             1 if p.in_portfolio else 0,
+            1 if p.in_watchlist else 0,
             p.empfehlung,
             self._enc.encrypt(p.story) if p.story else None,
             p.story_skill,
@@ -177,6 +179,7 @@ class PositionsRepository:
             strategy=row["strategy"],
             added_date=date.fromisoformat(row["added_date"]),
             in_portfolio=bool(row["in_portfolio"]),
+            in_watchlist=bool(row["in_watchlist"]) if "in_watchlist" in keys else False,
             empfehlung=row["empfehlung"] if "empfehlung" in keys else None,
             story=self._enc.decrypt(row["story"]) if ("story" in keys and row["story"]) else None,
             story_skill=row["story_skill"] if "story_skill" in keys else None,

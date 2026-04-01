@@ -101,7 +101,7 @@ def render_valuations(entries):
 
 
 portfolio_vals = [v for v in valuations if v.in_portfolio]
-watchlist_vals = [v for v in valuations if not v.in_portfolio]
+watchlist_vals = [v for v in valuations if v.in_watchlist]
 
 if portfolio_vals or not watchlist_vals:
     st.markdown(t("market_data.portfolio_section"))

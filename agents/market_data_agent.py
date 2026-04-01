@@ -46,6 +46,7 @@ class PortfolioValuation:
     pnl_pct: Optional[float]
     fetched_at: Optional[datetime]
     in_portfolio: bool = True
+    in_watchlist: bool = False
 
 
 class MarketDataAgent:
@@ -166,6 +167,7 @@ class MarketDataAgent:
                     pnl_pct=pnl_pct,
                     fetched_at=None,
                     in_portfolio=pos.in_portfolio,
+                    in_watchlist=pos.in_watchlist,
                 ))
                 continue
 
@@ -204,6 +206,7 @@ class MarketDataAgent:
                 pnl_pct=pnl_pct,
                 fetched_at=price_record.fetched_at if price_record else None,
                 in_portfolio=pos.in_portfolio,
+                in_watchlist=pos.in_watchlist,
             ))
 
         return valuations

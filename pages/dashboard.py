@@ -134,7 +134,7 @@ investment_types = list(dict.fromkeys(v.investment_type for v in valuations))
 
 for inv_type in investment_types:
     group = [v for v in valuations if v.investment_type == inv_type]
-    st.subheader(inv_type)
+    st.subheader(t(f"investment_types.{inv_type}"))
 
     rows = [
         {

@@ -93,6 +93,7 @@ def migrate(conn: sqlite3.Connection, enc: EncryptionService, dry_run: bool) -> 
             "strategy":               None,
             "added_date":             row["purchase_date"] or today,
             "in_portfolio":           1,
+            "in_watchlist":           0,
         })
 
     # ------------------------------------------------------------------
@@ -128,6 +129,7 @@ def migrate(conn: sqlite3.Connection, enc: EncryptionService, dry_run: bool) -> 
             "strategy":               None,
             "added_date":             row["added_date"],
             "in_portfolio":           0,
+            "in_watchlist":           1,
         })
 
     result = {
@@ -154,14 +156,14 @@ def migrate(conn: sqlite3.Connection, enc: EncryptionService, dry_run: bool) -> 
                     quantity, unit, purchase_price, purchase_date,
                     notes, extra_data,
                     recommendation_source, strategy,
-                    added_date, in_portfolio
+                    added_date, in_portfolio, in_watchlist
                 ) VALUES (
                     :asset_class, :investment_type,
                     :name, :isin, :wkn, :ticker,
                     :quantity, :unit, :purchase_price, :purchase_date,
                     :notes, :extra_data,
                     :recommendation_source, :strategy,
-                    :added_date, :in_portfolio
+                    :added_date, :in_portfolio, :in_watchlist
                 )
                 """,
                 p,
@@ -174,7 +176,7 @@ def migrate(conn: sqlite3.Connection, enc: EncryptionService, dry_run: bool) -> 
         "SELECT COUNT(*) FROM positions WHERE in_portfolio = 1"
     ).fetchone()[0]
     count_watchlist = conn.execute(
-        "SELECT COUNT(*) FROM positions WHERE in_portfolio = 0"
+        "SELECT COUNT(*) FROM positions WHERE in_watchlist = 1"
     ).fetchone()[0]
 
     assert count_portfolio == len(portfolio_rows), (

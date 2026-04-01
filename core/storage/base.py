@@ -59,11 +59,14 @@ def init_db(conn: sqlite3.Connection) -> None:
             strategy              TEXT,
             added_date            TEXT NOT NULL,
             in_portfolio          INTEGER NOT NULL DEFAULT 0,
+            in_watchlist          INTEGER NOT NULL DEFAULT 0,
             empfehlung            TEXT,
-            story                 TEXT
+            story                 TEXT,
+            story_skill           TEXT
         )""",
         "CREATE INDEX IF NOT EXISTS idx_positions_ticker ON positions(ticker)",
         "CREATE INDEX IF NOT EXISTS idx_positions_in_portfolio ON positions(in_portfolio)",
+        "CREATE INDEX IF NOT EXISTS idx_positions_in_watchlist ON positions(in_watchlist)",
         """CREATE TABLE IF NOT EXISTS current_prices (
             id                INTEGER PRIMARY KEY AUTOINCREMENT,
             symbol            TEXT NOT NULL UNIQUE,
@@ -162,6 +165,18 @@ def init_db(conn: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL
         )""",
         "CREATE INDEX IF NOT EXISTS idx_news_messages_run ON news_messages(run_id)",
+        """CREATE TABLE IF NOT EXISTS position_analyses (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            position_id INTEGER NOT NULL,
+            agent       TEXT NOT NULL,
+            skill_name  TEXT NOT NULL,
+            verdict     TEXT,
+            summary     TEXT,
+            session_id  INTEGER,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_position_analyses_position ON position_analyses(position_id)",
+        "CREATE INDEX IF NOT EXISTS idx_position_analyses_agent ON position_analyses(position_id, agent)",
         """CREATE TABLE IF NOT EXISTS rebalance_sessions (
             id                 INTEGER PRIMARY KEY AUTOINCREMENT,
             skill_name         TEXT NOT NULL,
@@ -199,6 +214,11 @@ def init_db(conn: sqlite3.Connection) -> None:
 def migrate_db(conn: sqlite3.Connection) -> None:
     """Apply schema migrations for columns/tables added after initial release."""
     existing_pos = {row[1] for row in conn.execute("PRAGMA table_info(positions)")}
+    if "in_watchlist" not in existing_pos:
+        conn.execute("ALTER TABLE positions ADD COLUMN in_watchlist INTEGER NOT NULL DEFAULT 0")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_positions_in_watchlist ON positions(in_watchlist)")
+        # Convert existing data: in_portfolio=0 was implicitly "watchlist" → set in_watchlist=1
+        conn.execute("UPDATE positions SET in_watchlist = 1 WHERE in_portfolio = 0")
     if "empfehlung" not in existing_pos:
         conn.execute("ALTER TABLE positions ADD COLUMN empfehlung TEXT")
     if "story" not in existing_pos:

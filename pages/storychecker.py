@@ -9,13 +9,14 @@ Uses built-in web search to find current news before assessing the thesis.
 import streamlit as st
 
 from core.i18n import t
-from state import get_positions_repo, get_skills_repo, get_storychecker_agent
+from state import get_analyses_repo, get_positions_repo, get_skills_repo, get_storychecker_agent
 
 st.set_page_config(page_title="Story Checker", page_icon="🔍", layout="wide")
 st.title(f"🔍 {t('storychecker.title')}")
 st.caption(t("storychecker.subtitle"))
 
 agent = get_storychecker_agent()
+analyses_repo = get_analyses_repo()
 st.info(t("storychecker.cloud_notice").format(model=agent._llm.model), icon="ℹ️")
 
 with st.expander(t("storychecker.what_is_this"), expanded=True):
@@ -83,6 +84,18 @@ with col_left:
                 st.markdown(selected_position.story)
                 if selected_position.story_skill:
                     st.caption(f"Anlage-Idee: {selected_position.story_skill}")
+
+        # Verdict history for selected position
+        past_analyses = analyses_repo.get_for_position(selected_position.id, limit=5)
+        if past_analyses:
+            _VERDICT_ICON = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴", "unknown": "⚪"}
+            with st.expander(t("storychecker.verdict_history"), expanded=False):
+                for a in past_analyses:
+                    icon = _VERDICT_ICON.get(a.verdict or "unknown", "⚪")
+                    date_str = a.created_at.strftime("%d.%m.%Y")
+                    st.markdown(f"{icon} **{date_str}** · {a.skill_name}")
+                    if a.summary:
+                        st.caption(a.summary)
 
         if submitted:
             skill = _skill_map.get(selected_skill_name)

@@ -90,9 +90,12 @@ def mock_repo():
 
 @pytest.fixture
 def agent(mock_positions_repo, mock_market_repo, mock_llm):
+    mock_analyses_repo = MagicMock()
+    mock_analyses_repo.get_latest_bulk.return_value = {}
     return RebalanceAgent(
         positions_repo=mock_positions_repo,
         market_repo=mock_market_repo,
+        analyses_repo=mock_analyses_repo,
         llm=mock_llm,
     )
 

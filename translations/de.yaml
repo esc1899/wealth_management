@@ -43,6 +43,14 @@ nav:
   group_system: "System ⚙️"
   statistics: "Statistiken"
 
+investment_types:
+  Wertpapiere: "Wertpapiere"
+  Renten: "Renten"
+  Immobilien: "Immobilien"
+  Edelmetalle: "Edelmetalle"
+  Krypto: "Krypto"
+  Geld: "Geld"
+
 dashboard:
   title: "Dashboard"
   portfolio_value: "Portfoliowert"
@@ -351,6 +359,7 @@ storychecker:
   pick_position: "Position wählen"
   pick_skill: "Anlage-Idee"
   show_story: "Hinterlegte Story anzeigen"
+  verdict_history: "Bisherige Urteile"
   run_button: "Story Check starten"
   thinking: "Suche nach aktuellen Infos und analysiere…"
   thinking_followup: "Analysiere…"
@@ -389,7 +398,9 @@ positionen:
   col_purchase_price: "Kaufpreis €"
   col_purchase_date: "Kaufdatum"
   col_notes: "Notizen"
-  in_portfolio: "Im Portfolio (nicht Watchlist)"
+  in_portfolio: "Im Portfolio"
+  in_watchlist: "Auf Watchlist"
+  error_no_flag: "Mindestens Portfolio oder Watchlist muss ausgewählt sein."
   empty_portfolio: "Noch keine Positionen im Portfolio."
   empty_watchlist: "Watchlist ist leer."
   error_name: "Name ist erforderlich."

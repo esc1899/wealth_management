@@ -204,6 +204,7 @@ class SearchAgent:
                 notes=notes,
                 added_date=date.today(),
                 in_portfolio=False,
+                in_watchlist=True,
                 recommendation_source="search_agent",
             )
             saved = self._positions.add(position)
