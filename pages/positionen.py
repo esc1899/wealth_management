@@ -13,7 +13,7 @@ from core.asset_class_config import get_asset_class_registry
 from core.figi import RELEVANT_EXCH, openfigi_lookup, to_yahoo_ticker
 from core.i18n import t
 from core.storage.models import Position
-from state import get_analyses_repo, get_app_config_repo, get_positions_repo, get_skills_repo
+from state import get_analyses_repo, get_app_config_repo, get_market_agent, get_positions_repo, get_skills_repo
 
 st.set_page_config(page_title="Positionen", page_icon="📋", layout="wide")
 st.title(f"📋 {t('positionen.title')}")
@@ -83,12 +83,19 @@ def _show_detail(pos_id: int):
         _set(_pos_show_form=True, _pos_edit_id=pos_id)
         st.rerun()
 
+    # ── Krypto-Warnung ───────────────────────────────────────────────────────
+    if pos.asset_class == "Kryptowährung":
+        st.warning(t("positionen.crypto_warning"), icon="⚠️")
+
     st.divider()
 
     # ── Core fields ─────────────────────────────────────────────────────────
     col_a, col_b = st.columns(2)
     col_a.markdown(f"**{t('positionen.col_asset_class')}:** {pos.asset_class}")
     col_b.markdown(f"**{t('positionen.col_unit')}:** {pos.unit}")
+
+    if pos.anlageart:
+        st.markdown(f"**{t('positionen.anlageart_label')}:** {pos.anlageart}")
 
     if pos.isin or pos.wkn:
         col_c, col_d = st.columns(2)
@@ -180,6 +187,19 @@ def _show_detail(pos_id: int):
             updated = pos.model_copy(update={"extra_data": new_extra})
             repo.update(updated)
             st.success(t("positionen.value_updated"))
+            st.rerun()
+
+    # ── Rebalance exclusion toggle ───────────────────────────────────────────
+    if pos.in_portfolio:
+        st.divider()
+        new_excluded = st.toggle(
+            t("positionen.rebalance_excluded_label"),
+            value=pos.rebalance_excluded,
+            help=t("positionen.rebalance_excluded_help"),
+            key=f"_detail_rebalance_excl_{pos_id}",
+        )
+        if new_excluded != pos.rebalance_excluded:
+            repo.update(pos.model_copy(update={"rebalance_excluded": new_excluded}))
             st.rerun()
 
     st.divider()
@@ -346,6 +366,23 @@ if _ss("_pos_show_form"):
                 format_func=lambda x: x if x else "—",
             )
 
+        # Anlageart (sub-type dropdown — only if asset class has anlagearten defined)
+        _anlagearten = cfg.anlagearten
+        if _anlagearten:
+            _al_opts = [""] + _anlagearten
+            _al_default = (editing.anlageart or "") if editing else ""
+            _al_idx = _al_opts.index(_al_default) if _al_default in _al_opts else 0
+            col_al, _ = st.columns(2)
+            with col_al:
+                form_anlageart = st.selectbox(
+                    t("positionen.anlageart_label"),
+                    options=_al_opts,
+                    index=_al_idx,
+                    format_func=lambda x: x if x else "—",
+                )
+        else:
+            form_anlageart = None
+
         # Empfohlen von (recommendation source — free text)
         col_rec, _ = st.columns(2)
         with col_rec:
@@ -393,6 +430,7 @@ if _ss("_pos_show_form"):
                     t("positionen.col_purchase_date"),
                     value=editing.purchase_date if editing else None,
                     min_value=date(2000, 1, 1),
+                    max_value=date.today(),
                 )
             else:
                 form_date = None
@@ -491,6 +529,12 @@ if _ss("_pos_show_form"):
             errs.append(t("positionen.error_no_flag"))
         if form_qty is not None and form_qty <= 0 and in_portfolio and not cfg.manual_valuation:
             errs.append(t("positionen.error_quantity"))
+        if form_ticker is not None:
+            ticker_clean = (form_ticker or "").strip()
+            if cfg.auto_fetch and in_portfolio and not ticker_clean:
+                errs.append(t("positionen.error_ticker_required"))
+            elif ticker_clean and (" " in ticker_clean or len(ticker_clean) > 20):
+                errs.append(t("positionen.error_ticker_format"))
 
         if errs:
             for e in errs:
@@ -528,13 +572,21 @@ if _ss("_pos_show_form"):
                 recommendation_source=(form_rec_source or "").strip() or None,
                 story=(form_story or "").strip() or None,
                 story_skill=form_story_skill or None,
+                anlageart=form_anlageart or None,
                 added_date=editing.added_date if editing else date.today(),
             )
             if editing:
                 pos = editing.model_copy(update=pos_data)
                 repo.update(pos)
             else:
-                repo.add(Position(**pos_data))
+                saved = repo.add(Position(**pos_data))
+                # Auto-fetch current price for new auto-fetch positions with a ticker
+                if saved.ticker and cfg.auto_fetch:
+                    with st.spinner(t("positionen.fetching_price")):
+                        try:
+                            get_market_agent().fetch_all_now()
+                        except Exception:
+                            pass  # non-critical — price can be fetched later
             _clear_form()
             st.session_state["_pos_just_saved"] = True
             st.rerun()

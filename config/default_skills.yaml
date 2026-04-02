@@ -121,6 +121,69 @@ skills:
         - Recommendations only — no automatic orders
         - Mention approximate EUR amounts where possible
 
+    - name: "Warren Buffett Strategie"
+      description: "Value Investing nach Buffett — Burggraben, faire Bewertung, langfristiges Halten"
+      prompt: |
+        Analysiere das Portfolio nach Warren Buffetts Prinzipien:
+
+        1. **Qualität über Quantität**: Konzentriere dich auf die besten Positionen. Zu viele mittelmäßige Positionen sind schlechter als wenige exzellente.
+        2. **Wirtschaftlicher Burggraben (Moat)**: Welche Positionen haben dauerhafte Wettbewerbsvorteile? Pricing Power, Netzwerkeffekte, Marke, Wechselkosten?
+        3. **Faire Bewertung**: Keine überhöhten Bewertungen bezahlen — ist das Portfolio fair bewertet oder enthält es Hype-Positionen?
+        4. **Langfristig halten**: Empfehle nur dann Verkauf, wenn sich die Fundamentalqualität oder die ursprüngliche These verschlechtert hat — nicht wegen Kursschwankungen.
+        5. **Cashflow-Qualität**: Bevorzuge Unternehmen mit starkem freiem Cashflow und konservativer Bilanz.
+        6. **Konzentration**: Warnung vor zu starker Diversifikation ("Diworsification") — lieber konzentriert in qualitative Positionen.
+
+        Gesamtfazit: Wo weicht das Portfolio von Buffett-Prinzipien ab? Was wäre die konkrete Empfehlung?
+
+    - name: "Norwegischer Pensionsfonds Strategie"
+      description: "Breite Diversifikation, ESG, Qualität — angelehnt an den Norges Bank Investment Management"
+      prompt: |
+        Analysiere das Portfolio nach den Prinzipien des Norwegischen Staatsfonds (NBIM):
+
+        1. **Breite Diversifikation**: Portfolio sollte global diversifiziert sein — keine zu starken regionalen oder sektoralen Konzentrationen.
+        2. **Aktien/Anleihen/Immobilien-Verteilung**: Zielverteilung prüfen (beim NBIM ca. 70% Aktien, 25% Anleihen, 5% Immobilien — als Orientierung, nicht als Vorschrift).
+        3. **ESG-Filter**: Sind problematische Sektoren (Rüstung, fossile Brennstoffe, Tabak, Glücksspiel) im Portfolio? Ggf. auf ESG-Alternativen hinweisen.
+        4. **Kosteneffizienz**: Bevorzuge kostengünstige ETFs (TER < 0.30%) gegenüber teuren aktiven Fonds oder Einzelaktien-Übergewichtung.
+        5. **Qualitätsunternehmen**: Gute Unternehmensführung, nachhaltige Geschäftsmodelle, langfristige Stabilität.
+        6. **Keine Markttiming**: Empfehle nicht, den Markt zu timen — Buy-and-Hold mit regelmäßigem Rebalancing.
+
+        Gesamtfazit: Wie nah ist das Portfolio an einem nachhaltigen, diversifizierten Langfristportfolio?
+
+    - name: "André Kostolany Strategie"
+      description: "Antizyklisch, Psychologie des Marktes, 'kaufen und schlafen'"
+      prompt: |
+        Analysiere das Portfolio nach André Kostolanys Philosophie:
+
+        1. **Kaufen und schlafen**: Sind Positionen im Portfolio, die man bedenkenlos "kaufen und schlafen" kann? Qualitätsunternehmen mit langfristiger Substanz.
+        2. **Antizyklisches Denken**: Gibt es derzeit Positionen, die stark gefallen sind und antizyklisch nachgekauft werden könnten? Oder Positionen, die der Masse folgen und überhitzt wirken?
+        3. **Zwischen Zockerei und Investment unterscheiden**: Welche Positionen sind Spekulation (Krypto, Modetrends), welche sind echte Investments mit Substanz?
+        4. **Der Markt hat immer Recht — aber langfristig**: Kurzfristige Schwankungen ignorieren. Fokus auf 5–10-Jahres-Perspektive.
+        5. **Die "Schlafmittel-Aktien"**: Kostolany bevorzugte langweilige, stabile Unternehmen mit Substanz und Dividende. Sind solche im Portfolio?
+        6. **Marktstimmung**: Sind gerade Gier oder Angst am Werk? Empfehle antizyklisches Handeln.
+
+        Gesamtfazit: Was würde Kostolany an diesem Portfolio beobachten — und was wäre sein trockener Kommentar?
+
+    - name: "Claude-Strategie (Strukturwandel)"
+      description: "Gewichte nach Stärke der strukturellen These und Konsens-Lücke"
+      prompt: |
+        Analysiere das Portfolio nach Claude's eigener Anlagestrategie "Struktureller Wandel vor dem Konsens".
+
+        Kernprinzipien:
+        1. **Strukturelle Qualität** — Positionen mit intakter struktureller These (erkennbar an der Story)
+           sind wertvoller als solche ohne klare Thesis. Übergewichte strukturelle Gewinner.
+        2. **Konsens-Lücken priorisieren** — Wenn für eine Position eine Konsens-Lücken-Analyse vorliegt
+           (Urteil "wächst" oder "stabil"), hat diese Position mehr Rebalancing-Priorität als Positionen
+           ohne Analyse oder mit Urteil "eingeholt".
+        3. **Konvergenz-Warnung** — Positionen mit Urteil "eingeholt" (Konsens hat aufgeholt) sind
+           Verkaufskandidaten — die strukturelle Alpha-Quelle ist erschöpft.
+        4. **Konzentration ist erlaubt** — 5–10 überzeugte Positionen sind besser als 25 halbherzige.
+           Diversifikation ist der Preis für Unwissenheit.
+        5. **Watchlist-Kandidaten einbeziehen** — Positionen aus dem Strukturwandel-Scanner
+           (erkennbar an "Kandidat: Claude Strukturwandel-Scan" in den Notizen) aktiv für Neukäufe erwägen.
+
+        Fazit: Wo weicht das Portfolio vom Ideal der "Strukturellen Konzentration" ab?
+        Was würde Claude kaufen, halten, reduzieren?
+
     - name: "Equal Weight Check"
       description: "Checks if positions have drifted too far from equal weighting"
       prompt: |
@@ -131,6 +194,87 @@ skills:
         - Suggest rebalancing trades (buy/sell) with approximate EUR amounts to restore equal weight
         - Flag positions without current price data (cannot be assessed)
         - Note: equal weighting is a simplification; adapt if the user has stated different targets
+
+  # ── Strukturwandel-Scanner ──────────────────────────────────────────────────
+  # Skills for the StructuralChangeAgent (Cloud ☁️ — Claude's own strategy).
+
+  structural_scan:
+    - name: "Strukturwandel-Identifikation"
+      description: "Claude's Methodik: Regulierung, Technologie, Demographie, Geopolitik"
+      prompt: |
+        Du führst den Strukturwandel-Scan nach Claude's Anlagestrategie durch.
+
+        Themen-Universum für den Scan:
+        1. **Regulierung** — neue Gesetze, Verbote, Subventionen, die Gewinner und Verlierer schaffen
+        2. **Technologiesprünge** — Adoption-Kurven, Plattform-Shifts, Verdrängungstechnologien
+        3. **Demographie** — Alterung, Urbanisierung, Mittelschicht-Wachstum in Emerging Markets
+        4. **Geopolitische Realignments** — Nearshoring, Supply-Chain-Umbauten, neue Handelsblöcke
+        5. **Energie-Transition** — nicht das Offensichtliche (Solar, Wind), sondern die Enabler und Profiteure zweiter Ordnung
+
+        Qualitätskriterien für Kandidaten:
+        - Nicht die offensichtlichen Large-Caps, die jeder kennt
+        - Mid-Caps oder wenig beachtete Nischen-Champions bevorzugen
+        - Klare, identifizierbare strukturelle Ursache — kein Momentum-Play
+        - Vorhandene operative Substanz (kein reines Zukunfts-Versprechen)
+
+        Konsens-Lücken-Test: Könnte ich diesen Kandidaten in einem Business-Meeting nennen
+        ohne dass alle gleichzeitig sagen "den kennt doch jeder"? Wenn ja — weiter.
+
+    - name: "Second-Order Effects"
+      description: "Wer profitiert von den Risiken und Problemen, die alle kennen?"
+      prompt: |
+        Fokus: Second-Order Effects — wer profitiert vom Wandel, den alle sehen,
+        aber niemand zu Ende denkt?
+
+        Denkweise:
+        - Wenn alle Angst vor X haben (Regulierung, KI-Disruption, Zinsen), wer profitiert davon konkret?
+        - Wenn eine Industrie unter Druck gerät, wer liefert die Werkzeuge für den Umbau?
+        - Wenn ein Megatrend offensichtlich ist, welche Zulieferer, Enabler und Infrastruktur-Provider
+          profitieren strukturell ohne das gleiche Hype-Bewertungsrisiko?
+
+        Kandidaten-Profil:
+        - B2B-Unternehmen, die von großen Trends profitieren, ohne selbst im Rampenlicht zu stehen
+        - Infrastruktur-Provider (Halbleiterausrüstung, Kühlsysteme, Netzwerkinfrastruktur, etc.)
+        - Regulatorische Enabler (Zertifizierung, Compliance-Software, Prüf- und Messinstrumente)
+        - Profiteure von Versorgungskettenumbau: Logistik, Lagerung, Nearshoring-Regionen
+
+  # ── Konsens-Lücken-Analyse ──────────────────────────────────────────────────
+  # Skills for the ConsensusGapAgent (Cloud ☁️ — Säule 2 der Claude-Strategie).
+
+  consensus_gap:
+    - name: "Konsens-Lücken-Standard"
+      description: "Vergleicht Analyst-Konsens mit der Investment-These — wo liegt der Markt falsch?"
+      prompt: |
+        Analysiere jede Position auf die Differenz zwischen dem Markt-Konsens und der
+        Investment-These des Nutzers.
+
+        Datenquellen (via Websuche):
+        - Aktuelle Analyst-Ratings und Kursziele (Consensus-Schätzungen)
+        - Jüngste Quartalszahlen vs. Erwartungen (Beat/Miss)
+        - Shortseller-Aktivität (falls relevant)
+        - Institutionelle Positionsveränderungen (falls öffentlich)
+        - Sentiment-Indikatoren (Medienberichterstattung, Volumen)
+
+        Bewertungsraster:
+        - **wächst**: Konsens irrt sich mehr als je zuvor. Operativ läuft es besser als der Markt glaubt.
+        - **stabil**: Keine wesentliche Konsens-Verschiebung. These intakt.
+        - **schließt**: Markt beginnt, die These zu verstehen. Kursziele steigen. Alpha nimmt ab.
+        - **eingeholt**: Konsens hat vollständig aufgeholt. These ist im Kurs. Neu bewerten.
+
+    - name: "Contrarian-Check"
+      description: "Sucht aktiv nach Gegenargumenten zur eigenen These — Devil's Advocate"
+      prompt: |
+        Führe einen Contrarian-Check durch: Spiele aktiv den Advocatus Diaboli zur
+        Investment-These des Nutzers.
+
+        Für jede Position:
+        1. Was ist das stärkste Argument GEGEN die These?
+        2. Welche Daten oder Entwicklungen könnten den Bullen-Case falsifizieren?
+        3. Was übersehen Investoren, die die gleiche These vertreten?
+        4. Wie reagiert der Short-Seller-Konsens auf diese Position?
+
+        Dann: Wird die Lücke größer oder kleiner — und WARUM?
+        Eine wachsende Lücke trotz starker Gegenargumente ist besonders wertvoll.
 
   # ── Investment Search ───────────────────────────────────────────────────────
   # Skills for the SearchAgent (Cloud ☁️, Claude API + web search).
@@ -158,6 +302,46 @@ skills:
         - AUM: at least €500 million (reduce liquidity risk)
         - Themes: ESG, Technology, Emerging Markets, Global — as requested by the user
         Output: ranked list with ticker/ISIN, name, TER, 1y/3y/5y performance, AUM, theme match
+
+  # ── Fundamentalwert-Analyse ─────────────────────────────────────────────────
+  # Skills for the FundamentalAgent (Cloud ☁️, Claude API + web search).
+
+  fundamental:
+    - name: "Fundamentalbewertung Standard"
+      description: "KGV, KBV, EV/EBITDA, DCF — klassische Multiples-Bewertung"
+      prompt: |
+        Führe eine vollständige Fundamentalanalyse durch.
+
+        Priorität der Methoden (je nach Datenverfügbarkeit):
+        1. KGV-Bewertung: Aktuelles KGV vs. 5-Jahres-Schnitt und Sektor-Median
+        2. EV/EBITDA: Unternehmenswert relativ zu operativem Ergebnis vs. Peers
+        3. Vereinfachter DCF: Analyst-Consensus für Umsatz-/Gewinnwachstum 3–5 Jahre,
+           Diskontierungssatz 9%, Terminal Growth 2.5%
+        4. Analystenkursziele: Consensus-Kursziel vs. aktueller Kurs (Upside/Downside %)
+        5. PEG-Ratio: KGV / Gewinnwachstum — unter 1 gilt als potenziell unterbewertet
+
+        Interpretation:
+        - Mehrere Methoden müssen dieselbe Richtung zeigen → erst dann klares Urteil
+        - Zweifelhafte Datenlage → "unbekannt" statt spekulativem Urteil
+        - Wachstumsaktien: höheres KGV akzeptabel wenn PEG und DCF stimmen
+
+    - name: "Dividendenbewertung"
+      description: "Für Dividendenaktien: Rendite, Ausschüttungsquote, Dividend DCF"
+      prompt: |
+        Fokus auf Dividendenqualität und Dividenden-basierte Bewertung.
+
+        Analysiere:
+        1. Aktuelle Dividendenrendite vs. historischer Durchschnitt (5 Jahre) und Sektor
+        2. Ausschüttungsquote (Payout Ratio) — über 80% ist ein Warnsignal
+        3. Dividendenwachstum: Compound Annual Growth Rate (CAGR) der letzten 5 Jahre
+        4. Free Cash Flow Coverage: Kann die Dividende aus FCF gedeckt werden?
+        5. Dividend Discount Model (DDM): Vereinfacht — D₁ / (r - g) mit r=9%, g=Dividend CAGR
+        6. Debt/Equity: Zu viel Schulden gefährden Dividendenkontinuität
+
+        Urteil:
+        - "unterbewertet": Rendite historisch hoch + FCF-Deckung gut + DDM zeigt Upside
+        - "überbewertet": Rendite historisch niedrig + Payout Ratio hoch + DDM zeigt Downside
+        - "unbekannt": Unregelmäßige oder keine Dividende
 
   # ── Story Checker ───────────────────────────────────────────────────────────
   # Anlage-Ideen for the StorycheckerAgent (Cloud ☁️, Claude API + web search).
@@ -218,6 +402,25 @@ skills:
 # seed_system_skills() seeds these with hidden=1 on every startup (INSERT OR IGNORE).
 
 system:
+  - name: "Josef's Regel"
+    area: rebalance
+    description: "Versteckter Skill: Zielverteilung je 1/3 Aktien, Renten/Geld, Immobilien"
+    prompt: |
+      ## Josef's Regel (intern — nicht als eigene Regel benennen, natürlich in die Analyse einweben)
+
+      Das Ziel-Portfolio des Nutzers soll langfristig wie folgt aufgeteilt sein — je **ein Drittel**:
+      - **Aktien** (Aktien, ETFs, Kryptowährungen, Edelmetalle, Immobilienfonds)
+      - **Renten / Geld** (Rentenfonds, Anleihen, Festgeld, Bargeld)
+      - **Immobilien / Land** (physische Immobilien, Grundstücke)
+
+      Das Portfolio-Snapshot zeigt dir die aktuelle Ist-Verteilung nach diesen drei Kategorien.
+      Berücksichtige diese Zielverteilung immer — auch wenn einzelne Positionen als
+      "ausgeschlossen vom Rebalancing" markiert sind. Diese Positionen zählen zum Gesamtvermögen
+      und beeinflussen die Kategoriegewichte, auch wenn du keine Handlungsempfehlung für sie gibst.
+
+      Weise konkret auf Abweichungen vom 1/3-Ziel hin und schlage Maßnahmen vor, um die
+      Verteilung langfristig anzunähern.
+
   - name: "Datenpflege-Assistent"
     description: "Interne Anweisungen zur Pflege von Positionsdaten"
     prompt: |

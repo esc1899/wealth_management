@@ -97,6 +97,25 @@ class MarketDataRepository:
         ).fetchall()
         return [self._deserialize_historical(row) for row in rows]
 
+    def get_prev_close(self, symbol: str) -> Optional[float]:
+        """Return the second-most-recent historical closing price for a symbol.
+
+        Used to compute daily P&L (current_price vs. previous day's close).
+        Returns None if fewer than 2 data points exist.
+        """
+        rows = self._conn.execute(
+            """
+            SELECT close_eur FROM historical_prices
+            WHERE symbol = ?
+            ORDER BY date DESC
+            LIMIT 2
+            """,
+            (symbol.upper(),),
+        ).fetchall()
+        if len(rows) < 2:
+            return None
+        return float(rows[1]["close_eur"])
+
     def get_all_symbols_historical(self, days: int = 90) -> dict[str, list[HistoricalPrice]]:
         """Return historical data for all symbols, grouped by symbol."""
         rows = self._conn.execute(

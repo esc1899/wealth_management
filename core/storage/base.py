@@ -62,7 +62,9 @@ def init_db(conn: sqlite3.Connection) -> None:
             in_watchlist          INTEGER NOT NULL DEFAULT 0,
             empfehlung            TEXT,
             story                 TEXT,
-            story_skill           TEXT
+            story_skill           TEXT,
+            rebalance_excluded    INTEGER NOT NULL DEFAULT 0,
+            anlageart             TEXT
         )""",
         "CREATE INDEX IF NOT EXISTS idx_positions_ticker ON positions(ticker)",
         "CREATE INDEX IF NOT EXISTS idx_positions_in_portfolio ON positions(in_portfolio)",
@@ -205,6 +207,36 @@ def init_db(conn: sqlite3.Connection) -> None:
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
         )""",
+        """CREATE TABLE IF NOT EXISTS structural_scan_runs (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            skill_name  TEXT NOT NULL,
+            user_focus  TEXT,
+            result      TEXT NOT NULL,
+            created_at  TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS structural_scan_messages (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id     INTEGER NOT NULL REFERENCES structural_scan_runs(id),
+            role       TEXT NOT NULL,
+            content    TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_structural_scan_messages_run ON structural_scan_messages(run_id)",
+        """CREATE TABLE IF NOT EXISTS scheduled_jobs (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_name  TEXT NOT NULL,
+            skill_name  TEXT NOT NULL,
+            skill_prompt TEXT NOT NULL,
+            frequency   TEXT NOT NULL,
+            run_hour    INTEGER NOT NULL DEFAULT 8,
+            run_minute  INTEGER NOT NULL DEFAULT 0,
+            run_weekday INTEGER,
+            run_day     INTEGER,
+            model       TEXT,
+            enabled     INTEGER NOT NULL DEFAULT 1,
+            last_run    TEXT,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
     ]:
         conn.execute(stmt)
     conn.commit()
@@ -224,6 +256,10 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE positions ADD COLUMN story TEXT")
     if "story_skill" not in existing_pos:
         conn.execute("ALTER TABLE positions ADD COLUMN story_skill TEXT")
+    if "rebalance_excluded" not in existing_pos:
+        conn.execute("ALTER TABLE positions ADD COLUMN rebalance_excluded INTEGER NOT NULL DEFAULT 0")
+    if "anlageart" not in existing_pos:
+        conn.execute("ALTER TABLE positions ADD COLUMN anlageart TEXT")
 
     existing_skills = {row[1] for row in conn.execute("PRAGMA table_info(skills)")}
     if "hidden" not in existing_skills:

@@ -16,56 +16,36 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 
 ## Planned
 
-### Bugs
+---
 
-#### [P1] [BUG] Rebalance crashes without error message
-The Rebalance page silently crashes — no user-visible error, just a blank result or spinner hang.
-- Wrap `agent.analyze()` call in `pages/rebalance_chat.py` in try/except
-- Display a user-friendly `st.error()` with the exception message
-- Root cause likely: Ollama not running, or model not pulled
+### Invest / Rebalance
 
-### Improvements
 
-#### [P1] [IMPR] Rebalancing: Geld und Immobilien separat behandeln
-Börsengehandelte Positionen (Aktien, ETFs, Krypto) von nicht-handelbaren Positionen trennen:
-- Geldanlagen (Festgeld, Bargeld): illiquide / feste Laufzeit
-- Immobilien/Grundstücke: sehr illiquide
+#### [P3] [FEAT] Invest/Rebalance: Zusammenhang Skill ↔ geplante Cloud-Agents
+Architektur-Frage: Wenn Agents (News, Storychecker) automatisch eingeplant werden, sollen ihre Ergebnisse als Kontext in Invest/Rebalance einfließen. Skill-Auswahl im Rebalance könnte steuern, welche Agent-Outputs relevant sind.
 
-Gewünschtes Verhalten:
-- Rebalance-Snapshot zeigt Geld + Immobilien separat als "Nicht-handelbares Vermögen"
-- Agent bekommt Kontext: "Diese Positionen stehen nicht zum Umschichten zur Verfügung"
-- Empfehlungen nur für handelbaren Portfolio-Teil
+Klärungsbedarf: Design-Session vor Umsetzung.
 
-Umsetzung: `_build_portfolio_context()` in `agents/rebalance_agent.py` aufteilen; Skill-Prompt anpassen.
+---
 
-#### [P1] [IMPR] Invest/Rebalance: Watchlist-Kandidaten einbeziehen
-Watchlist-Positionen mit Story als "Kaufkandidaten" im Rebalance-Kontext sichtbar machen — ohne Mengen/Preise aus dem Portfolio zu exponieren.
+### Research / Story / Investment Search
 
-Umsetzung: `_build_portfolio_context()` um optionale Watchlist-Sektion erweitern.
+#### [P2] [IMPR] Investment Search: Begründung als Story absichern
+Wenn eine Investment-Search-Empfehlung in die Watchlist übernommen wird, soll die Begründung (aus dem Chat) automatisch als Story gespeichert werden.
 
-#### [P2] [IMPR] Auto-fetch market data on position creation
-When a new position is added, automatically fetch:
-1. Historical price for the purchase date (accurate cost basis)
-2. Current price for latest trading day
+Umsetzung: "In Watchlist" Button übergibt Begründungstext an Story-Feld.
 
-Uses existing `MarketDataFetcher`. Graceful fallback if ticker invalid. No UI blocking.
+#### [P3] [FEAT] Story: AI-generiertes Bild
+Passend zum Investment (Name, Asset-Klasse, Story) ein Bild generieren lassen — z.B. via DALL-E oder Claude Vision-to-Image (falls verfügbar).
 
-→ [GitHub Issue #6](https://github.com/esc1899/wealth_management/issues/6)
+Klärungsbedarf: API-Kosten, Speicherort (Blob oder DB), UI-Integration.
 
-#### [P1] [IMPR] Input validation when creating positions
-Validate agent-extracted values before saving to DB:
-- Quantity/price: must be positive
-- Purchase date: not in the future, valid format
-- Asset class: must exist in `asset_classes.yaml`
-- Ticker: basic format check; optionally verify via yfinance
+---
 
-→ [GitHub Issue #7](https://github.com/esc1899/wealth_management/issues/7)
+### Architektur
 
-#### [P2] [IMPR] Portfolio Chat: Skill + proactive clarification + save confirmation
-Three linked improvements to make the LLM-based entry reliable:
-1. **Skill for Portfolio Chat** — example skill that tells the LLM which fields matter
-2. **Plausibility check before saving** — validates extracted values, asks for clarification if missing
-3. **Explicit save confirmation in chat** — agent replies with saved values after tool call
+
+
 
 ---
 
@@ -80,9 +60,82 @@ Allow users to enter an expected cash in- or outflow before running the analysis
 #### [P3] [FEAT] Währungsflexibilisierung
 `BASE_CURRENCY` Config-Eintrag (default EUR) für CH/GB/US-Nutzer.
 
+#### [P3] [IMPR] UI: Lokale vs. Cloud LLM visuell trennen
+Privater Bereich (Ollama 🔒) und Cloud-Bereich (Claude ☁️) klarer abheben — z.B. eigene Navigationsgruppen-Farben oder Badges.
+
+#### [P3] [IMPR] Tonfall-Skill pro Agent
+`st.selectbox` "Kommunikationsstil" in der Seitenleiste jedes Chat-Agents (Präzise, Erklärend, Motivierend, Kritisch, Formal).
+
 ---
 
 ## Done
+
+#### [P2] [IMPR] Rebalance: Cloud-Agent-Ergebnisse in Kontext einbeziehen
+`_build_portfolio_context()` lädt jetzt `fundamental`- und `consensus_gap`-Verdicts für alle Portfolio-Positionen und Watchlist-Kandidaten. Positionszeilen zeigen bis zu 3 Signale: `thesis: 🟢 intact | fundamental: 🟢 unterbewertet (+24%) | gap: 🟢 wächst`. Watchlist-Kandidaten ebenfalls mit Cloud-Verdicts angereichert. Graceful: fehlende Analysen werden einfach weggelassen.
+
+#### [P2] [IMPR] Demo-Daten: Analysen für alle Positionen
+`seed_demo.py` befüllt `position_analyses` mit fiktiven aber plausiblen Ergebnissen für alle 3 Agenten (storychecker, fundamental, consensus_gap). Summaries mit `[Demodaten]` gekennzeichnet. Werden automatisch überschrieben sobald echte Analysen laufen (neuester Eintrag gewinnt).
+
+#### [P2] [BUG] Scheduling: Agent-Wechsel aktualisiert Skills nicht
+Agent-Selectbox im "Geplante Aufgaben"-Formular war innerhalb `st.form` — kein Rerun bei Änderung, Skills-Dropdown blieb statisch. Fix: Agent-Selectbox aus dem Form herausbewegt (triggert Rerun), Skills werden reaktiv neu geladen.
+
+#### [P2] [BUG] Strukturwandel-Scanner: leeres Ergebnis ohne Fehlermeldung
+`web_search_20250305` wird von Haiku nicht als Server-Side-Tool ausgeführt — Claude emittiert einen `tool_use`-Block, der nicht in `CLIENT_TOOL_NAMES` ist → agentic loop bricht sofort ab → `response.content = ""`. Fix: Sonnet als Default für alle web-search-lastigen Agenten (structural_scan, consensus_gap, fundamental). Agentic loop zusätzlich auf `stop_reason == "end_turn"` geprüft.
+
+#### [P1] [IMPR] Input validation when creating positions
+Agent-extracted values validated before saving: quantity/price positive, purchase date not in the future, ticker format check. UI form: `max_value=date.today()` on date input, ticker required for auto-fetch classes.
+
+→ [GitHub Issue #7](https://github.com/esc1899/wealth_management/issues/7)
+
+#### [P2] [IMPR] Auto-fetch market data on position creation
+When a new position with a ticker is added (via form or portfolio chat), current price is automatically fetched via `MarketDataFetcher`. Graceful fallback if fetch fails. Non-blocking.
+
+→ [GitHub Issue #6](https://github.com/esc1899/wealth_management/issues/6)
+
+#### [P2] [IMPR] Portfolio Chat: validation + save confirmation
+`_tool_add_portfolio()` validates date format, future dates, quantity > 0, price >= 0. Returns `{"error": "..."}` on failure. Follow-up prompt requests explicit German confirmation with all saved fields (name, ticker, quantity+unit, purchase price, purchase date).
+
+#### [P2] [FEAT] Invest/Rebalance: Weitere Strategien als Skills
+Warren Buffett, Norwegischer Pensionsfonds, André Kostolany als wählbare Skills in `default_skills.yaml` geseedet. `SkillsRepository.seed_new_skills(area, list)` fügt neue Skills in bestehende Areas ein (INSERT OR IGNORE per name+area).
+
+#### [P3] [FEAT] Fundamentalwert-Agent ✅ UMGESETZT
+`FundamentalAgent` (Säule 3): KGV, P/B, EV/EBITDA, DCF, PEG, Analystenkursziele. Verdicts (unterbewertet/fair/überbewertet/unbekannt) mit Fair-Value-EUR und Upside-% in `position_analyses`. Neue Nav-Seite in "Claude-Strategie". Skills: Fundamentalbewertung Standard, Dividendenbewertung. Default-Modell: Sonnet (benötigt web_search_20250305).
+
+#### [P3] [FEAT] Grosses Experiment: "Claude-Strategie Strukturwandel" ✅ UMGESETZT
+`StructuralChangeAgent` (Säule 1): Monatlicher Web-Search-Scan, identifiziert strukturelle Themen vor dem Konsens, fügt Kandidaten direkt zur Watchlist hinzu. `ConsensusGapAgent` (Säule 2): Analysiert Portfolio-Positionen auf Konsens-Lücke, Verdicts (wächst/stabil/schließt/eingeholt) in `position_analyses`. Neue Nav-Gruppe "Claude-Strategie". Skills: Strukturwandel-Identifikation, Second-Order Effects, Konsens-Lücken-Standard, Contrarian-Check. Rebalance-Skill "Claude-Strategie (Strukturwandel)". Scheduling für beide Agenten.
+
+#### [P2] [IMPR] Modellauswahl pro Agent
+`config.CLAUDE_MODELS` aus Umgebungsvariable (Default alle drei Modelle, per `.env.work` einschränkbar). `state.py`: `_get_agent_model(agent_key, type, default)` — liest zuerst agentenspezifischen Key (`model_ollama_portfolio`), dann globalen Key, dann Env-Default. Settings-Seite: 2 Ollama-Dropdowns + 3 Claude-Dropdowns, ein Save-Button, `st.cache_resource.clear()` bei Speicherung.
+
+#### [P2] [FEAT] Datenpflege: Anlagearten & Stammdaten
+`anlageart` (TEXT, optional) in `positions` (DB-Migration + `init_db`). `AssetClassConfig.anlagearten: List[str]` — befüllt aus `asset_classes.yaml`. Position-Formular zeigt konditionalen Selectbox nur wenn Anlagearten vorhanden. Detail-Dialog zeigt Anlage-Art an. Portfolio-Agent-Tool um optionales `anlageart`-Feld erweitert.
+
+#### [P2] [FEAT] Scheduling: Agents automatisch einplanbar
+`scheduled_jobs`-Tabelle + `ScheduledJobsRepository`. `AgentSchedulerService` (eigene BackgroundScheduler-Instanz, eigene DB-Verbindung für Thread-Safety). News-Agent als erster planbarer Agent. Settings-Seite: Liste bestehender Jobs (Enable/Disable-Toggle, Löschen), Formular für neue Jobs (Skill, Häufigkeit, Zeit, Modell). `reload_jobs()` bei jeder Änderung.
+
+#### [P2] [FEAT] Investment Search: Begründung als Story absichern
+`add_to_watchlist`-Tool in `search_agent.py` um Feld `story` erweitert. Wird beim Tool-Aufruf von Claude gefüllt und als `Position.story` gespeichert.
+
+#### [P2] [FEAT] Krypto-Warnung
+Warnhinweis im Detail-Dialog für `Kryptowährung`-Positionen. Krypto-Positionen im Rebalance-Snapshot mit `⚠️ [HOCHSPEKULATIV — Krypto]` markiert.
+
+#### [P2] [FEAT] Tages-G/V in Analysen + automatisch aktualisierte Kurse
+`PortfolioValuation` um `day_pnl_eur` / `day_pnl_pct` erweitert. `MarketDataRepository.get_prev_close()` liefert zweitletzten historischen Schlusskurs. Analyse-Seite zeigt Tages-Performance-Chart. Auto-Fetch beim Seitenaufruf wenn letzte Kurse > 1 Stunde alt.
+
+#### [P1] [IMPR] Rebalancing: Geld und Immobilien separat behandeln
+`_build_portfolio_context()` in `rebalance_agent.py` aufgeteilt: "Handelbares Portfolio" (Börsentitel) vs. "Nicht-handelbares Vermögen" (Festgeld, Bargeld, Immobilie, Grundstück). Agent-Kontext macht die Trennung explizit.
+
+#### [P1] [FEAT] Invest/Rebalance: Josef's Regel (Hidden Skill)
+Hidden Skill (`area=rebalance`) in `config/default_skills.yaml` geseedet. LLM wird silently über Zielverteilung 1/3 Aktien / 1/3 Renten+Geld / 1/3 Immobilien instruiert. Portfolio-Snapshot liefert Josef's Regel-Tabelle (Ist vs. 33%-Ziel). `SkillsRepository.get_system_skills(area=)` mit optionalem Area-Filter erweitert.
+
+#### [P1] [FEAT] Invest/Rebalance: Position vom Rebalance ausschließen
+`rebalance_excluded` Spalte in `positions` (DB-Migration + `init_db`). Position trägt trotzdem zu Josef's Regel und Gesamtvermögen bei. Toggle im Detail-Dialog der Positionen-Seite. Im Snapshot mit `[AUSGESCHLOSSEN]` markiert.
+
+#### [P1] [IMPR] Invest/Rebalance: Watchlist-Kandidaten einbeziehen
+Watchlist-Positionen mit Story erscheinen als "Kaufkandidaten"-Sektion im Snapshot — ohne Mengen/Preise. Nur Positionen die nicht schon im Portfolio-Teil sind.
+
+#### [P1] [BUG] Rebalance crashes without error message
+`start_session()` and `chat()` in `pages/rebalance_chat.py` are both wrapped in try/except with `st.error()` display.
 
 #### [P1] [BUG] DB migration: OperationalError on existing DBs (in_watchlist index)
 `CREATE INDEX idx_positions_in_watchlist` war in `init_db` — schlägt fehl wenn `positions`-Tabelle schon ohne die Spalte existiert. Fix: Index in `migrate_db` verschoben (nach ALTER TABLE).

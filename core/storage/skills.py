@@ -71,6 +71,22 @@ class SkillsRepository:
             )
         self._conn.commit()
 
+    def seed_new_skills(self, area: str, skills_list: list[dict]) -> None:
+        """Add skills that don't exist yet (by name+area), without touching existing ones.
+
+        Use this to introduce new default skills into an area that already has other skills.
+        Existing user-created or user-edited skills are never modified.
+        """
+        for s in skills_list:
+            self._conn.execute(
+                """
+                INSERT OR IGNORE INTO skills (name, area, description, prompt, hidden)
+                VALUES (?, ?, ?, ?, 0)
+                """,
+                (s["name"], area, s.get("description"), s["prompt"]),
+            )
+        self._conn.commit()
+
     def seed_system_skills(self, skills_list: list[dict]) -> None:
         """Seed hidden system skills (INSERT OR IGNORE — never overwrites existing).
 
@@ -107,11 +123,22 @@ class SkillsRepository:
         ).fetchall()
         return [self._row_to_skill(r) for r in rows]
 
-    def get_system_skills(self) -> List[Skill]:
-        """Return all hidden system skills (for agent prompt injection)."""
-        rows = self._conn.execute(
-            "SELECT * FROM skills WHERE hidden = 1 ORDER BY area, name"
-        ).fetchall()
+    def get_system_skills(self, area: Optional[str] = None) -> List[Skill]:
+        """Return hidden system skills (for agent prompt injection).
+
+        Args:
+            area: If provided, returns only system skills for this area.
+                  If None, returns all system skills (legacy behaviour).
+        """
+        if area is not None:
+            rows = self._conn.execute(
+                "SELECT * FROM skills WHERE hidden = 1 AND area = ? ORDER BY name",
+                (area,),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM skills WHERE hidden = 1 ORDER BY area, name"
+            ).fetchall()
         return [self._row_to_skill(r) for r in rows]
 
     def get(self, skill_id: int) -> Optional[Skill]:

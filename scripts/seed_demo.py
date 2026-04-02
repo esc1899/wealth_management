@@ -24,6 +24,121 @@ import yfinance as yf
 from core.storage.base import init_db, migrate_db
 
 # ---------------------------------------------------------------------------
+# Demo analyses — frei erfunden, nur für Demonstrationszwecke
+# Gekennzeichnet mit skill_name = "Demodaten"
+# ---------------------------------------------------------------------------
+
+_D = "[Demodaten] "  # prefix for all demo summaries
+
+# storychecker: only for positions that have a story
+DEMO_STORYCHECKER: dict[str, dict] = {
+    "Microsoft": dict(
+        verdict="intact",
+        summary=_D + "Azure wächst weiter zweistellig, KI-Integration (Copilot) zeigt frühe Monetarisierung. These bestätigt.",
+    ),
+    "ASML": dict(
+        verdict="intact",
+        summary=_D + "EUV-Aufträge aus TSMC und Samsung für High-NA-Systeme. Monopolstellung vollständig intakt.",
+    ),
+    "Bitcoin": dict(
+        verdict="gemischt",
+        summary=_D + "ETF-Zuflüsse stützen den Kurs, regulatorisches Umfeld uneinheitlich. Wertspeicher-These intakt, kurzfristig volatil.",
+    ),
+}
+
+# fundamental: for all positions with ticker
+DEMO_FUNDAMENTAL: dict[str, dict] = {
+    "Apple": dict(
+        verdict="fair",
+        summary=_D + "KGV 29x leicht über 5J-Schnitt (26x). Services-Marge stützt Bewertung. (Fair Value: 210 €, Upside: +3%)",
+    ),
+    "Microsoft": dict(
+        verdict="unterbewertet",
+        summary=_D + "KGV 32x bei 15% EPS-Wachstum → PEG 2,1. Cloud-Margen expandieren, KI-Umsatz nicht eingepreist. (Fair Value: 490 €, Upside: +18%)",
+    ),
+    "Amazon": dict(
+        verdict="fair",
+        summary=_D + "EV/EBITDA 18x, AWS-Marge auf Rekordniveau. Retail-Restrukturierung läuft. (Fair Value: 195 €, Upside: +8%)",
+    ),
+    "Nestlé": dict(
+        verdict="unterbewertet",
+        summary=_D + "KGV 17x — 10J-Tief. Organisches Wachstum schwach, aber Dividendenrendite 3,8% attraktiv. (Fair Value: 95 CHF, Upside: +22%)",
+    ),
+    "ASML": dict(
+        verdict="unterbewertet",
+        summary=_D + "EV/EBITDA 30x für Monopolisten mit Orderbuch bis 2028. High-NA-Zyklus nicht vollständig eingepreist. (Fair Value: 950 €, Upside: +28%)",
+    ),
+    "Siemens": dict(
+        verdict="fair",
+        summary=_D + "KGV 18x, Infrastruktur- und Automatisierungssparte solide. Digitalisierungsgeschäft wächst. (Fair Value: 185 €, Upside: +5%)",
+    ),
+    "Toyota": dict(
+        verdict="unterbewertet",
+        summary=_D + "KGV 8x — deutlich unter Sektor (15x). Hybrid-Führerschaft unterschätzt, freier Cashflow stark. (Fair Value: 200 USD, Upside: +31%)",
+    ),
+    "TSMC": dict(
+        verdict="unterbewertet",
+        summary=_D + "KGV 22x bei 20%+ EPS-Wachstum. Geopolitischer Risikoabschlag übertrieben. (Fair Value: 195 USD, Upside: +25%)",
+    ),
+    "Novo Nordisk": dict(
+        verdict="überbewertet",
+        summary=_D + "KGV 38x bereits mit vollem GLP-1-Wachstum diskontiert. Konkurrenz (Eli Lilly, Roche) unterschätzt. (Fair Value: 68 USD, Upside: -19%)",
+    ),
+    "Alibaba": dict(
+        verdict="unterbewertet",
+        summary=_D + "KGV 10x, Nettocash 50 Mrd. USD. Regulierungsdruck abklingend, Cloud profitabel. (Fair Value: 105 USD, Upside: +35%)",
+    ),
+    "iShares Core MSCI World": dict(
+        verdict="unbekannt",
+        summary=_D + "ETF — keine Einzelaktien-Bewertungsmetriken anwendbar.",
+    ),
+    "Vanguard FTSE All-World": dict(
+        verdict="unbekannt",
+        summary=_D + "ETF — keine Einzelaktien-Bewertungsmetriken anwendbar.",
+    ),
+    "iShares Global Aggregate Bond": dict(
+        verdict="unbekannt",
+        summary=_D + "Rentenfonds — Equity-Bewertung nicht zutreffend.",
+    ),
+    "iShares Global REIT ETF": dict(
+        verdict="fair",
+        summary=_D + "P/FFO 15x, leicht unter historischem Schnitt. Zinsrückgang stützt REITs. (Fair Value: 27 USD, Upside: +10%)",
+    ),
+    "Gold (Unzen)": dict(
+        verdict="unbekannt",
+        summary=_D + "Edelmetall — DCF nicht anwendbar. Preis nahe 10J-Allzeithoch, real-Zinsen entscheidend.",
+    ),
+    "Gold (Gramm)": dict(
+        verdict="unbekannt",
+        summary=_D + "Edelmetall — DCF nicht anwendbar. Zentralbankankäufe stützen strukturell.",
+    ),
+    "Silber (Gramm)": dict(
+        verdict="unterbewertet",
+        summary=_D + "Gold/Silber-Ratio 85x — historischer Schnitt 65x. Industrienachfrage (Solar) wächst. (Fair Value: ~32 USD/oz, Upside: +15%)",
+    ),
+    "Bitcoin": dict(
+        verdict="unbekannt",
+        summary=_D + "Kryptowährung — klassische Equity-Bewertung nicht anwendbar. Stock-to-Flow-Modell: fair bis unterbewertet.",
+    ),
+}
+
+# consensus_gap: only for positions with a story
+DEMO_CONSENSUS_GAP: dict[str, dict] = {
+    "Microsoft": dict(
+        verdict="stabil",
+        summary=_D + "Analystenkonsens 'Buy' mit Kursziel 450 USD — deckt sich mit These. KI-Monetarisierung beginnt, Lücke bleibt moderat.",
+    ),
+    "ASML": dict(
+        verdict="wächst",
+        summary=_D + "Konsens unterschätzt High-NA-Volumen ab 2026. Sell-Side rechnet mit 40 Systemen p.a., Managementguidance deutet auf 60+. Lücke wächst.",
+    ),
+    "Bitcoin": dict(
+        verdict="stabil",
+        summary=_D + "ETF-Zulassung hat Mainstream-Akzeptanz erhöht, Lücke zum Konsens kleiner geworden. These als Wertspeicher weiter akzeptiert.",
+    ),
+}
+
+# ---------------------------------------------------------------------------
 # Demo position definitions
 # ---------------------------------------------------------------------------
 
@@ -446,6 +561,32 @@ def seed(db_path: str = "data/demo.db", conn: Optional[sqlite3.Connection] = Non
         for h in history:
             market_repo.upsert_historical(h)
         print(f"  {ticker}: {len(history)} Datenpunkte")
+
+    # --- seed demo analyses (storychecker, fundamental, consensus_gap) ---
+    print("\nSeeding demo analyses ...")
+    _demo_agents = [
+        ("storychecker",  DEMO_STORYCHECKER),
+        ("fundamental",   DEMO_FUNDAMENTAL),
+        ("consensus_gap", DEMO_CONSENSUS_GAP),
+    ]
+    for agent_name, demo_map in _demo_agents:
+        for pos_name, data in demo_map.items():
+            row = conn.execute(
+                "SELECT id FROM positions WHERE name = ? LIMIT 1", (pos_name,)
+            ).fetchone()
+            if row is None:
+                print(f"  [{agent_name}] Position '{pos_name}' not found — skipping")
+                continue
+            conn.execute(
+                """
+                INSERT INTO position_analyses
+                    (position_id, agent, skill_name, verdict, summary, created_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'))
+                """,
+                (row[0], agent_name, "Demodaten", data["verdict"], data["summary"]),
+            )
+            print(f"  [{agent_name}] {pos_name}: {data['verdict']}")
+        conn.commit()
 
     if own_conn:
         conn.close()

@@ -42,6 +42,7 @@ def _make_price_record(symbol: str = "AAPL", price_eur: float = 180.0) -> PriceR
 def agent():
     positions_repo = MagicMock()
     market_repo = MagicMock()
+    market_repo.get_prev_close.return_value = None  # daily P&L off by default
     fetcher = MagicMock()
     return MarketDataAgent(
         positions_repo=positions_repo,
@@ -245,6 +246,38 @@ class TestGetPortfolioValuationIncludeWatchlist:
         assert by_symbol["AAPL"].in_portfolio is True
         assert by_symbol["MSFT"].in_portfolio is False
 
+
+class TestDailyPnL:
+    def test_day_pnl_none_when_no_prev_close(self, agent):
+        pos = _make_position("AAPL", quantity=10, price=150.0)
+        agent._positions.get_portfolio.return_value = [pos]
+        agent._market.get_price.return_value = _make_price_record("AAPL", price_eur=180.0)
+        agent._market.get_prev_close.return_value = None
+
+        v = agent.get_portfolio_valuation()[0]
+        assert v.day_pnl_eur is None
+        assert v.day_pnl_pct is None
+
+    def test_day_pnl_computed_when_prev_close_available(self, agent):
+        pos = _make_position("AAPL", quantity=10, price=150.0)
+        agent._positions.get_portfolio.return_value = [pos]
+        agent._market.get_price.return_value = _make_price_record("AAPL", price_eur=180.0)
+        agent._market.get_prev_close.return_value = 175.0  # yesterday's close
+
+        v = agent.get_portfolio_valuation()[0]
+        # current: 10 * 180 = 1800, prev: 10 * 175 = 1750 → day_pnl = +50
+        assert v.day_pnl_eur == pytest.approx(50.0)
+        assert v.day_pnl_pct == pytest.approx(50.0 / 1750.0 * 100)
+
+    def test_day_pnl_negative(self, agent):
+        pos = _make_position("AAPL", quantity=10, price=150.0)
+        agent._positions.get_portfolio.return_value = [pos]
+        agent._market.get_price.return_value = _make_price_record("AAPL", price_eur=165.0)
+        agent._market.get_prev_close.return_value = 170.0
+
+        v = agent.get_portfolio_valuation()[0]
+        # current: 1650, prev: 1700 → -50
+        assert v.day_pnl_eur == pytest.approx(-50.0)
 
 class TestSetupScheduler:
     def test_returns_scheduler(self, agent):

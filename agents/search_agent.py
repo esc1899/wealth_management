@@ -69,7 +69,11 @@ ADD_TO_WATCHLIST_TOOL = {
             },
             "notes": {
                 "type": "string",
-                "description": "Brief reason for adding to the watchlist",
+                "description": "Brief reason for adding to the watchlist (1 sentence)",
+            },
+            "story": {
+                "type": "string",
+                "description": "Investment thesis in 2–3 sentences — why this investment is interesting, what the core opportunity is, and what to watch",
             },
         },
         "required": ["ticker", "name", "asset_class"],
@@ -187,6 +191,7 @@ class SearchAgent:
         name = args.get("name", ticker)
         asset_class = args.get("asset_class", "Aktie")
         notes = args.get("notes", "")
+        story = args.get("story", "")
 
         registry = get_asset_class_registry()
         try:
@@ -202,6 +207,7 @@ class SearchAgent:
                 investment_type=cfg.investment_type,
                 unit=cfg.default_unit,
                 notes=notes,
+                story=story or None,
                 added_date=date.today(),
                 in_portfolio=False,
                 in_watchlist=True,

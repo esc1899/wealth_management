@@ -17,6 +17,9 @@ asset_classes:
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
+    anlagearten:
+      - Einzelaktie
+      - ADR / GDR
     visible_fields:
       - isin
       - wkn
@@ -35,6 +38,9 @@ asset_classes:
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
+    anlagearten:
+      - ETF
+      - Aktiv gemanagter Fonds
     visible_fields:
       - isin
       - wkn
@@ -52,6 +58,9 @@ asset_classes:
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
+    anlagearten:
+      - ETF
+      - Aktiv gemanagter Fonds
     visible_fields:
       - isin
       - wkn
@@ -69,6 +78,10 @@ asset_classes:
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
+    anlagearten:
+      - ETF
+      - REIT
+      - Aktiv gemanagter Fonds
     visible_fields:
       - isin
       - wkn
@@ -89,6 +102,10 @@ asset_classes:
       - g
     auto_fetch: true
     watchlist_eligible: true
+    anlagearten:
+      - Münze
+      - Barren
+      - ETC
     visible_fields:
       - ticker
       - quantity
@@ -104,6 +121,10 @@ asset_classes:
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
+    anlagearten:
+      - Coin
+      - Token
+      - Staking
     visible_fields:
       - ticker
       - quantity
@@ -119,6 +140,10 @@ asset_classes:
     auto_fetch: false
     watchlist_eligible: false
     manual_valuation: false
+    anlagearten:
+      - Staatsanleihe
+      - Unternehmensanleihe
+      - Pfandbrief
     visible_fields:
       - isin
       - wkn
@@ -135,6 +160,10 @@ asset_classes:
     auto_fetch: false
     watchlist_eligible: false
     manual_valuation: true
+    anlagearten:
+      - Festgeld
+      - Tagesgeld
+      - Sparkonto
     extra_fields:
       - interest_rate
       - maturity_date
@@ -155,6 +184,10 @@ asset_classes:
     auto_fetch: false
     watchlist_eligible: false
     manual_valuation: true
+    anlagearten:
+      - Bargeld
+      - Girokonto
+      - Verrechnungskonto
     extra_fields:
       - estimated_value
       - valuation_date
@@ -170,6 +203,11 @@ asset_classes:
     auto_fetch: false
     watchlist_eligible: false
     manual_valuation: true
+    anlagearten:
+      - Eigentumswohnung
+      - Einfamilienhaus
+      - Mehrfamilienhaus
+      - Gewerbeimmobilie
     extra_fields:
       - estimated_value
       - valuation_date
@@ -186,6 +224,10 @@ asset_classes:
     auto_fetch: false
     watchlist_eligible: false
     manual_valuation: true
+    anlagearten:
+      - Baugrundstück
+      - Ackerland
+      - Forstland
     extra_fields:
       - estimated_value
       - valuation_date

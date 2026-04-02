@@ -54,6 +54,7 @@ def mock_positions_repo():
         make_position("AAPL", 10.0, 150.0),
         make_position("MSFT", 5.0, 300.0),
     ]
+    repo.get_watchlist.return_value = []
     return repo
 
 
@@ -162,3 +163,62 @@ class TestAnalyze:
         mock_market_repo.get_price.return_value = None
         _, result = await agent.start_session("Farmer Strategy", "Analyze.", user_context="", repo=mock_repo)
         assert result  # should not raise
+
+    @pytest.mark.asyncio
+    async def test_excluded_position_marked_in_snapshot(self, mock_positions_repo, mock_market_repo, mock_llm, mock_repo):
+        excluded = make_position("EXCL", 10.0, 100.0)
+        excluded = excluded.model_copy(update={"rebalance_excluded": True})
+        mock_positions_repo.get_portfolio.return_value = [excluded]
+        mock_analyses_repo = MagicMock()
+        mock_analyses_repo.get_latest_bulk.return_value = {}
+        agent = RebalanceAgent(
+            positions_repo=mock_positions_repo,
+            market_repo=mock_market_repo,
+            analyses_repo=mock_analyses_repo,
+            llm=mock_llm,
+        )
+        await agent.start_session("Farmer Strategy", "Analyze.", user_context="", repo=mock_repo)
+        call_args = mock_llm.chat.call_args
+        messages = call_args[0][0]
+        system_msg = next((m for m in messages if m.role.value == "system"), None)
+        assert "AUSGESCHLOSSEN" in system_msg.content
+
+    @pytest.mark.asyncio
+    async def test_snapshot_contains_josef_regel_section(self, agent, mock_llm, mock_repo):
+        await agent.start_session("Farmer Strategy", "Analyze.", user_context="", repo=mock_repo)
+        call_args = mock_llm.chat.call_args
+        messages = call_args[0][0]
+        system_msg = next((m for m in messages if m.role.value == "system"), None)
+        assert "Josef" in system_msg.content
+
+    @pytest.mark.asyncio
+    async def test_watchlist_candidates_shown_in_snapshot(
+        self, mock_positions_repo, mock_market_repo, mock_llm, mock_repo
+    ):
+        from datetime import date as dt
+        watchlist_pos = Position(
+            id=99,
+            ticker="CAND",
+            name="Buy Candidate",
+            asset_class="Aktie",
+            investment_type="Wertpapiere",
+            unit="Stück",
+            added_date=dt.today(),
+            in_portfolio=False,
+            in_watchlist=True,
+            story="Strong growth potential in AI sector.",
+        )
+        mock_positions_repo.get_watchlist.return_value = [watchlist_pos]
+        mock_analyses_repo = MagicMock()
+        mock_analyses_repo.get_latest_bulk.return_value = {}
+        agent = RebalanceAgent(
+            positions_repo=mock_positions_repo,
+            market_repo=mock_market_repo,
+            analyses_repo=mock_analyses_repo,
+            llm=mock_llm,
+        )
+        await agent.start_session("Farmer Strategy", "Analyze.", user_context="", repo=mock_repo)
+        call_args = mock_llm.chat.call_args
+        messages = call_args[0][0]
+        system_msg = next((m for m in messages if m.role.value == "system"), None)
+        assert "CAND" in system_msg.content or "Buy Candidate" in system_msg.content

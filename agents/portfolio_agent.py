@@ -12,6 +12,8 @@ from core.llm.local import OllamaProvider
 from core.storage.models import Position
 from core.storage.positions import PositionsRepository
 from core.storage.skills import SkillsRepository
+from agents.market_data_fetcher import MarketDataFetcher
+from core.storage.market_data import MarketDataRepository
 
 # All asset classes that support auto-fetch (eligible for watchlist)
 _WATCHLIST_CLASSES = [
@@ -77,6 +79,7 @@ TOOLS: list[dict] = [
                     "notes":          {"type": "string"},
                     "empfehlung":     {"type": "string", "description": "User recommendation label, e.g. Kaufen, Halten, Verkaufen"},
                     "story":          {"type": "string", "description": "Investment thesis or rationale"},
+                    "anlageart":      {"type": "string", "description": "Sub-type of asset class, e.g. ETF, Einzelaktie, Münze (optional)"},
                 },
                 "required": ["name", "asset_class", "unit"],
             },
@@ -167,10 +170,14 @@ class PortfolioAgent:
         positions_repo: PositionsRepository,
         llm: OllamaProvider,
         skills_repo: Optional[SkillsRepository] = None,
+        market_fetcher: Optional[MarketDataFetcher] = None,
+        market_repo: Optional[MarketDataRepository] = None,
     ):
         self._positions = positions_repo
         self._llm = llm
         self._skills_repo = skills_repo
+        self._market_fetcher = market_fetcher
+        self._market_repo = market_repo
 
     # ------------------------------------------------------------------
     # Public API for other agents
@@ -237,7 +244,12 @@ class PortfolioAgent:
             Message(role=Role.ASSISTANT, content=response.content or ""),
             Message(
                 role=Role.USER,
-                content=f"Tool results:\n{result_summary}\n\nPlease summarize what was done in one or two sentences.",
+                content=(
+                    f"Tool results:\n{result_summary}\n\n"
+                    "Please confirm what was saved or done in 1-2 sentences in German. "
+                    "For saved positions include: name, ticker (if available), quantity + unit, "
+                    "purchase price (€), purchase date. If there was an error, explain it clearly."
+                ),
             ),
         ]
         final = await self._llm.chat_with_tools(follow_up, tools=[])
@@ -271,26 +283,67 @@ class PortfolioAgent:
         registry = get_asset_class_registry()
         asset_class = args["asset_class"]
         cfg = registry.require(asset_class)
+
+        # Validate purchase_date
         purchase_date_raw = args.get("purchase_date")
+        purchase_date = None
+        if purchase_date_raw:
+            try:
+                purchase_date = date.fromisoformat(purchase_date_raw)
+            except ValueError:
+                return {"error": f"Invalid date format: '{purchase_date_raw}'. Use YYYY-MM-DD."}
+            if purchase_date > date.today():
+                return {"error": f"Purchase date {purchase_date_raw} is in the future. Please use today's date or earlier."}
+
+        # Validate quantity
+        quantity = args.get("quantity")
+        if quantity is not None and float(quantity) <= 0:
+            return {"error": "Quantity must be greater than 0."}
+
+        # Validate purchase_price
+        purchase_price = args.get("purchase_price")
+        if purchase_price is not None and float(purchase_price) < 0:
+            return {"error": "Purchase price cannot be negative."}
+
         position = Position(
             ticker=args.get("ticker") or None,
             name=args["name"],
             asset_class=asset_class,
             investment_type=cfg.investment_type,
-            quantity=args.get("quantity") or None,
+            quantity=float(quantity) if quantity is not None else None,
             unit=args.get("unit", cfg.default_unit),
-            purchase_price=args.get("purchase_price") or None,
-            purchase_date=date.fromisoformat(purchase_date_raw) if purchase_date_raw else None,
+            purchase_price=float(purchase_price) if purchase_price is not None else None,
+            purchase_date=purchase_date,
             isin=args.get("isin"),
             wkn=args.get("wkn"),
             notes=args.get("notes"),
             empfehlung=args.get("empfehlung"),
             story=args.get("story"),
+            anlageart=args.get("anlageart") or None,
             added_date=date.today(),
             in_portfolio=True,
         )
         saved = self._positions.add(position)
-        return {"success": True, "id": saved.id, "ticker": saved.ticker, "name": saved.name}
+
+        # Auto-fetch current price for new auto-fetch positions with a ticker
+        if saved.ticker and cfg.auto_fetch and self._market_fetcher and self._market_repo:
+            try:
+                records, _ = self._market_fetcher.fetch_current_prices([saved.ticker])
+                for rec in records:
+                    self._market_repo.upsert_price(rec)
+            except Exception:
+                pass  # non-critical
+
+        return {
+            "success": True,
+            "id": saved.id,
+            "ticker": saved.ticker,
+            "name": saved.name,
+            "quantity": saved.quantity,
+            "unit": saved.unit,
+            "purchase_price": saved.purchase_price,
+            "purchase_date": saved.purchase_date.isoformat() if saved.purchase_date else None,
+        }
 
     def _tool_remove_portfolio(self, args: dict) -> dict:
         deleted = self._positions.delete(args["entry_id"])

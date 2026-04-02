@@ -173,6 +173,10 @@ class Position(BaseModel):
     # State
     in_portfolio: bool = False
     in_watchlist: bool = False
+    rebalance_excluded: bool = False  # True = shown in rebalance snapshot but no action recommended
+
+    # Sub-type (optional, driven by asset_classes.yaml anlagearten list)
+    anlageart: Optional[str] = None
 
     @field_validator("ticker")
     @classmethod
@@ -393,3 +397,45 @@ class AppConfig(BaseModel):
 
     key: str
     value: str
+
+
+# ---------------------------------------------------------------------------
+# Scheduled jobs model
+# ---------------------------------------------------------------------------
+
+class StructuralScanRun(BaseModel):
+    """A single structural-change scan run."""
+
+    id: Optional[int] = None
+    skill_name: str
+    user_focus: Optional[str] = None   # optional theme focus from the user
+    result: str                         # full markdown report
+    created_at: datetime
+
+
+class StructuralScanMessage(BaseModel):
+    """A follow-up message in a structural scan session."""
+
+    id: Optional[int] = None
+    run_id: int
+    role: str       # 'user' or 'assistant'
+    content: str
+    created_at: datetime
+
+
+class ScheduledJob(BaseModel):
+    """A recurring agent run configured by the user."""
+
+    id: Optional[int] = None
+    agent_name: str          # e.g. 'news'
+    skill_name: str
+    skill_prompt: str
+    frequency: str           # 'daily', 'weekly', 'monthly'
+    run_hour: int = 8
+    run_minute: int = 0
+    run_weekday: Optional[int] = None   # 0=Mon … 6=Sun (weekly jobs)
+    run_day: Optional[int] = None       # 1–28 (monthly jobs)
+    model: Optional[str] = None         # Claude model; None = use app default
+    enabled: bool = True
+    last_run: Optional[datetime] = None
+    created_at: Optional[datetime] = None

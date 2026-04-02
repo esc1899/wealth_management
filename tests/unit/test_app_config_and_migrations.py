@@ -118,6 +118,10 @@ class TestMigrateDb:
         cols = [row[1] for row in conn.execute("PRAGMA table_info(skills)").fetchall()]
         assert "hidden" in cols
 
+    def test_rebalance_excluded_column_exists_after_migrate(self, conn):
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(positions)").fetchall()]
+        assert "rebalance_excluded" in cols
+
     def test_app_config_table_exists_after_init(self, conn):
         # app_config is created in init_db
         tables = [
@@ -177,6 +181,22 @@ class TestEmpfehlungAndStory:
         repo.update(updated)
         loaded = repo.get(saved.id)
         assert loaded.empfehlung == "Verkaufen"
+
+    def test_rebalance_excluded_default_false(self, repo):
+        saved = repo.add(_make_position())
+        loaded = repo.get(saved.id)
+        assert loaded.rebalance_excluded is False
+
+    def test_rebalance_excluded_saved_and_loaded(self, repo):
+        saved = repo.add(_make_position(rebalance_excluded=True))
+        loaded = repo.get(saved.id)
+        assert loaded.rebalance_excluded is True
+
+    def test_rebalance_excluded_toggle_via_update(self, repo):
+        saved = repo.add(_make_position())
+        repo.update(saved.model_copy(update={"rebalance_excluded": True}))
+        loaded = repo.get(saved.id)
+        assert loaded.rebalance_excluded is True
 
 
 # ---------------------------------------------------------------------------

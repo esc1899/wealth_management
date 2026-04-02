@@ -39,6 +39,16 @@ class Config:
     MARKET_DATA_FETCH_HOUR: int = int(os.getenv("MARKET_DATA_FETCH_HOUR", "18"))
     RATE_LIMIT_RPS: float = float(os.getenv("RATE_LIMIT_RPS", "2.0"))
 
+    # Available Claude models — restrict per environment via CLAUDE_MODELS env var
+    CLAUDE_MODELS: list = [
+        m.strip()
+        for m in os.getenv(
+            "CLAUDE_MODELS",
+            "claude-haiku-4-5-20251001,claude-sonnet-4-6,claude-opus-4-6",
+        ).split(",")
+        if m.strip()
+    ]
+
     def validate(self) -> list[str]:
         """Return list of error messages for missing required config. Empty = OK."""
         errors = []

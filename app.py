@@ -27,9 +27,9 @@ if config.DEMO_MODE:
 
 # Initialise shared resources (agents, repos, scheduler) on first load
 from state import (  # noqa: E402
-    get_market_agent, get_news_agent, get_portfolio_agent,
-    get_rebalance_agent, get_research_agent, get_search_agent,
-    get_storychecker_agent,
+    get_agent_scheduler, get_consensus_gap_agent, get_fundamental_agent, get_market_agent,
+    get_news_agent, get_portfolio_agent, get_rebalance_agent, get_research_agent,
+    get_search_agent, get_storychecker_agent, get_structural_change_agent,
 )
 get_portfolio_agent()
 get_market_agent()
@@ -38,6 +38,10 @@ get_news_agent()
 get_search_agent()
 get_storychecker_agent()
 get_rebalance_agent()
+get_structural_change_agent()
+get_consensus_gap_agent()
+get_fundamental_agent()
+get_agent_scheduler()
 
 @st.dialog("Disclaimer & Privacy Notice", width="large")
 def _legal_dialog():
@@ -77,6 +81,11 @@ pg = st.navigation({
         st.Page("pages/news_chat.py",       title=t("nav.news_chat"),        icon=":material/newspaper:"),
         st.Page("pages/search_chat.py",     title=t("nav.search_chat"),      icon=":material/manage_search:"),
         st.Page("pages/storychecker.py",    title=t("nav.storychecker"),     icon=":material/fact_check:"),
+        st.Page("pages/fundamental.py",     title=t("nav.fundamental"),      icon=":material/calculate:"),
+    ],
+    t("nav.group_claude_strategy"): [
+        st.Page("pages/structural_scan.py", title=t("nav.structural_scan"),  icon=":material/radar:"),
+        st.Page("pages/consensus_gap.py",   title=t("nav.consensus_gap"),    icon=":material/target:"),
     ],
     t("nav.group_system"): [
         st.Page("pages/statistics.py",      title=t("nav.statistics"),       icon=":material/bar_chart:"),

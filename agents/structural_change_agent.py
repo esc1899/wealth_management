@@ -1,0 +1,293 @@
+"""
+StructuralChangeAgent — identifies structural market shifts before consensus forms.
+
+Claude's own investment strategy: scan for regulatory, technological, demographic, and
+geopolitical shifts that are structural (not cyclical) and not yet priced in by the market.
+
+Flow per start_scan() call:
+  1. Run deep web-search analysis on structural themes
+  2. Claude identifies candidates and adds them to the watchlist via tool
+  3. Full report persisted in structural_scan_runs
+  4. Returns (run, report_text)
+
+Flow per chat() call:
+  1. Load run + messages from DB for context
+  2. Continue conversation with Claude (with web_search available)
+  3. Persist and return assistant reply
+"""
+
+from __future__ import annotations
+
+from datetime import date
+from typing import Optional, Tuple
+
+from core.asset_class_config import get_asset_class_registry
+from core.llm.claude import ClaudeProvider, ClaudeResponse
+from core.storage.models import Position, StructuralScanRun
+from core.storage.positions import PositionsRepository
+from core.storage.structural_scans import StructuralScansRepository
+
+# ------------------------------------------------------------------
+# System prompt
+# ------------------------------------------------------------------
+
+BASE_SYSTEM_PROMPT = """You are Claude's own investment strategist, executing Claude's proprietary "Struktureller Wandel" strategy.
+
+## The Philosophy
+Most investors react to prices, news, and consensus. Your edge is different: you identify structural shifts — regulatory, technological, demographic, or geopolitical — that are *already underway* but not yet priced into markets. You invest in structural winners *before the consensus understands them*.
+
+Structural vs. cyclical:
+- Structural: driven by irreversible forces (technology adoption, regulation, demographics, geopolitical realignment)
+- Cyclical: driven by economic cycles, temporary supply/demand imbalances
+
+Not-yet-consensus test: Would a room of 100 portfolio managers agree this is obvious? If yes, skip it.
+
+## Your Task
+Search broadly. Identify 3–5 structural themes currently in motion. For each theme:
+1. Name the structural force and why it's irreversible
+2. Identify 2–3 companies that are structural winners — not obvious ones, not the largest caps
+3. Explain what the consensus is currently missing
+4. Provide a concrete investment thesis for each candidate
+
+## Output Format
+Use this exact structure:
+
+---
+## Strukturwandel-Scan — [date]
+
+### Thema 1: [Theme Name]
+**Strukturelle Kraft:** [What is changing and why it's irreversible]
+**Konsens-Lücke:** [What the market is currently missing or misunderstanding]
+
+**Kandidaten:**
+#### [Company Name] ([TICKER])
+- **These:** [Investment thesis — 2-3 sentences]
+- **Warum strukturell:** [Why this company wins from the structural change]
+- **Risiko:** [Main risk to the thesis]
+
+#### [Company Name] ([TICKER])
+...
+
+### Thema 2: ...
+---
+
+## Rules
+- Use web_search extensively — find recent sources, regulatory documents, earnings calls
+- Only include structural candidates where you can articulate the consensus gap clearly
+- Use the add_structural_candidate tool to add the best 3–5 candidates to the watchlist
+- Be specific: include tickers, recent data points, and source references
+- German or English — match the user's language
+- Today's date: {today}"""
+
+FOLLOWUP_SYSTEM_PROMPT = """You are Claude's investment strategist running the "Struktureller Wandel" strategy.
+The user has received the following structural change scan report and may have follow-up questions.
+
+Original scan report:
+---
+{report}
+---
+
+Answer based on the report and your research. Use web_search for any new information the user requests.
+Be specific and analytical."""
+
+# ------------------------------------------------------------------
+# Tool definitions
+# ------------------------------------------------------------------
+
+WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search"}
+
+ADD_CANDIDATE_TOOL = {
+    "name": "add_structural_candidate",
+    "description": "Add a structural-change investment candidate to the watchlist.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "ticker": {
+                "type": "string",
+                "description": "Yahoo Finance ticker, e.g. AAPL, SAP.DE, ASML.AS",
+            },
+            "name": {
+                "type": "string",
+                "description": "Full company name",
+            },
+            "asset_class": {
+                "type": "string",
+                "enum": ["Aktie", "Aktienfonds", "Immobilienfonds", "Edelmetall", "Kryptowährung"],
+            },
+            "theme": {
+                "type": "string",
+                "description": "The structural theme this candidate belongs to (1 sentence)",
+            },
+            "story": {
+                "type": "string",
+                "description": "Full investment thesis: structural force, consensus gap, why this company wins, key risk (3–5 sentences)",
+            },
+        },
+        "required": ["ticker", "name", "asset_class", "story"],
+    },
+}
+
+TOOLS = [WEB_SEARCH_TOOL, ADD_CANDIDATE_TOOL]
+CLIENT_TOOL_NAMES = {"add_structural_candidate"}
+MAX_TOOL_ITERATIONS = 20
+
+
+class StructuralChangeAgent:
+    """
+    Cloud agent (Claude ☁️) — scans for structural market shifts and adds
+    identified candidates to the watchlist with full investment theses.
+    """
+
+    def __init__(
+        self,
+        positions_repo: PositionsRepository,
+        llm: ClaudeProvider,
+    ):
+        self._positions = positions_repo
+        self._llm = llm
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    async def start_scan(
+        self,
+        skill_name: str,
+        skill_prompt: str,
+        user_focus: Optional[str],
+        repo: StructuralScansRepository,
+    ) -> Tuple[StructuralScanRun, str]:
+        """
+        Run a structural change scan. Saves the run + messages. Returns (run, report).
+        """
+        system = BASE_SYSTEM_PROMPT.format(today=date.today().isoformat())
+        system += f"\n\n## Scan-Strategie (vom Nutzer konfiguriert)\n{skill_prompt}"
+
+        user_msg = user_focus.strip() if user_focus and user_focus.strip() else (
+            "Führe einen vollständigen Strukturwandel-Scan durch. "
+            "Identifiziere die 3–5 relevantesten strukturellen Themen mit jeweils 2–3 Kandidaten."
+        )
+
+        api_messages: list[dict] = [{"role": "user", "content": user_msg}]
+        report = await self._run_agentic_loop(api_messages, system)
+
+        run = repo.save_run(
+            skill_name=skill_name,
+            result=report,
+            user_focus=user_focus or None,
+        )
+        repo.add_message(run.id, "user", user_msg)
+        repo.add_message(run.id, "assistant", report)
+        return run, report
+
+    async def chat(
+        self,
+        run_id: int,
+        user_message: str,
+        repo: StructuralScansRepository,
+    ) -> str:
+        """Follow-up conversation after a scan."""
+        run = repo.get_run(run_id)
+        if run is None:
+            raise ValueError(f"Scan run {run_id} not found")
+
+        system = FOLLOWUP_SYSTEM_PROMPT.format(report=run.result)
+        history = repo.get_messages(run_id)
+
+        api_messages = [{"role": m.role, "content": m.content} for m in history]
+        api_messages.append({"role": "user", "content": user_message})
+        repo.add_message(run_id, "user", user_message)
+
+        response = await self._llm.chat_with_tools(
+            messages=api_messages,
+            tools=[WEB_SEARCH_TOOL],
+            system=system,
+            max_tokens=4096,
+        )
+        reply = response.content or ""
+        repo.add_message(run_id, "assistant", reply)
+        return reply
+
+    # ------------------------------------------------------------------
+    # Internal
+    # ------------------------------------------------------------------
+
+    async def _run_agentic_loop(
+        self,
+        api_messages: list[dict],
+        system: str,
+    ) -> str:
+        """Run Claude with tools until no more client tool calls remain."""
+        response: Optional[ClaudeResponse] = None
+        for _ in range(MAX_TOOL_ITERATIONS):
+            response = await self._llm.chat_with_tools(
+                messages=api_messages,
+                tools=TOOLS,
+                system=system,
+                max_tokens=8192,
+            )
+
+            client_calls = [
+                tc for tc in response.tool_calls if tc.name in CLIENT_TOOL_NAMES
+            ]
+
+            # Stop if Claude is done (end_turn) or has no tool calls at all
+            if response.stop_reason == "end_turn" or not response.tool_calls:
+                break
+
+            # If only server-side tools (web_search) and no client tools, Claude
+            # is still producing results — but we can't continue the loop without
+            # client tool results. This shouldn't happen with models that support
+            # web_search_20250305 server-side. Break and return whatever we have.
+            if not client_calls:
+                break
+
+            # Execute client-side tools and feed results back
+            tool_results = []
+            for tc in client_calls:
+                result = self._execute_tool(tc.name, tc.input)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tc.id,
+                    "content": str(result),
+                })
+
+            # Append assistant turn + tool results
+            api_messages.append({"role": "assistant", "content": response.raw_blocks})
+            api_messages.append({"role": "user", "content": tool_results})
+
+        return response.content if response else ""
+
+    def _execute_tool(self, name: str, args: dict) -> dict:
+        if name == "add_structural_candidate":
+            return self._tool_add_candidate(args)
+        return {"error": f"Unknown tool: {name}"}
+
+    def _tool_add_candidate(self, args: dict) -> dict:
+        registry = get_asset_class_registry()
+        asset_class = args.get("asset_class", "Aktie")
+        try:
+            cfg = registry.require(asset_class)
+        except ValueError:
+            asset_class = "Aktie"
+            cfg = registry.require(asset_class)
+
+        story = args.get("story", "")
+        theme = args.get("theme", "")
+        full_story = f"[Struktureller Wandel] {theme}\n\n{story}".strip() if theme else story
+
+        position = Position(
+            ticker=args["ticker"],
+            name=args["name"],
+            asset_class=asset_class,
+            investment_type=cfg.investment_type,
+            unit=cfg.default_unit,
+            story=full_story,
+            notes="Kandidat: Claude Strukturwandel-Scan",
+            recommendation_source="Claude Strukturwandel-Agent",
+            added_date=date.today(),
+            in_portfolio=False,
+            in_watchlist=True,
+        )
+        saved = self._positions.add(position)
+        return {"success": True, "id": saved.id, "ticker": saved.ticker, "name": saved.name}

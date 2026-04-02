@@ -35,6 +35,7 @@ class AssetClassConfig(BaseModel):
     watchlist_eligible: bool = True
     manual_valuation: bool = False
     extra_fields: List[str] = []
+    anlagearten: List[str] = []
 
     @field_validator("visible_fields")
     @classmethod

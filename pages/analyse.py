@@ -2,6 +2,8 @@
 Analysis — performance charts, historical prices, allocation.
 """
 
+from datetime import datetime, timedelta, timezone
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -14,9 +16,30 @@ st.title(f"🔍 {t('analysis.title')}")
 
 agent = get_market_agent()
 
+# ------------------------------------------------------------------
+# Auto-fetch: refresh prices if last fetch is older than 1 hour
+# ------------------------------------------------------------------
+
+if "analyse_auto_fetched" not in st.session_state:
+    st.session_state.analyse_auto_fetched = False
+
+if not st.session_state.analyse_auto_fetched:
+    valuations_check = agent.get_portfolio_valuation()
+    prices_fresh = any(
+        v.fetched_at is not None
+        and (datetime.now(timezone.utc) - v.fetched_at.replace(tzinfo=timezone.utc)).total_seconds() < 3600
+        for v in valuations_check
+        if v.fetched_at is not None
+    )
+    if not prices_fresh:
+        with st.spinner(t("analysis.auto_fetch_notice")):
+            agent.fetch_all_now(fetch_history=True)
+    st.session_state.analyse_auto_fetched = True
+
 col_title, col_refresh = st.columns([5, 1])
 with col_refresh:
     if st.button(f"🔄 {t('common.refresh')}"):
+        st.session_state.analyse_auto_fetched = False
         st.rerun()
 
 valuations = agent.get_portfolio_valuation()
@@ -31,7 +54,46 @@ if not has_prices:
     st.warning(t("analysis.no_price_data"))
 
 # ------------------------------------------------------------------
-# P&L per position
+# Today's performance (daily P&L)
+# ------------------------------------------------------------------
+st.subheader(t("analysis.day_pnl_header"))
+
+col_day_eur = t("analysis.day_pnl_col")
+col_day_pct = t("analysis.day_pnl_pct_col")
+
+day_rows = [
+    {
+        "Symbol": v.symbol,
+        col_day_eur: v.day_pnl_eur,
+        col_day_pct: v.day_pnl_pct,
+    }
+    for v in valuations
+    if v.day_pnl_eur is not None
+]
+
+if day_rows:
+    df_day = pd.DataFrame(day_rows).sort_values(col_day_eur)
+    total_day = df_day[col_day_eur].sum()
+    total_sign = "+" if total_day >= 0 else ""
+    st.caption(f"**Gesamt heute: {total_sign}€{total_day:,.2f}**".replace(",", "X").replace(".", ",").replace("X", "."))
+
+    fig_day = px.bar(
+        df_day, x="Symbol", y=col_day_eur,
+        color=col_day_eur,
+        color_continuous_scale=["red", "lightgrey", "green"],
+        color_continuous_midpoint=0,
+        text=df_day[col_day_pct].apply(lambda x: f"{x:+.2f}%" if x is not None else ""),
+    )
+    fig_day.update_traces(textposition="outside")
+    fig_day.update_layout(coloraxis_showscale=False, margin=dict(t=20))
+    st.plotly_chart(fig_day, use_container_width=True)
+else:
+    st.info(t("analysis.no_day_pnl"))
+
+st.divider()
+
+# ------------------------------------------------------------------
+# P&L per position (total, vs. cost basis)
 # ------------------------------------------------------------------
 st.subheader(t("analysis.pnl_chart"))
 

@@ -45,6 +45,8 @@ class PortfolioValuation:
     pnl_eur: Optional[float]
     pnl_pct: Optional[float]
     fetched_at: Optional[datetime]
+    day_pnl_eur: Optional[float] = None   # today vs. previous close
+    day_pnl_pct: Optional[float] = None
     in_portfolio: bool = True
     in_watchlist: bool = False
 
@@ -195,6 +197,19 @@ class MarketDataAgent:
             pnl_eur = (current_value - cost_basis) if current_value is not None and cost_basis is not None else None
             pnl_pct = (pnl_eur / cost_basis * 100) if pnl_eur is not None and cost_basis is not None and cost_basis > 0 else None
 
+            # Daily P&L: current price vs. previous historical close
+            prev_close = self._market.get_prev_close(pos.ticker)
+            if current_price is not None and prev_close is not None and pos.quantity is not None:
+                if pos.unit == "g":
+                    prev_value = (prev_close / TROY_OZ_TO_G) * pos.quantity
+                else:
+                    prev_value = prev_close * pos.quantity
+                day_pnl_eur: Optional[float] = current_value - prev_value if current_value is not None else None
+                day_pnl_pct: Optional[float] = (day_pnl_eur / prev_value * 100) if day_pnl_eur is not None and prev_value > 0 else None
+            else:
+                day_pnl_eur = None
+                day_pnl_pct = None
+
             valuations.append(PortfolioValuation(
                 symbol=pos.ticker,
                 name=pos.name,
@@ -209,6 +224,8 @@ class MarketDataAgent:
                 pnl_eur=pnl_eur,
                 pnl_pct=pnl_pct,
                 fetched_at=price_record.fetched_at if price_record else None,
+                day_pnl_eur=day_pnl_eur,
+                day_pnl_pct=day_pnl_pct,
                 in_portfolio=pos.in_portfolio,
                 in_watchlist=pos.in_watchlist,
             ))
