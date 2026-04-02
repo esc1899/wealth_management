@@ -70,6 +70,9 @@ Privater Bereich (Ollama 🔒) und Cloud-Bereich (Claude ☁️) klarer abheben 
 
 ## Done
 
+#### [P2] [FEAT] Storychecker: Alle Positionen auf einmal prüfen
+`batch_check_all()` async Methode im `StorycheckerAgent`: iteriert alle Positionen mit Story sequenziell, 15s Sleep zwischen Calls wegen Rate Limit. `start_session_async()` als async Pendant zu `start_session()`. Storychecker-Page: "Alle prüfen" Expander oben mit Background-Thread-Pattern (session_state), Skill-Auswahl, Auto-Refresh alle 5s, Fehler-Count in Erfolgsmeldung. Konsistent mit Fundamental- und Konsens-Lücken-Page.
+
 #### [P2] [IMPR] Rebalance: Cloud-Agent-Ergebnisse in Kontext einbeziehen
 `_build_portfolio_context()` lädt jetzt `fundamental`- und `consensus_gap`-Verdicts für alle Portfolio-Positionen und Watchlist-Kandidaten. Positionszeilen zeigen bis zu 3 Signale: `thesis: 🟢 intact | fundamental: 🟢 unterbewertet (+24%) | gap: 🟢 wächst`. Watchlist-Kandidaten ebenfalls mit Cloud-Verdicts angereichert. Graceful: fehlende Analysen werden einfach weggelassen.
 
