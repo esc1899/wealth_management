@@ -3,9 +3,12 @@ Strukturwandel-Scanner — Claude's eigene Investmentstrategie, Säule 1.
 
 Identifiziert strukturelle Marktverschiebungen bevor der Konsens sie erkennt.
 Kandidaten werden direkt in die Watchlist übernommen.
+Analysis runs in a background thread so page navigation doesn't kill the job.
 """
 
 import asyncio
+import threading
+import time
 
 import streamlit as st
 
@@ -34,22 +37,50 @@ if not _skills:
     st.stop()
 
 # ------------------------------------------------------------------
-# Session state
+# Background job tracking (session_state — survives reruns)
 # ------------------------------------------------------------------
+
+if "_scan_job" not in st.session_state:
+    st.session_state["_scan_job"] = {
+        "running": False, "done": False, "run_id": None, "error": None, "last_error": None
+    }
+
+_JOB = st.session_state["_scan_job"]
 
 if "scan_run_id" not in st.session_state:
     st.session_state["scan_run_id"] = None
+
+
+def _run_background(agent, skill_name, skill_prompt, user_focus, repo, job: dict):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        run, _ = loop.run_until_complete(
+            agent.start_scan(
+                skill_name=skill_name,
+                skill_prompt=skill_prompt,
+                user_focus=user_focus,
+                repo=repo,
+            )
+        )
+        job.update({"running": False, "done": True, "run_id": run.id, "error": None})
+    except Exception as exc:
+        job.update({"running": False, "done": True, "run_id": None, "error": str(exc), "last_error": str(exc)})
+    finally:
+        loop.close()
+
 
 # ------------------------------------------------------------------
 # Start a new scan
 # ------------------------------------------------------------------
 
-with st.expander(t("structural_scan.new_scan_header"), expanded=st.session_state["scan_run_id"] is None):
+with st.expander(t("structural_scan.new_scan_header"), expanded=st.session_state["scan_run_id"] is None and not _JOB["running"]):
     _skill_options = {s.name: s for s in _skills}
     _sel_skill_name = st.selectbox(
         t("structural_scan.skill_label"),
         options=list(_skill_options.keys()),
         key="_scan_skill",
+        disabled=_JOB["running"],
     )
     _sel_skill = _skill_options[_sel_skill_name]
 
@@ -58,20 +89,42 @@ with st.expander(t("structural_scan.new_scan_header"), expanded=st.session_state
         placeholder=t("structural_scan.focus_placeholder"),
         height=80,
         key="_scan_focus",
+        disabled=_JOB["running"],
     )
 
-    if st.button(t("structural_scan.start_button"), type="primary", key="_scan_start"):
-        with st.spinner(t("structural_scan.running")):
-            run, report = asyncio.run(
-                _agent.start_scan(
-                    skill_name=_sel_skill.name,
-                    skill_prompt=_sel_skill.prompt,
-                    user_focus=_user_focus or None,
-                    repo=_repo,
-                )
-            )
-        st.session_state["scan_run_id"] = run.id
+    if st.button(t("structural_scan.start_button"), type="primary", key="_scan_start", disabled=_JOB["running"]):
+        _JOB["running"] = True
+        _JOB["done"] = False
+        _JOB["run_id"] = None
+        _JOB["error"] = None
+        _JOB["last_error"] = None
+        t_bg = threading.Thread(
+            target=_run_background,
+            args=(_agent, _sel_skill.name, _sel_skill.prompt, _user_focus or None, _repo, _JOB),
+            daemon=True,
+        )
+        t_bg.start()
         st.rerun()
+
+# Running indicator — auto-refresh every 5s
+if _JOB["running"]:
+    st.info(f"⏳ {t('structural_scan.running')}", icon=":material/hourglass_top:")
+    time.sleep(5)
+    st.rerun()
+
+# Done: set active run and reset job state
+if _JOB["done"]:
+    if _JOB["error"]:
+        st.error(f"❌ {_JOB['error']}")
+    elif _JOB["run_id"]:
+        st.session_state["scan_run_id"] = _JOB["run_id"]
+    _JOB["done"] = False
+    if _JOB["run_id"]:
+        st.rerun()
+
+# Persistent error
+if _JOB["last_error"] and not _JOB["running"]:
+    st.error(f"❌ Letzter Scan fehlgeschlagen: {_JOB['last_error']}")
 
 # ------------------------------------------------------------------
 # Active run: report + follow-up chat
@@ -109,7 +162,6 @@ if _active_run_id:
         # ── Follow-up chat ───────────────────────────────────────────
         st.subheader(t("structural_scan.followup_header"))
         _messages = _repo.get_messages(_active_run_id)
-        # Show messages after the initial scan exchange (skip first user+assistant pair)
         for msg in _messages[2:]:
             with st.chat_message(msg.role):
                 st.markdown(msg.content)
