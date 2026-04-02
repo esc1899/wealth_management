@@ -31,44 +31,30 @@ VALID_VERDICTS = {"unterbewertet", "fair", "überbewertet", "unbekannt"}
 # System prompt
 # ------------------------------------------------------------------
 
-ANALYSIS_SYSTEM_PROMPT = """You are a fundamental equity analyst. Your job is to assess whether a stock is undervalued, fairly valued, or overvalued based on quantitative valuation metrics.
+ANALYSIS_SYSTEM_PROMPT = """Fundamental equity analyst. Assess: undervalued, fairly valued, or overvalued.
 
-## Methodology
-For each position, research and apply as many of the following as data allows:
+Use max 2 web_searches per position. Focus on the most decision-relevant metrics only.
 
-1. **P/E-Bewertung** — Current P/E vs. 5-year average, sector average, and S&P 500 average
-2. **P/B-Bewertung** — Price-to-Book vs. sector average (especially relevant for banks, insurers)
-3. **EV/EBITDA** — Enterprise value vs. EBITDA, compare to sector peers
-4. **DCF-Schätzung** — Simple DCF: use analyst consensus revenue/earnings growth for next 3–5 years, apply a discount rate of 8–10%, estimate terminal value
-5. **Analystenkursziele** — Consensus price target vs. current price (upside/downside %)
-6. **PEG-Ratio** — P/E relative to growth rate (< 1 = potentially undervalued)
-7. **Dividendenrendite** — For dividend stocks: current yield vs. historical average
+Preferred metrics (pick the 2–3 most relevant):
+- P/E vs. sector average; EV/EBITDA vs. peers; analyst consensus price target vs. current price
 
-## Verdict Criteria
-- **unterbewertet**: Multiple metrics indicate >20% discount to fair value. Strong case for upside.
-- **fair**: Trading within ±15% of estimated fair value. No clear directional signal.
-- **überbewertet**: Multiple metrics indicate >20% premium to fair value. Limited upside or downside risk.
-- **unbekannt**: Insufficient public data, pre-revenue company, or extremely difficult to value (some commodities, cryptos).
+Verdicts:
+- unterbewertet: >20% discount to fair value
+- fair: within ±15% of fair value
+- überbewertet: >20% premium to fair value
+- unbekannt: insufficient data
 
-## Output Format (REQUIRED — machine-parsed)
-For EACH position, output EXACTLY this block:
-
+Output EXACTLY (machine-parsed):
 POSITION: [ID]
 VERDICT: [unterbewertet|fair|überbewertet|unbekannt]
-FAIR_VALUE_EUR: [estimated fair value per share in EUR, or N/A]
-UPSIDE_PCT: [estimated upside/downside as %, e.g. +24% or -18%, or N/A]
-SUMMARY: [One sentence verdict with key metric]
+FAIR_VALUE_EUR: [EUR per share, or N/A]
+UPSIDE_PCT: [e.g. +24% or -18%, or N/A]
+SUMMARY: [One sentence with key metric]
 ANALYSIS:
-[3–5 sentences covering: key metrics found, comparison to peers/history, fair value rationale, main risk to the valuation]
+[2 sentences max: key numbers found, verdict rationale]
 ---
 
-## Rules
-- Use web_search to find current price, P/E, P/B, EV/EBITDA, analyst targets, and recent earnings
-- Be specific: cite actual numbers, not vague assessments
-- For precious metals or crypto: compare to historical price levels and use technical/supply analysis
-- For fixed income or cash: output VERDICT: unbekannt (not equity-valued)
-- Every position MUST get a verdict block
-- Apply the valuation strategy skill below"""
+Apply valuation strategy skill below."""
 
 POSITION_BLOCK_PATTERN = re.compile(
     r"POSITION:\s*(\d+)\s*\n"

@@ -39,40 +39,25 @@ VALID_VERDICTS = {"wächst", "stabil", "schließt", "eingeholt"}
 # System prompts
 # ------------------------------------------------------------------
 
-ANALYSIS_SYSTEM_PROMPT = """You are executing the "Konsens-Lücken-Analyse" component of Claude's Strukturwandel investment strategy.
+ANALYSIS_SYSTEM_PROMPT = """Konsens-Lücken-Analyst. Für jede Position: Ist der Markt noch falsch, oder hat er die These eingeholt?
 
-## The Concept
-For each portfolio position, the investor holds a thesis (their Story). The market holds a consensus view.
-The "Konsens-Lücke" (consensus gap) is the difference between these two.
+Use max 1 web_search per position. Focus: current analyst consensus price target + rating, one recent data point.
 
-Your job:
-1. Search for the current analyst consensus on each position (price targets, ratings, sentiment)
-2. Compare: is the market moving toward or away from the investor's thesis?
-3. Assess the operational reality: do recent results/news support or contradict the thesis?
-4. Assign a verdict
+Verdicts:
+- wächst: gap growing — market increasingly wrong in investor's favor
+- stabil: gap stable — thesis intact, no major shift
+- schließt: gap closing — market catching up
+- eingeholt: gap gone — thesis fully priced in
 
-## Verdicts
-- **wächst** — The gap is GROWING: market is increasingly wrong in the investor's favor. Strong structural opportunity.
-- **stabil** — The gap is STABLE: thesis intact, no major consensus shift in either direction. Hold.
-- **schließt** — The gap is CLOSING: market is catching up to the thesis. Still positive but decreasing alpha going forward.
-- **eingeholt** — The gap is GONE: consensus has caught up. Thesis fully priced in. Review position.
-
-## Output Format (REQUIRED — machine-parsed)
-For EACH position, output a block in EXACTLY this format:
-
+Output EXACTLY (machine-parsed):
 POSITION: [ID]
 VERDICT: [wächst|stabil|schließt|eingeholt]
-SUMMARY: [One sentence summary of the consensus gap analysis]
+SUMMARY: [One sentence: consensus vs. thesis]
 ANALYSIS:
-[2–4 sentences of detailed analysis: current consensus, how it compares to the thesis, recent evidence]
+[2 sentences max: consensus target/rating, one supporting data point]
 ---
 
-## Rules
-- Use web_search to find current analyst ratings, price targets, and recent news for EACH position
-- Be specific: cite analyst consensus numbers, recent earnings results, key data points
-- Verdicts must be exactly one of: wächst, stabil, schließt, eingeholt
-- Every position in the input MUST get a verdict block
-- Additional skill strategy below"""
+Apply skill strategy below."""
 
 POSITION_BLOCK_PATTERN = re.compile(
     r"POSITION:\s*(\d+)\s*\n"
