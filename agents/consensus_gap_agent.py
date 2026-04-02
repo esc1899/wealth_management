@@ -117,8 +117,8 @@ class ConsensusGapAgent:
         system = ANALYSIS_SYSTEM_PROMPT + f"\n\n## Strategie-Skill\n{skill_prompt}"
         all_results: List[Tuple[str, str, str, str]] = []
 
-        # Process in batches of 3 to stay within rate limits
-        batch_size = 3
+        # Process in batches of 2 to stay within rate limits
+        batch_size = 2
         for i in range(0, len(eligible), batch_size):
             batch = eligible[i: i + batch_size]
             positions_text = self._format_positions(batch)
@@ -129,13 +129,13 @@ class ConsensusGapAgent:
                 messages=[{"role": "user", "content": user_msg}],
                 tools=[{"type": "web_search_20250305", "name": "web_search"}],
                 system=system,
-                max_tokens=4096,
+                max_tokens=2500,
             )
             all_results.extend(self._parse_verdicts(response.content or ""))
 
-            # Brief pause between batches to avoid rate limit
+            # Pause between batches to avoid rate limit
             if i + batch_size < len(eligible):
-                await asyncio.sleep(5)
+                await asyncio.sleep(12)
 
         # Persist all found verdicts
         for pos_id_str, verdict, summary, analysis in all_results:

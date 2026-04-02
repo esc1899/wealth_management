@@ -303,12 +303,24 @@ with col_c2:
 with col_c3:
     sel_storychecker = _claude_sel("storychecker", t("settings.agent_storychecker"))
 
+st.markdown(f"**{t('settings.claude_strategy_header')}** ☁️")
+col_s1, col_s2, col_s3 = st.columns(3)
+with col_s1:
+    sel_structural = _claude_sel("structural_scan", t("settings.agent_structural_scan"))
+with col_s2:
+    sel_consensus = _claude_sel("consensus_gap", t("settings.agent_consensus_gap"))
+with col_s3:
+    sel_fundamental = _claude_sel("fundamental", t("settings.agent_fundamental"))
+
 if st.button(t("settings.save_models_button"), key="_save_models_btn"):
     app_config.set("model_ollama_portfolio", sel_portfolio)
     app_config.set("model_ollama_rebalance", sel_rebalance)
     app_config.set("model_claude_news", sel_news)
     app_config.set("model_claude_search", sel_search)
     app_config.set("model_claude_storychecker", sel_storychecker)
+    app_config.set("model_claude_structural_scan", sel_structural)
+    app_config.set("model_claude_consensus_gap", sel_consensus)
+    app_config.set("model_claude_fundamental", sel_fundamental)
     st.cache_resource.clear()
     st.success(t("settings.models_saved"))
 

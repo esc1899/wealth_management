@@ -47,6 +47,7 @@ with col_alltime:
     if alltime_rows:
         df_all = pd.DataFrame(alltime_rows)
         df_all["total"] = df_all["input_tokens"] + df_all["output_tokens"]
+        df_all["avg_per_call"] = (df_all["total"] / df_all["calls"]).round(0).astype(int)
         df_all = df_all.rename(columns={
             "agent":         t("statistics.col_agent"),
             "model":         t("statistics.col_model"),
@@ -54,13 +55,15 @@ with col_alltime:
             "output_tokens": t("statistics.col_output"),
             "calls":         t("statistics.col_calls"),
             "total":         t("statistics.col_total"),
+            "avg_per_call":  t("statistics.col_avg"),
         })
         st.dataframe(df_all, use_container_width=True, hide_index=True)
         total_all = sum(r["input_tokens"] + r["output_tokens"] for r in alltime_rows)
         total_calls = sum(r["calls"] for r in alltime_rows)
-        m1, m2 = st.columns(2)
+        m1, m2, m3 = st.columns(3)
         m1.metric(t("statistics.total_tokens"), f"{total_all:,}")
         m2.metric(t("statistics.total_calls"), f"{total_calls:,}")
+        m3.metric(t("statistics.avg_per_call"), f"{total_all // total_calls:,}" if total_calls else "—")
     else:
         st.info(t("statistics.no_data"))
 

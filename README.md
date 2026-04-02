@@ -17,20 +17,36 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 
 ## Features
 
+### Portfolio
 - **Portfolio Management** — track 11 asset types: stocks, ETFs, funds, precious metals, crypto, bonds, fixed deposits, cash, real estate, and land
 - **Live Market Data** — automatic and on-demand prices via yfinance with EUR conversion
-- **Portfolio Chat** — natural language interface powered by a local LLM (Ollama); data stays on your machine
-- **Invest / Rebalance** — portfolio rebalancing analysis via local LLM
-- **Research Chat** — AI-powered investment research using Claude API with web search
-- **News Digest** — recent news for all portfolio positions, filtered by strategy
-- **Investment Search** — screen for new opportunities using Claude + web search
-- **Manage Positions** — full CRUD for portfolio and watchlist without any AI assistant
-- **Skills System** — reusable prompt templates for research strategies; AI-assisted generation
-- **Model Selection** — choose Ollama and Claude models at runtime in Settings
+- **P&L Analysis** — daily gains/losses, allocation charts, day performance
+- **Rebalancing** — Josef's Rule (1/3 each: equities / bonds+cash / real estate) as hidden strategy layer
+
+### Local Assistants (private, Ollama)
+- **Portfolio Chat** — natural language CRUD interface; data never leaves your machine
+- **Invest / Rebalance** — portfolio rebalancing analysis including watchlist candidates and all cloud verdicts
+
+### Research (cloud, Claude API + web search)
+- **Research Chat** — deep-dive research per position using Claude
+- **News Digest** — recent news for all portfolio positions, filtered by investment strategy
+- **Investment Search** — screen for new opportunities; thesis saved automatically to watchlist
+- **Story Checker** — validates investment theses against current news and fundamentals
+- **Fundamental Value** — per-position valuation via P/E, P/B, EV/EBITDA, DCF, PEG; verdict: undervalued / fair / overvalued
+
+### Claude Strategy (cloud, Claude Sonnet + web search)
+- **Structural Change Scanner** — identifies irreversible market shifts not yet priced by consensus; adds candidates directly to watchlist
+- **Consensus Gap Analysis** — measures the gap between your investment thesis and market consensus per position
+- All verdicts from all agents feed back into the Rebalance context automatically
+
+### System
+- **Skills System** — reusable prompt templates for every agent; AI-assisted generation in Settings
+- **Per-agent Model Selection** — choose Ollama and Claude models individually at runtime
+- **Scheduled Tasks** — run cloud agents automatically on a schedule (daily / weekly / monthly)
+- **Token Usage Statistics** — per-agent token counts, daily trend chart, average tokens per call
 - **Recommendation & Story** — configurable recommendation labels and investment thesis per position
-- **Detail View** — dialog drawer for each position with estimated value update for manual types
-- **Demo Mode** — pre-seeded database with 20 realistic positions for testing
-- **Bilingual UI** — German / English, switchable in Settings
+- **Demo Mode** — pre-seeded database with 20 realistic positions + sample analyses for testing
+- **Bilingual UI** — German / English, switchable per session
 - **System Status** — health checks for Ollama connectivity, privacy mode, and demo mode
 
 ## What You Can Learn Here
@@ -59,7 +75,10 @@ The Skills system lets you save and edit prompt templates for each agent. Learn 
 Optionally connect Langfuse to trace every LLM call — full prompt, response, latency, and token counts.
 
 ### Agent design trade-offs
-The app has six agents with different characteristics: stateful vs. stateless, local vs. cloud, one-shot vs. conversational. Comparing Portfolio Chat, Rebalance, Research Chat, and News Digest shows the practical trade-offs: privacy, cost, speed, and capability.
+The app has ten agents with different characteristics: stateful vs. stateless, local vs. cloud, one-shot vs. conversational, agentic loop vs. single call. Comparing Portfolio Chat, Rebalance, Research Chat, News Digest, the Story Checker, and the Claude Strategy agents shows the practical trade-offs: privacy, cost, speed, and capability.
+
+### Agentic loops and tool use
+The Structural Change Scanner runs an agentic loop: Claude decides when to call `web_search` and when to call the custom `add_structural_candidate` tool to populate your watchlist — no user interaction needed. Compare this to the simpler Research Chat (single call) to understand the cost/quality trade-off.
 
 ---
 
@@ -107,7 +126,9 @@ Copy `.env.example` to `.env` and fill in your values.
 | `DB_PATH` | Optional | Default: `data/portfolio.db` |
 | `MARKET_DATA_FETCH_HOUR` | Optional | Hour (0–23) for automatic price refresh, default `18` |
 
-At least one of `ANTHROPIC_API_KEY` or `ANTHROPIC_BASE_URL` is required to use Research Chat, News Digest, or Investment Search.
+At least one of `ANTHROPIC_API_KEY` or `ANTHROPIC_BASE_URL` is required to use Research Chat, News Digest, Investment Search, Story Checker, Structural Change Scanner, Consensus Gap Analysis, or Fundamental Value.
+
+**Note on model choice:** Claude Sonnet (or better) is required for agents that use `web_search` (Structural Change Scanner, Consensus Gap, Fundamental Value). Claude Haiku works for Research Chat, News Digest, and Story Checker.
 
 ### LLM Proxy (corporate environments)
 

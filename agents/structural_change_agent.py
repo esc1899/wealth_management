@@ -224,7 +224,7 @@ class StructuralChangeAgent:
                 messages=api_messages,
                 tools=TOOLS,
                 system=system,
-                max_tokens=8192,
+                max_tokens=6000,
             )
 
             client_calls = [

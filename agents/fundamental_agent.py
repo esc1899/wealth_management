@@ -113,24 +113,24 @@ class FundamentalAgent:
         system = ANALYSIS_SYSTEM_PROMPT + f"\n\n## Bewertungs-Skill\n{skill_prompt}"
         all_results: List[Tuple[str, str, str, str, str, str]] = []
 
-        # Process in batches of 2 — fundamental analysis is token-heavy
-        batch_size = 2
+        # Process in batches of 1 — fundamental analysis is very token-heavy (web search per metric)
+        batch_size = 1
         for i in range(0, len(eligible), batch_size):
             batch = eligible[i: i + batch_size]
             positions_text = self._format_positions(batch)
             user_msg = (
-                f"Analysiere die Fundamentalbewertung dieser Positionen.\n\n{positions_text}"
+                f"Analysiere die Fundamentalbewertung dieser Position.\n\n{positions_text}"
             )
             response = await self._llm.chat_with_tools(
                 messages=[{"role": "user", "content": user_msg}],
                 tools=[{"type": "web_search_20250305", "name": "web_search"}],
                 system=system,
-                max_tokens=4096,
+                max_tokens=3000,
             )
             all_results.extend(self._parse_verdicts(response.content or ""))
 
             if i + batch_size < len(eligible):
-                await asyncio.sleep(5)
+                await asyncio.sleep(15)
 
         # Persist verdicts; embed fair value + upside in summary
         output: List[Tuple[int, str, str]] = []

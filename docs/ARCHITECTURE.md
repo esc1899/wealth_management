@@ -1,50 +1,62 @@
 # Architecture
 
-Stand: 2026-03-31
+Stand: 2026-04-02
 
 ## System Overview
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│  Streamlit UI  (localhost:8501)                                       │
-│                                                                       │
-│  app.py ─── pages/dashboard.py        (Portfolio overview, Easter Egg)│
-│         ├── pages/positionen.py       (CRUD, detail dialog, no LLM)  │
-│         ├── pages/portfolio_chat.py   (PortfolioAgent — Ollama 🔒)   │
-│         ├── pages/market_data.py      (MarketDataAgent — yfinance)    │
-│         ├── pages/analysis.py         (P&L, allocation charts)       │
-│         ├── pages/rebalance_chat.py   (RebalanceAgent — Ollama 🔒)   │
-│         ├── pages/research_chat.py    (ResearchAgent — Claude ☁️)    │
-│         ├── pages/news_chat.py        (NewsAgent — Claude ☁️)        │
-│         ├── pages/search_chat.py      (SearchAgent — Claude ☁️)      │
-│         ├── pages/settings.py         (Skills, models, labels)       │
-│         └── pages/statistics.py       (Token usage)                  │
-└────────────────────┬─────────────────────────────────────────────────┘
-                     │ state.py  (@st.cache_resource singletons)
-          ┌──────────┴───────────────────────────┐
-          │                                       │
-          ▼                                       ▼
-  Local Agents (Ollama 🔒)             Cloud Agents (Claude ☁️)
-  PortfolioAgent                        ResearchAgent
-  RebalanceAgent                        NewsAgent
-          │                             SearchAgent
-          ▼                                       │
-  OllamaProvider                        ClaudeProvider
-          │                                       │
-          └──────────────────────────┐            │
-                                     ▼            ▼
-                              PositionsRepository
-                              MarketDataRepository
-                              SkillsRepository
-                              AppConfigRepository
-                              UsageRepository
-                                     │
-                                     ▼
-                              SQLite  data/portfolio.db
-                              (encrypted: positions.quantity, purchase_price,
-                                          notes, extra_data, story)
-                              (plain: current_prices, historical_prices,
-                                       skills, app_config, llm_usage, ...)
+┌──────────────────────────────────────────────────────────────────────────┐
+│  Streamlit UI  (localhost:8501)                                           │
+│                                                                           │
+│  app.py ─── pages/dashboard.py         (Portfolio overview)              │
+│         ├── pages/positionen.py        (CRUD, detail dialog, no LLM)    │
+│         ├── pages/marktdaten.py        (MarketDataAgent — yfinance)      │
+│         ├── pages/analyse.py           (P&L, day chart, allocation)      │
+│         ├── pages/portfolio_chat.py    (PortfolioAgent — Ollama 🔒)      │
+│         ├── pages/rebalance_chat.py    (RebalanceAgent — Ollama 🔒)      │
+│         ├── pages/research_chat.py     (ResearchAgent — Claude ☁️)       │
+│         ├── pages/news_chat.py         (NewsAgent — Claude ☁️)           │
+│         ├── pages/search_chat.py       (SearchAgent — Claude ☁️)         │
+│         ├── pages/storychecker.py      (StorycheckerAgent — Claude ☁️)   │
+│         ├── pages/fundamental.py       (FundamentalAgent — Claude ☁️)    │
+│         ├── pages/structural_scan.py   (StructuralChangeAgent — Claude ☁️)│
+│         ├── pages/consensus_gap.py     (ConsensusGapAgent — Claude ☁️)   │
+│         ├── pages/settings.py          (Skills, models, scheduling)      │
+│         └── pages/statistics.py        (Token usage per agent)           │
+└──────────────────────┬───────────────────────────────────────────────────┘
+                       │ state.py  (@st.cache_resource singletons)
+          ┌────────────┴──────────────────────────────┐
+          │                                             │
+          ▼                                             ▼
+  Local Agents (Ollama 🔒)               Cloud Agents (Claude ☁️)
+  PortfolioAgent                          ResearchAgent       (Haiku)
+  RebalanceAgent                          NewsAgent           (Haiku)
+          │                               StorycheckerAgent   (Haiku)
+          ▼                               SearchAgent         (Sonnet)
+  OllamaProvider                          ConsensusGapAgent   (Sonnet)
+          │                               FundamentalAgent    (Sonnet)
+          │                               StructuralChangeAgent (Sonnet)
+          │                                             │
+          └──────────────────────────────┐              │
+                                         ▼              ▼
+                                  PositionsRepository
+                                  MarketDataRepository
+                                  SkillsRepository
+                                  AppConfigRepository
+                                  UsageRepository
+                                  PositionAnalysesRepository
+                                  StorycheckerRepository
+                                  StructuralScansRepository
+                                  ScheduledJobsRepository
+                                         │
+                                         ▼
+                                  SQLite  data/portfolio.db
+                                  (encrypted: positions.quantity, purchase_price,
+                                              notes, extra_data, story)
+                                  (plain: current_prices, historical_prices,
+                                          skills, app_config, llm_usage,
+                                          position_analyses, structural_scan_runs,
+                                          scheduled_jobs, ...)
 ```
 
 ## Runtime Architecture
@@ -121,10 +133,65 @@ get_portfolio_valuation()
             → extra_data.estimated_value  OR  purchase_price × quantity
 ```
 
-### Cloud Agents (ResearchAgent, NewsAgent, SearchAgent)
+### StorycheckerAgent
+
+Validates investment theses ("Stories") against current facts. Stateful — persists conversation sessions and the final verdict in `position_analyses` (agent=`storychecker`). Verdict values: `intact` / `gemischt` / `gefaehrdet`. Verdicts appear as badges in the positions list and feed into the Rebalance context.
+
+### StructuralChangeAgent
+
+Agentic loop — Claude decides autonomously when to search and when to add candidates:
+
+```
+start_scan()
+    │
+    ▼
+_run_agentic_loop()  (max 20 iterations)
+    │
+    ├── chat_with_tools([web_search, add_structural_candidate])
+    │
+    ├── web_search results? → Anthropic handles server-side, response continues
+    │
+    └── add_structural_candidate? → _tool_add_candidate()
+              └── PositionsRepository.add() → Position in watchlist
+                  with story = "[Struktureller Wandel] {theme}\n\n{thesis}"
+
+    loop ends when stop_reason == "end_turn" or no tool calls
+    └── save_run() + add_message() → StructuralScansRepository
+```
+
+**Important:** Requires Claude Sonnet+. Claude Haiku does not execute `web_search_20250305` server-side — the tool call appears as a client-side call, breaking the loop silently.
+
+### ConsensusGapAgent / FundamentalAgent
+
+Single-call agents (not agentic loop). Claude uses `web_search` server-side to research each position, then outputs a structured block per position.
+
+```
+analyze_portfolio(positions, skill_name, skill_prompt, analyses_repo)
+    │
+    ├── filter eligible (consensus_gap: has story; fundamental: has ticker)
+    ├── batch positions (2 or 1 per call)
+    ├── chat_with_tools([web_search]) → structured verdict blocks
+    ├── _parse_verdicts() → regex parse POSITION/VERDICT/SUMMARY/ANALYSIS
+    └── analyses_repo.save(position_id, agent, verdict, summary)
+```
+
+Verdict values:
+- ConsensusGap: `wächst` / `stabil` / `schließt` / `eingeholt`
+- Fundamental: `unterbewertet` / `fair` / `überbewertet` / `unbekannt`
+
+### Cloud Agents (ResearchAgent, NewsAgent, SearchAgent, StorycheckerAgent)
 
 All use `ClaudeProvider` with `on_usage` callback → `UsageRepository`.
-Token usage is tracked and displayed on the Statistics page.
+Token usage is tracked per agent and displayed on the Statistics page (total, daily trend, avg per call).
+
+### AgentSchedulerService
+
+APScheduler `BackgroundScheduler` in a daemon thread. Each job execution:
+1. Creates its own SQLite connection (thread safety — no shared write connection)
+2. Calls the appropriate agent's `analyze_portfolio()` or `run()` method
+3. Updates `scheduled_jobs.last_run`
+
+Configurable via Settings: agent, skill, frequency (daily/weekly/monthly), time, model override.
 
 ## Data Model
 
@@ -189,7 +256,25 @@ CREATE TABLE app_config (
 );
 ```
 
-Used for: `model_ollama`, `model_claude`, `empfehlung_labels`.
+Used for: `model_ollama`, `model_claude`, `model_claude_{agent_key}` (per-agent override), `empfehlung_labels`.
+
+### `position_analyses` Table
+
+Agent-agnostic verdict store — reused by Storychecker, ConsensusGap, and Fundamental:
+
+```sql
+CREATE TABLE position_analyses (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    position_id INTEGER NOT NULL,
+    agent       TEXT NOT NULL,      -- 'storychecker' | 'consensus_gap' | 'fundamental'
+    skill_name  TEXT NOT NULL,
+    verdict     TEXT,               -- agent-specific value
+    summary     TEXT,               -- one-sentence summary (shown in UI)
+    created_at  TEXT NOT NULL
+);
+```
+
+`get_latest_bulk(ids, agent)` always returns the newest entry per position — older runs accumulate but never overwrite.
 
 ### Other Tables (plaintext)
 
@@ -201,6 +286,10 @@ Used for: `model_ollama`, `model_claude`, `empfehlung_labels`.
 | `rebalance_sessions` / `rebalance_messages` | Rebalance sessions |
 | `news_runs` / `news_messages` | News Digest runs |
 | `search_sessions` / `search_messages` | Investment Search sessions |
+| `storychecker_sessions` / `storychecker_messages` | Story Checker sessions |
+| `structural_scan_runs` / `structural_scan_messages` | Structural Change scan history |
+| `position_analyses` | Agent verdicts (storychecker, consensus_gap, fundamental) |
+| `scheduled_jobs` | APScheduler job definitions |
 | `llm_usage` | Token usage per agent and model |
 
 ## Asset Class Configuration
@@ -242,12 +331,20 @@ Defined in `config/asset_classes.yaml`. No code change needed to add a type.
 
 ## Model Selection
 
-Ollama and Claude models are selectable at runtime in Settings → Model Selection.
+Ollama and Claude models are selectable per agent at runtime in Settings → Model Selection.
 
 - Available Ollama models are fetched live from `/api/tags`
-- Claude model is selected from a static list (`haiku-4-5`, `sonnet-4-6`, `opus-4-6`)
-- Selections are persisted in `app_config` (`model_ollama`, `model_claude`)
-- Agent factories in `state.py` are parameterized with model string as `@st.cache_resource` key
+- Claude models come from the `CLAUDE_MODELS` env var (comma-separated, default: all three)
+- Global fallback chain: `model_{type}_{agent_key}` → `model_{type}` → hardcoded default
+- Selections are persisted in `app_config`
+- `st.cache_resource.clear()` is called on save to force agent recreation with new model
+
+**Model requirements:**
+| Agent | Minimum | Reason |
+|---|---|---|
+| Portfolio Chat, Rebalance | any Ollama | Local only |
+| Research, News, Storychecker | Haiku+ | No web search needed |
+| Search, Structural, ConsensusGap, Fundamental | **Sonnet+** | Requires server-side `web_search_20250305` |
 
 ## Schema Migrations
 
