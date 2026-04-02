@@ -420,6 +420,12 @@ storychecker:
   select_to_start: "Links eine vergangene Analyse auswählen oder neuen Check starten."
   session_not_found: "Session nicht gefunden."
   error: "Fehler bei der Analyse"
+  batch_header: "Alle Positionen auf einmal prüfen"
+  batch_caption: "{n} Positionen mit Story gefunden — alle werden nacheinander geprüft."
+  batch_button: "Alle prüfen"
+  batch_running: "Story-Checks laufen im Hintergrund…"
+  batch_done: "Positionen geprüft"
+  batch_errors: "Fehler"
 
 positionen:
   title: "Positionen verwalten"

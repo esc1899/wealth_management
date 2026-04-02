@@ -9,9 +9,14 @@ company, then evaluates whether the original investment thesis still holds.
 
 Persistent sessions: start_session() kicks off a new check, chat() allows
 follow-up questions within the same session.
+
+batch_check_all() runs all eligible positions sequentially (background thread).
 """
 
 from __future__ import annotations
+
+import asyncio
+from typing import List, Tuple
 
 from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
@@ -128,6 +133,55 @@ class StorycheckerAgent:
             session_id=session.id,
         )
         return session
+
+    async def start_session_async(
+        self,
+        position: Position,
+        skill_name: str,
+        skill_prompt: str,
+    ) -> StorycheckerSession:
+        """Async version of start_session — for use in batch_check_all."""
+        session = self._storychecker.create_session(
+            position_id=position.id,
+            ticker=position.ticker,
+            position_name=position.name,
+            skill_name=skill_name,
+            skill_prompt=skill_prompt,
+        )
+        initial_msg = _build_initial_message(position, skill_name, skill_prompt)
+        self._storychecker.add_message(session.id, "user", initial_msg)
+        response = await self._run_llm_async(session.id, [{"role": "user", "content": initial_msg}])
+        self._analyses.save(
+            position_id=position.id,
+            agent="storychecker",
+            skill_name=skill_name,
+            verdict=_extract_verdict(response),
+            summary=_extract_summary(response),
+            session_id=session.id,
+        )
+        return session
+
+    async def batch_check_all(
+        self,
+        positions: List[Position],
+        skill_name: str,
+        skill_prompt: str,
+    ) -> List[Tuple[str, str | None]]:
+        """
+        Run story checks for all eligible positions sequentially.
+        Returns list of (position_name, error_or_None).
+        """
+        eligible = [p for p in positions if p.story and p.id is not None]
+        results: List[Tuple[str, str | None]] = []
+        for i, pos in enumerate(eligible):
+            try:
+                await self.start_session_async(pos, skill_name, skill_prompt)
+                results.append((pos.name, None))
+            except Exception as exc:
+                results.append((pos.name, str(exc)))
+            if i < len(eligible) - 1:
+                await asyncio.sleep(15)  # rate limit
+        return results
 
     def chat(self, session_id: int, user_message: str) -> str:
         """Send a follow-up message and return the assistant reply."""

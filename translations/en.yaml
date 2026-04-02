@@ -420,6 +420,12 @@ storychecker:
   select_to_start: "Select a past analysis on the left or start a new check."
   session_not_found: "Session not found."
   error: "Error during analysis"
+  batch_header: "Check all positions at once"
+  batch_caption: "{n} positions with a story found — all will be checked sequentially."
+  batch_button: "Check all"
+  batch_running: "Story checks running in background…"
+  batch_done: "positions checked"
+  batch_errors: "errors"
 
 positionen:
   title: "Manage Positions"

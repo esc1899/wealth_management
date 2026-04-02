@@ -6,6 +6,10 @@ No quantities or purchase prices are exposed.
 Uses built-in web search to find current news before assessing the thesis.
 """
 
+import asyncio
+import threading
+import time
+
 import streamlit as st
 
 from core.i18n import t
@@ -19,7 +23,7 @@ agent = get_storychecker_agent()
 analyses_repo = get_analyses_repo()
 st.info(t("storychecker.cloud_notice").format(model=agent._llm.model), icon="ℹ️")
 
-with st.expander(t("storychecker.what_is_this"), expanded=True):
+with st.expander(t("storychecker.what_is_this"), expanded=False):
     st.markdown(t("storychecker.explanation"))
 
 # ------------------------------------------------------------------
@@ -28,6 +32,92 @@ with st.expander(t("storychecker.what_is_this"), expanded=True):
 
 positions_with_story = [p for p in get_positions_repo().get_all() if p.story]
 storychecker_skills = get_skills_repo().get_by_area("storychecker")
+
+# ------------------------------------------------------------------
+# Batch check — background job
+# ------------------------------------------------------------------
+
+if "_sc_batch_job" not in st.session_state:
+    st.session_state["_sc_batch_job"] = {
+        "running": False, "done": False, "count": 0, "errors": 0, "error": None, "last_error": None,
+    }
+
+_BATCH = st.session_state["_sc_batch_job"]
+
+
+def _run_batch_background(ag, positions, skill_name, skill_prompt, job: dict):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        results = loop.run_until_complete(
+            ag.batch_check_all(
+                positions=positions,
+                skill_name=skill_name,
+                skill_prompt=skill_prompt,
+            )
+        )
+        errors = sum(1 for _, err in results if err)
+        job.update({"running": False, "done": True, "count": len(results), "errors": errors, "error": None})
+    except Exception as exc:
+        job.update({"running": False, "done": True, "count": 0, "errors": 0, "error": str(exc), "last_error": str(exc)})
+    finally:
+        loop.close()
+
+
+if positions_with_story and storychecker_skills:
+    _skill_map_all = {s.name: s for s in storychecker_skills}
+    with st.expander(t("storychecker.batch_header"), expanded=False):
+        st.caption(t("storychecker.batch_caption").format(n=len(positions_with_story)))
+        col_skill, col_btn = st.columns([3, 1])
+        with col_skill:
+            _batch_skill_name = st.selectbox(
+                t("storychecker.pick_skill"),
+                options=list(_skill_map_all.keys()),
+                key="_sc_batch_skill",
+                disabled=_BATCH["running"],
+            )
+        with col_btn:
+            st.write("")
+            st.write("")
+            if st.button(
+                t("storychecker.batch_button"),
+                type="primary",
+                key="_sc_batch_run",
+                use_container_width=True,
+                disabled=_BATCH["running"],
+            ):
+                _batch_skill = _skill_map_all[_batch_skill_name]
+                _BATCH["running"] = True
+                _BATCH["done"] = False
+                _BATCH["error"] = None
+                _BATCH["last_error"] = None
+                threading.Thread(
+                    target=_run_batch_background,
+                    args=(agent, positions_with_story, _batch_skill.name, _batch_skill.prompt, _BATCH),
+                    daemon=True,
+                ).start()
+                st.rerun()
+
+if _BATCH["running"]:
+    st.info(f"⏳ {t('storychecker.batch_running')}", icon=":material/hourglass_top:")
+    time.sleep(5)
+    st.rerun()
+
+if _BATCH["done"]:
+    if _BATCH["error"]:
+        st.error(f"❌ {_BATCH['error']}")
+    else:
+        msg = f"✅ {_BATCH['count']} {t('storychecker.batch_done')}"
+        if _BATCH["errors"]:
+            msg += f" ({_BATCH['errors']} {t('storychecker.batch_errors')})"
+        st.success(msg, icon=":material/check_circle:")
+    _BATCH["done"] = False
+    st.rerun()
+
+if _BATCH["last_error"] and not _BATCH["running"]:
+    st.error(f"❌ Letzter Batch-Lauf fehlgeschlagen: {_BATCH['last_error']}")
+
+st.divider()
 _skill_map = {s.name: s for s in storychecker_skills}
 
 # ------------------------------------------------------------------
