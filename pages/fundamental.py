@@ -33,14 +33,16 @@ _analyses_repo = get_analyses_repo()
 _skills = get_skills_repo().get_by_area("fundamental")
 
 # ------------------------------------------------------------------
-# Background job tracking (module-level — survives page navigation)
+# Background job tracking (session_state — survives reruns)
 # ------------------------------------------------------------------
 
-_JOB: dict = {"running": False, "done": False, "count": 0, "error": None, "last_error": None}
+if "_fund_job" not in st.session_state:
+    st.session_state["_fund_job"] = {"running": False, "done": False, "count": 0, "error": None, "last_error": None}
+
+_JOB = st.session_state["_fund_job"]
 
 
-def _run_background(agent, positions, skill_name, skill_prompt, analyses_repo):
-    global _JOB
+def _run_background(agent, positions, skill_name, skill_prompt, analyses_repo, job: dict):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -52,9 +54,9 @@ def _run_background(agent, positions, skill_name, skill_prompt, analyses_repo):
                 analyses_repo=analyses_repo,
             )
         )
-        _JOB = {"running": False, "done": True, "count": len(results), "error": None}
+        job.update({"running": False, "done": True, "count": len(results), "error": None})
     except Exception as exc:
-        _JOB = {"running": False, "done": True, "count": 0, "error": str(exc), "last_error": str(exc)}
+        job.update({"running": False, "done": True, "count": 0, "error": str(exc), "last_error": str(exc)})
     finally:
         loop.close()
 
@@ -123,7 +125,7 @@ else:
             _JOB["last_error"] = None
             t_bg = threading.Thread(
                 target=_run_background,
-                args=(_agent, _eligible, _sel_skill.name, _sel_skill.prompt, _analyses_repo),
+                args=(_agent, _eligible, _sel_skill.name, _sel_skill.prompt, _analyses_repo, _JOB),
                 daemon=True,
             )
             t_bg.start()
