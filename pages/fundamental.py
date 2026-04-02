@@ -36,7 +36,7 @@ _skills = get_skills_repo().get_by_area("fundamental")
 # Background job tracking (module-level — survives page navigation)
 # ------------------------------------------------------------------
 
-_JOB: dict = {"running": False, "done": False, "count": 0, "error": None}
+_JOB: dict = {"running": False, "done": False, "count": 0, "error": None, "last_error": None}
 
 
 def _run_background(agent, positions, skill_name, skill_prompt, analyses_repo):
@@ -54,7 +54,7 @@ def _run_background(agent, positions, skill_name, skill_prompt, analyses_repo):
         )
         _JOB = {"running": False, "done": True, "count": len(results), "error": None}
     except Exception as exc:
-        _JOB = {"running": False, "done": True, "count": 0, "error": str(exc)}
+        _JOB = {"running": False, "done": True, "count": 0, "error": str(exc), "last_error": str(exc)}
     finally:
         loop.close()
 
@@ -120,6 +120,7 @@ else:
             _JOB["running"] = True
             _JOB["done"] = False
             _JOB["error"] = None
+            _JOB["last_error"] = None
             t_bg = threading.Thread(
                 target=_run_background,
                 args=(_agent, _eligible, _sel_skill.name, _sel_skill.prompt, _analyses_repo),
@@ -144,8 +145,11 @@ if _JOB["done"]:
             icon=":material/check_circle:",
         )
     _JOB["done"] = False
-    # Reload verdicts after background job finished
     _current_verdicts = _analyses_repo.get_latest_bulk(_all_ids, agent="fundamental")
+
+# Persistent error from last run (survives reruns)
+if _JOB["last_error"] and not _JOB["running"]:
+    st.error(f"❌ Letzter Lauf fehlgeschlagen: {_JOB['last_error']}")
 
 st.divider()
 
@@ -154,18 +158,22 @@ st.divider()
 # ------------------------------------------------------------------
 
 _analysed = {pid: a for pid, a in _current_verdicts.items()}
-if _analysed:
-    _counts = {"unterbewertet": 0, "fair": 0, "überbewertet": 0, "unbekannt": 0}
-    for a in _analysed.values():
-        if a.verdict in _counts:
-            _counts[a.verdict] += 1
+_pending = len(_eligible) - len(_analysed)
 
-    _sc1, _sc2, _sc3, _sc4 = st.columns(4)
-    _sc1.metric("🟢 " + t("fundamental.verdict_unter"), _counts["unterbewertet"])
-    _sc2.metric("🟡 " + t("fundamental.verdict_fair"),  _counts["fair"])
-    _sc3.metric("🔴 " + t("fundamental.verdict_ueber"), _counts["überbewertet"])
-    _sc4.metric("⚪ " + t("fundamental.verdict_unbekannt"), _counts["unbekannt"])
-    st.divider()
+_counts = {"unterbewertet": 0, "fair": 0, "überbewertet": 0, "unbekannt": 0}
+for a in _analysed.values():
+    if a.verdict in _counts:
+        _counts[a.verdict] += 1
+
+_sc1, _sc2, _sc3, _sc4, _sc5 = st.columns(5)
+_sc1.metric("🟢 " + t("fundamental.verdict_unter"), _counts["unterbewertet"])
+_sc2.metric("🟡 " + t("fundamental.verdict_fair"),  _counts["fair"])
+_sc3.metric("🔴 " + t("fundamental.verdict_ueber"), _counts["überbewertet"])
+_sc4.metric("⚪ " + t("fundamental.verdict_unbekannt"), _counts["unbekannt"])
+_sc5.metric("⏳ Ausstehend", _pending)
+if _pending > 0 and _analysed:
+    st.caption(f"{_pending} Position(en) noch nicht bewertet — erneut auf 'Portfolio bewerten' klicken.")
+st.divider()
 
 # ------------------------------------------------------------------
 # Position cards

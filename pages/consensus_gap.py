@@ -36,7 +36,7 @@ _skills = get_skills_repo().get_by_area("consensus_gap")
 # Background job tracking (module-level — survives page navigation)
 # ------------------------------------------------------------------
 
-_JOB: dict = {"running": False, "done": False, "count": 0, "error": None}
+_JOB: dict = {"running": False, "done": False, "count": 0, "error": None, "last_error": None}
 
 
 def _run_background(agent, positions, skill_name, skill_prompt, analyses_repo):
@@ -54,7 +54,7 @@ def _run_background(agent, positions, skill_name, skill_prompt, analyses_repo):
         )
         _JOB = {"running": False, "done": True, "count": len(results), "error": None}
     except Exception as exc:
-        _JOB = {"running": False, "done": True, "count": 0, "error": str(exc)}
+        _JOB = {"running": False, "done": True, "count": 0, "error": str(exc), "last_error": str(exc)}
     finally:
         loop.close()
 
@@ -121,6 +121,7 @@ else:
             _JOB["running"] = True
             _JOB["done"] = False
             _JOB["error"] = None
+            _JOB["last_error"] = None
             t_bg = threading.Thread(
                 target=_run_background,
                 args=(_agent, _eligible, _sel_skill.name, _sel_skill.prompt, _analyses_repo),
@@ -146,6 +147,9 @@ if _JOB["done"]:
         )
     _JOB["done"] = False
     _current_verdicts = _analyses_repo.get_latest_bulk(_all_ids, agent="consensus_gap")
+
+if _JOB["last_error"] and not _JOB["running"]:
+    st.error(f"❌ Letzter Lauf fehlgeschlagen: {_JOB['last_error']}")
 
 st.divider()
 
