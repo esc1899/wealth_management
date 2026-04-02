@@ -106,14 +106,36 @@ class FundamentalAgent:
         Verdicts are persisted in position_analyses.
         """
         # Only positions with tickers are fundamentally analysable
-        eligible = [p for p in positions if p.ticker and p.id is not None]
-        if not eligible:
+        all_with_ticker = [p for p in positions if p.ticker and p.id is not None]
+        if not all_with_ticker:
             return []
+
+        # Auto-assign "unbekannt" for asset classes Claude cannot meaningfully value
+        # (bond funds, precious metals, crypto — no DCF/P/E applicable)
+        _AUTO_UNBEKANNT = {"Rentenfonds", "Edelmetall", "Kryptowährung"}
+        auto_skip = [p for p in all_with_ticker if p.asset_class in _AUTO_UNBEKANNT]
+        eligible  = [p for p in all_with_ticker if p.asset_class not in _AUTO_UNBEKANNT]
+
+        output: List[Tuple[int, str, str]] = []
+
+        for pos in auto_skip:
+            summary = f"Automatisch als unbekannt klassifiziert — {pos.asset_class} ist nicht klassisch bewertbar (kein DCF/P/E anwendbar)."
+            analyses_repo.save(
+                position_id=pos.id,
+                agent=AGENT_NAME,
+                skill_name=skill_name,
+                verdict="unbekannt",
+                summary=summary,
+            )
+            output.append((pos.id, "unbekannt", summary))
+
+        if not eligible:
+            return output
 
         system = ANALYSIS_SYSTEM_PROMPT + f"\n\n## Bewertungs-Skill\n{skill_prompt}"
         all_results: List[Tuple[str, str, str, str, str, str]] = []
 
-        # Process in batches of 1 — fundamental analysis is very token-heavy (web search per metric)
+        # Process one position at a time — fundamental analysis is very token-heavy
         batch_size = 1
         for i in range(0, len(eligible), batch_size):
             batch = eligible[i: i + batch_size]
@@ -133,7 +155,6 @@ class FundamentalAgent:
                 await asyncio.sleep(15)
 
         # Persist verdicts; embed fair value + upside in summary
-        output: List[Tuple[int, str, str]] = []
         for pos_id_str, verdict, fair_value, upside, summary, analysis in all_results:
             if verdict not in VALID_VERDICTS:
                 continue

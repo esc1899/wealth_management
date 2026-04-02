@@ -5,6 +5,7 @@ Requires ANTHROPIC_API_KEY.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
@@ -95,7 +96,16 @@ class ClaudeProvider(LLMProvider):
         if system:
             kwargs["system"] = system
 
-        response = await self._client.messages.create(**kwargs)
+        # Retry up to 3 times on rate limit errors (60s between attempts)
+        for attempt in range(3):
+            try:
+                response = await self._client.messages.create(**kwargs)
+                break
+            except anthropic.RateLimitError:
+                if attempt < 2:
+                    await asyncio.sleep(60)
+                else:
+                    raise
 
         content_text = ""
         tool_calls: List[ClaudeToolCall] = []

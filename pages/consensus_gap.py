@@ -6,6 +6,8 @@ und dem Markt-Konsens. Zeigt wo der Markt (noch) falsch liegt.
 """
 
 import asyncio
+import threading
+import time
 
 import streamlit as st
 
@@ -29,6 +31,33 @@ _agent = get_consensus_gap_agent()
 _positions_repo = get_positions_repo()
 _analyses_repo = get_analyses_repo()
 _skills = get_skills_repo().get_by_area("consensus_gap")
+
+# ------------------------------------------------------------------
+# Background job tracking (module-level — survives page navigation)
+# ------------------------------------------------------------------
+
+_JOB: dict = {"running": False, "done": False, "count": 0, "error": None}
+
+
+def _run_background(agent, positions, skill_name, skill_prompt, analyses_repo):
+    global _JOB
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        results = loop.run_until_complete(
+            agent.analyze_portfolio(
+                positions=positions,
+                skill_name=skill_name,
+                skill_prompt=skill_prompt,
+                analyses_repo=analyses_repo,
+            )
+        )
+        _JOB = {"running": False, "done": True, "count": len(results), "error": None}
+    except Exception as exc:
+        _JOB = {"running": False, "done": True, "count": 0, "error": str(exc)}
+    finally:
+        loop.close()
+
 
 # ------------------------------------------------------------------
 # Verdict display helpers
@@ -76,6 +105,7 @@ else:
             t("consensus_gap.skill_label"),
             options=list(_skill_options.keys()),
             key="_cgap_skill",
+            disabled=_JOB["running"],
         )
     with col_btn:
         st.write("")
@@ -85,22 +115,37 @@ else:
             type="primary",
             key="_cgap_run",
             use_container_width=True,
+            disabled=_JOB["running"],
         ):
             _sel_skill = _skill_options[_sel_skill_name]
-            with st.spinner(t("consensus_gap.running")):
-                results = asyncio.run(
-                    _agent.analyze_portfolio(
-                        positions=_eligible,
-                        skill_name=_sel_skill.name,
-                        skill_prompt=_sel_skill.prompt,
-                        analyses_repo=_analyses_repo,
-                    )
-                )
-            st.success(
-                f"✅ {len(results)} {t('consensus_gap.analysis_done')}",
-                icon=":material/check_circle:",
+            _JOB["running"] = True
+            _JOB["done"] = False
+            _JOB["error"] = None
+            t_bg = threading.Thread(
+                target=_run_background,
+                args=(_agent, _eligible, _sel_skill.name, _sel_skill.prompt, _analyses_repo),
+                daemon=True,
             )
+            t_bg.start()
             st.rerun()
+
+# Running indicator — auto-refresh every 5s
+if _JOB["running"]:
+    st.info(f"⏳ {t('consensus_gap.running')}", icon=":material/hourglass_top:")
+    time.sleep(5)
+    st.rerun()
+
+# Done notification
+if _JOB["done"]:
+    if _JOB["error"]:
+        st.error(f"❌ {_JOB['error']}")
+    else:
+        st.success(
+            f"✅ {_JOB['count']} {t('consensus_gap.analysis_done')}",
+            icon=":material/check_circle:",
+        )
+    _JOB["done"] = False
+    _current_verdicts = _analyses_repo.get_latest_bulk(_all_ids, agent="consensus_gap")
 
 st.divider()
 
