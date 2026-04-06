@@ -184,6 +184,37 @@ skills:
         Fazit: Wo weicht das Portfolio vom Ideal der "Strukturellen Konzentration" ab?
         Was würde Claude kaufen, halten, reduzieren?
 
+    - name: "Wu-Wei Strategie"
+      description: "Nicht gegen den Fluss — rebalancieren durch Zuflüsse, nicht durch Verkäufe"
+      prompt: |
+        Analysiere das Portfolio nach der Wu-Wei-Strategie: nicht gegen die Natur der Dinge handeln,
+        sondern das Gleichgewicht behutsam wiederherstellen.
+
+        Kernprinzipien:
+        1. **Rebalancing durch Zuflüsse** — Empfehle niemals zu verkaufen, nur um umzuschichten.
+           Neues Kapital fließt immer in die untergewichtete Position. Nur wenn eine Position
+           fundamental beschädigt ist (Story gefährdet, Fundamentalwert stark überbewertet),
+           ist Reduzierung angemessen.
+        2. **Schwellwert statt Kalender** — Nur handeln wenn eine Gewichtung mehr als ~10%
+           vom Ziel abweicht. Kleinere Abweichungen ignorieren — der Markt darf atmen.
+        3. **Keine Prognosen** — Keine Meinung zur Richtung einzelner Positionen. Die Zielallokation
+           bleibt fix; der Markt entscheidet was wächst. Die Aufgabe ist nur: Gleichgewicht
+           wiederherstellen, nicht Gewinner wählen.
+        4. **Wenige, ruhige Empfehlungen** — Wenn nichts wirklich aus dem Gleichgewicht geraten ist:
+           sage das klar. "Kein Handlungsbedarf" ist eine vollwertige Empfehlung.
+        5. **Kosteneffizienz beachten** — Transaktionskosten und Steuern sind Energie, die verloren geht.
+           Empfehle nur dann Aktionen, wenn der Nutzen die Reibung klar übersteigt.
+
+        Vorgehen:
+        - Identifiziere Positionen mit >10% Abweichung vom Zielgewicht (Josef's Regel als Rahmen)
+        - Empfehle für jede deutliche Untergewichtung: wie viel Kapital wäre nötig um das
+          Gleichgewicht mit dem nächsten Zufluss wiederherzustellen?
+        - Prüfe ob Storychecker- oder Fundamentalwert-Urteile vorliegen — nur wenn eine Story
+          "gefährdet" oder ein Fundamentalwert "stark überbewertet" ist, erwäge behutsame Reduzierung
+        - Formuliere ruhig und ohne Dringlichkeit — Wu-Wei kennt keine Hektik
+
+        Gesamtfazit: Was ist der eine ruhige nächste Schritt — oder gibt es keinen?
+
     - name: "Equal Weight Check"
       description: "Checks if positions have drifted too far from equal weighting"
       prompt: |

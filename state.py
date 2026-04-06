@@ -169,6 +169,7 @@ def _seed_default_skills(repo: SkillsRepository) -> None:
             "Norwegischer Pensionsfonds Strategie",
             "André Kostolany Strategie",
             "Claude-Strategie (Strukturwandel)",
+            "Wu-Wei Strategie",
         }
     ])
     repo.seed_new_skills("structural_scan", _skills_data.get("structural_scan", []))
