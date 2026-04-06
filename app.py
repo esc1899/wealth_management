@@ -14,6 +14,7 @@ st.set_page_config(
 from config import config  # noqa: E402
 from core.health import Severity, is_local_url, run_static_checks  # noqa: E402
 from core.i18n import t, set_language, current_language, SUPPORTED_LANGUAGES  # noqa: E402
+from core.cost_alert import check_alerts, get_period_costs  # noqa: E402
 
 # Fail fast if required config is missing
 _config_errors = config.validate()
@@ -89,6 +90,7 @@ pg = st.navigation({
     ],
     t("nav.group_system"): [
         st.Page("pages/statistics.py",      title=t("nav.statistics"),       icon=":material/bar_chart:"),
+        st.Page("pages/benchmark.py",       title=t("nav.benchmark"),        icon=":material/speed:"),
         st.Page("pages/settings.py",        title=t("nav.settings"),         icon=":material/settings:"),
     ],
 })
@@ -105,6 +107,32 @@ with st.sidebar:
         st.warning(t("health.sidebar_status_warning"), icon=":material/warning:")
     else:
         st.success(t("health.sidebar_status_ok"), icon=":material/check_circle:")
+
+    # Cost alerts
+    try:
+        from state import get_app_config_repo, get_usage_repo
+        _cfg = get_app_config_repo()
+        _limits = _cfg.get_cost_alert()
+        if _limits.get("daily", 0) > 0 or _limits.get("monthly", 0) > 0:
+            _prices = _cfg.get_model_prices()
+            _costs = get_period_costs(get_usage_repo(), _prices)
+            for _alert in check_alerts(_costs, _limits):
+                if _alert["period"] == "daily":
+                    st.error(
+                        t("statistics.alert_sidebar_daily").format(
+                            cost=_alert["cost"], limit=_alert["limit"]
+                        ),
+                        icon=":material/warning:",
+                    )
+                else:
+                    st.error(
+                        t("statistics.alert_sidebar_monthly").format(
+                            cost=_alert["cost"], limit=_alert["limit"]
+                        ),
+                        icon=":material/warning:",
+                    )
+    except Exception:
+        pass  # never crash the sidebar
 
 # Language switcher in sidebar
 with st.sidebar:

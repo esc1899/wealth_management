@@ -33,10 +33,10 @@ VALID_VERDICTS = {"unterbewertet", "fair", "überbewertet", "unbekannt"}
 
 ANALYSIS_SYSTEM_PROMPT = """Fundamental equity analyst. Assess: undervalued, fairly valued, or overvalued.
 
-Use max 2 web_searches per position. Focus on the most decision-relevant metrics only.
-
-Preferred metrics (pick the 2–3 most relevant):
-- P/E vs. sector average; EV/EBITDA vs. peers; analyst consensus price target vs. current price
+STRICT RULES — token budget is limited:
+- Exactly 1 web_search per position. No more.
+- Search only for: current P/E, analyst price target, and current price.
+- Do NOT retrieve full articles. Use the most concise search query possible.
 
 Verdicts:
 - unterbewertet: >20% discount to fair value
@@ -118,6 +118,7 @@ class FundamentalAgent:
         if not eligible:
             return output
 
+        self._llm.skill_context = skill_name
         system = ANALYSIS_SYSTEM_PROMPT + f"\n\n## Bewertungs-Skill\n{skill_prompt}"
         all_results: List[Tuple[str, str, str, str, str, str]] = []
 
@@ -133,12 +134,12 @@ class FundamentalAgent:
                 messages=[{"role": "user", "content": user_msg}],
                 tools=[{"type": "web_search_20250305", "name": "web_search"}],
                 system=system,
-                max_tokens=3000,
+                max_tokens=1000,
             )
             all_results.extend(self._parse_verdicts(response.content or ""))
 
             if i + batch_size < len(eligible):
-                await asyncio.sleep(15)
+                await asyncio.sleep(5)
 
         # Persist verdicts; embed fair value + upside in summary
         for pos_id_str, verdict, fair_value, upside, summary, analysis in all_results:

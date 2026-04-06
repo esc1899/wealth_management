@@ -89,6 +89,7 @@ class NewsAgent:
             user_context: Optional user focus ("Fokus auf Tech-Positionen")
             repo:         NewsRepository for persistence
         """
+        self._llm.skill_context = skill_name
         digest = await self._run_digest(tickers, ticker_names, skill_name, skill_prompt)
         run = repo.save_run(skill_name=skill_name, tickers=tickers, result=digest)
 

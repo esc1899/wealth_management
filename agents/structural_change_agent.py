@@ -144,6 +144,7 @@ class StructuralChangeAgent:
             "Identifiziere die 3–5 relevantesten strukturellen Themen mit jeweils 2–3 Kandidaten."
         )
 
+        self._llm.skill_context = skill_name
         api_messages: list[dict] = [{"role": "user", "content": user_msg}]
         report = await self._run_agentic_loop(api_messages, system)
 

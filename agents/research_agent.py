@@ -141,6 +141,7 @@ class ResearchAgent:
             raise ValueError(f"Session {session_id} not found")
 
         # Build system prompt = base + strategy focus
+        self._llm.skill_context = session.strategy_name
         system = BASE_SYSTEM_PROMPT + "\n\n## Analysestrategie\n" + session.strategy_prompt
 
         # Load history before adding new message, then append manually

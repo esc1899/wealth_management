@@ -13,7 +13,7 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - You are solely responsible for your deployment, data security, and any API keys you configure.
 - If you use external AI APIs (e.g. Anthropic API for Research Chat), your data is subject to that provider's terms and privacy policy.
 - This project is **not affiliated** with Anthropic or any other AI provider.
-- **Commercial use is strictly prohibited** — see [LICENSE](LICENSE) for details.
+- Commercial use requires a separate license — see [Commercial Licensing](#commercial-licensing) below.
 
 ## Features
 
@@ -43,7 +43,10 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Skills System** — reusable prompt templates for every agent; AI-assisted generation in Settings
 - **Per-agent Model Selection** — choose Ollama and Claude models individually at runtime
 - **Scheduled Tasks** — run cloud agents automatically on a schedule (daily / weekly / monthly)
-- **Token Usage Statistics** — per-agent token counts, daily trend chart, average tokens per call
+- **Cost & Token Tracking** — per-agent/skill/model token counts and USD costs; split by manual vs. scheduled runs; daily trend chart; non-destructive per-row reset
+- **Cost Alerts** — configurable daily and monthly USD spending limits; warnings in sidebar and Statistics page
+- **Monthly Cost Forecast** — projects scheduled-job costs forward based on actual average tokens per call
+- **Performance Benchmarks** — run agents against fixed scenarios; compare runs over time; duration and token delta tracked per benchmark
 - **Recommendation & Story** — configurable recommendation labels and investment thesis per position
 - **Demo Mode** — pre-seeded database with 20 realistic positions + sample analyses for testing
 - **Bilingual UI** — German / English, switchable per session
@@ -51,7 +54,7 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 
 ## What You Can Learn Here
 
-This project is a hands-on introduction to building real AI-powered applications.
+This project is a hands-on introduction to building real AI-powered applications. The exercises are not toy examples — the end result is your own personal wealth management tool. That is the point: learning agent architecture by building something you actually want to use.
 
 ### Running a local LLM with Ollama
 Install Ollama and pull a model (e.g. `qwen3:8b`). Learn what running an LLM on your own hardware means: model size vs. RAM, context windows, cold start latency, and when a local model is good enough vs. when you need a cloud API.
@@ -79,6 +82,12 @@ The app has ten agents with different characteristics: stateful vs. stateless, l
 
 ### Agentic loops and tool use
 The Structural Change Scanner runs an agentic loop: Claude decides when to call `web_search` and when to call the custom `add_structural_candidate` tool to populate your watchlist — no user interaction needed. Compare this to the simpler Research Chat (single call) to understand the cost/quality trade-off.
+
+### Tracking costs and controlling spending
+The Statistics page gives an indication of what each agent call costs in USD, broken down by agent, skill, and model. Configurable daily and monthly alert thresholds warn you before spending gets out of hand. The monthly forecast extrapolates from actual average token usage of your scheduled jobs — so you see the projected bill before it arrives. Learn what makes one agent 10× more expensive than another (hint: agentic loops with web search vs. a single-shot call), and how to use this to choose the right model for each task.
+
+### Benchmarking prompt and model changes
+The Benchmark page lets you run an agent against a fixed scenario and compare the results over time. Change the system prompt or switch from Sonnet to Haiku, run the benchmark, and see the token delta and duration side by side. This is the feedback loop for prompt engineering: measurable, repeatable, not just a feeling.
 
 ---
 
@@ -153,6 +162,26 @@ DB_PATH=data/work.db
 ENV_PROFILE=work streamlit run app.py
 ```
 
+## Commercial Licensing
+
+This project is released under the [Business Source License 1.1](LICENSE), which allows personal, educational, and non-commercial use freely.
+
+**Commercial use, production hosting, or white-label distribution requires a separate commercial license.**
+
+This includes (but is not limited to):
+- Hosting a running instance for paying users or clients
+- Embedding this software in a commercial product or SaaS offering
+- Distributing a modified version as part of a training programme or course for profit
+- Deploying internally at a bank, fintech, or financial institution
+
+If any of these apply to you, contact us before deploying:
+
+📩 **faeden.tuell_34@icloud.com**
+
+We are open to licensing arrangements for financial institutions, fintech companies, LLM training providers, and enterprise deployments.
+
+---
+
 ## Disclaimer
 
 This app is for informational purposes only. AI-generated content does not constitute financial or investment advice. The authors accept no liability for financial losses based on information provided by this app. This software is provided as-is with no warranties of any kind.
@@ -163,4 +192,4 @@ See [PRIVACY.md](PRIVACY.md) for the full privacy notice.
 
 ## License
 
-[Business Source License 1.1](LICENSE) — commercial use prohibited.
+[Business Source License 1.1](LICENSE) — free for personal and educational use. Commercial use requires a separate license, see [Commercial Licensing](#commercial-licensing).

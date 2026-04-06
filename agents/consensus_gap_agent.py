@@ -99,6 +99,7 @@ class ConsensusGapAgent:
         if not eligible:
             return []
 
+        self._llm.skill_context = skill_name
         system = ANALYSIS_SYSTEM_PROMPT + f"\n\n## Strategie-Skill\n{skill_prompt}"
         all_results: List[Tuple[str, str, str, str]] = []
 

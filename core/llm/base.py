@@ -21,7 +21,7 @@ class Message:
     content: str
 
 
-UsageCallback = Callable[[int, int], None]  # (input_tokens, output_tokens)
+UsageCallback = Callable[[int, int, Optional[str], Optional[int]], None]  # (input_tokens, output_tokens, skill, duration_ms)
 
 
 class LLMProvider(ABC):
@@ -29,6 +29,9 @@ class LLMProvider(ABC):
 
     # Set by state.py after construction to record token usage.
     on_usage: Optional[UsageCallback] = None
+
+    # Set by agents before each call so usage is attributed to the correct skill.
+    skill_context: Optional[str] = None
 
     @property
     def model(self) -> str:

@@ -3,6 +3,7 @@ Ollama LLM provider — runs entirely on the local Mac Mini.
 Requires Ollama to be installed and running (https://ollama.com).
 """
 
+import time
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -71,6 +72,7 @@ class OllamaProvider(LLMProvider):
         if tools:
             payload["tools"] = tools
 
+        _t0 = time.monotonic()
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             response = await client.post(
                 f"{self._host}/api/chat",
@@ -78,6 +80,7 @@ class OllamaProvider(LLMProvider):
             )
             response.raise_for_status()
             data = response.json()
+        _duration_ms = int((time.monotonic() - _t0) * 1000)
 
         message = data["message"]
         tool_calls = [
@@ -91,6 +94,8 @@ class OllamaProvider(LLMProvider):
             self.on_usage(
                 data.get("prompt_eval_count", 0),
                 data.get("eval_count", 0),
+                self.skill_context,
+                _duration_ms,
             )
         return OllamaResponse(
             content=message.get("content", ""),

@@ -124,6 +124,7 @@ class RebalanceAgent:
         )
         repo.add_message(session.id, "user", user_message)
 
+        self._llm.skill_context = skill_name
         system = (
             SYSTEM_PROMPT.format(today=date.today().isoformat())
             + f"\n\n## Strategy: {skill_name}\n{skill_prompt}"

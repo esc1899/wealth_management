@@ -22,6 +22,7 @@ from core.storage.models import ScheduledJob
 from core.storage.news import NewsRepository
 from core.storage.positions import PositionsRepository
 from core.storage.scheduled_jobs import ScheduledJobsRepository
+from core.storage.usage import UsageRepository
 
 logger = logging.getLogger(__name__)
 
@@ -139,16 +140,24 @@ class AgentSchedulerService:
         finally:
             conn.close()
 
+    def _make_scheduled_llm(self, agent_name: str, model: str, conn) -> "ClaudeProvider":
+        from core.llm.claude import ClaudeProvider
+        usage_repo = UsageRepository(conn)
+        llm = ClaudeProvider(api_key=self._anthropic_key, model=model)
+        llm.on_usage = lambda i, o, skill=None, dur=None: usage_repo.record(
+            agent_name, model, i, o, skill=skill, source="scheduled", duration_ms=dur
+        )
+        return llm
+
     async def _run_news_job(self, job: ScheduledJob, conn) -> None:
         from agents.news_agent import NewsAgent
-        from core.llm.claude import ClaudeProvider
 
         enc = build_encryption_service(self._enc_key, "data/salt.bin")
         positions_repo = PositionsRepository(conn, enc)
         news_repo = NewsRepository(conn)
 
         model = job.model or self._default_claude_model
-        llm = ClaudeProvider(api_key=self._anthropic_key, model=model)
+        llm = self._make_scheduled_llm("news_digest", model, conn)
         agent = NewsAgent(llm=llm)
 
         positions = positions_repo.get_portfolio()
@@ -170,12 +179,11 @@ class AgentSchedulerService:
 
     async def _run_structural_scan_job(self, job, conn) -> None:
         from agents.structural_change_agent import StructuralChangeAgent
-        from core.llm.claude import ClaudeProvider
         from core.storage.structural_scans import StructuralScansRepository
 
         enc = build_encryption_service(self._enc_key, "data/salt.bin")
         model = job.model or self._default_claude_model
-        llm = ClaudeProvider(api_key=self._anthropic_key, model=model)
+        llm = self._make_scheduled_llm("structural_scan", model, conn)
         positions_repo = PositionsRepository(conn, enc)
         scans_repo = StructuralScansRepository(conn)
         agent = StructuralChangeAgent(positions_repo=positions_repo, llm=llm)
@@ -189,12 +197,11 @@ class AgentSchedulerService:
 
     async def _run_consensus_gap_job(self, job, conn) -> None:
         from agents.consensus_gap_agent import ConsensusGapAgent
-        from core.llm.claude import ClaudeProvider
         from core.storage.analyses import PositionAnalysesRepository
 
         enc = build_encryption_service(self._enc_key, "data/salt.bin")
         model = job.model or self._default_claude_model
-        llm = ClaudeProvider(api_key=self._anthropic_key, model=model)
+        llm = self._make_scheduled_llm("consensus_gap", model, conn)
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         agent = ConsensusGapAgent(llm=llm)

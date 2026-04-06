@@ -194,15 +194,39 @@ def init_db(conn: sqlite3.Connection) -> None:
         )""",
         "CREATE INDEX IF NOT EXISTS idx_rebalance_messages_session ON rebalance_messages(session_id)",
         """CREATE TABLE IF NOT EXISTS llm_usage (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            agent        TEXT NOT NULL,
-            model        TEXT NOT NULL,
-            input_tokens INTEGER NOT NULL,
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent         TEXT NOT NULL,
+            model         TEXT NOT NULL,
+            skill         TEXT,
+            source        TEXT NOT NULL DEFAULT 'manual',
+            input_tokens  INTEGER NOT NULL,
             output_tokens INTEGER NOT NULL,
-            created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+            duration_ms   INTEGER,
+            created_at    TEXT NOT NULL DEFAULT (datetime('now'))
         )""",
         "CREATE INDEX IF NOT EXISTS idx_llm_usage_agent ON llm_usage(agent)",
         "CREATE INDEX IF NOT EXISTS idx_llm_usage_created ON llm_usage(created_at)",
+        """CREATE TABLE IF NOT EXISTS usage_resets (
+            id       INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent    TEXT,
+            model    TEXT,
+            skill    TEXT,
+            reset_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        """CREATE TABLE IF NOT EXISTS benchmark_runs (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            scenario_name TEXT NOT NULL,
+            agent         TEXT NOT NULL,
+            model         TEXT NOT NULL,
+            skill_name    TEXT NOT NULL,
+            input_tokens  INTEGER NOT NULL,
+            output_tokens INTEGER NOT NULL,
+            cost_eur      REAL NOT NULL DEFAULT 0,
+            duration_ms   INTEGER,
+            run_at        TEXT NOT NULL DEFAULT (datetime('now')),
+            label         TEXT
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_benchmark_runs_scenario ON benchmark_runs(scenario_name)",
         """CREATE TABLE IF NOT EXISTS app_config (
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -266,6 +290,39 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE skills ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0"
         )
+
+    existing_usage = {row[1] for row in conn.execute("PRAGMA table_info(llm_usage)")}
+    if "skill" not in existing_usage:
+        conn.execute("ALTER TABLE llm_usage ADD COLUMN skill TEXT")
+    if "source" not in existing_usage:
+        conn.execute("ALTER TABLE llm_usage ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'")
+    if "duration_ms" not in existing_usage:
+        conn.execute("ALTER TABLE llm_usage ADD COLUMN duration_ms INTEGER")
+
+    conn.execute("""CREATE TABLE IF NOT EXISTS usage_resets (
+        id       INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent    TEXT,
+        model    TEXT,
+        skill    TEXT,
+        reset_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS benchmark_runs (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        scenario_name TEXT NOT NULL,
+        agent         TEXT NOT NULL,
+        model         TEXT NOT NULL,
+        skill_name    TEXT NOT NULL,
+        input_tokens  INTEGER NOT NULL,
+        output_tokens INTEGER NOT NULL,
+        cost_eur      REAL NOT NULL DEFAULT 0,
+        duration_ms   INTEGER,
+        run_at        TEXT NOT NULL DEFAULT (datetime('now')),
+        label         TEXT
+    )""")
+    existing_bm = {row[1] for row in conn.execute("PRAGMA table_info(benchmark_runs)")}
+    if "duration_ms" not in existing_bm:
+        conn.execute("ALTER TABLE benchmark_runs ADD COLUMN duration_ms INTEGER")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_benchmark_runs_scenario ON benchmark_runs(scenario_name)")
     conn.commit()
 
 

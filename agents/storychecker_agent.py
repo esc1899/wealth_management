@@ -120,6 +120,7 @@ class StorycheckerAgent:
             skill_prompt=skill_prompt,
         )
         # Auto-send the initial analysis request
+        self._llm.skill_context = skill_name
         initial_msg = _build_initial_message(position, skill_name, skill_prompt)
         self._storychecker.add_message(session.id, "user", initial_msg)
         response = self._run_llm(session.id, [{"role": "user", "content": initial_msg}])
@@ -148,6 +149,7 @@ class StorycheckerAgent:
             skill_name=skill_name,
             skill_prompt=skill_prompt,
         )
+        self._llm.skill_context = skill_name
         initial_msg = _build_initial_message(position, skill_name, skill_prompt)
         self._storychecker.add_message(session.id, "user", initial_msg)
         response = await self._run_llm_async(session.id, [{"role": "user", "content": initial_msg}])

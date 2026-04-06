@@ -6,6 +6,7 @@ Requires ANTHROPIC_API_KEY.
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
@@ -70,9 +71,11 @@ class ClaudeProvider(LLMProvider):
         if system_content:
             kwargs["system"] = system_content
 
+        _t0 = time.monotonic()
         response = await self._client.messages.create(**kwargs)
+        _duration_ms = int((time.monotonic() - _t0) * 1000)
         if self.on_usage:
-            self.on_usage(response.usage.input_tokens, response.usage.output_tokens)
+            self.on_usage(response.usage.input_tokens, response.usage.output_tokens, self.skill_context, _duration_ms)
         return response.content[0].text
 
     async def chat_with_tools(
@@ -97,6 +100,7 @@ class ClaudeProvider(LLMProvider):
             kwargs["system"] = system
 
         # Retry up to 3 times on rate limit errors (60s between attempts)
+        _t0 = time.monotonic()
         for attempt in range(3):
             try:
                 response = await self._client.messages.create(**kwargs)
@@ -120,8 +124,9 @@ class ClaudeProvider(LLMProvider):
                     input=block.input,
                 ))
 
+        _duration_ms = int((time.monotonic() - _t0) * 1000)
         if self.on_usage:
-            self.on_usage(response.usage.input_tokens, response.usage.output_tokens)
+            self.on_usage(response.usage.input_tokens, response.usage.output_tokens, self.skill_context, _duration_ms)
         return ClaudeResponse(
             content=content_text,
             tool_calls=tool_calls,

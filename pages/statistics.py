@@ -1,26 +1,66 @@
 """
-Statistics — LLM token usage per agent and over time.
+Statistics — LLM token usage and costs per agent/skill/model.
 """
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from core.cost_alert import check_alerts, get_period_costs
 from core.i18n import t
-from state import get_usage_repo
+from core.storage.usage import compute_cost
+from state import get_app_config_repo, get_scheduled_jobs_repo, get_usage_repo
 
 st.set_page_config(page_title="Statistics", page_icon="📊", layout="wide")
 st.title(f"📊 {t('statistics.title')}")
 st.caption(t("statistics.subtitle"))
 
 repo = get_usage_repo()
+config_repo = get_app_config_repo()
+model_prices = config_repo.get_model_prices()
+
+# ------------------------------------------------------------------
+# Cost alerts
+# ------------------------------------------------------------------
+_limits = config_repo.get_cost_alert()
+if _limits.get("daily", 0) > 0 or _limits.get("monthly", 0) > 0:
+    _period_costs = get_period_costs(repo, model_prices)
+    for _alert in check_alerts(_period_costs, _limits):
+        if _alert["period"] == "daily":
+            st.error(
+                t("statistics.alert_daily_exceeded").format(cost=_alert["cost"], limit=_alert["limit"]),
+                icon=":material/warning:",
+            )
+        else:
+            st.error(
+                t("statistics.alert_monthly_exceeded").format(cost=_alert["cost"], limit=_alert["limit"]),
+                icon=":material/warning:",
+            )
 
 # ------------------------------------------------------------------
 # Today vs. all-time totals
 # ------------------------------------------------------------------
 
-today_rows = repo.total_today()
-alltime_rows = repo.total_all_time()
+_SOURCE_OPTIONS = {"all": "Alle", "manual": "Manuell", "scheduled": "Geplant (Auto)"}
+_sel_source = st.radio(
+    "Quelle",
+    options=list(_SOURCE_OPTIONS.keys()),
+    format_func=lambda k: _SOURCE_OPTIONS[k],
+    key="_stats_source",
+    horizontal=True,
+    label_visibility="collapsed",
+)
+
+today_rows_raw = repo.total_today()
+alltime_rows_raw = repo.total_all_time()
+
+def _filter_source(rows, source):
+    if source == "all":
+        return rows
+    return [r for r in rows if r.get("source") == source]
+
+today_rows = _filter_source(today_rows_raw, _sel_source)
+alltime_rows = _filter_source(alltime_rows_raw, _sel_source)
 
 col_today, col_alltime = st.columns(2)
 
@@ -29,16 +69,29 @@ with col_today:
     if today_rows:
         df_today = pd.DataFrame(today_rows)
         df_today["total"] = df_today["input_tokens"] + df_today["output_tokens"]
+        df_today["cost"] = df_today.apply(
+            lambda r: compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices),
+            axis=1,
+        ).round(4)
         df_today = df_today.rename(columns={
             "agent":         t("statistics.col_agent"),
+            "skill":         t("statistics.col_skill"),
             "model":         t("statistics.col_model"),
+            "source":        "Quelle",
             "input_tokens":  t("statistics.col_input"),
             "output_tokens": t("statistics.col_output"),
             "total":         t("statistics.col_total"),
+            "cost":          t("statistics.col_cost"),
         })
         st.dataframe(df_today, use_container_width=True, hide_index=True)
         total_today = sum(r["input_tokens"] + r["output_tokens"] for r in today_rows)
-        st.metric(t("statistics.total_tokens"), f"{total_today:,}")
+        cost_today = sum(
+            compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices)
+            for r in today_rows
+        )
+        m1, m2 = st.columns(2)
+        m1.metric(t("statistics.total_tokens"), f"{total_today:,}")
+        m2.metric(t("statistics.total_cost"), f"${cost_today:.4f}")
     else:
         st.info(t("statistics.no_data_today"))
 
@@ -48,24 +101,73 @@ with col_alltime:
         df_all = pd.DataFrame(alltime_rows)
         df_all["total"] = df_all["input_tokens"] + df_all["output_tokens"]
         df_all["avg_per_call"] = (df_all["total"] / df_all["calls"]).round(0).astype(int)
+        df_all["cost"] = df_all.apply(
+            lambda r: compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices),
+            axis=1,
+        ).round(4)
+        df_all["avg_cost"] = (df_all["cost"] / df_all["calls"]).round(6)
+        df_all["avg_duration_s"] = pd.to_numeric(df_all["avg_duration_ms"], errors="coerce").div(1000).round(1)
+        df_all = df_all.drop(columns=["avg_duration_ms"], errors="ignore")
         df_all = df_all.rename(columns={
-            "agent":         t("statistics.col_agent"),
-            "model":         t("statistics.col_model"),
-            "input_tokens":  t("statistics.col_input"),
-            "output_tokens": t("statistics.col_output"),
-            "calls":         t("statistics.col_calls"),
-            "total":         t("statistics.col_total"),
-            "avg_per_call":  t("statistics.col_avg"),
+            "agent":          t("statistics.col_agent"),
+            "skill":          t("statistics.col_skill"),
+            "model":          t("statistics.col_model"),
+            "source":         "Quelle",
+            "input_tokens":   t("statistics.col_input"),
+            "output_tokens":  t("statistics.col_output"),
+            "calls":          t("statistics.col_calls"),
+            "total":          t("statistics.col_total"),
+            "avg_per_call":   t("statistics.col_avg"),
+            "cost":           t("statistics.col_cost"),
+            "avg_cost":       t("statistics.col_avg_cost"),
+            "avg_duration_s": "Ø Dauer (s)",
         })
         st.dataframe(df_all, use_container_width=True, hide_index=True)
         total_all = sum(r["input_tokens"] + r["output_tokens"] for r in alltime_rows)
         total_calls = sum(r["calls"] for r in alltime_rows)
+        cost_all = sum(
+            compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices)
+            for r in alltime_rows
+        )
         m1, m2, m3 = st.columns(3)
         m1.metric(t("statistics.total_tokens"), f"{total_all:,}")
         m2.metric(t("statistics.total_calls"), f"{total_calls:,}")
-        m3.metric(t("statistics.avg_per_call"), f"{total_all // total_calls:,}" if total_calls else "—")
+        m3.metric(t("statistics.total_cost"), f"${cost_all:.4f}")
     else:
         st.info(t("statistics.no_data"))
+
+# ------------------------------------------------------------------
+# Reset
+# ------------------------------------------------------------------
+
+st.divider()
+st.subheader(t("statistics.reset_header"))
+
+if alltime_rows:
+    reset_cols = st.columns([3, 1])
+    with reset_cols[1]:
+        if st.button(t("statistics.reset_all_button"), type="secondary", use_container_width=True):
+            repo.reset()
+            st.success(t("statistics.reset_all_confirm"))
+            st.rerun()
+
+    # Per-row reset
+    with reset_cols[0]:
+        st.caption("Reset per Agent/Skill/Modell:")
+    for row in alltime_rows_raw:  # always show all rows in reset section
+        label = f"{row['agent']} / {row['skill'] or '—'} / {row['model']} / {row.get('source','manual')}"
+        rc1, rc2 = st.columns([5, 1])
+        rc1.markdown(f"`{label}`")
+        if rc2.button(
+            t("statistics.reset_row_button"),
+            key=f"_reset_{row['agent']}_{row['skill']}_{row['model']}_{row.get('source','')}",
+            use_container_width=True,
+        ):
+            repo.reset(agent=row["agent"], model=row["model"], skill=row["skill"])
+            st.success(t("statistics.reset_row_confirm"))
+            st.rerun()
+
+st.caption(t("statistics.prices_note"))
 
 # ------------------------------------------------------------------
 # Daily trend chart
@@ -116,3 +218,35 @@ if alltime_rows:
     )
     fig2.update_traces(textinfo="label+percent")
     st.plotly_chart(fig2, use_container_width=True)
+
+# ------------------------------------------------------------------
+# Monthly cost estimate
+# ------------------------------------------------------------------
+
+st.divider()
+st.subheader(t("statistics.monthly_header"))
+st.caption(t("statistics.monthly_caption"))
+
+jobs_repo = get_scheduled_jobs_repo()
+all_jobs = jobs_repo.get_all()
+active_jobs = [j for j in all_jobs if j.enabled]
+
+if not active_jobs:
+    st.info(t("statistics.monthly_no_jobs"))
+else:
+    monthly_rows = repo.monthly_estimate(active_jobs, model_prices)
+    if monthly_rows:
+        df_monthly = pd.DataFrame(monthly_rows)
+        df_monthly = df_monthly.rename(columns={
+            "agent":             t("statistics.col_agent"),
+            "skill_name":        t("statistics.col_skill"),
+            "model":             t("statistics.col_model"),
+            "calls_per_month":   t("statistics.col_monthly_calls"),
+            "avg_cost_eur":      t("statistics.col_monthly_avg"),
+            "monthly_cost_eur":  t("statistics.col_monthly_total"),
+        })
+        st.dataframe(df_monthly, use_container_width=True, hide_index=True)
+        total_monthly = sum(r["monthly_cost_eur"] for r in monthly_rows)
+        st.metric(t("statistics.monthly_total"), f"${total_monthly:.4f}")
+    else:
+        st.info(t("statistics.monthly_no_jobs"))

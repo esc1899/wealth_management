@@ -312,7 +312,7 @@ with col_s2:
 with col_s3:
     sel_fundamental = _claude_sel("fundamental", t("settings.agent_fundamental"))
 
-if st.button(t("settings.save_models_button"), key="_save_models_btn"):
+if st.button(t("settings.save_models_button"), key="_save_models_btn", use_container_width=False):
     app_config.set("model_ollama_portfolio", sel_portfolio)
     app_config.set("model_ollama_rebalance", sel_rebalance)
     app_config.set("model_claude_news", sel_news)
@@ -323,6 +323,101 @@ if st.button(t("settings.save_models_button"), key="_save_models_btn"):
     app_config.set("model_claude_fundamental", sel_fundamental)
     st.cache_resource.clear()
     st.success(t("settings.models_saved"))
+
+st.divider()
+
+# ------------------------------------------------------------------
+# Section: Model prices
+# ------------------------------------------------------------------
+
+st.subheader(t("settings.model_prices_header"))
+st.caption(t("settings.model_prices_caption"))
+
+_current_prices = app_config.get_model_prices()
+
+# Header row
+_ph1, _ph2, _ph3 = st.columns([3, 1, 1])
+_ph1.caption("Modell")
+_ph2.caption(t("settings.model_prices_input_label") + " ($/Mio)")
+_ph3.caption(t("settings.model_prices_output_label") + " ($/Mio)")
+
+# Render one row per model
+_price_edits: dict = {}
+for _model_id, _price in _current_prices.items():
+    _pc1, _pc2, _pc3 = st.columns([3, 1, 1])
+    _pc1.markdown(f"`{_model_id}`")
+    _price_edits[_model_id] = {
+        "input": _pc2.number_input(
+            t("settings.model_prices_input_label"),
+            value=float(_price.get("input", 0.0)),
+            min_value=0.0,
+            step=0.01,
+            format="%.4f",
+            key=f"_price_in_{_model_id}",
+            label_visibility="collapsed",
+        ),
+        "output": _pc3.number_input(
+            t("settings.model_prices_output_label"),
+            value=float(_price.get("output", 0.0)),
+            min_value=0.0,
+            step=0.01,
+            format="%.4f",
+            key=f"_price_out_{_model_id}",
+            label_visibility="collapsed",
+        ),
+    }
+
+# Add a new model row
+with st.expander(t("settings.model_prices_add_model")):
+    _new_model_id = st.text_input(t("settings.model_prices_model_id"), key="_new_price_model_id")
+    _nc1, _nc2 = st.columns(2)
+    _new_price_in = _nc1.number_input(
+        t("settings.model_prices_input_label"), min_value=0.0, step=0.01, format="%.4f", key="_new_price_in"
+    )
+    _new_price_out = _nc2.number_input(
+        t("settings.model_prices_output_label"), min_value=0.0, step=0.01, format="%.4f", key="_new_price_out"
+    )
+
+if st.button(t("settings.model_prices_save"), key="_save_prices_btn"):
+    _saved_prices = dict(_price_edits)
+    if _new_model_id.strip():
+        _saved_prices[_new_model_id.strip()] = {"input": _new_price_in, "output": _new_price_out}
+    app_config.set_model_prices(_saved_prices)
+    st.success(t("settings.model_prices_saved"))
+
+st.divider()
+
+# ------------------------------------------------------------------
+# Section: Cost alerts
+# ------------------------------------------------------------------
+
+st.subheader(t("settings.cost_alert_header"))
+st.caption(t("settings.cost_alert_caption"))
+
+_current_alert = app_config.get_cost_alert()
+_cal1, _cal2 = st.columns(2)
+_alert_daily = _cal1.number_input(
+    t("settings.cost_alert_daily_label"),
+    value=float(_current_alert.get("daily", 0.0)),
+    min_value=0.0,
+    step=0.5,
+    format="%.2f",
+    help=t("settings.cost_alert_disabled"),
+    key="_alert_daily",
+)
+_alert_monthly = _cal2.number_input(
+    t("settings.cost_alert_monthly_label"),
+    value=float(_current_alert.get("monthly", 0.0)),
+    min_value=0.0,
+    step=1.0,
+    format="%.2f",
+    help=t("settings.cost_alert_disabled"),
+    key="_alert_monthly",
+)
+
+if st.button(t("settings.cost_alert_save"), key="_save_alert_btn"):
+    app_config.set_cost_alert(_alert_daily, _alert_monthly)
+    st.success(t("settings.cost_alert_saved"))
 
 st.divider()
 
