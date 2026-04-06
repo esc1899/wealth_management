@@ -165,10 +165,6 @@ def _seed_default_skills(repo: SkillsRepository) -> None:
     repo.seed_new_skills("rebalance", [
         s for s in _skills_data.get("rebalance", [])
         if s["name"] in {
-            "Warren Buffett Strategie",
-            "Norwegischer Pensionsfonds Strategie",
-            "André Kostolany Strategie",
-            "Claude-Strategie (Strukturwandel)",
             "Wu-Wei Strategie",
         }
     ])
