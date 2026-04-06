@@ -22,6 +22,9 @@ htmlcov/
 # macOS
 .DS_Store
 
+# Private skills (personal prompts, not for public repo)
+config/private_skills.yaml
+
 # IDE
 .vscode/
 .idea/

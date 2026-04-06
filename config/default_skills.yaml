@@ -184,37 +184,6 @@ skills:
         Fazit: Wo weicht das Portfolio vom Ideal der "Strukturellen Konzentration" ab?
         Was würde Claude kaufen, halten, reduzieren?
 
-    - name: "Wu-Wei Strategie"
-      description: "Nicht gegen den Fluss — rebalancieren durch Zuflüsse, nicht durch Verkäufe"
-      prompt: |
-        Analysiere das Portfolio nach der Wu-Wei-Strategie: nicht gegen die Natur der Dinge handeln,
-        sondern das Gleichgewicht behutsam wiederherstellen.
-
-        Kernprinzipien:
-        1. **Rebalancing durch Zuflüsse** — Empfehle niemals zu verkaufen, nur um umzuschichten.
-           Neues Kapital fließt immer in die untergewichtete Position. Nur wenn eine Position
-           fundamental beschädigt ist (Story gefährdet, Fundamentalwert stark überbewertet),
-           ist Reduzierung angemessen.
-        2. **Schwellwert statt Kalender** — Nur handeln wenn eine Gewichtung mehr als ~10%
-           vom Ziel abweicht. Kleinere Abweichungen ignorieren — der Markt darf atmen.
-        3. **Keine Prognosen** — Keine Meinung zur Richtung einzelner Positionen. Die Zielallokation
-           bleibt fix; der Markt entscheidet was wächst. Die Aufgabe ist nur: Gleichgewicht
-           wiederherstellen, nicht Gewinner wählen.
-        4. **Wenige, ruhige Empfehlungen** — Wenn nichts wirklich aus dem Gleichgewicht geraten ist:
-           sage das klar. "Kein Handlungsbedarf" ist eine vollwertige Empfehlung.
-        5. **Kosteneffizienz beachten** — Transaktionskosten und Steuern sind Energie, die verloren geht.
-           Empfehle nur dann Aktionen, wenn der Nutzen die Reibung klar übersteigt.
-
-        Vorgehen:
-        - Identifiziere Positionen mit >10% Abweichung vom Zielgewicht (Josef's Regel als Rahmen)
-        - Empfehle für jede deutliche Untergewichtung: wie viel Kapital wäre nötig um das
-          Gleichgewicht mit dem nächsten Zufluss wiederherzustellen?
-        - Prüfe ob Storychecker- oder Fundamentalwert-Urteile vorliegen — nur wenn eine Story
-          "gefährdet" oder ein Fundamentalwert "stark überbewertet" ist, erwäge behutsame Reduzierung
-        - Formuliere ruhig und ohne Dringlichkeit — Wu-Wei kennt keine Hektik
-
-        Gesamtfazit: Was ist der eine ruhige nächste Schritt — oder gibt es keinen?
-
     - name: "Equal Weight Check"
       description: "Checks if positions have drifted too far from equal weighting"
       prompt: |
@@ -419,31 +388,6 @@ skills:
         Worauf du achten solltest: Neue Wettbewerber oder Technologie-Disruptoren,
         Marktanteilsveränderungen, Pricing Power (wird sie noch ausgeübt?),
         Wechselkosten für Kunden, aktuelle News zur Wettbewerbssituation.
-
-    - name: "Lindy + Potential"
-      description: "Bewiesene Anpassungsfähigkeit × aktuelle strukturelle These — hohe Überzeugung"
-      prompt: |
-        Prüfe das Unternehmen nach dem Lindy + Potential Filter. Zwei Kriterien müssen
-        gleichzeitig erfüllt sein:
-
-        1. **Lindy-Qualität (Anpassungsfähigkeit):**
-           Hat dieses Unternehmen eine ernsthafte Disruption, einen Strukturbruch oder eine
-           Krise überlebt — und dabei seine Marktposition gehalten oder sogar ausgebaut?
-           Suche nach konkreten historischen Beispielen: Technologiewechsel, neue Wettbewerber,
-           Regulierung, Rezession. Ein Unternehmen das sich nie neu erfinden musste, gilt nicht.
-
-        2. **Aktuelle These mit Potential:**
-           Gibt es heute einen glaubwürdigen strukturellen Rückenwind — eine spezifische These
-           warum genau dieses Unternehmen überproportional davon profitiert?
-           Nicht "der Markt wächst" sondern: Warum dieses Unternehmen und nicht die Konkurrenz?
-
-        Bewertung:
-        - Beide Kriterien erfüllt → **"Lindy-Kandidat"**: bewährt und mit aktiver These
-        - Nur Lindy → **"Bewährt, aber ohne klare Wachstumsthese"**: sicher, aber kein Aufwärtspotential
-        - Nur Potential → **"Interessante Story, aber unbewiesen"**: Vorsicht, kein Track Record
-        - Keins → **"Nicht relevant"** für diese Strategie
-
-        Formuliere das Urteil klar als eines der vier Kategorien, dann Begründung.
 
     - name: "Generisch"
       description: "Keine spezifische Anlage-Idee — allgemeine Thesis-Prüfung"

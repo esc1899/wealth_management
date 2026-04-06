@@ -162,21 +162,16 @@ def _seed_default_skills(repo: SkillsRepository) -> None:
     # Seed new visible skills that may not be in existing installations
     # (INSERT OR IGNORE per name+area — never overwrites user edits)
     _skills_data = data.get("skills") or {}
-    repo.seed_new_skills("rebalance", [
-        s for s in _skills_data.get("rebalance", [])
-        if s["name"] in {
-            "Wu-Wei Strategie",
-        }
-    ])
-    repo.seed_new_skills("storychecker", [
-        s for s in _skills_data.get("storychecker", [])
-        if s["name"] in {
-            "Lindy + Potential",
-        }
-    ])
     repo.seed_new_skills("structural_scan", _skills_data.get("structural_scan", []))
     repo.seed_new_skills("consensus_gap", _skills_data.get("consensus_gap", []))
     repo.seed_new_skills("fundamental", _skills_data.get("fundamental", []))
+    # Load private skills if config/private_skills.yaml exists (gitignored)
+    private_path = Path(__file__).parent / "config" / "private_skills.yaml"
+    if private_path.exists():
+        with open(private_path) as f:
+            private_data = yaml.safe_load(f) or {}
+        for area, skills_list in (private_data.get("skills") or {}).items():
+            repo.seed_new_skills(area, skills_list or [])
 
 
 def _make_claude_provider(model: str, agent_name: str) -> ClaudeProvider:
