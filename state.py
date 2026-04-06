@@ -168,6 +168,12 @@ def _seed_default_skills(repo: SkillsRepository) -> None:
             "Wu-Wei Strategie",
         }
     ])
+    repo.seed_new_skills("storychecker", [
+        s for s in _skills_data.get("storychecker", [])
+        if s["name"] in {
+            "Lindy + Potential",
+        }
+    ])
     repo.seed_new_skills("structural_scan", _skills_data.get("structural_scan", []))
     repo.seed_new_skills("consensus_gap", _skills_data.get("consensus_gap", []))
     repo.seed_new_skills("fundamental", _skills_data.get("fundamental", []))
