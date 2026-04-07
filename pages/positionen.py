@@ -20,7 +20,7 @@ st.title(f"📋 {t('positionen.title')}")
 st.caption(t("positionen.subtitle"))
 
 if st.session_state.pop("_pos_just_saved", None):
-    st.success(t("positionen.saved"))
+    st.toast(t("positionen.saved"), icon="✅")
 
 registry = get_asset_class_registry()
 repo = get_positions_repo()
@@ -186,7 +186,7 @@ def _show_detail(pos_id: int):
             new_extra["valuation_date"] = new_val_date.isoformat() if new_val_date else None
             updated = pos.model_copy(update={"extra_data": new_extra})
             repo.update(updated)
-            st.success(t("positionen.value_updated"))
+            st.toast(t("positionen.value_updated"), icon="✅")
             st.rerun()
 
     # ── Rebalance exclusion toggle ───────────────────────────────────────────
@@ -606,7 +606,7 @@ if confirm_id is not None:
             if c1.button(t("positionen.confirm_yes"), type="primary"):
                 repo.delete(confirm_id)
                 st.session_state.pop("_pos_confirm_del", None)
-                st.success(t("positionen.deleted"))
+                st.toast(t("positionen.deleted"), icon="🗑️")
                 st.rerun()
             if c2.button(t("positionen.confirm_no")):
                 st.session_state.pop("_pos_confirm_del", None)
