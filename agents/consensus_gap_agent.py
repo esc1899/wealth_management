@@ -24,8 +24,11 @@ Flow:
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from typing import List, Tuple
+
+logger = logging.getLogger(__name__)
 
 from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
@@ -60,10 +63,10 @@ ANALYSIS:
 Apply skill strategy below."""
 
 POSITION_BLOCK_PATTERN = re.compile(
-    r"POSITION:\s*(\d+)\s*\n"
-    r"VERDICT:\s*(wächst|stabil|schließt|eingeholt)\s*\n"
-    r"SUMMARY:\s*(.+?)\s*\n"
-    r"ANALYSIS:\s*\n(.*?)(?=\n---|\Z)",
+    r"POSITION:\s*(\d+)\s*[\n\r]+"
+    r"VERDICT:\s*(wächst|stabil|schließt|eingeholt)\s*[\n\r]+"
+    r"SUMMARY:\s*(.+?)\s*[\n\r]+"
+    r"ANALYSIS:\s*[\n\r]+(.*?)(?=[\n\r]+---|$)",
     re.DOTALL | re.IGNORECASE,
 )
 
@@ -117,7 +120,10 @@ class ConsensusGapAgent:
                 system=system,
                 max_tokens=2500,
             )
-            all_results.extend(self._parse_verdicts(response.content or ""))
+            parsed = self._parse_verdicts(response.content or "")
+            if not parsed:
+                logger.warning("consensus_gap: no verdicts parsed from response. Raw content:\n%s", response.content)
+            all_results.extend(parsed)
 
             # Pause between batches to avoid rate limit
             if i + batch_size < len(eligible):
