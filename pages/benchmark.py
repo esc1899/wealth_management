@@ -57,7 +57,7 @@ def _run_structural_benchmark(agent, skill_name, skill_prompt, repo, job: dict):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        run, _ = loop.run_until_complete(
+        run, _, _candidates = loop.run_until_complete(
             agent.start_scan(
                 skill_name=skill_name,
                 skill_prompt=skill_prompt,

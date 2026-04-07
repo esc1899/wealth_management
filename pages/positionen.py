@@ -48,7 +48,10 @@ def _position_current_value(pos: Position) -> Optional[float]:
     est = extra.get("estimated_value")
     if est is not None:
         return float(est)
-    if pos.purchase_price is not None:
+    # Fallback to purchase_price only for manual-valuation classes (auto_fetch=false).
+    # Auto-fetch positions without a cached price just don't have data yet.
+    cfg = registry.get(pos.asset_class)
+    if cfg and not cfg.auto_fetch and pos.purchase_price is not None:
         if pos.quantity is not None:
             return pos.quantity * pos.purchase_price
         return pos.purchase_price

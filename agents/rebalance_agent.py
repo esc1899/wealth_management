@@ -20,6 +20,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional, Tuple
 
+from core.asset_class_config import get_asset_class_registry
 from core.llm.base import Message, Role
 from core.llm.local import OllamaProvider
 from core.storage.analyses import PositionAnalysesRepository
@@ -207,10 +208,13 @@ class RebalanceAgent:
             est = pos.extra_data.get("estimated_value")
             if est is not None:
                 return float(est)
-        # Fallback: use purchase_price for positions without market data or estimated value.
-        # If quantity is also set (e.g. Anleihe: quantity × price), use the product.
-        # For single-unit assets (Immobilie, Grundstück), purchase_price IS the total value.
-        if pos.purchase_price is not None:
+        # Fallback to purchase_price only for manual-valuation classes (auto_fetch=false).
+        # For auto-fetch classes (stocks, ETFs, crypto) a missing market price means
+        # the data simply hasn't been fetched yet — purchase_price is in an unknown
+        # currency and would produce a wrong EUR value.
+        registry = get_asset_class_registry()
+        cfg = registry.get(pos.asset_class)
+        if cfg and not cfg.auto_fetch and pos.purchase_price is not None:
             if pos.quantity is not None:
                 return pos.quantity * pos.purchase_price
             return pos.purchase_price
