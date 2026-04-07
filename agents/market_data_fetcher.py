@@ -141,6 +141,12 @@ class MarketDataFetcher:
         if price is None or price <= 0 or currency is None:
             return None
 
+        # yfinance reports UK pence-traded stocks with currency="GBp" (lowercase p).
+        # The price is in pence — divide by 100 to get GBP before EUR conversion.
+        if currency == "GBp":
+            price = price / 100
+            currency = "GBP"
+
         currency = currency.upper()
         eur_rate = self._get_eur_rate(currency)
         price_eur = price * eur_rate

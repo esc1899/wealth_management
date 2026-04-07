@@ -150,6 +150,7 @@ with col_sidebar:
 
     if submitted and skill_choice:
         selected_skill = _skill_map[skill_choice]
+        _rb_error = None
         with st.spinner(t("rebalance_chat.thinking")):
             try:
                 session, _ = asyncio.run(
@@ -162,7 +163,10 @@ with col_sidebar:
                 )
                 st.session_state.rb_session_id = session.id
             except Exception as exc:
-                st.error(f"⚠️ {t('common.agent_error')}: {exc}")
+                _rb_error = str(exc)
+        if _rb_error:
+            st.error(f"⚠️ {t('common.agent_error')}: {_rb_error}")
+            st.stop()
         st.rerun()
 
     st.divider()
