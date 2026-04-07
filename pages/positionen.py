@@ -36,11 +36,16 @@ def _fmtnum(value: float, decimals: int = 2) -> str:
 _market_repo = get_market_repo()
 
 
+_TROY_OZ_TO_G = 31.1035
+
+
 def _position_current_value(pos: Position) -> Optional[float]:
     """Return current EUR value of a position, or None if unknown."""
     if pos.ticker:
         pr = _market_repo.get_price(pos.ticker)
         if pr is not None and pos.quantity is not None:
+            if pos.unit == "g":
+                return (pr.price_eur / _TROY_OZ_TO_G) * pos.quantity
             return pos.quantity * pr.price_eur
     if pos.asset_class == "Bargeld" and pos.quantity is not None:
         return pos.quantity

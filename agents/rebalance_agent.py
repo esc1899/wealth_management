@@ -194,11 +194,16 @@ class RebalanceAgent:
     # Internal helpers
     # ------------------------------------------------------------------
 
+    _TROY_OZ_TO_G = 31.1035  # grams per troy ounce
+
     def _get_position_value(self, pos: Position) -> Optional[float]:
         """Determine EUR value of a position from market data or extra_data."""
         if pos.ticker:
             price_record = self._market.get_price(pos.ticker)
             if price_record is not None and pos.quantity is not None:
+                # Precious metals stored in grams: price_eur is per Troy Oz
+                if pos.unit == "g":
+                    return (price_record.price_eur / self._TROY_OZ_TO_G) * pos.quantity
                 return pos.quantity * price_record.price_eur
         # Bargeld: quantity IS the amount in EUR (unit="€")
         if pos.asset_class == "Bargeld" and pos.quantity is not None:
