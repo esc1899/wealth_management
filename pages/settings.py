@@ -485,7 +485,10 @@ else:
                 elif _job.frequency == "monthly" and _job.run_day:
                     _freq_label += f" ({t('settings.day_of_month')} {_job.run_day})"
                 _freq_label += f" {_job.run_hour:02d}:{_job.run_minute:02d}"
-                st.markdown(f"**{_job.agent_name.capitalize()} — {_job.skill_name}**")
+                _job_title = _job.agent_name.capitalize()
+                if _job.skill_name:
+                    _job_title += f" — {_job.skill_name}"
+                st.markdown(f"**{_job_title}**")
                 st.caption(f"{_freq_label}" + (f" · {t('settings.last_run')}: {_job.last_run.strftime('%d.%m.%Y %H:%M') if _job.last_run else '—'}"))
             with _jc2:
                 _new_enabled = st.toggle(
