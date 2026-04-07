@@ -58,7 +58,12 @@ class StorycheckerRepository:
 
     def list_sessions(self, limit: int = 50) -> List[StorycheckerSession]:
         rows = self._conn.execute(
-            "SELECT * FROM storychecker_sessions ORDER BY created_at DESC LIMIT ?",
+            """
+            SELECT s.*, pa.verdict
+            FROM storychecker_sessions s
+            LEFT JOIN position_analyses pa ON pa.session_id = s.id AND pa.agent = 'storychecker'
+            ORDER BY s.created_at DESC LIMIT ?
+            """,
             (limit,),
         ).fetchall()
         return [self._row_to_session(r) for r in rows]
@@ -107,6 +112,7 @@ class StorycheckerRepository:
 
     @staticmethod
     def _row_to_session(row: sqlite3.Row) -> StorycheckerSession:
+        keys = row.keys()
         return StorycheckerSession(
             id=row["id"],
             position_id=row["position_id"],
@@ -115,6 +121,7 @@ class StorycheckerRepository:
             skill_name=row["skill_name"],
             skill_prompt=row["skill_prompt"],
             created_at=datetime.fromisoformat(row["created_at"]),
+            verdict=row["verdict"] if "verdict" in keys else None,
         )
 
     @staticmethod

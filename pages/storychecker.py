@@ -211,10 +211,11 @@ with col_left:
     if not sessions:
         st.info(t("storychecker.no_checks"))
     else:
+        _VERDICT_ICON = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴"}
         for s in sessions:
-            label = f"**{s.position_name}** — {s.skill_name}"
-            date_str = s.created_at.strftime("%d.%m.%Y")
-            btn_label = f"{label}  \n{date_str}"
+            icon = _VERDICT_ICON.get(s.verdict or "", "⚪")
+            date_str = s.created_at.strftime("%d.%m. %H:%M")
+            btn_label = f"{icon} **{s.position_name}**  \n{s.skill_name} · {date_str}"
             active = st.session_state.get("sc_session_id") == s.id
             if st.button(
                 btn_label,

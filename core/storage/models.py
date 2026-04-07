@@ -284,6 +284,7 @@ class StorycheckerSession(BaseModel):
     skill_name: str
     skill_prompt: str
     created_at: datetime
+    verdict: Optional[str] = None
 
 
 class StorycheckerMessage(BaseModel):
