@@ -186,6 +186,9 @@ with col_left:
                     if a.summary:
                         st.caption(a.summary)
 
+        if st.session_state.get("sc_start_error"):
+            st.error(f"⚠️ {t('storychecker.error')}: {st.session_state.pop('sc_start_error')}")
+
         if submitted:
             skill = _skill_map.get(selected_skill_name)
             if skill:
@@ -198,7 +201,7 @@ with col_left:
                         )
                         st.session_state["sc_session_id"] = session.id
                     except Exception as exc:
-                        st.error(f"⚠️ {t('storychecker.error')}: {exc}")
+                        st.session_state["sc_start_error"] = str(exc)
                 st.rerun()
 
     st.divider()
