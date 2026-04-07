@@ -123,6 +123,11 @@ class ConsensusGapAgent:
             parsed = self._parse_verdicts(response.content or "")
             if not parsed:
                 logger.warning("consensus_gap: no verdicts parsed from response. Raw content:\n%s", response.content)
+                # Write raw response to temp file for debugging
+                import tempfile, os
+                debug_path = os.path.join(tempfile.gettempdir(), "consensus_gap_debug.txt")
+                with open(debug_path, "a", encoding="utf-8") as f:
+                    f.write(f"\n\n=== BATCH {i} ===\n{response.content}\n")
             all_results.extend(parsed)
 
             # Pause between batches to avoid rate limit
