@@ -521,14 +521,19 @@ _jf_agent_label = st.selectbox(
     key="_jf_agent",
 )
 _jf_agent_skills = _all_skills_repo.get_by_area(_jf_agent_label)
+_jf_needs_skill = _jf_agent_label != "storychecker"
 
 with st.form("add_job_form"):
-    _jf_skill = st.selectbox(
-        t("settings.job_skill_label"),
-        options=_jf_agent_skills,
-        format_func=lambda s: s.name,
-        key="_jf_skill",
-    )
+    if _jf_needs_skill:
+        _jf_skill = st.selectbox(
+            t("settings.job_skill_label"),
+            options=_jf_agent_skills,
+            format_func=lambda s: s.name,
+            key="_jf_skill",
+        )
+    else:
+        _jf_skill = None
+        st.caption(t("settings.storychecker_skill_note"))
     _jf_freq_label = st.selectbox(
         t("settings.job_frequency_label"),
         options=_FREQ_LABELS,
@@ -566,13 +571,13 @@ with st.form("add_job_form"):
     _jf_submitted = st.form_submit_button(t("settings.save_button"), use_container_width=True)
 
 if _jf_submitted:
-    if not _jf_agent_skills:
+    if _jf_needs_skill and not _jf_agent_skills:
         st.error(t("settings.no_agent_skills"))
     else:
         _new_job = ScheduledJob(
             agent_name=_jf_agent_label,
-            skill_name=_jf_skill.name,
-            skill_prompt=_jf_skill.prompt,
+            skill_name=_jf_skill.name if _jf_skill else "",
+            skill_prompt=_jf_skill.prompt if _jf_skill else "",
             frequency=_jf_freq,
             run_hour=int(_jf_hour),
             run_minute=int(_jf_minute),

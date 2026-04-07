@@ -310,6 +310,7 @@ settings:
   job_enabled: "Aktiv"
   job_saved: "Aufgabe gespeichert."
   no_agent_skills: "Keine Skills für diesen Agenten vorhanden. Bitte zuerst einen passenden Skill anlegen."
+  storychecker_skill_note: "Story Checker nutzt automatisch die Anlage-Idee der jeweiligen Position — kein gemeinsamer Skill nötig."
   job_agent_label: "Agent"
   job_skill_label: "Skill"
   job_frequency_label: "Häufigkeit"

@@ -310,6 +310,7 @@ settings:
   job_enabled: "Active"
   job_saved: "Task saved."
   no_agent_skills: "No skills available for this agent. Please create one first."
+  storychecker_skill_note: "Story Checker uses each position's own Anlage-Idee automatically — no shared skill needed."
   job_agent_label: "Agent"
   job_skill_label: "Skill"
   job_frequency_label: "Frequency"
