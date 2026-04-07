@@ -63,11 +63,11 @@ ANALYSIS:
 Apply skill strategy below."""
 
 POSITION_BLOCK_PATTERN = re.compile(
-    r"POSITION:\s*(\d+)\s*[\n\r]+"
-    r"VERDICT:\s*(wächst|stabil|schließt|eingeholt)\s*[\n\r]+"
-    r"SUMMARY:\s*(.+?)\s*[\n\r]+"
-    r"ANALYSIS:\s*[\n\r]+(.*?)(?=[\n\r]+---|$)",
-    re.DOTALL | re.IGNORECASE,
+    r"\*{0,2}POSITION:\*{0,2}\s*(\d+).*?[\n\r]+"
+    r".*?\*{0,2}VERDICT:\*{0,2}\s*(wächst|stabil|schließt|eingeholt).*?[\n\r]+"
+    r".*?\*{0,2}SUMMARY:\*{0,2}\s*(.+?)[\n\r]+"
+    r"[\s\S]*?\*{0,2}ANALYSIS:\*{0,2}\s*[\n\r]+([\s\S]*?)(?=\n---|\Z)",
+    re.IGNORECASE,
 )
 
 
@@ -99,12 +99,6 @@ class ConsensusGapAgent:
         Verdicts are also persisted in position_analyses.
         """
         eligible = [p for p in positions if p.story and p.id is not None]
-        import tempfile, os
-        debug_path = os.path.join(tempfile.gettempdir(), "consensus_gap_debug.txt")
-        with open(debug_path, "a", encoding="utf-8") as f:
-            f.write(f"\n=== analyze_portfolio called: {len(positions)} positions, {len(eligible)} eligible ===\n")
-            for p in positions:
-                f.write(f"  id={p.id} name={p.name} story={bool(p.story)}\n")
         if not eligible:
             return []
 
@@ -127,12 +121,8 @@ class ConsensusGapAgent:
                 max_tokens=2500,
             )
             parsed = self._parse_verdicts(response.content or "")
-            import tempfile, os
-            debug_path = os.path.join(tempfile.gettempdir(), "consensus_gap_debug.txt")
-            with open(debug_path, "a", encoding="utf-8") as f:
-                f.write(f"\n\n=== BATCH {i} — parsed={len(parsed)} ===\n{response.content}\n")
             if not parsed:
-                logger.warning("consensus_gap: no verdicts parsed from response. Raw content:\n%s", response.content)
+                logger.warning("consensus_gap: no verdicts parsed from response. Raw:\n%s", response.content[:500])
             all_results.extend(parsed)
 
             # Pause between batches to avoid rate limit

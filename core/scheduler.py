@@ -89,6 +89,9 @@ class AgentSchedulerService:
                 return
             await self._dispatch_agent(job, conn)
             jobs_repo.update_last_run(job_id)
+        except Exception as exc:
+            logger.exception("Job force-run %s failed: %s", job_id, exc)
+            raise
         finally:
             conn.close()
 
