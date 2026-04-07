@@ -214,6 +214,10 @@ class AgentSchedulerService:
 
     async def _run_structural_scan_job(self, job, conn) -> None:
         from agents.structural_change_agent import StructuralChangeAgent
+        from agents.storychecker_agent import StorycheckerAgent
+        from core.storage.analyses import PositionAnalysesRepository
+        from core.storage.skills import SkillsRepository
+        from core.storage.storychecker import StorycheckerRepository
         from core.storage.structural_scans import StructuralScansRepository
 
         enc = build_encryption_service(self._enc_key, self._salt_path)
@@ -222,13 +226,26 @@ class AgentSchedulerService:
         positions_repo = PositionsRepository(conn, enc)
         scans_repo = StructuralScansRepository(conn)
         agent = StructuralChangeAgent(positions_repo=positions_repo, llm=llm)
-        await agent.start_scan(
+        _, _, new_candidates = await agent.start_scan(
             skill_name=job.skill_name,
             skill_prompt=job.skill_prompt,
             user_focus=None,
             repo=scans_repo,
         )
-        logger.info("Structural scan job %s completed", job.id)
+        logger.info("Structural scan job %s completed — %d new candidates", job.id, len(new_candidates))
+
+        if new_candidates:
+            logger.info("Structural scan job %s: running story checks on %d candidates", job.id, len(new_candidates))
+            sc_llm = self._make_scheduled_llm("storychecker", model, conn)
+            storychecker = StorycheckerAgent(
+                positions_repo=positions_repo,
+                storychecker_repo=StorycheckerRepository(conn),
+                analyses_repo=PositionAnalysesRepository(conn),
+                llm=sc_llm,
+                skills_repo=SkillsRepository(conn),
+            )
+            await storychecker.batch_check_all(positions=new_candidates)
+            logger.info("Story checks done for structural scan job %s", job.id)
 
     async def _run_consensus_gap_job(self, job, conn) -> None:
         from agents.consensus_gap_agent import ConsensusGapAgent

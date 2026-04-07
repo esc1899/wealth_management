@@ -14,8 +14,11 @@ import streamlit as st
 
 from core.i18n import t
 from state import (
+    get_analyses_repo,
     get_positions_repo,
     get_skills_repo,
+    get_storychecker_agent,
+    get_storychecker_repo,
     get_structural_change_agent,
     get_structural_scans_repo,
 )
@@ -42,7 +45,8 @@ if not _skills:
 
 if "_scan_job" not in st.session_state:
     st.session_state["_scan_job"] = {
-        "running": False, "done": False, "run_id": None, "error": None, "last_error": None
+        "running": False, "done": False, "run_id": None,
+        "error": None, "last_error": None, "story_check_count": 0,
     }
 
 _JOB = st.session_state["_scan_job"]
@@ -51,11 +55,11 @@ if "scan_run_id" not in st.session_state:
     st.session_state["scan_run_id"] = None
 
 
-def _run_background(agent, skill_name, skill_prompt, user_focus, repo, job: dict):
+def _run_background(agent, storychecker, skill_name, skill_prompt, user_focus, repo, job: dict):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        run, _ = loop.run_until_complete(
+        run, _, new_candidates = loop.run_until_complete(
             agent.start_scan(
                 skill_name=skill_name,
                 skill_prompt=skill_prompt,
@@ -63,7 +67,11 @@ def _run_background(agent, skill_name, skill_prompt, user_focus, repo, job: dict
                 repo=repo,
             )
         )
-        job.update({"running": False, "done": True, "run_id": run.id, "error": None})
+        story_count = 0
+        if new_candidates:
+            loop.run_until_complete(storychecker.batch_check_all(positions=new_candidates))
+            story_count = len(new_candidates)
+        job.update({"running": False, "done": True, "run_id": run.id, "error": None, "story_check_count": story_count})
     except Exception as exc:
         job.update({"running": False, "done": True, "run_id": None, "error": str(exc), "last_error": str(exc)})
     finally:
@@ -98,9 +106,10 @@ with st.expander(t("structural_scan.new_scan_header"), expanded=st.session_state
         _JOB["run_id"] = None
         _JOB["error"] = None
         _JOB["last_error"] = None
+        _JOB["story_check_count"] = 0
         t_bg = threading.Thread(
             target=_run_background,
-            args=(_agent, _sel_skill.name, _sel_skill.prompt, _user_focus or None, _repo, _JOB),
+            args=(_agent, get_storychecker_agent(), _sel_skill.name, _sel_skill.prompt, _user_focus or None, _repo, _JOB),
             daemon=True,
         )
         t_bg.start()
@@ -108,7 +117,7 @@ with st.expander(t("structural_scan.new_scan_header"), expanded=st.session_state
 
 # Running indicator — auto-refresh every 5s
 if _JOB["running"]:
-    st.info(f"⏳ {t('structural_scan.running')}", icon=":material/hourglass_top:")
+    st.info(f"⏳ {t('structural_scan.running')} (inkl. Story-Check der Kandidaten …)", icon=":material/hourglass_top:")
     time.sleep(5)
     st.rerun()
 
@@ -118,6 +127,9 @@ if _JOB["done"]:
         st.error(f"❌ {_JOB['error']}")
     elif _JOB["run_id"]:
         st.session_state["scan_run_id"] = _JOB["run_id"]
+        n = _JOB.get("story_check_count", 0)
+        if n:
+            st.success(f"✅ Scan abgeschlossen — {n} Kandidat(en) automatisch Story-gecheckt 🔍", icon=":material/fact_check:")
     _JOB["done"] = False
     if _JOB["run_id"]:
         st.rerun()
@@ -155,9 +167,15 @@ if _active_run_id:
                 f"✅ {len(_candidates)} {t('structural_scan.candidates_added')}",
                 icon=":material/bookmark_added:",
             )
+            _cand_ids = [c.id for c in _candidates if c.id]
+            _cand_verdicts = get_analyses_repo().get_latest_bulk(_cand_ids, "storychecker")
+            _SC_ICONS = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴", "unknown": "⚪"}
             with st.expander(t("structural_scan.show_candidates")):
                 for c in _candidates:
-                    st.markdown(f"- **{c.name}** ({c.ticker or '—'}) · {c.asset_class}")
+                    _sv = _cand_verdicts.get(c.id) if c.id else None
+                    _icon = _SC_ICONS.get(_sv.verdict, "⚪") if _sv else "⏳"
+                    _summary = f" — _{_sv.summary}_" if _sv and _sv.summary else (" — Story-Check ausstehend" if not _sv else "")
+                    st.markdown(f"- {_icon} **{c.name}** ({c.ticker or '—'}) · {c.asset_class}{_summary}")
 
         # ── Follow-up chat ───────────────────────────────────────────
         st.subheader(t("structural_scan.followup_header"))

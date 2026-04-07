@@ -21,6 +21,8 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional, Tuple
 
+from typing import List
+
 from core.asset_class_config import get_asset_class_registry
 from core.llm.claude import ClaudeProvider, ClaudeResponse
 from core.storage.models import Position, StructuralScanRun
@@ -121,6 +123,7 @@ class StructuralChangeAgent:
     ):
         self._positions = positions_repo
         self._llm = llm
+        self._scan_added: List[Position] = []  # candidates added in the current scan
 
     # ------------------------------------------------------------------
     # Public API
@@ -132,10 +135,13 @@ class StructuralChangeAgent:
         skill_prompt: str,
         user_focus: Optional[str],
         repo: StructuralScansRepository,
-    ) -> Tuple[StructuralScanRun, str]:
+    ) -> Tuple[StructuralScanRun, str, List[Position]]:
         """
-        Run a structural change scan. Saves the run + messages. Returns (run, report).
+        Run a structural change scan. Saves the run + messages.
+        Returns (run, report, newly_added_candidates).
         """
+        self._scan_added = []  # reset for this scan
+
         system = BASE_SYSTEM_PROMPT.format(today=date.today().isoformat())
         system += f"\n\n## Scan-Strategie (vom Nutzer konfiguriert)\n{skill_prompt}"
 
@@ -155,7 +161,7 @@ class StructuralChangeAgent:
         )
         repo.add_message(run.id, "user", user_msg)
         repo.add_message(run.id, "assistant", report)
-        return run, report
+        return run, report, list(self._scan_added)
 
     async def chat(
         self,
@@ -267,4 +273,5 @@ class StructuralChangeAgent:
             in_watchlist=True,
         )
         saved = self._positions.add(position)
+        self._scan_added.append(saved)
         return {"success": True, "id": saved.id, "ticker": saved.ticker, "name": saved.name}
