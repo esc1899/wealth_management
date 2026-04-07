@@ -99,6 +99,12 @@ class ConsensusGapAgent:
         Verdicts are also persisted in position_analyses.
         """
         eligible = [p for p in positions if p.story and p.id is not None]
+        import tempfile, os
+        debug_path = os.path.join(tempfile.gettempdir(), "consensus_gap_debug.txt")
+        with open(debug_path, "a", encoding="utf-8") as f:
+            f.write(f"\n=== analyze_portfolio called: {len(positions)} positions, {len(eligible)} eligible ===\n")
+            for p in positions:
+                f.write(f"  id={p.id} name={p.name} story={bool(p.story)}\n")
         if not eligible:
             return []
 
