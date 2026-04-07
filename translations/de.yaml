@@ -147,6 +147,10 @@ rebalance_chat:
   thinking: "Analysiere…"
   chat_placeholder: "Rückfrage zur Analyse…"
   session_not_found: "Session nicht gefunden."
+  freshness_header: "Veraltete Agents"
+  freshness_caption: "Diese geplanten Agents haben seit Längerem nicht gelaufen. Für eine aktuelle Rebalancing-Analyse empfiehlt es sich, sie vorher auszuführen."
+  freshness_never: "Nie gelaufen"
+  freshness_run: "▶ Jetzt"
 
 news_chat:
   title: "News Digest"
@@ -327,6 +331,8 @@ settings:
   weekday_sun: "Sonntag"
   day_of_month: "Tag"
   last_run: "Letzter Lauf"
+  run_now_button: "▶ Jetzt"
+  job_started: "Agent gestartet – Ergebnis in Kürze verfügbar."
 
 legal:
   modal_title: "Disclaimer & Datenschutzhinweis"

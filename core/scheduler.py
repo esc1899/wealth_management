@@ -65,6 +65,11 @@ class AgentSchedulerService:
         """Call after DB changes to re-sync APScheduler with stored jobs."""
         self._reload_jobs()
 
+    def run_job_now(self, job_id: int) -> None:
+        """Trigger a job immediately in a background thread."""
+        import threading
+        threading.Thread(target=self._dispatch_job, args=[job_id], daemon=True).start()
+
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------

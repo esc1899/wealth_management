@@ -3,13 +3,14 @@ Rebalance Chat — conversational portfolio analysis using local Ollama LLM.
 """
 
 import asyncio
+from datetime import datetime, timezone
 
 import streamlit as st
 
 from config import config
 from core.health import is_local_url
 from core.i18n import t
-from state import get_rebalance_agent, get_rebalance_repo, get_skills_repo
+from state import get_agent_scheduler, get_rebalance_agent, get_rebalance_repo, get_scheduled_jobs_repo, get_skills_repo
 
 st.set_page_config(page_title="Invest / Rebalance", page_icon="⚖️", layout="wide")
 st.title(f"⚖️ {t('rebalance_chat.title')}")
@@ -22,6 +23,40 @@ if is_local_url(config.OLLAMA_HOST):
 else:
     st.warning(t("rebalance_chat.remote_notice").format(host=config.OLLAMA_HOST, model=agent._llm.model), icon="⚠️")
 repo = get_rebalance_repo()
+
+# ------------------------------------------------------------------
+# Agent freshness check
+# ------------------------------------------------------------------
+
+_STALE_DAYS = {"daily": 2, "weekly": 10, "monthly": 35}
+_RELEVANT_AGENTS = {"consensus_gap", "structural_scan", "news"}
+
+_all_sched_jobs = get_scheduled_jobs_repo().get_all()
+_relevant_jobs = [j for j in _all_sched_jobs if j.agent_name in _RELEVANT_AGENTS]
+
+if _relevant_jobs:
+    _now = datetime.now(timezone.utc).replace(tzinfo=None)
+    _stale_jobs = []
+    for _j in _relevant_jobs:
+        if _j.last_run is None:
+            _stale_jobs.append(_j)
+        else:
+            _age_days = (_now - _j.last_run).total_seconds() / 86400
+            if _age_days > _STALE_DAYS.get(_j.frequency, 10):
+                _stale_jobs.append(_j)
+
+    if _stale_jobs:
+        with st.expander(f"⚠️ {t('rebalance_chat.freshness_header')} ({len(_stale_jobs)})", expanded=True):
+            st.caption(t("rebalance_chat.freshness_caption"))
+            for _j in _stale_jobs:
+                _fc1, _fc2 = st.columns([4, 1])
+                with _fc1:
+                    _last = _j.last_run.strftime("%d.%m.%Y %H:%M") if _j.last_run else t("rebalance_chat.freshness_never")
+                    st.markdown(f"🔴 **{_j.agent_name}** — {_j.skill_name}  \n{t('settings.last_run')}: {_last}")
+                with _fc2:
+                    if st.button(t("rebalance_chat.freshness_run"), key=f"_rb_run_{_j.id}", type="primary"):
+                        get_agent_scheduler().run_job_now(_j.id)
+                        st.toast(f"▶️ {_j.agent_name} gestartet", icon="▶️")
 
 if "rb_session_id" not in st.session_state:
     st.session_state.rb_session_id = None

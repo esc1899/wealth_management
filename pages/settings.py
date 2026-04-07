@@ -475,7 +475,7 @@ else:
     ]
     for _job in _all_jobs:
         with st.container(border=True):
-            _jc1, _jc2, _jc3 = st.columns([4, 1, 1])
+            _jc1, _jc2, _jc3, _jc4 = st.columns([4, 1, 1, 1])
             with _jc1:
                 _freq_label = t(f"settings.freq_{_job.frequency}")
                 if _job.frequency == "weekly" and _job.run_weekday is not None:
@@ -496,6 +496,10 @@ else:
                     get_agent_scheduler().reload_jobs()
                     st.rerun()
             with _jc3:
+                if st.button(t("settings.run_now_button"), key=f"_job_run_{_job.id}", type="primary"):
+                    get_agent_scheduler().run_job_now(_job.id)
+                    st.toast(t("settings.job_started"), icon="▶️")
+            with _jc4:
                 if st.button(t("settings.delete_button"), key=f"_job_del_{_job.id}", type="secondary"):
                     _sched_repo.delete(_job.id)
                     get_agent_scheduler().reload_jobs()

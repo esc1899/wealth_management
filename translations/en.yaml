@@ -147,6 +147,10 @@ rebalance_chat:
   thinking: "Analyzing…"
   chat_placeholder: "Ask a follow-up question about the analysis…"
   session_not_found: "Session not found."
+  freshness_header: "Stale Agents"
+  freshness_caption: "These scheduled agents have not run recently. Running them first will give you a more accurate rebalancing analysis."
+  freshness_never: "Never run"
+  freshness_run: "▶ Run now"
 
 news_chat:
   title: "News Digest"
@@ -327,6 +331,8 @@ settings:
   weekday_sun: "Sunday"
   day_of_month: "Day"
   last_run: "Last run"
+  run_now_button: "▶ Run now"
+  job_started: "Agent started – results available shortly."
 
 legal:
   modal_title: "Disclaimer & Privacy Notice"
