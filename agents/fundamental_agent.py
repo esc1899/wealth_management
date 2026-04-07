@@ -57,13 +57,13 @@ ANALYSIS:
 Apply valuation strategy skill below."""
 
 POSITION_BLOCK_PATTERN = re.compile(
-    r"POSITION:\s*(\d+)\s*\n"
-    r"VERDICT:\s*(unterbewertet|fair|überbewertet|unbekannt)\s*\n"
-    r"FAIR_VALUE_EUR:\s*(.+?)\s*\n"
-    r"UPSIDE_PCT:\s*(.+?)\s*\n"
-    r"SUMMARY:\s*(.+?)\s*\n"
-    r"ANALYSIS:\s*\n(.*?)(?=\n---|\Z)",
-    re.DOTALL | re.IGNORECASE,
+    r"\*{0,2}POSITION:\*{0,2}\s*(\d+).*?[\n\r]+"
+    r".*?\*{0,2}VERDICT:\*{0,2}\s*(unterbewertet|fair|überbewertet|unbekannt).*?[\n\r]+"
+    r".*?\*{0,2}FAIR_VALUE_EUR:\*{0,2}\s*(.+?)[\n\r]+"
+    r".*?\*{0,2}UPSIDE_PCT:\*{0,2}\s*(.+?)[\n\r]+"
+    r".*?\*{0,2}SUMMARY:\*{0,2}\s*(.+?)[\n\r]+"
+    r"[\s\S]*?\*{0,2}ANALYSIS:\*{0,2}\s*[\n\r]+([\s\S]*?)(?=\n---|\Z)",
+    re.IGNORECASE,
 )
 
 
@@ -134,7 +134,7 @@ class FundamentalAgent:
                 messages=[{"role": "user", "content": user_msg}],
                 tools=[{"type": "web_search_20250305", "name": "web_search"}],
                 system=system,
-                max_tokens=1000,
+                max_tokens=1800,
             )
             all_results.extend(self._parse_verdicts(response.content or ""))
 

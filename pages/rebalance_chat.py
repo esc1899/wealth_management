@@ -10,7 +10,7 @@ import streamlit as st
 from config import config
 from core.health import is_local_url
 from core.i18n import t
-from state import get_agent_scheduler, get_rebalance_agent, get_rebalance_repo, get_scheduled_jobs_repo, get_skills_repo
+from state import get_agent_scheduler, get_analyses_repo, get_positions_repo, get_rebalance_agent, get_rebalance_repo, get_scheduled_jobs_repo, get_skills_repo
 
 st.set_page_config(page_title="Invest / Rebalance", page_icon="⚖️", layout="wide")
 st.title(f"⚖️ {t('rebalance_chat.title')}")
@@ -57,6 +57,60 @@ if _relevant_jobs:
                     if st.button(t("rebalance_chat.freshness_run"), key=f"_rb_run_{_j.id}", type="primary"):
                         get_agent_scheduler().run_job_now(_j.id)
                         st.toast(f"▶️ {_j.agent_name} gestartet", icon="▶️")
+
+# ------------------------------------------------------------------
+# Agent signals overview — per-position verdict summary
+# ------------------------------------------------------------------
+
+_positions_repo = get_positions_repo()
+_analyses_repo = get_analyses_repo()
+_portfolio = _positions_repo.get_portfolio()
+
+if _portfolio:
+    _pos_ids = [p.id for p in _portfolio if p.id]
+    _story_v  = _analyses_repo.get_latest_bulk(_pos_ids, "storychecker")
+    _fund_v   = _analyses_repo.get_latest_bulk(_pos_ids, "fundamental")
+    _gap_v    = _analyses_repo.get_latest_bulk(_pos_ids, "consensus_gap")
+
+    _S_ICONS  = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴"}
+    _F_ICONS  = {"unterbewertet": "🟢", "fair": "🟡", "überbewertet": "🔴", "unbekannt": "⚪"}
+    _G_ICONS  = {"wächst": "🟢", "stabil": "🟡", "schließt": "🟠", "eingeholt": "🔴"}
+
+    with st.expander("📊 Agent-Signale — Einzelpositionen", expanded=False):
+        _header = st.columns([3, 1, 1, 1])
+        _header[0].markdown("**Position**")
+        _header[1].markdown("**Thesis**")
+        _header[2].markdown("**Fundamental**")
+        _header[3].markdown("**Konsens-Lücke**")
+        st.divider()
+        for _p in sorted(_portfolio, key=lambda p: p.name.lower()):
+            if not _p.id:
+                continue
+            _sv = _story_v.get(_p.id)
+            _fv = _fund_v.get(_p.id)
+            _gv = _gap_v.get(_p.id)
+
+            _s_cell = f"{_S_ICONS.get(_sv.verdict, '⚪')} {_sv.verdict}" if _sv and _sv.verdict else "—"
+            _f_cell = f"{_F_ICONS.get(_fv.verdict, '⚪')} {_fv.verdict}" if _fv and _fv.verdict else "—"
+            _g_cell = f"{_G_ICONS.get(_gv.verdict, '⚪')} {_gv.verdict}" if _gv and _gv.verdict else "—"
+
+            _row = st.columns([3, 1, 1, 1])
+            _label = f"**{_p.ticker or _p.name}**" + (f" · {_p.name}" if _p.ticker and _p.ticker != _p.name else "")
+            _row[0].markdown(_label)
+            _row[1].markdown(_s_cell)
+            _row[2].markdown(_f_cell)
+            _row[3].markdown(_g_cell)
+
+            # Show summaries on hover via caption if any verdict has a summary
+            _summaries = []
+            if _sv and _sv.summary:
+                _summaries.append(f"Thesis: {_sv.summary}")
+            if _fv and _fv.summary:
+                _summaries.append(f"Fundamental: {_fv.summary}")
+            if _gv and _gv.summary:
+                _summaries.append(f"Lücke: {_gv.summary}")
+            if _summaries:
+                _row[0].caption(" · ".join(_summaries))
 
 if "rb_session_id" not in st.session_state:
     st.session_state.rb_session_id = None

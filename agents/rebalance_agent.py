@@ -207,6 +207,13 @@ class RebalanceAgent:
             est = pos.extra_data.get("estimated_value")
             if est is not None:
                 return float(est)
+        # Fallback: use purchase_price for positions without market data or estimated value.
+        # If quantity is also set (e.g. Anleihe: quantity × price), use the product.
+        # For single-unit assets (Immobilie, Grundstück), purchase_price IS the total value.
+        if pos.purchase_price is not None:
+            if pos.quantity is not None:
+                return pos.quantity * pos.purchase_price
+            return pos.purchase_price
         return None
 
     def _build_portfolio_context(
