@@ -13,7 +13,7 @@ from core.asset_class_config import get_asset_class_registry
 from core.figi import RELEVANT_EXCH, openfigi_lookup, to_yahoo_ticker
 from core.i18n import t
 from core.storage.models import Position
-from state import get_analyses_repo, get_app_config_repo, get_market_agent, get_positions_repo, get_skills_repo
+from state import get_analyses_repo, get_app_config_repo, get_market_agent, get_market_repo, get_positions_repo, get_skills_repo
 
 st.set_page_config(page_title="Positionen", page_icon="📋", layout="wide")
 st.title(f"📋 {t('positionen.title')}")
@@ -31,6 +31,28 @@ def _fmtnum(value: float, decimals: int = 2) -> str:
     """Format a number in German locale style (1.234,56)."""
     formatted = f"{value:,.{decimals}f}"
     return formatted.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+_market_repo = get_market_repo()
+
+
+def _position_current_value(pos: Position) -> Optional[float]:
+    """Return current EUR value of a position, or None if unknown."""
+    if pos.ticker:
+        pr = _market_repo.get_price(pos.ticker)
+        if pr is not None and pos.quantity is not None:
+            return pos.quantity * pr.price_eur
+    if pos.asset_class == "Bargeld" and pos.quantity is not None:
+        return pos.quantity
+    extra = pos.extra_data or {}
+    est = extra.get("estimated_value")
+    if est is not None:
+        return float(est)
+    if pos.purchase_price is not None:
+        if pos.quantity is not None:
+            return pos.quantity * pos.purchase_price
+        return pos.purchase_price
+    return None
 
 
 _DEFAULT_EMPFEHLUNG_LABELS = ["Kaufen", "Halten", "Verkaufen", "Beobachten"]
@@ -630,20 +652,20 @@ def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
         [p.id for p in positions if p.id], "storychecker"
     )
 
-    # Header row (10 columns: name, ticker, isin, class, qty, unit, price, detail, edit, del)
-    hc = st.columns([3, 1, 2, 1, 1, 1, 1, 0.4, 0.4, 0.4])
+    # Header row (10 columns: name, ticker, isin, class, qty, unit, current_value, detail, edit, del)
+    hc = st.columns([3, 1, 2, 1, 1, 1, 1.3, 0.4, 0.4, 0.4])
     for col, label in zip(hc, [
         t("positionen.col_name"), t("positionen.col_ticker"),
         t("positionen.col_isin"), t("positionen.col_asset_class"),
         t("positionen.col_quantity"), t("positionen.col_unit"),
-        t("positionen.col_purchase_price"), "", "", "",
+        "Akt. Wert", "", "", "",
     ]):
         col.markdown(f"**{label}**")
 
     st.divider()
 
     for pos in positions:
-        cols = st.columns([3, 1, 2, 1, 1, 1, 1, 0.4, 0.4, 0.4])
+        cols = st.columns([3, 1, 2, 1, 1, 1, 1.3, 0.4, 0.4, 0.4])
         analysis = verdicts.get(pos.id)
         verdict_badge = _VERDICT_ICON.get(analysis.verdict, "") if analysis else ""
         cols[0].write(f"{verdict_badge} {pos.name}" if verdict_badge else pos.name)
@@ -655,9 +677,24 @@ def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
             if pos.quantity else "—"
         )
         cols[5].write(pos.unit)
-        cols[6].write(
-            f"{_fmtnum(pos.purchase_price)} €" if pos.purchase_price else "—"
-        )
+
+        _cur_val = _position_current_value(pos)
+        if _cur_val is not None:
+            _val_str = f"**{_fmtnum(_cur_val, 0)} €**"
+            # Show gain/loss vs purchase cost if both are known
+            if pos.purchase_price and pos.quantity:
+                _cost = pos.purchase_price * pos.quantity
+                _pnl_pct = (_cur_val - _cost) / _cost * 100
+                _pnl_icon = "▲" if _pnl_pct >= 0 else "▼"
+                _val_str += f"  \n{_pnl_icon} {_pnl_pct:+.1f}%"
+            elif pos.purchase_price and not pos.quantity:
+                # single-unit (Immobilie etc.): compare directly
+                _pnl_pct = (_cur_val - pos.purchase_price) / pos.purchase_price * 100
+                _pnl_icon = "▲" if _pnl_pct >= 0 else "▼"
+                _val_str += f"  \n{_pnl_icon} {_pnl_pct:+.1f}%"
+            cols[6].markdown(_val_str)
+        else:
+            cols[6].write("—")
         if cols[7].button("🔍", key=f"{key_prefix}_det_{pos.id}", help=t("positionen.detail_tooltip")):
             _set(_pos_detail_id=pos.id)
             st.rerun()
