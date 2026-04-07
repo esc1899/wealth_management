@@ -66,9 +66,29 @@ class AgentSchedulerService:
         self._reload_jobs()
 
     def run_job_now(self, job_id: int) -> None:
-        """Trigger a job immediately in a background thread."""
+        """Trigger a job immediately in a background thread, bypassing enabled check."""
         import threading
-        threading.Thread(target=self._dispatch_job, args=[job_id], daemon=True).start()
+
+        def _run():
+            try:
+                asyncio.run(self._execute_job_force(job_id))
+            except Exception:
+                logger.exception("Manual job trigger %s failed", job_id)
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    async def _execute_job_force(self, job_id: int) -> None:
+        """Like _execute_job but runs regardless of enabled flag."""
+        conn = self._open_conn()
+        try:
+            jobs_repo = ScheduledJobsRepository(conn)
+            job = jobs_repo.get(job_id)
+            if not job:
+                return
+            await self._dispatch_agent(job, conn)
+            jobs_repo.update_last_run(job_id)
+        finally:
+            conn.close()
 
     # ------------------------------------------------------------------
     # Internal
@@ -131,19 +151,24 @@ class AgentSchedulerService:
             job = jobs_repo.get(job_id)
             if not job or not job.enabled:
                 return
-
-            if job.agent_name == "news":
-                await self._run_news_job(job, conn)
-            elif job.agent_name == "structural_scan":
-                await self._run_structural_scan_job(job, conn)
-            elif job.agent_name == "consensus_gap":
-                await self._run_consensus_gap_job(job, conn)
-            else:
-                logger.warning("Unknown agent_name '%s' in job %s", job.agent_name, job_id)
-                return
+            await self._dispatch_agent(job, conn)
             jobs_repo.update_last_run(job_id)
         finally:
             conn.close()
+
+    async def _dispatch_agent(self, job: ScheduledJob, conn) -> None:
+        if job.agent_name == "news":
+            await self._run_news_job(job, conn)
+        elif job.agent_name == "structural_scan":
+            await self._run_structural_scan_job(job, conn)
+        elif job.agent_name == "consensus_gap":
+            await self._run_consensus_gap_job(job, conn)
+        elif job.agent_name == "storychecker":
+            await self._run_storychecker_job(job, conn)
+        elif job.agent_name == "fundamental":
+            await self._run_fundamental_job(job, conn)
+        else:
+            logger.warning("Unknown agent_name '%s' in job %s", job.agent_name, job.id)
 
     def _make_scheduled_llm(self, agent_name: str, model: str, conn) -> "ClaudeProvider":
         from core.llm.claude import ClaudeProvider
@@ -218,6 +243,53 @@ class AgentSchedulerService:
             analyses_repo=analyses_repo,
         )
         logger.info("Consensus gap job %s completed", job.id)
+
+    async def _run_storychecker_job(self, job, conn) -> None:
+        from agents.storychecker_agent import StoryCheckerAgent
+        from core.storage.analyses import PositionAnalysesRepository
+        from core.storage.storychecker import StorycheckerRepository
+
+        enc = build_encryption_service(self._enc_key, "data/salt.bin")
+        model = job.model or self._default_claude_model
+        llm = self._make_scheduled_llm("storychecker", model, conn)
+        positions_repo = PositionsRepository(conn, enc)
+        analyses_repo = PositionAnalysesRepository(conn)
+        storychecker_repo = StorycheckerRepository(conn)
+        agent = StoryCheckerAgent(
+            positions_repo=positions_repo,
+            storychecker_repo=storychecker_repo,
+            analyses_repo=analyses_repo,
+            llm=llm,
+        )
+        positions = [p for p in positions_repo.get_all() if p.story]
+        if not positions:
+            logger.info("Storychecker job %s: no positions with story, skipping", job.id)
+            return
+        await agent.batch_check_all(
+            positions=positions,
+            skill_name=job.skill_name,
+            skill_prompt=job.skill_prompt,
+        )
+        logger.info("Storychecker job %s completed for %d positions", job.id, len(positions))
+
+    async def _run_fundamental_job(self, job, conn) -> None:
+        from agents.fundamental_agent import FundamentalAgent
+        from core.storage.analyses import PositionAnalysesRepository
+
+        enc = build_encryption_service(self._enc_key, "data/salt.bin")
+        model = job.model or self._default_claude_model
+        llm = self._make_scheduled_llm("fundamental", model, conn)
+        positions_repo = PositionsRepository(conn, enc)
+        analyses_repo = PositionAnalysesRepository(conn)
+        agent = FundamentalAgent(llm=llm)
+        positions = positions_repo.get_portfolio()
+        await agent.analyze_portfolio(
+            positions=positions,
+            skill_name=job.skill_name,
+            skill_prompt=job.skill_prompt,
+            analyses_repo=analyses_repo,
+        )
+        logger.info("Fundamental job %s completed for %d positions", job.id, len(positions))
 
     def _open_conn(self):
         conn = get_connection(self._db_path)

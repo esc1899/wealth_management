@@ -458,6 +458,8 @@ _SCHEDULABLE_AGENTS = {
     "news": t("settings.agent_news"),
     "structural_scan": t("nav.structural_scan"),
     "consensus_gap": t("nav.consensus_gap"),
+    "storychecker": t("settings.agent_storychecker"),
+    "fundamental": t("settings.agent_fundamental"),
 }
 
 st.subheader(t("settings.scheduling_header"))
