@@ -129,6 +129,7 @@ Copy `.env.example` to `.env` and fill in your values.
 | `ANTHROPIC_BASE_URL` | See below | LLM proxy URL — use instead of `ANTHROPIC_API_KEY` |
 | `OLLAMA_HOST` | Optional | Default: `http://localhost:11434` |
 | `OLLAMA_MODEL` | Optional | Default model for Portfolio Chat and Rebalance (overridable in Settings UI) |
+| `TAVILY_API_KEY` | Optional | Tavily search — replaces Anthropic's built-in web_search when set. Free tier: 1000 searches/month |
 | `LANGFUSE_SECRET_KEY` | Optional | Langfuse monitoring (omit to disable) |
 | `LANGFUSE_PUBLIC_KEY` | Optional | Langfuse monitoring (omit to disable) |
 | `DEMO_MODE` | Optional | Set to `true` to use the demo database |
