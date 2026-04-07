@@ -248,6 +248,7 @@ def get_storychecker_agent() -> StorycheckerAgent:
         storychecker_repo=get_storychecker_repo(),
         analyses_repo=get_analyses_repo(),
         llm=llm,
+        skills_repo=get_skills_repo(),
     )
 
 

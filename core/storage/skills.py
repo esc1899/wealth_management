@@ -115,6 +115,13 @@ class SkillsRepository:
         ).fetchall()
         return [self._row_to_skill(r) for r in rows]
 
+    def get_by_name(self, name: str) -> Optional[Skill]:
+        """Return a skill by exact name, or None if not found."""
+        row = self._conn.execute(
+            "SELECT * FROM skills WHERE name = ? LIMIT 1", (name,)
+        ).fetchone()
+        return self._row_to_skill(row) if row else None
+
     def get_by_area(self, area: str) -> List[Skill]:
         """Return all visible skills for a given area, ordered by name."""
         rows = self._conn.execute(

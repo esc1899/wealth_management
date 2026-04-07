@@ -245,8 +245,9 @@ class AgentSchedulerService:
         logger.info("Consensus gap job %s completed", job.id)
 
     async def _run_storychecker_job(self, job, conn) -> None:
-        from agents.storychecker_agent import StoryCheckerAgent
+        from agents.storychecker_agent import StorycheckerAgent
         from core.storage.analyses import PositionAnalysesRepository
+        from core.storage.skills import SkillsRepository
         from core.storage.storychecker import StorycheckerRepository
 
         enc = build_encryption_service(self._enc_key, "data/salt.bin")
@@ -255,21 +256,19 @@ class AgentSchedulerService:
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         storychecker_repo = StorycheckerRepository(conn)
-        agent = StoryCheckerAgent(
+        skills_repo = SkillsRepository(conn)
+        agent = StorycheckerAgent(
             positions_repo=positions_repo,
             storychecker_repo=storychecker_repo,
             analyses_repo=analyses_repo,
             llm=llm,
+            skills_repo=skills_repo,
         )
         positions = [p for p in positions_repo.get_all() if p.story]
         if not positions:
             logger.info("Storychecker job %s: no positions with story, skipping", job.id)
             return
-        await agent.batch_check_all(
-            positions=positions,
-            skill_name=job.skill_name,
-            skill_prompt=job.skill_prompt,
-        )
+        await agent.batch_check_all(positions=positions)
         logger.info("Storychecker job %s completed for %d positions", job.id, len(positions))
 
     async def _run_fundamental_job(self, job, conn) -> None:

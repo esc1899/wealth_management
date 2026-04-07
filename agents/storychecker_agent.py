@@ -41,8 +41,7 @@ BASE_SYSTEM_PROMPT = """Du bist ein kritischer Investment-Analyst der prüft ob 
 Du erhältst:
 - Name und Ticker des Unternehmens
 - Die ursprüngliche Investment-These (Story) des Nutzers
-- Die verfolgte Anlage-Idee (z.B. "Megatrend-Play", "Qualitäts-Compounder")
-- Spezifische Prüfkriterien zur Anlage-Idee
+- Optional: die verfolgte Anlage-Idee mit spezifischen Prüfkriterien
 
 Deine Aufgabe: Nutze web_search um aktuelle Informationen zur Firma zu finden
 (News, Quartalszahlen, Management-Aussagen, Wettbewerb). Beurteile dann ob die
@@ -51,7 +50,7 @@ These noch hält — nicht ob sie theoretisch "gut" ist, sondern ob sie heute no
 Antworte auf die erste Anfrage IMMER in diesem Format:
 
 ## Story-Check: {NAME} ({TICKER})
-**Anlage-Idee:** {SKILL} · **Urteil:** {AMPEL}
+**Urteil:** {AMPEL}
 
 > {EIN-SATZ-FAZIT}
 
@@ -91,27 +90,25 @@ class StorycheckerAgent:
 
     def __init__(
         self,
-        positions_repo,  # PositionsRepository — kept for future use
+        positions_repo,
         storychecker_repo: StorycheckerRepository,
         analyses_repo: PositionAnalysesRepository,
         llm: ClaudeProvider,
+        skills_repo=None,
     ) -> None:
         self._positions = positions_repo
         self._storychecker = storychecker_repo
         self._analyses = analyses_repo
         self._llm = llm
+        self._skills_repo = skills_repo
 
     # ------------------------------------------------------------------
     # Session management
     # ------------------------------------------------------------------
 
-    def start_session(
-        self,
-        position: Position,
-        skill_name: str,
-        skill_prompt: str,
-    ) -> StorycheckerSession:
+    def start_session(self, position: Position) -> StorycheckerSession:
         """Create a new session and run the initial story check."""
+        skill_name, skill_prompt = self._resolve_skill(position)
         session = self._storychecker.create_session(
             position_id=position.id,
             ticker=position.ticker,
@@ -120,7 +117,7 @@ class StorycheckerAgent:
             skill_prompt=skill_prompt,
         )
         # Auto-send the initial analysis request
-        self._llm.skill_context = skill_name
+        self._llm.skill_context = skill_name or "storychecker"
         initial_msg = _build_initial_message(position, skill_name, skill_prompt)
         self._storychecker.add_message(session.id, "user", initial_msg)
         response = self._run_llm(session.id, [{"role": "user", "content": initial_msg}])
@@ -135,13 +132,9 @@ class StorycheckerAgent:
         )
         return session
 
-    async def start_session_async(
-        self,
-        position: Position,
-        skill_name: str,
-        skill_prompt: str,
-    ) -> StorycheckerSession:
+    async def start_session_async(self, position: Position) -> StorycheckerSession:
         """Async version of start_session — for use in batch_check_all."""
+        skill_name, skill_prompt = self._resolve_skill(position)
         session = self._storychecker.create_session(
             position_id=position.id,
             ticker=position.ticker,
@@ -149,7 +142,7 @@ class StorycheckerAgent:
             skill_name=skill_name,
             skill_prompt=skill_prompt,
         )
-        self._llm.skill_context = skill_name
+        self._llm.skill_context = skill_name or "storychecker"
         initial_msg = _build_initial_message(position, skill_name, skill_prompt)
         self._storychecker.add_message(session.id, "user", initial_msg)
         response = await self._run_llm_async(session.id, [{"role": "user", "content": initial_msg}])
@@ -163,21 +156,17 @@ class StorycheckerAgent:
         )
         return session
 
-    async def batch_check_all(
-        self,
-        positions: List[Position],
-        skill_name: str,
-        skill_prompt: str,
-    ) -> List[Tuple[str, str | None]]:
+    async def batch_check_all(self, positions: List[Position]) -> List[Tuple[str, str | None]]:
         """
         Run story checks for all eligible positions sequentially.
+        Each position uses its own story_skill (or none if not set).
         Returns list of (position_name, error_or_None).
         """
         eligible = [p for p in positions if p.story and p.id is not None]
         results: List[Tuple[str, str | None]] = []
         for i, pos in enumerate(eligible):
             try:
-                await self.start_session_async(pos, skill_name, skill_prompt)
+                await self.start_session_async(pos)
                 results.append((pos.name, None))
             except Exception as exc:
                 results.append((pos.name, str(exc)))
@@ -206,6 +195,15 @@ class StorycheckerAgent:
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
+
+    def _resolve_skill(self, position: Position) -> tuple[str, str]:
+        """Return (skill_name, skill_prompt) from the position's story_skill, or ('', '') if none."""
+        if not position.story_skill or not self._skills_repo:
+            return "", ""
+        skill = self._skills_repo.get_by_name(position.story_skill)
+        if skill:
+            return skill.name, skill.prompt
+        return "", ""
 
     def _run_llm(self, session_id: int, api_messages: list[dict]) -> str:
         """Run the tool-calling loop and persist the final assistant response."""
@@ -273,7 +271,7 @@ def _extract_summary(text: str) -> str | None:
     return None
 
 
-def _build_initial_message(position: Position, skill_name: str, skill_prompt: str) -> str:
+def _build_initial_message(position: Position, skill_name: str = "", skill_prompt: str = "") -> str:
     ticker_str = f" ({position.ticker})" if position.ticker else ""
     lines = [
         f"Bitte prüfe ob die folgende Investment-These noch intakt ist.",
@@ -292,9 +290,11 @@ def _build_initial_message(position: Position, skill_name: str, skill_prompt: st
         lines.append(f"")
         lines.append(f"**Investment-These:** (keine Story hinterlegt — bitte allgemein für {position.name} prüfen)")
 
-    lines.append(f"")
-    lines.append(f"**Anlage-Idee:** {skill_name}")
-    lines.append(f"**Prüfkriterien:** {skill_prompt}")
+    if skill_name and skill_prompt:
+        lines.append(f"")
+        lines.append(f"**Anlage-Idee:** {skill_name}")
+        lines.append(f"**Prüfkriterien:** {skill_prompt}")
+
     lines.append(f"")
     lines.append(f"Bitte suche aktuelle Informationen und erstelle deine Bewertung.")
 

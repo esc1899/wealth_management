@@ -13,7 +13,7 @@ import time
 import streamlit as st
 
 from core.i18n import t
-from state import get_analyses_repo, get_positions_repo, get_skills_repo, get_storychecker_agent
+from state import get_analyses_repo, get_positions_repo, get_storychecker_agent
 
 st.set_page_config(page_title="Story Checker", page_icon="🔍", layout="wide")
 st.title(f"🔍 {t('storychecker.title')}")
@@ -31,7 +31,6 @@ with st.expander(t("storychecker.what_is_this"), expanded=False):
 # ------------------------------------------------------------------
 
 positions_with_story = [p for p in get_positions_repo().get_all() if p.story]
-storychecker_skills = get_skills_repo().get_by_area("storychecker")
 
 # ------------------------------------------------------------------
 # Batch check — background job
@@ -45,17 +44,11 @@ if "_sc_batch_job" not in st.session_state:
 _BATCH = st.session_state["_sc_batch_job"]
 
 
-def _run_batch_background(ag, positions, skill_name, skill_prompt, job: dict):
+def _run_batch_background(ag, positions, job: dict):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        results = loop.run_until_complete(
-            ag.batch_check_all(
-                positions=positions,
-                skill_name=skill_name,
-                skill_prompt=skill_prompt,
-            )
-        )
+        results = loop.run_until_complete(ag.batch_check_all(positions=positions))
         errors = sum(1 for _, err in results if err)
         job.update({"running": False, "done": True, "count": len(results), "errors": errors, "error": None})
     except Exception as exc:
@@ -64,39 +57,26 @@ def _run_batch_background(ag, positions, skill_name, skill_prompt, job: dict):
         loop.close()
 
 
-if positions_with_story and storychecker_skills:
-    _skill_map_all = {s.name: s for s in storychecker_skills}
+if positions_with_story:
     with st.expander(t("storychecker.batch_header"), expanded=False):
         st.caption(t("storychecker.batch_caption").format(n=len(positions_with_story)))
-        col_skill, col_btn = st.columns([3, 1])
-        with col_skill:
-            _batch_skill_name = st.selectbox(
-                t("storychecker.pick_skill"),
-                options=list(_skill_map_all.keys()),
-                key="_sc_batch_skill",
-                disabled=_BATCH["running"],
-            )
-        with col_btn:
-            st.write("")
-            st.write("")
-            if st.button(
-                t("storychecker.batch_button"),
-                type="primary",
-                key="_sc_batch_run",
-                use_container_width=True,
-                disabled=_BATCH["running"],
-            ):
-                _batch_skill = _skill_map_all[_batch_skill_name]
-                _BATCH["running"] = True
-                _BATCH["done"] = False
-                _BATCH["error"] = None
-                _BATCH["last_error"] = None
-                threading.Thread(
-                    target=_run_batch_background,
-                    args=(agent, positions_with_story, _batch_skill.name, _batch_skill.prompt, _BATCH),
-                    daemon=True,
-                ).start()
-                st.rerun()
+        if st.button(
+            t("storychecker.batch_button"),
+            type="primary",
+            key="_sc_batch_run",
+            use_container_width=False,
+            disabled=_BATCH["running"],
+        ):
+            _BATCH["running"] = True
+            _BATCH["done"] = False
+            _BATCH["error"] = None
+            _BATCH["last_error"] = None
+            threading.Thread(
+                target=_run_batch_background,
+                args=(agent, positions_with_story, _BATCH),
+                daemon=True,
+            ).start()
+            st.rerun()
 
 if _BATCH["running"]:
     st.info(f"⏳ {t('storychecker.batch_running')}", icon=":material/hourglass_top:")
@@ -118,7 +98,6 @@ if _BATCH["last_error"] and not _BATCH["running"]:
     st.error(f"❌ Letzter Batch-Lauf fehlgeschlagen: {_BATCH['last_error']}")
 
 st.divider()
-_skill_map = {s.name: s for s in storychecker_skills}
 
 # ------------------------------------------------------------------
 # Layout: left control panel | right chat
@@ -136,8 +115,6 @@ with col_left:
     if not positions_with_story:
         st.warning(t("storychecker.no_stories"))
         st.caption(t("storychecker.no_stories_hint"))
-    elif not storychecker_skills:
-        st.warning(t("storychecker.no_skills"))
     else:
         pos_labels = [
             f"{p.name} ({p.ticker})" if p.ticker else p.name
@@ -152,17 +129,6 @@ with col_left:
             )
             selected_position = positions_with_story[selected_idx]
 
-            # Prefer the skill stored on the position; fall back to first skill
-            default_skill_name = selected_position.story_skill
-            skill_names = [s.name for s in storychecker_skills]
-            default_idx = skill_names.index(default_skill_name) if default_skill_name in skill_names else 0
-
-            selected_skill_name = st.selectbox(
-                t("storychecker.pick_skill"),
-                options=skill_names,
-                index=default_idx,
-            )
-
             submitted = st.form_submit_button(
                 t("storychecker.run_button"), use_container_width=True, type="primary"
             )
@@ -172,7 +138,7 @@ with col_left:
             with st.expander(t("storychecker.show_story"), expanded=False):
                 st.markdown(selected_position.story)
                 if selected_position.story_skill:
-                    st.caption(f"Anlage-Idee: {selected_position.story_skill}")
+                    st.caption(f"{t('storychecker.skill_caption')}: {selected_position.story_skill}")
 
         # Verdict history for selected position
         past_analyses = analyses_repo.get_for_position(selected_position.id, limit=5)
@@ -182,7 +148,8 @@ with col_left:
                 for a in past_analyses:
                     icon = _VERDICT_ICON.get(a.verdict or "unknown", "⚪")
                     date_str = a.created_at.strftime("%d.%m.%Y")
-                    st.markdown(f"{icon} **{date_str}** · {a.skill_name}")
+                    skill_label = f" · {a.skill_name}" if a.skill_name else ""
+                    st.markdown(f"{icon} **{date_str}**{skill_label}")
                     if a.summary:
                         st.caption(a.summary)
 
@@ -190,19 +157,13 @@ with col_left:
             st.error(f"⚠️ {t('storychecker.error')}: {st.session_state.pop('sc_start_error')}")
 
         if submitted:
-            skill = _skill_map.get(selected_skill_name)
-            if skill:
-                with st.spinner(t("storychecker.thinking")):
-                    try:
-                        session = agent.start_session(
-                            position=selected_position,
-                            skill_name=skill.name,
-                            skill_prompt=skill.prompt,
-                        )
-                        st.session_state["sc_session_id"] = session.id
-                    except Exception as exc:
-                        st.session_state["sc_start_error"] = str(exc)
-                st.rerun()
+            with st.spinner(t("storychecker.thinking")):
+                try:
+                    session = agent.start_session(position=selected_position)
+                    st.session_state["sc_session_id"] = session.id
+                except Exception as exc:
+                    st.session_state["sc_start_error"] = str(exc)
+            st.rerun()
 
     st.divider()
     st.subheader(t("storychecker.past_checks"))
@@ -215,7 +176,8 @@ with col_left:
         for s in sessions:
             icon = _VERDICT_ICON.get(s.verdict or "", "⚪")
             date_str = s.created_at.strftime("%d.%m. %H:%M")
-            btn_label = f"{icon} **{s.position_name}**  \n{s.skill_name} · {date_str}"
+            skill_part = f" · {s.skill_name}" if s.skill_name else ""
+            btn_label = f"{icon} **{s.position_name}**  \n{date_str}{skill_part}"
             active = st.session_state.get("sc_session_id") == s.id
             if st.button(
                 btn_label,
@@ -242,11 +204,10 @@ with col_right:
             st.session_state.pop("sc_session_id", None)
         else:
             st.markdown(f"### {session.position_name}")
-            st.caption(
-                f"{t('storychecker.skill_caption')}: {session.skill_name} · "
-                f"{t('storychecker.started_caption')}: "
-                f"{session.created_at.strftime('%d.%m.%Y %H:%M')}"
-            )
+            caption = session.created_at.strftime("%d.%m.%Y %H:%M")
+            if session.skill_name:
+                caption = f"{t('storychecker.skill_caption')}: {session.skill_name} · {caption}"
+            st.caption(caption)
 
             messages = agent.get_messages(session_id)
             for msg in messages:
