@@ -230,6 +230,7 @@ class RebalanceAgent:
         gap_v       = self._analyses.get_latest_bulk(all_ids, "consensus_gap")
         fund_v_wl   = self._analyses.get_latest_bulk(watchlist_ids, "fundamental")
         gap_v_wl    = self._analyses.get_latest_bulk(watchlist_ids, "consensus_gap")
+        story_v_wl  = self._analyses.get_latest_bulk(watchlist_ids, "storychecker")
 
         # Separate tradeable vs non-tradeable
         tradeable: list[Position] = []
@@ -395,6 +396,12 @@ class RebalanceAgent:
                 skill_tag = f" [{w.story_skill}]" if w.story_skill else ""
                 story_preview = (w.story[:120] + "…") if len(w.story or "") > 120 else (w.story or "")
                 cloud_signals: list[str] = []
+                ws = story_v_wl.get(w.id) if w.id else None
+                if ws and ws.verdict:
+                    _sicons = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴"}
+                    cloud_signals.append(f"thesis: {_sicons.get(ws.verdict, '⚪')} {ws.verdict}")
+                    if ws.summary:
+                        cloud_signals[-1] += f" — {ws.summary}"
                 wf = fund_v_wl.get(w.id) if w.id else None
                 if wf and wf.verdict:
                     _ficons = {"unterbewertet": "🟢", "fair": "🟡", "überbewertet": "🔴", "unbekannt": "⚪"}
