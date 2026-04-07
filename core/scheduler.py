@@ -45,7 +45,9 @@ class AgentSchedulerService:
         default_claude_model: str,
         timezone: str = "Europe/Berlin",
     ):
+        import os
         self._db_path = db_path
+        self._salt_path = os.path.join(os.path.dirname(os.path.abspath(db_path)), "salt.bin")
         self._enc_key = encryption_key
         self._anthropic_key = anthropic_api_key
         self._default_claude_model = default_claude_model
@@ -182,7 +184,7 @@ class AgentSchedulerService:
     async def _run_news_job(self, job: ScheduledJob, conn) -> None:
         from agents.news_agent import NewsAgent
 
-        enc = build_encryption_service(self._enc_key, "data/salt.bin")
+        enc = build_encryption_service(self._enc_key, self._salt_path)
         positions_repo = PositionsRepository(conn, enc)
         news_repo = NewsRepository(conn)
 
@@ -211,7 +213,7 @@ class AgentSchedulerService:
         from agents.structural_change_agent import StructuralChangeAgent
         from core.storage.structural_scans import StructuralScansRepository
 
-        enc = build_encryption_service(self._enc_key, "data/salt.bin")
+        enc = build_encryption_service(self._enc_key, self._salt_path)
         model = job.model or self._default_claude_model
         llm = self._make_scheduled_llm("structural_scan", model, conn)
         positions_repo = PositionsRepository(conn, enc)
@@ -229,7 +231,7 @@ class AgentSchedulerService:
         from agents.consensus_gap_agent import ConsensusGapAgent
         from core.storage.analyses import PositionAnalysesRepository
 
-        enc = build_encryption_service(self._enc_key, "data/salt.bin")
+        enc = build_encryption_service(self._enc_key, self._salt_path)
         model = job.model or self._default_claude_model
         llm = self._make_scheduled_llm("consensus_gap", model, conn)
         positions_repo = PositionsRepository(conn, enc)
@@ -250,7 +252,7 @@ class AgentSchedulerService:
         from core.storage.skills import SkillsRepository
         from core.storage.storychecker import StorycheckerRepository
 
-        enc = build_encryption_service(self._enc_key, "data/salt.bin")
+        enc = build_encryption_service(self._enc_key, self._salt_path)
         model = job.model or self._default_claude_model
         llm = self._make_scheduled_llm("storychecker", model, conn)
         positions_repo = PositionsRepository(conn, enc)
@@ -275,7 +277,7 @@ class AgentSchedulerService:
         from agents.fundamental_agent import FundamentalAgent
         from core.storage.analyses import PositionAnalysesRepository
 
-        enc = build_encryption_service(self._enc_key, "data/salt.bin")
+        enc = build_encryption_service(self._enc_key, self._salt_path)
         model = job.model or self._default_claude_model
         llm = self._make_scheduled_llm("fundamental", model, conn)
         positions_repo = PositionsRepository(conn, enc)
