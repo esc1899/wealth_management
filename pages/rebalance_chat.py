@@ -210,8 +210,31 @@ with col_chat:
             st.warning(t("rebalance_chat.session_not_found"))
             st.session_state.rb_session_id = None
         else:
-            st.markdown(f"### {session.skill_name}")
-            st.caption(session.created_at.strftime("%d.%m.%Y %H:%M"))
+            # Session header with refresh button
+            col_title, col_refresh = st.columns([5, 1])
+            col_title.markdown(f"### {session.skill_name}")
+            col_title.caption(session.created_at.strftime("%d.%m.%Y %H:%M"))
+
+            if col_refresh.button("↻", key="rb_refresh", help=t("rebalance_chat.refresh_tooltip")):
+                _rb_error = None
+                with st.spinner(t("rebalance_chat.thinking")):
+                    try:
+                        new_session, _ = asyncio.run(
+                            agent.start_session(
+                                skill_name=session.skill_name,
+                                skill_prompt=session.skill_prompt,
+                                user_context="",
+                                repo=repo,
+                            )
+                        )
+                        st.session_state.rb_session_id = new_session.id
+                    except Exception as exc:
+                        _rb_error = str(exc)
+                if _rb_error:
+                    st.error(f"⚠️ {t('common.agent_error')}: {_rb_error}")
+                else:
+                    st.toast(t("rebalance_chat.refresh_done"), icon="✅")
+                st.rerun()
 
             messages = repo.get_messages(session_id)
             for msg in messages:

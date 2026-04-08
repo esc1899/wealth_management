@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
@@ -37,6 +36,35 @@ from core.storage.models import Position
 AGENT_NAME = "consensus_gap"
 
 VALID_VERDICTS = {"wächst", "stabil", "schließt", "eingeholt"}
+
+# Tool for structured verdict submission
+SUBMIT_VERDICT_TOOL = {
+    "name": "submit_consensus_verdict",
+    "description": "Submit the consensus gap verdict for a portfolio position.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "position_id": {
+                "type": "integer",
+                "description": "The position ID to analyze",
+            },
+            "verdict": {
+                "type": "string",
+                "enum": ["wächst", "stabil", "schließt", "eingeholt"],
+                "description": "The consensus gap verdict",
+            },
+            "summary": {
+                "type": "string",
+                "description": "One sentence: consensus vs. thesis",
+            },
+            "analysis": {
+                "type": "string",
+                "description": "2 sentences max: consensus target/rating and supporting data",
+            },
+        },
+        "required": ["position_id", "verdict", "summary"],
+    },
+}
 
 # ------------------------------------------------------------------
 # System prompts
@@ -52,17 +80,10 @@ Verdicts:
 - schließt: gap closing — market catching up
 - eingeholt: gap gone — thesis fully priced in
 
-Output EXACTLY (machine-parsed):
-POSITION: [ID]
-VERDICT: [wächst|stabil|schließt|eingeholt]
-SUMMARY: [One sentence: consensus vs. thesis]
-ANALYSIS:
-[2 sentences max: consensus target/rating, one supporting data point]
----
+Für jede Position: Rufe submit_consensus_verdict auf mit position_id (die Zahl), verdict, summary und analysis.
+Rufe es einmal pro Position auf — kein Freitext-Output nötig.
 
 Apply skill strategy below."""
-
-_LABEL_RE = re.compile(r"^\*{0,2}(POSITION|VERDICT|SUMMARY|ANALYSIS):\*{0,2}\s*", re.IGNORECASE)
 
 
 class ConsensusGapAgent:
@@ -110,15 +131,28 @@ class ConsensusGapAgent:
             )
             response = await self._llm.chat_with_tools(
                 messages=[{"role": "user", "content": user_msg}],
-                tools=[{"type": "web_search_20250305", "name": "web_search"}],
+                tools=[
+                    {"type": "web_search_20250305", "name": "web_search"},
+                    SUBMIT_VERDICT_TOOL,
+                ],
                 system=system,
                 max_tokens=2500,
             )
-            parsed = self._parse_verdicts(response.content or "")
+            # Extract verdicts from tool calls
+            parsed = [
+                (
+                    str(c.input.get("position_id")),
+                    c.input.get("verdict", "").lower(),
+                    c.input.get("summary", ""),
+                    c.input.get("analysis", ""),
+                )
+                for c in response.tool_calls
+                if c.name == "submit_consensus_verdict"
+                and c.input.get("verdict", "").lower() in VALID_VERDICTS
+            ]
             if not parsed:
                 logger.warning(
-                    "consensus_gap: no verdicts parsed for batch %d. Full response:\n%s",
-                    i, response.content
+                    "consensus_gap: no submit_consensus_verdict calls in batch %d", i
                 )
             all_results.extend(parsed)
 
@@ -161,44 +195,3 @@ class ConsensusGapAgent:
             lines.append(f"**Investment-These (Story):**\n{p.story}")
             lines.append("")
         return "\n".join(lines)
-
-    def _parse_verdicts(
-        self, text: str
-    ) -> List[Tuple[str, str, str, str]]:
-        """
-        Parse structured verdict blocks from Claude's response.
-        Splits on '---' separators and parses key/value pairs per block.
-        Robust against blank lines, bold markers, and varied spacing.
-        """
-        results = []
-        blocks = re.split(r"\n---+\n?", text)
-        for block in blocks:
-            pos_id = verdict = summary = None
-            analysis_lines: List[str] = []
-            in_analysis = False
-
-            for line in block.splitlines():
-                m = _LABEL_RE.match(line)
-                if m:
-                    label = m.group(1).upper()
-                    value = line[m.end():].strip()
-                    in_analysis = False
-                    if label == "POSITION":
-                        # Extract leading digits (position ID)
-                        num = re.match(r"(\d+)", value)
-                        pos_id = num.group(1) if num else None
-                    elif label == "VERDICT":
-                        verdict = value.lower().strip("[]* ")
-                    elif label == "SUMMARY":
-                        summary = value
-                    elif label == "ANALYSIS":
-                        in_analysis = True
-                        if value:
-                            analysis_lines.append(value)
-                elif in_analysis:
-                    analysis_lines.append(line)
-
-            if pos_id and verdict in VALID_VERDICTS and summary:
-                results.append((pos_id, verdict, summary, "\n".join(analysis_lines).strip()))
-
-        return results

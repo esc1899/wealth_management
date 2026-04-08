@@ -1,182 +1,385 @@
 """
-Unit tests for ConsensusGapAgent._parse_verdicts.
+Unit tests for ConsensusGapAgent — Tool-call based verdict extraction.
 
-This parser required multiple fix commits (and debug /tmp writes) because
-Claude returns markdown-formatted output with bold labels, brackets, and
-varied spacing that naive regex parsing couldn't handle.
+The agent now uses Claude's tool-calling mechanism to extract verdicts,
+rather than parsing free-form text. This is deterministic and robust.
 """
-from unittest.mock import MagicMock
+
+from datetime import date
+from unittest.mock import AsyncMock, MagicMock
+import pytest
 
 from agents.consensus_gap_agent import ConsensusGapAgent
+from core.llm.claude import ClaudeResponse, ClaudeToolCall
+from core.storage.models import Position
 
 
-def _make_agent() -> ConsensusGapAgent:
-    return ConsensusGapAgent(llm=MagicMock())
+def make_agent():
+    """Create agent with mocked LLM."""
+    llm = MagicMock()
+    return ConsensusGapAgent(llm=llm)
 
 
-class TestParseVerdicts:
+def make_test_position(pos_id: int, name: str, story: str = "Test thesis") -> Position:
+    """Create a test position with a story."""
+    return Position(
+        id=pos_id,
+        name=name,
+        ticker="TEST",
+        asset_class="Equity",
+        investment_type="stock",
+        story=story,
+        quantity=10,
+        unit="Shares",
+        purchase_price=100,
+        purchase_date=None,
+        added_date=date.today(),
+        in_portfolio=False,
+        in_watchlist=False,
+        rebalance_excluded=False,
+    )
 
-    def test_standard_clean_format(self):
-        text = (
-            "POSITION: 3\n"
-            "VERDICT: wächst\n"
-            "SUMMARY: Market still underestimates the thesis.\n"
-            "ANALYSIS:\nConsensus target is €100, actual is €140.\n"
-            "---\n"
+
+@pytest.mark.asyncio
+async def test_single_verdict_extraction():
+    """Agent extracts a single position verdict from tool call."""
+    agent = make_agent()
+
+    tool_call = ClaudeToolCall(
+        id="call_1",
+        name="submit_consensus_verdict",
+        input={
+            "position_id": 42,
+            "verdict": "wächst",
+            "summary": "Market still wrong.",
+            "analysis": "Target lags fundamentals.",
+        },
+    )
+
+    agent._llm.chat_with_tools = AsyncMock(
+        return_value=ClaudeResponse(
+            content="",
+            tool_calls=[tool_call],
+            stop_reason="tool_use",
         )
-        results = _make_agent()._parse_verdicts(text)
-        assert len(results) == 1
-        pos_id, verdict, summary, analysis = results[0]
-        assert pos_id == "3"
-        assert verdict == "wächst"
-        assert "Market" in summary
-        assert "100" in analysis
+    )
 
-    def test_bold_markdown_labels(self):
-        """Claude often wraps labels in **bold** — must still parse correctly."""
-        text = (
-            "**POSITION:** 7\n"
-            "**VERDICT:** stabil\n"
-            "**SUMMARY:** Thesis intact, no shift in consensus.\n"
-            "**ANALYSIS:**\nStable rating across 12 analysts.\n"
-            "---\n"
+    analyses_repo = MagicMock()
+
+    positions = [make_test_position(42, "Apple")]
+    results = await agent.analyze_portfolio(
+        positions=positions,
+        skill_name="test_skill",
+        skill_prompt="Test prompt",
+        analyses_repo=analyses_repo,
+    )
+
+    assert len(results) == 1
+    pos_id, verdict, summary = results[0]
+    assert pos_id == 42
+    assert verdict == "wächst"
+    assert summary == "Market still wrong."
+
+    # Verify verdict was persisted
+    analyses_repo.save.assert_called_once()
+    call_kwargs = analyses_repo.save.call_args[1]
+    assert call_kwargs["position_id"] == 42
+    assert call_kwargs["verdict"] == "wächst"
+
+
+@pytest.mark.asyncio
+async def test_multiple_verdicts_in_batch():
+    """Agent extracts multiple verdicts from a single batch."""
+    agent = make_agent()
+
+    tool_calls = [
+        ClaudeToolCall(
+            id="call_1",
+            name="submit_consensus_verdict",
+            input={
+                "position_id": 1,
+                "verdict": "wächst",
+                "summary": "Gap growing.",
+                "analysis": "Market wrong.",
+            },
+        ),
+        ClaudeToolCall(
+            id="call_2",
+            name="submit_consensus_verdict",
+            input={
+                "position_id": 2,
+                "verdict": "eingeholt",
+                "summary": "Gap closed.",
+                "analysis": "Consensus caught up.",
+            },
+        ),
+    ]
+
+    agent._llm.chat_with_tools = AsyncMock(
+        return_value=ClaudeResponse(
+            content="",
+            tool_calls=tool_calls,
+            stop_reason="tool_use",
         )
-        results = _make_agent()._parse_verdicts(text)
-        assert len(results) == 1
-        assert results[0][0] == "7"
-        assert results[0][1] == "stabil"
+    )
 
-    def test_verdict_in_brackets(self):
-        """Claude sometimes returns [verdict] with surrounding brackets."""
-        text = (
-            "POSITION: 12\n"
-            "VERDICT: [eingeholt]\n"
-            "SUMMARY: Gap has closed, thesis fully priced in.\n"
-            "ANALYSIS:\nAnalyst consensus now matches user thesis.\n"
-            "---\n"
+    analyses_repo = MagicMock()
+    positions = [
+        make_test_position(1, "Apple"),
+        make_test_position(2, "Microsoft"),
+    ]
+
+    results = await agent.analyze_portfolio(
+        positions=positions,
+        skill_name="test",
+        skill_prompt="prompt",
+        analyses_repo=analyses_repo,
+    )
+
+    assert len(results) == 2
+    assert {r[1] for r in results} == {"wächst", "eingeholt"}
+    assert analyses_repo.save.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_no_verdicts_logged():
+    """When no tool calls are returned, warning is logged."""
+    agent = make_agent()
+
+    agent._llm.chat_with_tools = AsyncMock(
+        return_value=ClaudeResponse(
+            content="Some text without tool calls.",
+            tool_calls=[],
+            stop_reason="end_turn",
         )
-        results = _make_agent()._parse_verdicts(text)
-        assert len(results) == 1
-        assert results[0][1] == "eingeholt"
+    )
 
-    def test_verdict_case_insensitive(self):
-        """Verdict label and value should survive mixed casing."""
-        text = (
-            "POSITION: 5\n"
-            "verdict: Schließt\n"
-            "SUMMARY: Market catching up to thesis.\n"
-            "ANALYSIS:\nCoverage expanding, target converging.\n"
-            "---\n"
+    analyses_repo = MagicMock()
+    positions = [make_test_position(1, "Apple")]
+
+    results = await agent.analyze_portfolio(
+        positions=positions,
+        skill_name="test",
+        skill_prompt="prompt",
+        analyses_repo=analyses_repo,
+    )
+
+    assert len(results) == 0
+    analyses_repo.save.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_invalid_verdict_filtered():
+    """Tool calls with invalid verdicts are filtered out."""
+    agent = make_agent()
+
+    tool_call = ClaudeToolCall(
+        id="call_1",
+        name="submit_consensus_verdict",
+        input={
+            "position_id": 1,
+            "verdict": "bullish",  # Invalid!
+            "summary": "Not a valid verdict.",
+            "analysis": "N/A",
+        },
+    )
+
+    agent._llm.chat_with_tools = AsyncMock(
+        return_value=ClaudeResponse(
+            content="",
+            tool_calls=[tool_call],
+            stop_reason="tool_use",
         )
-        results = _make_agent()._parse_verdicts(text)
-        assert len(results) == 1
-        assert results[0][1] == "schließt"
+    )
 
-    def test_position_id_with_extra_text(self):
-        """Claude often annotates IDs with ticker/name like '42 (AAPL - Apple Inc.)' — extract leading digits only."""
-        text = (
-            "POSITION: 42 (AAPL - Apple Inc.)\n"
-            "VERDICT: wächst\n"
-            "SUMMARY: Strong upside still ahead.\n"
-            "ANALYSIS:\nWall St target lags fundamentals.\n"
-            "---\n"
+    analyses_repo = MagicMock()
+    positions = [make_test_position(1, "Apple")]
+
+    results = await agent.analyze_portfolio(
+        positions=positions,
+        skill_name="test",
+        skill_prompt="prompt",
+        analyses_repo=analyses_repo,
+    )
+
+    assert len(results) == 0
+    analyses_repo.save.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_mixed_valid_and_invalid():
+    """Valid and invalid verdicts are separated."""
+    agent = make_agent()
+
+    tool_calls = [
+        ClaudeToolCall(
+            id="call_1",
+            name="submit_consensus_verdict",
+            input={
+                "position_id": 1,
+                "verdict": "wächst",
+                "summary": "Valid.",
+                "analysis": "OK.",
+            },
+        ),
+        ClaudeToolCall(
+            id="call_2",
+            name="submit_consensus_verdict",
+            input={
+                "position_id": 2,
+                "verdict": "invalid",  # Invalid!
+                "summary": "Invalid verdict.",
+                "analysis": "Dropped.",
+            },
+        ),
+    ]
+
+    agent._llm.chat_with_tools = AsyncMock(
+        return_value=ClaudeResponse(
+            content="",
+            tool_calls=tool_calls,
+            stop_reason="tool_use",
         )
-        results = _make_agent()._parse_verdicts(text)
-        assert len(results) == 1
-        assert results[0][0] == "42"
+    )
 
-    def test_multiple_blocks_parsed(self):
-        """Two positions in one response, separated by ---."""
-        text = (
-            "POSITION: 1\n"
-            "VERDICT: wächst\n"
-            "SUMMARY: First position looks strong.\n"
-            "ANALYSIS:\nGrowth thesis intact.\n"
-            "---\n"
-            "POSITION: 2\n"
-            "VERDICT: eingeholt\n"
-            "SUMMARY: Second position fully priced in.\n"
-            "ANALYSIS:\nConsensus caught up.\n"
-            "---\n"
+    analyses_repo = MagicMock()
+    positions = [
+        make_test_position(1, "A"),
+        make_test_position(2, "B"),
+    ]
+
+    results = await agent.analyze_portfolio(
+        positions=positions,
+        skill_name="test",
+        skill_prompt="prompt",
+        analyses_repo=analyses_repo,
+    )
+
+    assert len(results) == 1
+    pos_ids = {r[0] for r in results}
+    assert pos_ids == {1}
+    assert analyses_repo.save.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_all_valid_verdicts_accepted():
+    """All four valid verdicts are accepted."""
+    agent = make_agent()
+
+    verdicts = ["wächst", "stabil", "schließt", "eingeholt"]
+    for i, verdict in enumerate(verdicts, 1):
+        tool_call = ClaudeToolCall(
+            id=f"call_{i}",
+            name="submit_consensus_verdict",
+            input={
+                "position_id": i,
+                "verdict": verdict,
+                "summary": f"Summary for {verdict}.",
+                "analysis": "Analysis.",
+            },
         )
-        results = _make_agent()._parse_verdicts(text)
-        assert len(results) == 2
-        assert {r[0] for r in results} == {"1", "2"}
-        assert {r[1] for r in results} == {"wächst", "eingeholt"}
 
-    def test_invalid_verdict_block_skipped(self):
-        """Blocks with unrecognized verdict values are excluded."""
-        text = (
-            "POSITION: 9\n"
-            "VERDICT: bullish\n"
-            "SUMMARY: Something.\n"
-            "ANALYSIS:\nN/A\n"
-            "---\n"
-        )
-        assert _make_agent()._parse_verdicts(text) == []
-
-    def test_missing_summary_block_skipped(self):
-        """Blocks without SUMMARY are excluded — incomplete LLM output."""
-        text = (
-            "POSITION: 9\n"
-            "VERDICT: stabil\n"
-            "ANALYSIS:\nSome analysis.\n"
-            "---\n"
-        )
-        assert _make_agent()._parse_verdicts(text) == []
-
-    def test_empty_response_returns_empty_list(self):
-        agent = _make_agent()
-        assert agent._parse_verdicts("") == []
-        assert agent._parse_verdicts("   \n  \n") == []
-
-    def test_multiline_analysis_collected(self):
-        """ANALYSIS can span multiple lines — all should be captured."""
-        text = (
-            "POSITION: 3\n"
-            "VERDICT: stabil\n"
-            "SUMMARY: Thesis holds.\n"
-            "ANALYSIS:\n"
-            "Line one of analysis.\n"
-            "Line two of analysis.\n"
-            "---\n"
-        )
-        results = _make_agent()._parse_verdicts(text)
-        assert len(results) == 1
-        _, _, _, analysis = results[0]
-        assert "Line one" in analysis
-        assert "Line two" in analysis
-
-    def test_all_four_valid_verdicts_accepted(self):
-        """Smoke-test: every valid verdict parses correctly."""
-        verdicts = ["wächst", "stabil", "schließt", "eingeholt"]
-        agent = _make_agent()
-        for v in verdicts:
-            text = (
-                f"POSITION: 1\n"
-                f"VERDICT: {v}\n"
-                f"SUMMARY: Summary for {v}.\n"
-                f"ANALYSIS:\nSome analysis.\n"
-                f"---\n"
+        agent._llm.chat_with_tools = AsyncMock(
+            return_value=ClaudeResponse(
+                content="",
+                tool_calls=[tool_call],
+                stop_reason="tool_use",
             )
-            results = agent._parse_verdicts(text)
-            assert len(results) == 1, f"Failed for verdict: {v}"
-            assert results[0][1] == v
-
-    def test_mixed_valid_and_invalid_blocks(self):
-        """Only valid blocks are returned; invalid ones are silently dropped."""
-        text = (
-            "POSITION: 1\n"
-            "VERDICT: wächst\n"
-            "SUMMARY: Valid.\n"
-            "ANALYSIS:\nOK.\n"
-            "---\n"
-            "POSITION: 2\n"
-            "VERDICT: invalid_value\n"
-            "SUMMARY: Invalid verdict.\n"
-            "ANALYSIS:\nWill be dropped.\n"
-            "---\n"
         )
-        results = _make_agent()._parse_verdicts(text)
+
+        analyses_repo = MagicMock()
+        positions = [make_test_position(i, f"Stock{i}")]
+
+        results = await agent.analyze_portfolio(
+            positions=positions,
+            skill_name="test",
+            skill_prompt="prompt",
+            analyses_repo=analyses_repo,
+        )
+
         assert len(results) == 1
-        assert results[0][0] == "1"
+        assert results[0][1] == verdict, f"Failed for verdict: {verdict}"
+
+
+@pytest.mark.asyncio
+async def test_positions_without_story_skipped():
+    """Positions without a story are not analyzed."""
+    agent = make_agent()
+
+    analyses_repo = MagicMock()
+
+    # Position without story
+    pos_no_story = Position(
+        id=1,
+        name="NoStory",
+        ticker="TEST",
+        asset_class="Equity",
+        investment_type="stock",
+        story=None,  # No story
+        quantity=10,
+        unit="Shares",
+        purchase_price=100,
+        purchase_date=None,
+        added_date=date.today(),
+        in_portfolio=False,
+        in_watchlist=False,
+        rebalance_excluded=False,
+    )
+
+    results = await agent.analyze_portfolio(
+        positions=[pos_no_story],
+        skill_name="test",
+        skill_prompt="prompt",
+        analyses_repo=analyses_repo,
+    )
+
+    assert len(results) == 0
+    agent._llm.chat_with_tools.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_non_tool_calls_ignored():
+    """Tool calls for other tools are ignored (e.g., web_search)."""
+    agent = make_agent()
+
+    # Only the submit_consensus_verdict call matters
+    tool_calls = [
+        ClaudeToolCall(
+            id="web_1",
+            name="web_search",  # Not our verdict tool
+            input={"query": "Something"},
+        ),
+        ClaudeToolCall(
+            id="verdict_1",
+            name="submit_consensus_verdict",
+            input={
+                "position_id": 1,
+                "verdict": "wächst",
+                "summary": "Valid.",
+                "analysis": "OK.",
+            },
+        ),
+    ]
+
+    agent._llm.chat_with_tools = AsyncMock(
+        return_value=ClaudeResponse(
+            content="",
+            tool_calls=tool_calls,
+            stop_reason="tool_use",
+        )
+    )
+
+    analyses_repo = MagicMock()
+    positions = [make_test_position(1, "Apple")]
+
+    results = await agent.analyze_portfolio(
+        positions=positions,
+        skill_name="test",
+        skill_prompt="prompt",
+        analyses_repo=analyses_repo,
+    )
+
+    # Only the verdict tool call is processed
+    assert len(results) == 1
+    assert results[0][0] == 1
+    assert analyses_repo.save.call_count == 1

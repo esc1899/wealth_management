@@ -151,6 +151,8 @@ rebalance_chat:
   freshness_caption: "Diese geplanten Agents haben seit Längerem nicht gelaufen. Für eine aktuelle Rebalancing-Analyse empfiehlt es sich, sie vorher auszuführen."
   freshness_never: "Nie gelaufen"
   freshness_run: "▶ Jetzt"
+  refresh_tooltip: "Portfolio neu laden (neue Positionen einbeziehen)"
+  refresh_done: "Portfolio aktualisiert"
 
 news_chat:
   title: "News Digest"

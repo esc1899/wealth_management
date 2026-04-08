@@ -151,6 +151,8 @@ rebalance_chat:
   freshness_caption: "These scheduled agents have not run recently. Running them first will give you a more accurate rebalancing analysis."
   freshness_never: "Never run"
   freshness_run: "▶ Run now"
+  refresh_tooltip: "Reload portfolio (include new positions)"
+  refresh_done: "Portfolio refreshed"
 
 news_chat:
   title: "News Digest"
