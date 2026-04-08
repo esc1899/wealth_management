@@ -6,12 +6,27 @@ Requires ANTHROPIC_API_KEY.
 from __future__ import annotations
 
 import asyncio
+import logging
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
 import anthropic
 from core.llm.base import LLMProvider, Message, Role
+
+_logger = logging.getLogger(__name__)
+
+# Patterns to detect signs of successful prompt injection in LLM output
+_OUTPUT_INJECTION_PATTERNS = [
+    r"ignore\s+(previous|all|prior)\s+instructions?",
+    r"disregard\s+(your|the)\s+(system\s+)?instructions?",
+    r"new\s+instructions?",
+    r"execute\s+(this|the\s+following)",
+]
+_OUTPUT_COMPILED_PATTERNS = [
+    re.compile(p, re.IGNORECASE) for p in _OUTPUT_INJECTION_PATTERNS
+]
 
 # Claude model to use — update when a newer version is preferred
 DEFAULT_MODEL = "claude-sonnet-4-6"
@@ -34,6 +49,26 @@ class ClaudeResponse:
     @property
     def has_tool_calls(self) -> bool:
         return len(self.tool_calls) > 0
+
+
+def validate_llm_response(text: str) -> str:
+    """
+    Scan Claude's response for signs of successful prompt injection.
+    Logs a warning if suspicious patterns are detected.
+    Returns the response unchanged (non-blocking validation).
+
+    Args:
+        text: The LLM response text to validate
+
+    Returns:
+        The response unchanged (non-blocking)
+    """
+    for pattern in _OUTPUT_COMPILED_PATTERNS:
+        if pattern.search(text):
+            _logger.warning(
+                "Suspicious pattern detected in LLM output: %s", pattern.pattern
+            )
+    return text
 
 
 class ClaudeProvider(LLMProvider):
@@ -194,6 +229,9 @@ class ClaudeProvider(LLMProvider):
                         name=block.name,
                         input=block.input,
                     ))
+
+        # Validate response for signs of prompt injection
+        content_text = validate_llm_response(content_text)
 
         _duration_ms = int((time.monotonic() - _t0) * 1000)
         if self.on_usage:
