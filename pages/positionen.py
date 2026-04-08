@@ -111,12 +111,21 @@ def _set(**kwargs):
         st.session_state[k] = v
 
 def _clear_form():
+    """Clear all form-related keys from session state."""
+    # Form control and basic fields
     for k in [
         "_pos_edit_id", "_pos_show_form", "_pos_confirm_del",
         "_pos_ticker", "_pos_name", "_pos_figi_results",
         "_pos_isin", "_pos_wkn", "_pos_asset_class",
-        "_pos_story_draft", "_pos_form_story",
+        "_pos_story_draft", "_pos_form_story", "_pos_figi_pick",
+        "_pos_story_gen",
     ]:
+        st.session_state.pop(k, None)
+
+    # Clear dynamic keys (detail dialog inputs for valuation and rebalance exclusion)
+    # These use the pattern _detail_<field>_<pos_id> or _save_est_<pos_id>
+    keys_to_remove = [k for k in st.session_state.keys() if k.startswith(("_detail_", "_save_est_"))]
+    for k in keys_to_remove:
         st.session_state.pop(k, None)
 
 def _clear_detail():
@@ -142,10 +151,11 @@ def _show_detail(pos_id: int):
     if pos.ticker:
         c1.caption(pos.ticker)
     if c2.button(t("positionen.edit_button_detail"), use_container_width=True):
-        _clear_detail()
         _clear_form()
         _set(_pos_show_form=True, _pos_edit_id=pos_id)
+        _clear_detail()
         st.rerun()
+        return  # Exit dialog immediately to avoid re-rendering
 
     # ── Krypto-Warnung ───────────────────────────────────────────────────────
     if pos.asset_class == "Kryptowährung":
