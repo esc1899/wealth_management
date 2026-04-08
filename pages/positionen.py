@@ -4,16 +4,46 @@ Positionen — direktes CRUD für Portfolio und Watchlist, kein LLM.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date, timedelta
 from typing import Optional
 
 import streamlit as st
 
+from config import config
 from core.asset_class_config import get_asset_class_registry
 from core.figi import RELEVANT_EXCH, openfigi_lookup, to_yahoo_ticker
 from core.i18n import t
 from core.storage.models import Position
 from state import get_analyses_repo, get_app_config_repo, get_market_agent, get_market_repo, get_positions_repo, get_skills_repo
+
+
+def _generate_story_proposal(name: str, ticker: str | None, asset_class: str, existing_story: str | None) -> str:
+    """Call Claude to generate an investment thesis for a position."""
+    from core.llm.claude import ClaudeProvider
+
+    llm = ClaudeProvider(api_key=config.ANTHROPIC_API_KEY, model="claude-haiku-4-5-20251001")
+
+    info = f"Name: {name}\nAsset-Klasse: {asset_class}"
+    if ticker:
+        info += f"\nTicker: {ticker}"
+
+    if existing_story:
+        task = f"Aktualisiere und verbessere diese bestehende Investment-These:\n\n{existing_story}"
+    else:
+        task = "Schreibe eine prägnante Investment-These (2–4 Sätze)."
+
+    prompt = (
+        f"Du bist ein erfahrener Investmentanalyst.\n\n"
+        f"Position:\n{info}\n\n"
+        f"{task}\n\n"
+        "Die These soll erklären: warum diese Position interessant ist, "
+        "was die Kernthese ist (Wachstum, Value, Dividende, Absicherung …) "
+        "und welche wichtigen Katalysatoren oder Risiken bestehen. "
+        "Antworte NUR mit der These, keine Einleitung, keine Überschrift."
+    )
+
+    return asyncio.run(llm.complete(prompt, max_tokens=400))
 
 st.set_page_config(page_title="Positionen", page_icon="📋", layout="wide")
 st.title(f"📋 {t('positionen.title')}")
@@ -82,6 +112,7 @@ def _clear_form():
         "_pos_edit_id", "_pos_show_form", "_pos_confirm_del",
         "_pos_ticker", "_pos_name", "_pos_figi_results",
         "_pos_isin", "_pos_wkn", "_pos_asset_class",
+        "_pos_story_draft", "_pos_form_story",
     ]:
         st.session_state.pop(k, None)
 
@@ -341,6 +372,36 @@ if _ss("_pos_show_form"):
         lookup_isin = editing.isin if editing else ""
         lookup_wkn = editing.wkn if editing else ""
 
+    # ── Story suggestion (outside form — needs its own rerun) ────────────────
+    # Seed story textarea state on first render so it shows the existing story.
+    if "_pos_form_story" not in st.session_state:
+        st.session_state["_pos_form_story"] = (editing.story or "") if editing else ""
+
+    _suggest_name = _ss("_pos_name", editing.name if editing else "") or ""
+    _suggest_ticker = _ss("_pos_ticker", editing.ticker if editing else "") or None
+    _suggest_ac = st.session_state.get("_pos_asset_class", selected_ac)
+    _current_story = st.session_state.get("_pos_form_story") or ""
+
+    _btn_label = t("positionen.story_update_button") if _current_story else t("positionen.story_suggest_button")
+    if _suggest_name and st.button(_btn_label, key="_pos_story_gen"):
+        _story_err = None
+        with st.spinner(t("positionen.story_suggest_spinner")):
+            try:
+                _draft = _generate_story_proposal(
+                    name=_suggest_name,
+                    ticker=_suggest_ticker or None,
+                    asset_class=_suggest_ac,
+                    existing_story=_current_story or None,
+                )
+                st.session_state["_pos_form_story"] = _draft
+            except Exception as _exc:
+                _story_err = str(_exc)
+        if _story_err:
+            st.error(f"{t('positionen.story_suggest_error')}: {_story_err}")
+        else:
+            st.toast(t("positionen.story_suggest_hint"), icon="✨")
+            st.rerun()
+
     st.divider()
 
     # ── Main form ─────────────────────────────────────────────────────────────
@@ -489,12 +550,12 @@ if _ss("_pos_show_form"):
             value=(editing.notes or "") if editing else "",
         )
 
-        # Story textarea (always)
+        # Story textarea — state managed via "_pos_form_story" key (supports AI draft injection)
         form_story = st.text_area(
             t("positionen.story_label"),
-            value=(editing.story or "") if editing else "",
+            key="_pos_form_story",
             placeholder=t("positionen.story_placeholder"),
-            height=80,
+            height=120,
         )
 
         # Anlage-Idee selector — only visible when a story is being written

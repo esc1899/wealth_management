@@ -62,13 +62,7 @@ ANALYSIS:
 
 Apply skill strategy below."""
 
-POSITION_BLOCK_PATTERN = re.compile(
-    r"\*{0,2}POSITION:\*{0,2}\s*(\d+).*?[\n\r]+"
-    r".*?\*{0,2}VERDICT:\*{0,2}\s*(wächst|stabil|schließt|eingeholt).*?[\n\r]+"
-    r".*?\*{0,2}SUMMARY:\*{0,2}\s*(.+?)[\n\r]+"
-    r"[\s\S]*?\*{0,2}ANALYSIS:\*{0,2}\s*[\n\r]+([\s\S]*?)(?=\n---|\Z)",
-    re.IGNORECASE,
-)
+_LABEL_RE = re.compile(r"^\*{0,2}(POSITION|VERDICT|SUMMARY|ANALYSIS):\*{0,2}\s*", re.IGNORECASE)
 
 
 class ConsensusGapAgent:
@@ -122,7 +116,14 @@ class ConsensusGapAgent:
             )
             parsed = self._parse_verdicts(response.content or "")
             if not parsed:
-                logger.warning("consensus_gap: no verdicts parsed from response. Raw:\n%s", response.content[:500])
+                logger.warning(
+                    "consensus_gap: no verdicts parsed for batch %d. Full response:\n%s",
+                    i, response.content
+                )
+                import os, tempfile
+                _dbg = os.path.join(tempfile.gettempdir(), "consensus_gap_debug.txt")
+                with open(_dbg, "a", encoding="utf-8") as _f:
+                    _f.write(f"\n=== BATCH {i} (no parse) ===\n{response.content}\n")
             all_results.extend(parsed)
 
             # Pause between batches to avoid rate limit
@@ -168,12 +169,40 @@ class ConsensusGapAgent:
     def _parse_verdicts(
         self, text: str
     ) -> List[Tuple[str, str, str, str]]:
-        """Parse structured verdict blocks from Claude's response."""
+        """
+        Parse structured verdict blocks from Claude's response.
+        Splits on '---' separators and parses key/value pairs per block.
+        Robust against blank lines, bold markers, and varied spacing.
+        """
         results = []
-        for m in POSITION_BLOCK_PATTERN.finditer(text):
-            pos_id = m.group(1).strip()
-            verdict = m.group(2).strip().lower()
-            summary = m.group(3).strip()
-            analysis = m.group(4).strip()
-            results.append((pos_id, verdict, summary, analysis))
+        blocks = re.split(r"\n---+\n?", text)
+        for block in blocks:
+            pos_id = verdict = summary = None
+            analysis_lines: List[str] = []
+            in_analysis = False
+
+            for line in block.splitlines():
+                m = _LABEL_RE.match(line)
+                if m:
+                    label = m.group(1).upper()
+                    value = line[m.end():].strip()
+                    in_analysis = False
+                    if label == "POSITION":
+                        # Extract leading digits (position ID)
+                        num = re.match(r"(\d+)", value)
+                        pos_id = num.group(1) if num else None
+                    elif label == "VERDICT":
+                        verdict = value.lower().strip("[]* ")
+                    elif label == "SUMMARY":
+                        summary = value
+                    elif label == "ANALYSIS":
+                        in_analysis = True
+                        if value:
+                            analysis_lines.append(value)
+                elif in_analysis:
+                    analysis_lines.append(line)
+
+            if pos_id and verdict in VALID_VERDICTS and summary:
+                results.append((pos_id, verdict, summary, "\n".join(analysis_lines).strip()))
+
         return results
