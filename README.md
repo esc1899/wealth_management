@@ -163,6 +163,28 @@ DB_PATH=data/work.db
 ENV_PROFILE=work streamlit run app.py
 ```
 
+### macOS App Bundle
+
+Create a native macOS app with icon for easy access from Applications folder and Dock:
+
+```bash
+# Generate icon (custom portfolio chart theme)
+python3 generate_icon.py
+
+# Convert to .icns and install in app bundle
+python3 install_icon.py
+
+# Create app bundle
+python3 create_automator_app.py
+```
+
+The app will appear in `/Applications`. You can add it to Dock by dragging it there or:
+```bash
+# Right-click app → Options → Keep in Dock
+```
+
+**Note:** The app bundle launches via `.command` file for reliable Python environment detection on Apple Silicon Macs.
+
 ## Commercial Licensing
 
 This project is released under the [Business Source License 1.1](LICENSE), which allows personal, educational, and non-commercial use freely.
