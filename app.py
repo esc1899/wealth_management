@@ -31,6 +31,7 @@ def _login_form():
     """Full-page login form — renders as main content for password manager autofill."""
     st.markdown("## 🔐 Login")
     with st.form("login_form"):
+        st.text_input("Benutzer", value="wealth-management", disabled=True)
         password = st.text_input("Passwort", type="password", autocomplete="current-password")
         submitted = st.form_submit_button("Anmelden", use_container_width=True)
     if submitted:
