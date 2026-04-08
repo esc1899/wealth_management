@@ -38,12 +38,11 @@ from core.storage.skills import SkillsRepository
 # active rebalancing recommendations but still counted in total wealth.
 _NON_TRADEABLE_CLASSES = {"Festgeld", "Bargeld", "Immobilie", "Grundstück"}
 
-# Josef's Regel: target 1/3 per category.
+# Josef's Regel: target 1/3 per category (Rohstoffe + Immobilien together = 1/3).
 # Maps investment_type → Josef category
 _JOSEF_CATEGORY = {
     "Wertpapiere": "Aktien",
-    "Krypto": "Aktien",
-    "Edelmetalle": "Aktien",
+    "Edelmetalle": "Rohstoffe",
     "Renten": "Renten/Geld",
     "Geld": "Renten/Geld",
     "Immobilien": "Immobilien",
@@ -65,6 +64,7 @@ Rules:
 - Keep the output structured and scannable
 - Positions marked [AUSGESCHLOSSEN] are excluded from rebalancing — assess them but make no buy/sell recommendation
 - Non-tradeable positions (cash, fixed-term deposits, real estate) cannot be rebalanced — include their value in the overall picture only
+- **Crypto positions [HOCHSPEKULATIV — Krypto]**: Always recommend selling these immediately — crypto carries unmanageable volatility and does not fit into disciplined portfolio construction
 - Today's date is {today}"""
 
 
@@ -368,8 +368,9 @@ class RebalanceAgent:
             lines.append(f"**Gesamtvermögen: €{grand_total:,.0f}**")
 
         # ── Section 3: Josef's Regel breakdown ────────────────────────
+        # Aktien: 1/3, Renten/Geld: 1/3, Rohstoffe + Immobilien together: 1/3
         lines.append("\n### Josef's Regel — Ist-Verteilung vs. Ziel (je 1/3 = 33,3%)")
-        josef_totals: dict[str, float] = {"Aktien": 0.0, "Renten/Geld": 0.0, "Immobilien": 0.0}
+        josef_totals: dict[str, float] = {"Aktien": 0.0, "Renten/Geld": 0.0, "Rohstoffe": 0.0, "Immobilien": 0.0}
         for pos in positions:
             value = (
                 tradeable_values.get(pos.id)
@@ -384,18 +385,28 @@ class RebalanceAgent:
 
         if grand_total > 0:
             lines.append(
-                f"| Kategorie      | Wert         | Ist    | Ziel  | Abweichung |"
+                f"| Kategorie              | Wert         | Ist    | Ziel  | Abweichung |"
             )
             lines.append(
-                f"|----------------|--------------|--------|-------|------------|"
+                f"|------------------------|--------------|--------|-------|------------|"
             )
-            for cat, total in josef_totals.items():
+            # Individual categories (Aktien, Renten/Geld each get 1/3)
+            for cat in ["Aktien", "Renten/Geld"]:
+                total = josef_totals.get(cat, 0.0)
                 pct = total / grand_total * 100
                 delta = pct - 33.33
                 delta_str = f"+{delta:.1f}%" if delta >= 0 else f"{delta:.1f}%"
                 lines.append(
-                    f"| {cat:<14} | €{total:>10,.0f} | {pct:>5.1f}% | 33.3% | {delta_str:>10} |"
+                    f"| {cat:<22} | €{total:>10,.0f} | {pct:>5.1f}% | 33.3% | {delta_str:>10} |"
                 )
+            # Rohstoffe + Immobilien combined (together = 1/3)
+            combined_raw = josef_totals.get("Rohstoffe", 0.0) + josef_totals.get("Immobilien", 0.0)
+            combined_pct = combined_raw / grand_total * 100
+            combined_delta = combined_pct - 33.33
+            combined_delta_str = f"+{combined_delta:.1f}%" if combined_delta >= 0 else f"{combined_delta:.1f}%"
+            lines.append(
+                f"| Rohstoffe + Immobilien | €{combined_raw:>10,.0f} | {combined_pct:>5.1f}% | 33.3% | {combined_delta_str:>10} |"
+            )
         else:
             lines.append("*(kein Vermögen mit Wertangabe — Kursdaten oder Schätzwerte fehlen)*")
 
