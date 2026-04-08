@@ -26,6 +26,25 @@ if _config_errors:
         st.error(f"⚙️ **Configuration error:** {_err}")
     st.stop()
 
+# Optional: App authentication (login gate)
+def _login_form():
+    """Full-page login form — renders as main content for password manager autofill."""
+    st.markdown("## 🔐 Login")
+    with st.form("login_form"):
+        password = st.text_input("Passwort", type="password", autocomplete="current-password")
+        submitted = st.form_submit_button("Anmelden", use_container_width=True)
+    if submitted:
+        import hmac
+        if hmac.compare_digest(password, config.APP_PASSWORD):
+            st.session_state["authenticated"] = True
+            st.rerun()
+        else:
+            st.error("Falsches Passwort.")
+
+if config.APP_PASSWORD and not st.session_state.get("authenticated"):
+    _login_form()
+    st.stop()
+
 if config.DEMO_MODE:
     st.warning(t("demo.banner"), icon="🎭")
 

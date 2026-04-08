@@ -27,6 +27,9 @@ class Config:
     # Encryption
     ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
 
+    # App authentication (optional — leave empty to disable login)
+    APP_PASSWORD: str = os.getenv("APP_PASSWORD", "")
+
     # Demo mode
     DEMO_MODE: bool = os.getenv("DEMO_MODE", "false").lower() == "true"
     DEMO_DB_PATH: str = os.getenv("DEMO_DB_PATH", "data/demo.db")
