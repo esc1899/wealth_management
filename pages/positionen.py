@@ -5,10 +5,13 @@ Positionen — direktes CRUD für Portfolio und Watchlist, kein LLM.
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import date, timedelta
 from typing import Optional
 
 import streamlit as st
+
+logger = logging.getLogger(__name__)
 
 from config import config
 from core.asset_class_config import get_asset_class_registry
@@ -676,8 +679,8 @@ if _ss("_pos_show_form"):
                     with st.spinner(t("positionen.fetching_price")):
                         try:
                             get_market_agent().fetch_all_now()
-                        except Exception:
-                            pass  # non-critical — price can be fetched later
+                        except Exception as e:
+                            logger.warning("Auto-fetch after save failed (non-critical): %s", e)
             _clear_form()
             st.session_state["_pos_just_saved"] = True
             st.rerun()

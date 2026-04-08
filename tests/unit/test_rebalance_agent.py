@@ -222,3 +222,60 @@ class TestAnalyze:
         messages = call_args[0][0]
         system_msg = next((m for m in messages if m.role.value == "system"), None)
         assert "CAND" in system_msg.content or "Buy Candidate" in system_msg.content
+
+
+# ------------------------------------------------------------------
+# _get_position_value
+# ------------------------------------------------------------------
+
+class TestPositionValue:
+    """
+    Tests for _get_position_value — the calculation that fixed precious metals.
+    Bug: 100g gold at €2800/troy oz returned €280,000 instead of €9,002.
+    """
+
+    def _make_agent(self, market_repo):
+        return RebalanceAgent(
+            positions_repo=MagicMock(),
+            market_repo=market_repo,
+            analyses_repo=MagicMock(),
+            llm=MagicMock(),
+        )
+
+    def test_standard_stock_quantity_times_price(self):
+        """Stock value = quantity × current price (in EUR)."""
+        price = make_price("AAPL", 175.0)
+        market_repo = MagicMock()
+        market_repo.get_price.side_effect = lambda t: price if t == "AAPL" else None
+
+        pos = make_position("AAPL", 10.0, 150.0)
+        agent = self._make_agent(market_repo)
+        assert agent._get_position_value(pos) == 1750.0
+
+    def test_precious_metal_gram_uses_troy_oz_conversion(self):
+        """
+        Precious metals stored in grams with price in €/troy oz.
+        100g at €2800/troy oz = 100 × (2800 / 31.1035) ≈ €9,002 — NOT 100 × 2800 = €280,000.
+        """
+        price = make_price("GC=F", 2800.0)
+        market_repo = MagicMock()
+        market_repo.get_price.side_effect = lambda t: price if t == "GC=F" else None
+
+        pos = make_position("GC=F", 100.0, 80.0)
+        pos = pos.model_copy(update={"unit": "g"})
+        agent = self._make_agent(market_repo)
+
+        value = agent._get_position_value(pos)
+        expected = 100.0 * (2800.0 / 31.1035)
+        assert value is not None
+        assert abs(value - expected) < 1.0
+        assert value < 15_000  # Sanity: not the 100x-inflated €280,000
+
+    def test_missing_market_price_returns_none(self):
+        """No price in market data → None (data not yet fetched or invalid ticker)."""
+        market_repo = MagicMock()
+        market_repo.get_price.return_value = None
+
+        pos = make_position("AAPL", 10.0, 150.0)
+        agent = self._make_agent(market_repo)
+        assert agent._get_position_value(pos) is None

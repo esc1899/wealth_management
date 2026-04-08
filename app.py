@@ -3,7 +3,10 @@ Wealth Management — Streamlit entry point.
 Navigation is defined explicitly via st.navigation with grouped sections.
 """
 
+import logging
 import streamlit as st
+
+logger = logging.getLogger(__name__)
 
 st.set_page_config(
     page_title="Wealth Management",
@@ -131,8 +134,8 @@ with st.sidebar:
                         ),
                         icon=":material/warning:",
                     )
-    except Exception:
-        pass  # never crash the sidebar
+    except Exception as e:
+        logger.warning("Cost alert sidebar failed: %s", e, exc_info=True)  # never crash the sidebar
 
 # Language switcher in sidebar
 with st.sidebar:

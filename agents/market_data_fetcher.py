@@ -3,6 +3,7 @@ Market data fetcher — wraps yfinance with symbol validation, rate limiting,
 and EUR conversion. This is the only module that imports yfinance.
 """
 
+import logging
 import re
 import time
 import threading
@@ -13,6 +14,8 @@ import yfinance as yf
 import pandas as pd
 
 from core.storage.models import HistoricalPrice, PriceRecord
+
+logger = logging.getLogger(__name__)
 
 # Symbols: uppercase alphanumeric plus . - ^ = (covers stocks, ETFs, crypto, commodities)
 SYMBOL_PATTERN = re.compile(r"^[A-Z0-9\-\.\^=]{1,20}$")
@@ -168,8 +171,8 @@ class MarketDataFetcher:
             currency = getattr(info, "currency", None)
             if price and price > 0 and currency:
                 return price, currency
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("yfinance fast_info failed for %s: %s", ticker.ticker, e)
 
         # Fallback: use last close from recent history
         try:
@@ -182,8 +185,8 @@ class MarketDataFetcher:
                     info_dict = ticker.info
                     currency = info_dict.get("currency")
                 return price, currency
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("yfinance history fallback failed for %s: %s", ticker.ticker, e)
 
         return None, None
 
@@ -192,8 +195,8 @@ class MarketDataFetcher:
             currency = getattr(ticker.fast_info, "currency", None)
             if currency:
                 return currency.upper()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("_detect_currency failed for %s, defaulting to USD: %s", ticker.ticker, e)
         return "USD"
 
     def _get_eur_rate(self, currency: str) -> float:
@@ -216,7 +219,7 @@ class MarketDataFetcher:
             rate = getattr(fx.fast_info, "last_price", None)
             if rate and rate > 0:
                 return float(rate)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("FX rate fetch failed for %s, defaulting to 1.0: %s", currency, e)
         # Fallback: 1.0 (no conversion) — safest default when FX unavailable
         return 1.0

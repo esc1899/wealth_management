@@ -3,8 +3,11 @@ Settings — manage and AI-generate skills, model selection, empfehlung labels.
 """
 
 import asyncio
+import logging
 
 import streamlit as st
+
+logger = logging.getLogger(__name__)
 
 from config import config
 from core.health import Severity, check_ollama_connectivity, run_static_checks
@@ -268,8 +271,8 @@ def _get_ollama_model_list() -> list[str]:
         if resp.status_code == 200:
             data = resp.json()
             return [m["name"] for m in data.get("models", [])]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Ollama model discovery failed: %s", e)
     return []
 
 _ollama_models = _get_ollama_model_list()

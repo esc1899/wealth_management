@@ -4,10 +4,13 @@ All sensitive data is encrypted before storage and decrypted on retrieval.
 """
 
 import base64
+import logging
 import os
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
+
+logger = logging.getLogger(__name__)
 
 
 def derive_key(password: str, salt: bytes) -> bytes:
@@ -52,6 +55,9 @@ class PassthroughEncryptionService:
     No-op encryption service for demo mode.
     Values are stored and retrieved as plain strings — no encryption applied.
     """
+
+    def __init__(self):
+        logger.warning("DEMO_MODE: PassthroughEncryptionService active — all data stored unencrypted")
 
     def encrypt(self, plaintext: str) -> str:
         return plaintext

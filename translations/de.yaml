@@ -547,7 +547,7 @@ positionen:
   rebalance_excluded_help: "Position wird bewertet und in der Gesamtverteilung berücksichtigt, aber es werden keine Kauf-/Verkaufsempfehlungen gemacht."
 
 demo:
-  banner: "⚠️ Demo-Modus aktiv — keine echten Daten"
+  banner: "⚠️ Demo-Modus aktiv — Daten werden unverschlüsselt gespeichert"
 
 health:
   title: "System-Status"

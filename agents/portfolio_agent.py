@@ -3,8 +3,11 @@ Portfolio Agent — natural language interface for portfolio and watchlist manag
 """
 
 import json
+import logging
 from datetime import date
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from core.asset_class_config import get_asset_class_registry
 from core.llm.base import Message, Role
@@ -331,8 +334,8 @@ class PortfolioAgent:
                 records, _ = self._market_fetcher.fetch_current_prices([saved.ticker])
                 for rec in records:
                     self._market_repo.upsert_price(rec)
-            except Exception:
-                pass  # non-critical
+            except Exception as e:
+                logger.warning("Price fetch after add_position failed (non-critical): %s", e)
 
         return {
             "success": True,

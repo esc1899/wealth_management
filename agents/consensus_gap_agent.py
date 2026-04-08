@@ -120,10 +120,6 @@ class ConsensusGapAgent:
                     "consensus_gap: no verdicts parsed for batch %d. Full response:\n%s",
                     i, response.content
                 )
-                import os, tempfile
-                _dbg = os.path.join(tempfile.gettempdir(), "consensus_gap_debug.txt")
-                with open(_dbg, "a", encoding="utf-8") as _f:
-                    _f.write(f"\n=== BATCH {i} (no parse) ===\n{response.content}\n")
             all_results.extend(parsed)
 
             # Pause between batches to avoid rate limit

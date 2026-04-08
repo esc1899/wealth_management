@@ -542,7 +542,7 @@ positionen:
   rebalance_excluded_help: "Position is assessed and counted in the overall allocation, but no buy/sell recommendations will be made."
 
 demo:
-  banner: "⚠️ Demo Mode active — no real data"
+  banner: "⚠️ Demo Mode active — data is stored unencrypted"
 
 health:
   title: "System Status"
