@@ -268,6 +268,7 @@ def _show_detail(pos_id: int):
 
     st.divider()
     if st.button(t("positionen.close_button"), use_container_width=True):
+        _clear_detail()
         st.rerun()
 
 # ---------------------------------------------------------------------------
