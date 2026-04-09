@@ -219,6 +219,20 @@ def _show_detail(pos_id: int):
             f"**{t('positionen.bank')}:** {extra.get('bank', '—')}"
         )
 
+    # ── Anleihe extra fields ───────────────────────────────────────────────
+    if pos.asset_class == "Anleihe":
+        st.divider()
+        an_a, an_b = st.columns(2)
+        an_a.markdown(
+            f"**{t('positionen.interest_rate')}:** "
+            f"{extra.get('interest_rate', '—')} %"
+            if extra.get("interest_rate") else f"**{t('positionen.interest_rate')}:** —"
+        )
+        an_b.markdown(
+            f"**{t('positionen.maturity_date')}:** "
+            f"{extra.get('maturity_date', '—')}"
+        )
+
     # ── Manual valuation section (Immobilie, Grundstück) ────────────────────
     if cfg and cfg.manual_valuation:
         st.divider()
@@ -610,6 +624,26 @@ if _ss("_pos_show_form"):
                     t("positionen.bank"),
                     value=existing_extra.get("bank", ""),
                 )
+        elif selected_ac == "Anleihe":
+            st.markdown("---")
+            an_a, an_b = st.columns(2)
+            with an_a:
+                form_interest_rate = st.number_input(
+                    t("positionen.interest_rate"),
+                    min_value=0.0,
+                    max_value=100.0,
+                    step=0.1,
+                    format="%.2f",
+                    value=float(existing_extra.get("interest_rate", 0.0)),
+                )
+            with an_b:
+                maturity_raw = existing_extra.get("maturity_date")
+                form_maturity = st.date_input(
+                    t("positionen.maturity_date"),
+                    value=date.fromisoformat(maturity_raw) if maturity_raw else None,
+                    min_value=date.today(),
+                )
+            form_bank = None
         else:
             form_interest_rate = None
             form_maturity = None
@@ -654,6 +688,11 @@ if _ss("_pos_show_form"):
                     extra["maturity_date"] = form_maturity.isoformat()
                 if form_bank and form_bank.strip():
                     extra["bank"] = form_bank.strip()
+            elif selected_ac == "Anleihe":
+                if form_interest_rate:
+                    extra["interest_rate"] = form_interest_rate
+                if form_maturity:
+                    extra["maturity_date"] = form_maturity.isoformat()
 
             # Preserve existing estimated_value for manual valuation types
             # (updated via detail dialog, not the edit form)
@@ -797,4 +836,64 @@ st.divider()
 
 st.subheader(t("positionen.tab_watchlist"))
 _render_table(repo.get_watchlist(), "positionen.empty_watchlist", "wl")
+
+# ------------------------------------------------------------------
+# Dividends & Interest Income Overview
+# ------------------------------------------------------------------
+
+st.divider()
+st.subheader("📈 Erwartete Dividenden & Ausschüttungen (Jahresprognose, brutto)")
+
+_market_agent = get_market_agent()
+_valuations = _market_agent.get_portfolio_valuation(include_watchlist=False)
+
+# Filter to only portfolio positions with dividend data
+_div_valuations = [
+    v for v in _valuations
+    if v.annual_dividend_eur is not None and v.annual_dividend_eur > 0
+]
+
+if _div_valuations:
+    # Build table data
+    _div_data = []
+    for v in sorted(_div_valuations, key=lambda x: x.annual_dividend_eur or 0, reverse=True):
+        _div_data.append({
+            "Position": v.name,
+            "Klasse": v.asset_class,
+            "Yield": f"{(v.dividend_yield_pct or 0) * 100:.2f}%" if v.dividend_yield_pct else "—",
+            "Jährlich (€)": f"€{v.annual_dividend_eur:,.0f}" if v.annual_dividend_eur else "—",
+        })
+
+    import pandas as pd
+    _df_div = pd.DataFrame(_div_data)
+    st.dataframe(_df_div, use_container_width=True, hide_index=True)
+
+    # Total
+    _total_div = sum(v.annual_dividend_eur for v in _div_valuations if v.annual_dividend_eur)
+    st.markdown(f"**Gesamtportfolio: €{_total_div:,.0f}/Jahr**")
+
+    # Fetch button
+    col_fetch, col_info = st.columns([1, 4])
+    with col_fetch:
+        if st.button("🔄 Dividenden aktualisieren", use_container_width=True):
+            with st.spinner("Fetching dividend data..."):
+                errors = _market_agent.fetch_dividends_now()
+                if errors:
+                    st.warning(f"Fehler bei {len(errors)} Symbolen: {', '.join(errors.keys())[:100]}")
+                else:
+                    st.success("Dividend data updated successfully")
+                st.rerun()
+
+    # Last fetch info
+    _div_records = get_market_repo().get_all_dividends()
+    if _div_records:
+        _latest_fetch = max(
+            (r.fetched_at for r in _div_records.values() if r.fetched_at),
+            default=None
+        )
+        if _latest_fetch:
+            with col_info:
+                st.caption(f"Zuletzt aktualisiert: {_latest_fetch.strftime('%d.%m.%Y %H:%M')} UTC")
+else:
+    st.info("Keine Positionen mit Dividendendaten. Klicken Sie auf 'Dividenden aktualisieren', um Daten zu laden.")
 

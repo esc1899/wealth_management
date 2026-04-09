@@ -13,7 +13,7 @@ from typing import Optional
 import yfinance as yf
 import pandas as pd
 
-from core.storage.models import HistoricalPrice, PriceRecord
+from core.storage.models import DividendRecord, HistoricalPrice, PriceRecord
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +129,56 @@ class MarketDataFetcher:
             return records
         except Exception:
             return []
+
+    def fetch_dividend(self, symbol: str) -> Optional[DividendRecord]:
+        """
+        Fetch forward annual dividend rate and yield via ticker.info (slow path).
+        Returns None if no dividend data or fetch fails.
+        Note: This is a heavier call than price fetches, so use sparingly.
+        """
+        symbol = symbol.upper().strip()
+        if not validate_symbol(symbol):
+            return None
+
+        try:
+            self._rate_limiter.wait()
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+
+            # Extract dividend data from info
+            rate_native = info.get("trailingAnnualDividendRate")
+            yield_pct = info.get("trailingAnnualDividendYield")
+            currency = info.get("currency", "USD").upper()
+
+            # If no dividend data, return None (not an error — many stocks don't pay dividends)
+            if rate_native is None or rate_native <= 0:
+                return DividendRecord(
+                    symbol=symbol,
+                    rate_eur=None,
+                    yield_pct=None,
+                    currency=currency,
+                    fetched_at=datetime.now(timezone.utc),
+                )
+
+            # GBp handling for UK pence-traded stocks
+            if currency == "GBp":
+                rate_native = rate_native / 100
+                currency = "GBP"
+
+            # Convert to EUR
+            eur_rate = self._get_eur_rate(currency)
+            rate_eur = rate_native * eur_rate
+
+            return DividendRecord(
+                symbol=symbol,
+                rate_eur=round(rate_eur, 6),
+                yield_pct=round(yield_pct, 6) if yield_pct else None,
+                currency=currency,
+                fetched_at=datetime.now(timezone.utc),
+            )
+        except Exception as e:
+            logger.warning("Failed to fetch dividend for %s: %s", symbol, e)
+            return None
 
     # ------------------------------------------------------------------
     # Internal helpers

@@ -144,6 +144,11 @@ asset_classes:
       - Staatsanleihe
       - Unternehmensanleihe
       - Pfandbrief
+    extra_fields:
+      - interest_rate
+      - maturity_date
+      - estimated_value
+      - valuation_date
     visible_fields:
       - isin
       - wkn

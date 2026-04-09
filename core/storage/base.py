@@ -261,6 +261,13 @@ def init_db(conn: sqlite3.Connection) -> None:
             last_run    TEXT,
             created_at  TEXT NOT NULL DEFAULT (datetime('now'))
         )""",
+        """CREATE TABLE IF NOT EXISTS dividend_data (
+            symbol      TEXT NOT NULL PRIMARY KEY,
+            rate_eur    REAL,
+            yield_pct   REAL,
+            currency    TEXT,
+            fetched_at  TEXT NOT NULL
+        )""",
     ]:
         conn.execute(stmt)
     conn.commit()
@@ -322,6 +329,15 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     existing_bm = {row[1] for row in conn.execute("PRAGMA table_info(benchmark_runs)")}
     if "duration_ms" not in existing_bm:
         conn.execute("ALTER TABLE benchmark_runs ADD COLUMN duration_ms INTEGER")
+
+    # Create dividend_data table if it doesn't exist
+    conn.execute("""CREATE TABLE IF NOT EXISTS dividend_data (
+        symbol      TEXT NOT NULL PRIMARY KEY,
+        rate_eur    REAL,
+        yield_pct   REAL,
+        currency    TEXT,
+        fetched_at  TEXT NOT NULL
+    )""")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_benchmark_runs_scenario ON benchmark_runs(scenario_name)")
     conn.commit()
 

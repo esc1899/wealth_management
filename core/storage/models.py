@@ -123,6 +123,28 @@ class HistoricalPrice(BaseModel):
         return v
 
 
+class DividendRecord(BaseModel):
+    """Annual dividend rate and yield for a symbol — not encrypted (public data)."""
+
+    symbol: str
+    rate_eur: Optional[float] = None      # Forward annual dividend per share in EUR
+    yield_pct: Optional[float] = None     # Forward yield as decimal (0.015 = 1.5%)
+    currency: Optional[str] = None        # Native ticker currency
+    fetched_at: datetime
+
+    @field_validator("symbol")
+    @classmethod
+    def symbol_uppercase(cls, v: str) -> str:
+        return v.upper().strip()
+
+    @field_validator("rate_eur", "yield_pct")
+    @classmethod
+    def non_negative(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v < 0:
+            raise ValueError("Must be zero or greater")
+        return v
+
+
 # ---------------------------------------------------------------------------
 # New unified model — replaces PortfolioEntry + WatchlistEntry
 # ---------------------------------------------------------------------------

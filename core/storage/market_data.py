@@ -7,7 +7,7 @@ import sqlite3
 from datetime import date, datetime
 from typing import Optional
 
-from core.storage.models import HistoricalPrice, PriceRecord
+from core.storage.models import DividendRecord, HistoricalPrice, PriceRecord
 
 
 class MarketDataRepository:
@@ -133,6 +133,47 @@ class MarketDataRepository:
         return result
 
     # ------------------------------------------------------------------
+    # Dividend data
+    # ------------------------------------------------------------------
+
+    def upsert_dividend(self, record: DividendRecord) -> DividendRecord:
+        """Insert or replace dividend data for a symbol."""
+        cursor = self._conn.execute(
+            """
+            INSERT INTO dividend_data (symbol, rate_eur, yield_pct, currency, fetched_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(symbol) DO UPDATE SET
+                rate_eur  = excluded.rate_eur,
+                yield_pct = excluded.yield_pct,
+                currency  = excluded.currency,
+                fetched_at = excluded.fetched_at
+            """,
+            (
+                record.symbol,
+                record.rate_eur,
+                record.yield_pct,
+                record.currency,
+                record.fetched_at.isoformat(),
+            ),
+        )
+        self._conn.commit()
+        return record
+
+    def get_dividend(self, symbol: str) -> Optional[DividendRecord]:
+        """Get dividend data for a single symbol."""
+        row = self._conn.execute(
+            "SELECT * FROM dividend_data WHERE symbol = ?", (symbol.upper(),)
+        ).fetchone()
+        return self._deserialize_dividend(row) if row else None
+
+    def get_all_dividends(self) -> dict[str, DividendRecord]:
+        """Get all dividend data, keyed by symbol."""
+        rows = self._conn.execute(
+            "SELECT * FROM dividend_data ORDER BY symbol"
+        ).fetchall()
+        return {row["symbol"]: self._deserialize_dividend(row) for row in rows}
+
+    # ------------------------------------------------------------------
     # Deserializers
     # ------------------------------------------------------------------
 
@@ -154,4 +195,13 @@ class MarketDataRepository:
             date=date.fromisoformat(row["date"]),
             close_eur=row["close_eur"],
             volume=row["volume"],
+        )
+
+    def _deserialize_dividend(self, row: sqlite3.Row) -> DividendRecord:
+        return DividendRecord(
+            symbol=row["symbol"],
+            rate_eur=row["rate_eur"],
+            yield_pct=row["yield_pct"],
+            currency=row["currency"],
+            fetched_at=datetime.fromisoformat(row["fetched_at"]),
         )

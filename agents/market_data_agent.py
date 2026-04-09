@@ -49,6 +49,9 @@ class PortfolioValuation:
     day_pnl_pct: Optional[float] = None
     in_portfolio: bool = True
     in_watchlist: bool = False
+    annual_dividend_eur: Optional[float] = None  # calculated: rate_eur × quantity
+    dividend_yield_pct: Optional[float] = None   # from dividend_data or extra_data
+    dividend_source: Optional[str] = None        # "yfinance", "festgeld", "anleihe", None
 
 
 class MarketDataAgent:
@@ -103,6 +106,36 @@ class MarketDataAgent:
 
         return result
 
+    def fetch_dividends_now(self, symbols: Optional[list[str]] = None) -> dict[str, str]:
+        """
+        Fetch dividend data for given symbols (or all auto-fetch symbols if None).
+        Returns {symbol: error_message} for failures, empty dict if all successful.
+        """
+        if symbols is None:
+            # Fetch for all auto-fetch asset classes
+            registry = get_asset_class_registry()
+            auto_fetch_classes = set(registry.auto_fetch_names())
+
+            all_positions = self._positions.get_portfolio() + self._positions.get_watchlist()
+            symbols = list({
+                p.ticker.upper()
+                for p in all_positions
+                if p.ticker and p.asset_class in auto_fetch_classes
+            })
+
+        errors = {}
+        for symbol in symbols:
+            try:
+                dividend_record = self._fetcher.fetch_dividend(symbol)
+                if dividend_record:
+                    self._market.upsert_dividend(dividend_record)
+                else:
+                    errors[symbol] = "No dividend data returned"
+            except Exception as e:
+                errors[symbol] = str(e)
+
+        return errors
+
     # ------------------------------------------------------------------
     # Portfolio valuation
     # ------------------------------------------------------------------
@@ -115,10 +148,16 @@ class MarketDataAgent:
         valuations = []
 
         registry = get_asset_class_registry()
+        dividend_records = self._market.get_all_dividends()
 
         for pos in positions:
             cfg = registry.get(pos.asset_class)
             is_auto_fetch = cfg.auto_fetch if cfg else True
+
+            # Initialize dividend fields
+            annual_dividend_eur = None
+            dividend_yield_pct = None
+            dividend_source = None
 
             if not is_auto_fetch:
                 # Manual valuation: use estimated_value from extra_data, or cost basis
@@ -158,6 +197,18 @@ class MarketDataAgent:
                     else None
                 )
 
+                # Calculate dividends for Festgeld + Anleihe from interest_rate
+                if pos.asset_class in {"Festgeld", "Anleihe"} and extra:
+                    rate = extra.get("interest_rate")
+                    if rate is not None and current_value is not None:
+                        try:
+                            rate_float = float(rate)
+                            annual_dividend_eur = current_value * rate_float / 100
+                            dividend_yield_pct = rate_float / 100
+                            dividend_source = "festgeld" if pos.asset_class == "Festgeld" else "anleihe"
+                        except (ValueError, TypeError):
+                            pass
+
                 valuations.append(PortfolioValuation(
                     symbol=pos.ticker or pos.name[:10],
                     name=pos.name,
@@ -174,6 +225,9 @@ class MarketDataAgent:
                     fetched_at=None,
                     in_portfolio=pos.in_portfolio,
                     in_watchlist=pos.in_watchlist,
+                    annual_dividend_eur=annual_dividend_eur,
+                    dividend_yield_pct=dividend_yield_pct,
+                    dividend_source=dividend_source,
                 ))
                 continue
 
@@ -210,6 +264,14 @@ class MarketDataAgent:
                 day_pnl_eur = None
                 day_pnl_pct = None
 
+            # Calculate dividends from yfinance dividend data
+            if pos.ticker in dividend_records:
+                div_record = dividend_records[pos.ticker]
+                if div_record.rate_eur is not None and pos.quantity is not None:
+                    annual_dividend_eur = div_record.rate_eur * pos.quantity
+                    dividend_yield_pct = div_record.yield_pct
+                    dividend_source = "yfinance"
+
             valuations.append(PortfolioValuation(
                 symbol=pos.ticker,
                 name=pos.name,
@@ -228,6 +290,9 @@ class MarketDataAgent:
                 day_pnl_pct=day_pnl_pct,
                 in_portfolio=pos.in_portfolio,
                 in_watchlist=pos.in_watchlist,
+                annual_dividend_eur=annual_dividend_eur,
+                dividend_yield_pct=dividend_yield_pct,
+                dividend_source=dividend_source,
             ))
 
         return valuations
