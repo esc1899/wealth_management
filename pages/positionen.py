@@ -649,6 +649,19 @@ if _ss("_pos_show_form"):
             form_maturity = None
             form_bank = None
 
+        # ── Dividend Yield Override (all asset classes) ────────────────────────
+        st.markdown("---")
+        st.markdown("#### 📊 Dividende / Zinssatz (manueller Override)")
+        form_dividend_override = st.number_input(
+            "Jährlicher Zinssatz / Dividendenrendite (%)",
+            min_value=0.0,
+            max_value=100.0,
+            step=0.1,
+            format="%.2f",
+            value=float(existing_extra.get("dividend_yield_override", 0.0)),
+            help="Wenn > 0: nutze diesen Wert statt yfinance-Daten oder berechneter Werte. Z.B. 3.5 für 3,5%",
+        )
+
         # ── Save / Cancel ──────────────────────────────────────────────────────
         col_save, col_cancel = st.columns([1, 5])
         with col_save:
@@ -693,6 +706,12 @@ if _ss("_pos_show_form"):
                     extra["interest_rate"] = form_interest_rate
                 if form_maturity:
                     extra["maturity_date"] = form_maturity.isoformat()
+
+            # Dividend yield override (all asset classes)
+            if form_dividend_override and form_dividend_override > 0:
+                extra["dividend_yield_override"] = form_dividend_override
+            elif "dividend_yield_override" in extra:
+                del extra["dividend_yield_override"]
 
             # Preserve existing estimated_value for manual valuation types
             # (updated via detail dialog, not the edit form)
@@ -871,29 +890,29 @@ if _div_valuations:
     # Total
     _total_div = sum(v.annual_dividend_eur for v in _div_valuations if v.annual_dividend_eur)
     st.markdown(f"**Gesamtportfolio: €{_total_div:,.0f}/Jahr**")
-
-    # Fetch button
-    col_fetch, col_info = st.columns([1, 4])
-    with col_fetch:
-        if st.button("🔄 Dividenden aktualisieren", use_container_width=True):
-            with st.spinner("Fetching dividend data..."):
-                errors = _market_agent.fetch_dividends_now()
-                if errors:
-                    st.warning(f"Fehler bei {len(errors)} Symbolen: {', '.join(errors.keys())[:100]}")
-                else:
-                    st.success("Dividend data updated successfully")
-                st.rerun()
-
-    # Last fetch info
-    _div_records = get_market_repo().get_all_dividends()
-    if _div_records:
-        _latest_fetch = max(
-            (r.fetched_at for r in _div_records.values() if r.fetched_at),
-            default=None
-        )
-        if _latest_fetch:
-            with col_info:
-                st.caption(f"Zuletzt aktualisiert: {_latest_fetch.strftime('%d.%m.%Y %H:%M')} UTC")
 else:
     st.info("Keine Positionen mit Dividendendaten. Klicken Sie auf 'Dividenden aktualisieren', um Daten zu laden.")
+
+# Fetch button (always visible)
+col_fetch, col_info = st.columns([1, 4])
+with col_fetch:
+    if st.button("🔄 Dividenden aktualisieren", use_container_width=True):
+        with st.spinner("Fetching dividend data..."):
+            errors = _market_agent.fetch_dividends_now()
+            if errors:
+                st.warning(f"Fehler bei {len(errors)} Symbolen: {', '.join(errors.keys())[:100]}")
+            else:
+                st.success("Dividend data updated successfully")
+            st.rerun()
+
+# Last fetch info
+_div_records = get_market_repo().get_all_dividends()
+if _div_records:
+    _latest_fetch = max(
+        (r.fetched_at for r in _div_records.values() if r.fetched_at),
+        default=None
+    )
+    if _latest_fetch:
+        with col_info:
+            st.caption(f"Zuletzt aktualisiert: {_latest_fetch.strftime('%d.%m.%Y %H:%M')} UTC")
 

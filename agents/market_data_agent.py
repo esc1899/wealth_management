@@ -197,8 +197,17 @@ class MarketDataAgent:
                     else None
                 )
 
-                # Calculate dividends for Festgeld + Anleihe from interest_rate
-                if pos.asset_class in {"Festgeld", "Anleihe"} and extra:
+                # Calculate dividends: override > interest_rate for Festgeld/Anleihe
+                override_yield = extra.get("dividend_yield_override") if extra else None
+                if override_yield is not None and current_value is not None:
+                    try:
+                        rate_float = float(override_yield)
+                        annual_dividend_eur = current_value * rate_float / 100
+                        dividend_yield_pct = rate_float / 100
+                        dividend_source = "override"
+                    except (ValueError, TypeError):
+                        pass
+                elif pos.asset_class in {"Festgeld", "Anleihe"} and extra:
                     rate = extra.get("interest_rate")
                     if rate is not None and current_value is not None:
                         try:
@@ -264,8 +273,18 @@ class MarketDataAgent:
                 day_pnl_eur = None
                 day_pnl_pct = None
 
-            # Calculate dividends from yfinance dividend data
-            if pos.ticker in dividend_records:
+            # Calculate dividends: override > yfinance
+            extra = pos.extra_data or {}
+            override_yield = extra.get("dividend_yield_override")
+            if override_yield is not None and current_value is not None:
+                try:
+                    rate_float = float(override_yield)
+                    annual_dividend_eur = current_value * rate_float / 100
+                    dividend_yield_pct = rate_float / 100
+                    dividend_source = "override"
+                except (ValueError, TypeError):
+                    pass
+            elif pos.ticker in dividend_records:
                 div_record = dividend_records[pos.ticker]
                 if div_record.rate_eur is not None and pos.quantity is not None:
                     annual_dividend_eur = div_record.rate_eur * pos.quantity
