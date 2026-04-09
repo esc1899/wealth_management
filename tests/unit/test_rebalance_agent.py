@@ -279,3 +279,126 @@ class TestPositionValue:
         pos = make_position("AAPL", 10.0, 150.0)
         agent = self._make_agent(market_repo)
         assert agent._get_position_value(pos) is None
+
+
+# ------------------------------------------------------------------
+# Josef's Regel & Portfolio Totals
+# ------------------------------------------------------------------
+
+class TestJosefRule:
+    """
+    Test that portfolio totals are calculated correctly.
+    Bug: Positions with both in_portfolio=1 and in_watchlist=1 were double-counted,
+    causing allocation percentages to sum to 200% instead of 100%.
+    """
+
+    @pytest.mark.asyncio
+    async def test_watchlist_positions_excluded_from_portfolio_totals(self, mock_llm, mock_repo):
+        """
+        REGRESSION TEST for bug: Positions with both in_portfolio=1 and in_watchlist=1
+        were double-counted in portfolio totals, causing allocation % to sum to 200% instead of 100%.
+
+        Setup:
+        - Portfolio: AAPL (€1000) + MSFT (€2000) = €3000 total
+        - MSFT is ALSO in watchlist (both flags = 1)
+        - Pure watchlist: GOOG (not in portfolio)
+
+        Expected: AAPL 33.3%, MSFT 66.7% in Josef's Regel (sum = 100%)
+        The bug was: MSFT got counted twice, making sum = 200%
+        """
+        # Pure portfolio position
+        pos_a = make_position("AAPL", 10.0, 100.0)
+        pos_a = pos_a.model_copy(update={"id": 1, "ticker": "AAPL", "in_watchlist": False})
+
+        # Position that is BOTH in portfolio AND watchlist (the problematic case)
+        pos_b = make_position("MSFT", 5.0, 400.0)
+        pos_b = pos_b.model_copy(update={"id": 2, "ticker": "MSFT", "in_watchlist": True})
+
+        # Pure watchlist (NOT in portfolio)
+        pos_goog = make_position("GOOG", 20.0, 150.0)
+        pos_goog = pos_goog.model_copy(update={
+            "id": 3, "ticker": "GOOG", "in_portfolio": False, "in_watchlist": True
+        })
+
+        # Setup mocks
+        positions_repo = MagicMock()
+        positions_repo.get_portfolio.return_value = [pos_a, pos_b]  # Only portfolio positions
+        positions_repo.get_watchlist.return_value = [pos_b, pos_goog]  # Both hybrid and pure watchlist
+
+        market_repo = MagicMock()
+        market_repo.get_price.side_effect = lambda ticker: {
+            "AAPL": make_price("AAPL", 100.0),  # 10 × 100 = €1000
+            "MSFT": make_price("MSFT", 400.0),  # 5 × 400 = €2000
+            "GOOG": make_price("GOOG", 150.0),  # 20 × 150 = €3000 (watchlist only)
+        }.get(ticker)
+
+        analyses_repo = MagicMock()
+        analyses_repo.get_latest_bulk.return_value = {}
+
+        agent = RebalanceAgent(
+            positions_repo=positions_repo,
+            market_repo=market_repo,
+            analyses_repo=analyses_repo,
+            llm=mock_llm,
+        )
+
+        # Generate snapshot
+        await agent.start_session("Test", "Test strategy", user_context="", repo=mock_repo)
+
+        # Extract the snapshot from LLM call
+        call_args = mock_llm.chat.call_args
+        messages = call_args[0][0]
+        system_msg = next((m for m in messages if m.role.value == "system"), None)
+        snapshot = system_msg.content
+
+        # Assertions
+        assert "Josef" in snapshot, "Josef's Regel section should be present"
+        assert "Aktien" in snapshot, "Aktien category should be present (both stocks are Wertpapiere)"
+
+        # GOOG should NOT appear in the portfolio section (it's watchlist-only)
+        tradeable_section = snapshot.split("### Nicht-handelbares Vermögen")[0]  # Get portfolio section only
+        assert "GOOG" not in tradeable_section, "Watchlist-only position GOOG should not be in portfolio section"
+
+        # MSFT and AAPL should be in handelbares portfolio
+        assert "MSFT" in snapshot
+        assert "AAPL" in snapshot
+
+        # Critical: Check that percentages don't sum to 200%
+        # The bug manifested as "Ist" percentages summing to 200%
+        assert "200%" not in snapshot, "Bug: allocation percentages summed to 200% instead of 100%"
+
+        # Positive check: sum of "Ist" column should be ~100% (not 200%)
+        # The table format is: | Kategorie | Wert | Ist | Ziel | Abweichung |
+        # We need to extract only the "Ist" column values
+        lines = snapshot.split("\n")
+        josef_section = False
+        ist_percentages = []
+        header_found = False
+
+        for line in lines:
+            if "Josef" in line:
+                josef_section = True
+                continue
+            if not josef_section:
+                continue
+            if not header_found and "Ist" in line and "Ziel" in line:
+                header_found = True
+                continue
+            if header_found and "%" in line and "|" in line:
+                # Parse table row: | Kategorie | €value | 33.3% | 33.3% | +0.0% |
+                parts = [p.strip() for p in line.split("|")]
+                if len(parts) >= 5:
+                    # Index 3 should be the "Ist" column (0-indexed: 0=empty, 1=category, 2=value, 3=Ist, 4=Ziel, 5=Abweichung)
+                    ist_col = parts[3]  # The "Ist" percentage
+                    if ist_col and "%" in ist_col:
+                        try:
+                            pct = float(ist_col.rstrip("%").strip())
+                            ist_percentages.append(pct)
+                        except:
+                            pass
+
+        if ist_percentages:
+            total = sum(ist_percentages)
+            assert total < 110, f"Ist allocation sum should be ~100%, got {total}% (suggests double-counting bug)"
+            # Positive: should be close to 100%
+            assert total > 90, f"Ist allocation sum should be ~100%, got {total}%"

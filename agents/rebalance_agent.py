@@ -237,21 +237,34 @@ class RebalanceAgent:
           2. Non-tradeable wealth (for context only)
           3. Josef's Regel — actual vs. 1/3 target per category
           4. Buy candidates (watchlist positions with story)
+
+        Note: Positions that are both in_portfolio and in_watchlist are included
+        in the portfolio analysis (since get_portfolio() returns them), but this
+        is a data consistency issue — ideally, each position should be either
+        portfolio OR watchlist, not both.
         """
-        all_ids = [p.id for p in positions if p.id]
-        watchlist_ids = [w.id for w in watchlist if w.id]
+        # Filter out pure watchlist positions (in_watchlist=True but in_portfolio=False)
+        # to ensure watchlist-only entries don't get counted in portfolio totals.
+        # Portfolio positions can have in_watchlist=True, but that's a data anomaly
+        # we tolerate here; the real fix is at the data layer.
+        watchlist_ids = {w.id for w in watchlist if w.id and not w.in_portfolio}
+
+        # Use only positions that are actually in the portfolio
+        portfolio_positions = [p for p in positions if p.in_portfolio]
+
+        all_ids = [p.id for p in portfolio_positions if p.id]
 
         verdicts    = self._analyses.get_latest_bulk(all_ids, "storychecker")
         fund_v      = self._analyses.get_latest_bulk(all_ids, "fundamental")
         gap_v       = self._analyses.get_latest_bulk(all_ids, "consensus_gap")
-        fund_v_wl   = self._analyses.get_latest_bulk(watchlist_ids, "fundamental")
-        gap_v_wl    = self._analyses.get_latest_bulk(watchlist_ids, "consensus_gap")
-        story_v_wl  = self._analyses.get_latest_bulk(watchlist_ids, "storychecker")
+        fund_v_wl   = self._analyses.get_latest_bulk([w.id for w in watchlist if w.id], "fundamental")
+        gap_v_wl    = self._analyses.get_latest_bulk([w.id for w in watchlist if w.id], "consensus_gap")
+        story_v_wl  = self._analyses.get_latest_bulk([w.id for w in watchlist if w.id], "storychecker")
 
         # Separate tradeable vs non-tradeable
         tradeable: list[Position] = []
         non_tradeable: list[Position] = []
-        for pos in positions:
+        for pos in portfolio_positions:
             if pos.asset_class in _NON_TRADEABLE_CLASSES:
                 non_tradeable.append(pos)
             else:
@@ -371,7 +384,8 @@ class RebalanceAgent:
         # Aktien: 1/3, Renten/Geld: 1/3, Rohstoffe + Immobilien together: 1/3
         lines.append("\n### Josef's Regel — Ist-Verteilung vs. Ziel (je 1/3 = 33,3%)")
         josef_totals: dict[str, float] = {"Aktien": 0.0, "Renten/Geld": 0.0, "Rohstoffe": 0.0, "Immobilien": 0.0}
-        for pos in positions:
+        # Use portfolio_positions (not original 'positions') to avoid double-counting watchlist positions
+        for pos in portfolio_positions:
             value = (
                 tradeable_values.get(pos.id)
                 if pos.id in tradeable_values
@@ -412,7 +426,7 @@ class RebalanceAgent:
 
         # ── Section 4: Watchlist buy candidates ───────────────────────
         # Only show watchlist positions that are NOT already in the portfolio section
-        portfolio_ids = {p.id for p in positions if p.id}
+        portfolio_ids = {p.id for p in portfolio_positions if p.id}
         candidates = [
             w for w in watchlist
             if w.id not in portfolio_ids and w.story
