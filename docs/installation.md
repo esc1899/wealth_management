@@ -5,7 +5,6 @@
 - Python 3.9 or higher
 - [Ollama](https://ollama.com) installed and running locally
 - An [Anthropic API key](https://console.anthropic.com) — required for Research Chat, News Digest, and Investment Search
-  - Alternatively: a corporate LLM proxy that exposes an Anthropic-compatible API
 
 ---
 
@@ -52,14 +51,10 @@ strictly required for full functionality.
 ENCRYPTION_KEY=your_fernet_key_here
 ```
 
-### Claude API (choose one)
+### Claude API
 
 ```env
-# Option A: direct Anthropic API key
 ANTHROPIC_API_KEY=sk-ant-...
-
-# Option B: corporate LLM proxy (leave ANTHROPIC_API_KEY unset)
-ANTHROPIC_BASE_URL=https://your-llm-proxy.example.com
 ```
 
 ### Ollama
@@ -100,7 +95,6 @@ to keep machine-specific overrides separate from your shared base config.
 
 ```env
 # .env.work
-ANTHROPIC_BASE_URL=https://corp-proxy.example.com
 OLLAMA_HOST=http://workstation.local:11434
 DB_PATH=data/work.db
 ```
@@ -212,7 +206,7 @@ streamlit run app.py              # migration runs automatically on startup
 → Check Settings → System Status for a connectivity check.
 
 **Research / News / Search Chat fails with API error**
-→ Check that `ANTHROPIC_API_KEY` or `ANTHROPIC_BASE_URL` is set in `.env`.
+→ Check that `ANTHROPIC_API_KEY` is set in `.env`.
 
 **Prices not updating**
 → Click **Refresh Now** on the Market Data page. Check that tickers are valid yfinance symbols.

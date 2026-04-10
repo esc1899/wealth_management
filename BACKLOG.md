@@ -188,8 +188,8 @@ FIGI Apply setzte nur `_pos_ticker`, nicht `_pos_name`. Fix: `chosen["name"]` �
 #### [P2] [IMPR] Seed example skills in all environments
 `config/default_skills.yaml` covers all areas.
 
-#### [P1] [FEAT] Multi-environment setup & proxy LLM support
-`ENV_PROFILE=work`, `ANTHROPIC_BASE_URL` für Corporate Proxy.
+#### [P1] [FEAT] Multi-environment setup
+`ENV_PROFILE=work` for machine-specific overrides (OLLAMA_HOST, DB_PATH, etc.)
 
 #### [P2] [FEAT] News Agent (Cloud ☁️)
 `NewsAgent` — stateless, one-shot digest per run.

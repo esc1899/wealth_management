@@ -132,8 +132,7 @@ Copy `.env.example` to `.env` and fill in your values.
 | Variable | Required | Description |
 |---|---|---|
 | `ENCRYPTION_KEY` | Yes | Fernet key — generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
-| `ANTHROPIC_API_KEY` | See below | Direct Anthropic API key (for Research Chat, News Digest, Investment Search) |
-| `ANTHROPIC_BASE_URL` | See below | LLM proxy URL — use instead of `ANTHROPIC_API_KEY` |
+| `ANTHROPIC_API_KEY` | Yes* | Anthropic API key (for Research Chat, News Digest, Investment Search, Story Checker, Structural Change Scanner, Consensus Gap Analysis, Fundamental Value) |
 | `OLLAMA_HOST` | Optional | Default: `http://localhost:11434` |
 | `OLLAMA_MODEL` | Optional | Default model for Portfolio Chat and Rebalance (overridable in Settings UI) |
 | `TAVILY_API_KEY` | Optional | Tavily search — replaces Anthropic's built-in web_search when set. Free tier: 1000 searches/month |
@@ -143,17 +142,9 @@ Copy `.env.example` to `.env` and fill in your values.
 | `DB_PATH` | Optional | Default: `data/portfolio.db` |
 | `MARKET_DATA_FETCH_HOUR` | Optional | Hour (0–23) for automatic price refresh, default `18` |
 
-At least one of `ANTHROPIC_API_KEY` or `ANTHROPIC_BASE_URL` is required to use Research Chat, News Digest, Investment Search, Story Checker, Structural Change Scanner, Consensus Gap Analysis, or Fundamental Value.
+*`ANTHROPIC_API_KEY` is required to use Research Chat, News Digest, Investment Search, Story Checker, Structural Change Scanner, Consensus Gap Analysis, or Fundamental Value.
 
 **Note on model choice:** Claude Sonnet (or better) is required for agents that use `web_search` (Structural Change Scanner, Consensus Gap, Fundamental Value). Claude Haiku works for Research Chat, News Digest, and Story Checker.
-
-### LLM Proxy (corporate environments)
-
-```env
-ANTHROPIC_BASE_URL=https://your-llm-proxy.example.com
-```
-
-The proxy must expose an Anthropic-compatible API.
 
 ### Multi-Environment Setup
 
@@ -161,7 +152,6 @@ Use environment profiles to maintain separate configs for different machines:
 
 ```bash
 # .env.work — only the values that differ
-ANTHROPIC_BASE_URL=https://corp-proxy.example.com
 OLLAMA_HOST=http://workstation.local:11434
 DB_PATH=data/work.db
 ```
