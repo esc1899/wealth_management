@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from core.currency import symbol
 from core.i18n import t
 from state import get_market_agent
 

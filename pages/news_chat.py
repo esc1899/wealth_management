@@ -18,7 +18,7 @@ news_repo = get_news_repo()
 positions_repo = get_positions_repo()
 
 portfolio = positions_repo.get_portfolio()
-_NEWS_ASSET_CLASSES = {"Wertpapiere", "Kryptowährung"}  # only asset classes with company/project news
+_NEWS_ASSET_CLASSES = {"Aktie", "Aktienfonds", "Kryptowährung"}  # only asset classes with company/project news
 ticker_map: dict[str, str] = {
     p.ticker: p.name for p in portfolio
     if p.ticker and p.asset_class in _NEWS_ASSET_CLASSES

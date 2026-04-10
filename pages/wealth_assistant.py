@@ -5,6 +5,7 @@ Create, preview, edit, and delete wealth snapshots with asset class breakdown.
 
 from datetime import date
 import streamlit as st
+from core.currency import fmt, symbol
 from core.i18n import t
 from state import get_wealth_snapshot_agent
 

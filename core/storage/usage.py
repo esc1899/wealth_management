@@ -140,34 +140,105 @@ class UsageRepository:
             return 0.0
         return _compute_cost(rows["avg_in"], rows["avg_out"], model, model_prices)
 
+    def avg_cost_per_position(
+        self,
+        agent: str,
+        model: str,
+        skill: Optional[str],
+        model_prices: dict,
+    ) -> float:
+        """
+        Average cost PER POSITION for a specific agent/model/skill combination.
+
+        Assumes each call processes multiple positions (e.g., StorycheckerAgent checks 24 positions).
+        Divides total tokens by number of calls to get per-position cost.
+
+        Returns 0.0 if no data or insufficient calls to estimate.
+        """
+        skill_filter = "AND skill = ?" if skill else "AND skill IS NULL"
+        params: list = [agent, model]
+        if skill:
+            params.append(skill)
+
+        rows = self._conn.execute(
+            f"""SELECT COUNT(*) AS call_count,
+                      AVG(input_tokens) AS avg_in,
+                      AVG(output_tokens) AS avg_out
+               FROM llm_usage lu
+               WHERE agent = ? AND model = ? {skill_filter}
+                 AND {self._RESET_FILTER}""",
+            params,
+        ).fetchone()
+
+        if not rows or rows["avg_in"] is None or rows["call_count"] < 1:
+            return 0.0
+
+        # Cost per call, divided by position count (estimated as 20 if no data)
+        # This is a conservative estimate; will improve as more data accumulates
+        cost_per_call = _compute_cost(rows["avg_in"], rows["avg_out"], model, model_prices)
+
+        # Conservative: assume ~20 positions per call as baseline
+        # Real position count will be passed in monthly_estimate()
+        estimated_positions_per_call = 20
+        return cost_per_call / estimated_positions_per_call
+
     def monthly_estimate(
         self,
         scheduled_jobs: list,
         model_prices: dict,
+        positions_repo=None,
     ) -> list[dict]:
         """
-        Estimate monthly cost per scheduled job based on avg tokens/call.
+        Estimate monthly cost per scheduled job based on avg tokens per position.
 
         scheduled_jobs: list of ScheduledJob instances
         model_prices:   {"model_id": {"input": float, "output": float}}
+        positions_repo: PositionsRepository for counting relevant positions per job
 
         Returns list of dicts with agent, skill_name, model, calls_per_month, avg_cost, monthly_cost.
         """
         _CALLS_PER_MONTH = {"daily": 30.0, "weekly": 4.33, "monthly": 1.0}
         result = []
+
         for job in scheduled_jobs:
             if not job.enabled:
                 continue
+
             model = job.model or "claude-haiku-4-5-20251001"
             calls = _CALLS_PER_MONTH.get(job.frequency, 0.0)
-            avg = self.avg_cost_per_call(job.agent_name, model, job.skill_name, model_prices)
+
+            # Count relevant positions for this agent
+            position_count = 1  # fallback: treat as single call if no repo
+            if positions_repo:
+                all_positions = positions_repo.get_portfolio()
+                if job.agent_name == "storychecker":
+                    position_count = len([p for p in all_positions if p.story])
+                elif job.agent_name == "news_digest":
+                    # Positions with ticker and news-eligible asset classes
+                    position_count = len([
+                        p for p in all_positions
+                        if p.ticker and p.asset_class in {"Aktie", "Aktienfonds", "Kryptowährung"}
+                    ])
+                elif job.agent_name in {"consensus_gap", "fundamental"}:
+                    position_count = len(all_positions)
+                elif job.agent_name == "structural_scan":
+                    position_count = len(all_positions)
+
+            # Cost per position (not per call)
+            cost_per_position = self.avg_cost_per_position(
+                job.agent_name, model, job.skill_name, model_prices
+            )
+
+            # Monthly cost = calls × position_count × cost_per_position
+            monthly_total = round(calls * position_count * cost_per_position, 6)
+
             result.append({
                 "agent": job.agent_name,
                 "skill_name": job.skill_name,
                 "model": model,
                 "calls_per_month": calls,
-                "avg_cost_eur": avg,
-                "monthly_cost_eur": round(calls * avg, 6),
+                "avg_cost_eur": round(cost_per_position * position_count, 6),
+                "monthly_cost_eur": monthly_total,
             })
         return result
 

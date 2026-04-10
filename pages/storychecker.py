@@ -103,7 +103,7 @@ st.divider()
 # Layout: left control panel | right chat
 # ------------------------------------------------------------------
 
-col_left, col_right = st.columns([1, 2])
+col_left, col_right = st.columns([0.8, 2.2], gap="medium")
 
 # ------------------------------------------------------------------
 # Left: new check form + past sessions

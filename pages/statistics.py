@@ -9,7 +9,7 @@ import streamlit as st
 from core.cost_alert import check_alerts, get_period_costs
 from core.i18n import t
 from core.storage.usage import compute_cost
-from state import get_app_config_repo, get_scheduled_jobs_repo, get_usage_repo
+from state import get_app_config_repo, get_positions_repo, get_scheduled_jobs_repo, get_usage_repo
 
 st.set_page_config(page_title="Statistics", page_icon="📊", layout="wide")
 st.title(f"📊 {t('statistics.title')}")
@@ -17,6 +17,7 @@ st.caption(t("statistics.subtitle"))
 
 repo = get_usage_repo()
 config_repo = get_app_config_repo()
+positions_repo = get_positions_repo()
 model_prices = config_repo.get_model_prices()
 
 # ------------------------------------------------------------------
@@ -234,7 +235,7 @@ active_jobs = [j for j in all_jobs if j.enabled]
 if not active_jobs:
     st.info(t("statistics.monthly_no_jobs"))
 else:
-    monthly_rows = repo.monthly_estimate(active_jobs, model_prices)
+    monthly_rows = repo.monthly_estimate(active_jobs, model_prices, positions_repo)
     if monthly_rows:
         df_monthly = pd.DataFrame(monthly_rows)
         df_monthly = df_monthly.rename(columns={

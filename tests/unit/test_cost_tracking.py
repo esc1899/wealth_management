@@ -209,9 +209,18 @@ def test_monthly_estimate_with_data(usage_repo):
     job.skill_name = "Standard"
     job.model = "claude-haiku-4-5-20251001"
     job.frequency = "daily"
-    result = usage_repo.monthly_estimate([job], _PRICES)
+
+    # Mock positions_repo with 20 positions (news-eligible)
+    positions_repo = MagicMock()
+    pos = MagicMock()
+    pos.ticker = "TEST"
+    pos.asset_class = "Aktie"
+    positions_repo.get_portfolio.return_value = [pos] * 20
+
+    result = usage_repo.monthly_estimate([job], _PRICES, positions_repo)
     assert len(result) == 1
-    # avg cost = $0.80 per call, 30 calls/month = $24.00
+    # Cost per position = $0.80 / 20 = $0.04
+    # Monthly = 30 calls × 20 positions × $0.04 = $24.00
     assert result[0]["monthly_cost_eur"] == pytest.approx(24.00)
 
 
