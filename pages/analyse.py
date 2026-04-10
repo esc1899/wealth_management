@@ -75,7 +75,7 @@ if day_rows:
     df_day = pd.DataFrame(day_rows).sort_values(col_day_eur)
     total_day = df_day[col_day_eur].sum()
     total_sign = "+" if total_day >= 0 else ""
-    st.caption(f"**Gesamt heute: {total_sign}€{total_day:,.2f}**".replace(",", "X").replace(".", ",").replace("X", "."))
+    st.caption(f"**Gesamt heute: {total_sign}{symbol()}{total_day:,.2f}**".replace(",", "X").replace(".", ",").replace("X", "."))
 
     fig_day = px.bar(
         df_day, x="Symbol", y=col_day_eur,

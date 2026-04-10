@@ -181,7 +181,7 @@ def _show_detail(pos_id: int):
         col_e.markdown(f"**{t('positionen.col_quantity')}:** {_fmtnum(pos.quantity, 4).rstrip('0').rstrip(',')}")
         col_f.markdown(
             f"**{t('positionen.col_purchase_price')}:** "
-            f"{_fmtnum(pos.purchase_price)} €" if pos.purchase_price else f"**{t('positionen.col_purchase_price')}:** —"
+            f"{_fmtnum(pos.purchase_price)} {symbol()}" if pos.purchase_price else f"**{t('positionen.col_purchase_price')}:** —"
         )
 
     if pos.purchase_date:
@@ -912,7 +912,7 @@ if _div_valuations:
             "Position": v.name,
             "Klasse": v.asset_class,
             "Yield": f"{(v.dividend_yield_pct or 0) * 100:.2f}%" if v.dividend_yield_pct else "—",
-            "Jährlich (€)": f"€{v.annual_dividend_eur:,.0f}" if v.annual_dividend_eur else "—",
+            "Jährlich (€)": f"{symbol()}{v.annual_dividend_eur:,.0f}" if v.annual_dividend_eur else "—",
         })
 
     import pandas as pd

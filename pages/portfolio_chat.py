@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from config import config
+from core.currency import symbol
 from core.health import is_local_url
 from core.i18n import t
 from state import get_portfolio_agent, get_positions_repo
@@ -19,7 +20,7 @@ repo = get_positions_repo()
 
 st.caption(
     f"Modell: {agent._llm.model} · "
-    "Beispiele: 'Ich habe heute 10 SAP-Aktien für 185€ gekauft' · "
+    f"Beispiele: 'Ich habe heute 10 SAP-Aktien für 185{symbol()} gekauft' · "
     "'Zeig mein Portfolio' · 'Füge Tesla zur Watchlist hinzu'"
 )
 

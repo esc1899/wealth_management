@@ -23,6 +23,7 @@ from datetime import date
 from typing import Optional, Tuple
 
 from core.asset_class_config import get_asset_class_registry
+from core.currency import symbol
 from core.llm.base import Message, Role
 from core.llm.local import OllamaProvider
 from core.storage.analyses import PositionAnalysesRepository
@@ -300,11 +301,11 @@ class RebalanceAgent:
                 if value and tradeable_total > 0
                 else "n/a"
             )
-            purchase = f"€{pos.purchase_price:.2f}" if pos.purchase_price else "unknown"
+            purchase = f"{symbol()}{pos.purchase_price:.2f}" if pos.purchase_price else "unknown"
 
             price_record = self._market.get_price(pos.ticker) if pos.ticker else None
-            current_str = f"€{price_record.price_eur:.2f}" if price_record else "no price"
-            value_str = f"€{value:,.0f}" if value is not None else "n/a"
+            current_str = f"{symbol()}{price_record.price_eur:.2f}" if price_record else "no price"
+            value_str = f"{symbol()}{value:,.0f}" if value is not None else "n/a"
 
             if pos.quantity is not None:
                 qty = pos.quantity
@@ -352,14 +353,14 @@ class RebalanceAgent:
         if not has_tradeable_data:
             lines.append("*(keine handelbaren Positionen)*")
         if tradeable_total > 0:
-            lines.append(f"\n**Handelbares Vermögen gesamt: €{tradeable_total:,.0f}**")
+            lines.append(f"\n**Handelbares Vermögen gesamt: {symbol()}{tradeable_total:,.0f}**")
 
         # ── Section 2: Non-tradeable wealth ───────────────────────────
         lines.append("\n### Nicht-handelbares Vermögen (kein Rebalancing möglich)")
         non_tradeable_total = 0.0
         for pos in non_tradeable:
             value = non_tradeable_values.get(pos.id) if pos.id else None
-            value_str = f"€{value:,.0f}" if value is not None else "kein Wert"
+            value_str = f"{symbol()}{value:,.0f}" if value is not None else "kein Wert"
             if value:
                 non_tradeable_total += value
 
@@ -380,10 +381,10 @@ class RebalanceAgent:
             lines.append("*(keine nicht-handelbaren Positionen)*")
         if non_tradeable_total > 0:
             lines.append(
-                f"\n**Nicht-handelbares Vermögen gesamt: €{non_tradeable_total:,.0f}**"
+                f"\n**Nicht-handelbares Vermögen gesamt: {symbol()}{non_tradeable_total:,.0f}**"
             )
         if grand_total > 0:
-            lines.append(f"**Gesamtvermögen: €{grand_total:,.0f}**")
+            lines.append(f"**Gesamtvermögen: {symbol()}{grand_total:,.0f}**")
 
         # ── Section 3: Josef's Regel breakdown ────────────────────────
         # Aktien: 1/3, Renten/Geld: 1/3, Rohstoffe (Edelmetalle + Immobilien): 1/3
@@ -416,7 +417,7 @@ class RebalanceAgent:
                 delta = pct - 33.33
                 delta_str = f"+{delta:.1f}%" if delta >= 0 else f"{delta:.1f}%"
                 lines.append(
-                    f"| {cat:<22} | €{total:>10,.0f} | {pct:>5.1f}% | 33.3% | {delta_str:>10} |"
+                    f"| {cat:<22} | {symbol()}{total:>10,.0f} | {pct:>5.1f}% | 33.3% | {delta_str:>10} |"
                 )
             # Rohstoffe + Immobilien combined (together = 1/3)
             # (Immobilien is already mapped to "Rohstoffe" category)
@@ -425,7 +426,7 @@ class RebalanceAgent:
             delta = pct - 33.33
             delta_str = f"+{delta:.1f}%" if delta >= 0 else f"{delta:.1f}%"
             lines.append(
-                f"| Rohstoffe + Immobilien | €{raw:>10,.0f} | {pct:>5.1f}% | 33.3% | {delta_str:>10} |"
+                f"| Rohstoffe + Immobilien | {symbol()}{raw:>10,.0f} | {pct:>5.1f}% | 33.3% | {delta_str:>10} |"
             )
         else:
             lines.append("*(kein Vermögen mit Wertangabe — Kursdaten oder Schätzwerte fehlen)*")

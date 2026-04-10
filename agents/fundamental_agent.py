@@ -21,6 +21,7 @@ import asyncio
 import re
 from typing import List, Optional, Tuple
 
+from core.currency import symbol
 from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.models import Position
@@ -158,7 +159,7 @@ class FundamentalAgent:
             rich_summary = summary
             extras = []
             if fair_value and fair_value.upper() != "N/A":
-                extras.append(f"Fair Value: {fair_value} €")
+                extras.append(f"Fair Value: {fair_value} {symbol()}")
             if upside and upside.upper() != "N/A":
                 extras.append(f"Upside: {upside}")
             if extras:
@@ -189,7 +190,7 @@ class FundamentalAgent:
             if p.anlageart:
                 lines.append(f"**Anlage-Art:** {p.anlageart}")
             if p.purchase_price:
-                lines.append(f"**Kaufpreis:** {p.purchase_price:.2f} €")
+                lines.append(f"**Kaufpreis:** {p.purchase_price:.2f} {symbol()}")
             if p.purchase_date:
                 lines.append(f"**Kaufdatum:** {p.purchase_date.isoformat()}")
             if p.story:

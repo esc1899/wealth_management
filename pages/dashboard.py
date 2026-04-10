@@ -10,6 +10,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from core.currency import fmt, symbol
 from core.i18n import t
 from state import get_market_agent, get_wealth_snapshot_agent
 
@@ -77,14 +78,14 @@ total_pnl_pct = (total_pnl / total_cost * 100) if total_pnl is not None and tota
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric(t("dashboard.portfolio_value"), f"€ {total_value:,.2f}" if has_prices else t("dashboard.no_prices"))
+    st.metric(t("dashboard.portfolio_value"), fmt(total_value) if has_prices else t("dashboard.no_prices"))
 with col2:
     if total_pnl is not None:
-        st.metric(t("dashboard.pnl"), f"€ {total_pnl:,.2f}", delta=f"{total_pnl_pct:.2f}%")
+        st.metric(t("dashboard.pnl"), fmt(total_pnl), delta=f"{total_pnl_pct:.2f}%")
     else:
         st.metric(t("dashboard.pnl"), "—")
 with col3:
-    st.metric(t("dashboard.cost_basis"), f"€ {total_cost:,.2f}" if total_cost else "—")
+    st.metric(t("dashboard.cost_basis"), fmt(total_cost) if total_cost else "—")
 with col4:
     st.metric(t("dashboard.positions_count"), len(valuations))
 
@@ -118,12 +119,12 @@ COL_TICKER = t("common.ticker")
 COL_NAME = t("common.name")
 COL_ASSET_CLASS = t("common.asset_class")
 
-fmt = {
+fmt_rules = {
     COL_QUANTITY:       fmt_quantity,
     COL_UNIT:           "{}",
     COL_PURCHASE_PRICE: lambda x: fmt_optional(x),
     COL_CURRENT_PRICE:  lambda x: fmt_optional(x),
-    COL_VALUE:          lambda x: fmt_optional(x, "€ {:,.2f}"),
+    COL_VALUE:          lambda x: fmt_optional(x, f"{symbol()} {{:,.2f}}"),
     COL_PNL_EUR:        lambda x: fmt_optional(x, "{:+,.2f}"),
     COL_PNL_PCT:        lambda x: fmt_optional(x, "{:+.2f}%"),
 }
@@ -153,7 +154,7 @@ for inv_type in investment_types:
         for v in group
     ]
     df = pd.DataFrame(rows)
-    st.dataframe(df.style.format(fmt), use_container_width=True, hide_index=True)
+    st.dataframe(df.style.format(fmt_rules), use_container_width=True, hide_index=True)
 
 # ------------------------------------------------------------------
 # Allocation chart (only if prices available)
@@ -207,17 +208,17 @@ try:
             name=t("dashboard.total_wealth"),
             line=dict(color="rgb(31, 119, 180)", width=2),
             marker=dict(size=6),
-            hovertemplate="<b>%{x}</b><br>€ %{y:,.0f}<extra></extra>",
+            hovertemplate=f"<b>%{{x}}</b><br>{symbol()} %{{y:,.0f}}<extra></extra>",
         ))
         fig.update_layout(
             title=t("dashboard.wealth_timeline"),
             xaxis_title=t("common.date"),
-            yaxis_title="€",
+            yaxis_title=symbol(),
             hovermode="x unified",
             height=400,
             margin=dict(l=60, r=20, t=40, b=40),
         )
-        fig.update_yaxes(tickformat="€,.0f")
+        fig.update_yaxes(tickformat=f"{symbol()},.0f")
         st.plotly_chart(fig, use_container_width=True)
 
         # Optional: breakdown by asset class in stacked area
@@ -245,7 +246,7 @@ try:
             fig_area.update_layout(
                 title=t("dashboard.wealth_by_class"),
                 xaxis_title=t("common.date"),
-                yaxis_title="€",
+                yaxis_title=symbol(),
                 hovermode="x unified",
                 height=350,
                 margin=dict(l=60, r=20, t=40, b=40),

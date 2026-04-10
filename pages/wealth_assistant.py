@@ -35,7 +35,7 @@ with col2:
     if latest:
         st.metric(
             t("dashboard.total_wealth"),
-            f"€ {latest.total_eur:,.0f}",
+            fmt(latest.total_eur, 0),
         )
     else:
         st.metric(
@@ -114,7 +114,7 @@ with col_snap:
 if st.session_state.get("_prepare_preview"):
     preview = st.session_state["_prepare_preview"]
     with st.expander(t("wealth_assistant.preview_title"), expanded=True):
-        st.write(f"**{t('dashboard.total_wealth')}**: € {preview.total_eur:,.0f}")
+        st.write(f"**{t('dashboard.total_wealth')}**: {fmt(preview.total_eur, 0)}")
         st.write(f"**{t('wealth_assistant.coverage')}**: {preview.coverage_pct:.0f}%")
 
         if preview.stale_positions:
@@ -122,7 +122,7 @@ if st.session_state.get("_prepare_preview"):
                 f"**{t('wealth_assistant.stale_positions')}** ({len(preview.stale_positions)}):"
             )
             for pos in preview.stale_positions:
-                value_str = f"€ {pos['value']:,.0f}" if pos['value'] is not None else "—"
+                value_str = f"{fmt(pos['value'], 0)}" if pos['value'] is not None else "—"
                 st.write(
                     f"  • {pos['name']}: {value_str} ({pos['days_old']} Tage alt)"
                 )
@@ -140,7 +140,7 @@ def _overwrite_confirm_dialog(date_str: str):
     """Dialog to confirm overwriting an existing snapshot."""
     existing = wealth_agent.get_snapshot_for_date(date_str)
     st.write(f"**{t('wealth_assistant.overwrite_message')}**")
-    st.write(f"{date_str}: € {existing.total_eur:,.0f}")
+    st.write(f"{date_str}: {fmt(existing.total_eur, 0)}")
 
     col1, col2 = st.columns(2)
     with col1:
@@ -201,7 +201,7 @@ try:
 
             # Auto-calculated total
             new_total = sum(new_breakdown.values())
-            st.metric("Gesamtwert", f"€ {new_total:,.0f}")
+            st.metric("Gesamtwert", fmt(new_total, 0))
 
             # Note field
             new_note = st.text_input(

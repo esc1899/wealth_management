@@ -58,6 +58,9 @@ class Config:
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
+    # Currency — EUR (default), CHF, GBP, USD, JPY
+    BASE_CURRENCY: str = os.getenv("BASE_CURRENCY", "EUR")
+
     def validate(self) -> list[str]:
         """Return list of error messages for missing required config. Empty = OK."""
         errors = []

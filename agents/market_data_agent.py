@@ -15,6 +15,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from agents.market_data_fetcher import MarketDataFetcher
 from core.asset_class_config import get_asset_class_registry
+from core.currency import is_cash_unit
 from core.storage.base import build_encryption_service, get_connection, init_db, migrate_db
 from core.storage.market_data import MarketDataRepository
 from core.storage.positions import PositionsRepository
@@ -177,8 +178,8 @@ class MarketDataAgent:
                 elif pos.purchase_price is not None:
                     current_value = pos.purchase_price
                     current_price = pos.purchase_price
-                elif pos.unit == "€" and pos.quantity is not None:
-                    # Bargeld: quantity IS the value in €
+                elif is_cash_unit(pos.unit) and pos.quantity is not None:
+                    # Bargeld: quantity IS the value in the base currency
                     current_value = float(pos.quantity)
                     current_price = 1.0
                 else:
