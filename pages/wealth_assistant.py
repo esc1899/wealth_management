@@ -11,7 +11,7 @@ from core.storage.base import get_connection, init_db, migrate_db
 from state import get_wealth_snapshot_agent, get_market_agent
 
 st.set_page_config(page_title="Wealth Assistant", page_icon="💰", layout="wide")
-st.title(f"💰 {t('wealth_assistant.title', 'Vermögens-Assistent')}")
+st.title(f"💰 {t('wealth_assistant.title')}")
 
 wealth_agent = get_wealth_snapshot_agent()
 market_agent = get_market_agent()
@@ -25,48 +25,48 @@ col1, col2, col3, col4 = st.columns(4)
 with col1:
     if latest:
         st.metric(
-            t("wealth_assistant.latest_snapshot", "Letzter Snapshot"),
+            t("wealth_assistant.latest_snapshot"),
             latest.date,
         )
     else:
         st.metric(
-            t("wealth_assistant.latest_snapshot", "Letzter Snapshot"),
+            t("wealth_assistant.latest_snapshot"),
             "—",
         )
 
 with col2:
     if latest:
         st.metric(
-            t("dashboard.total_wealth", "Gesamtvermögen"),
+            t("dashboard.total_wealth"),
             f"€ {latest.total_eur:,.0f}",
         )
     else:
         st.metric(
-            t("dashboard.total_wealth", "Gesamtvermögen"),
+            t("dashboard.total_wealth"),
             "—",
         )
 
 with col3:
     if latest:
         st.metric(
-            t("wealth_assistant.coverage", "Datenvollständigkeit"),
+            t("wealth_assistant.coverage"),
             f"{latest.coverage_pct:.0f}%",
         )
     else:
         st.metric(
-            t("wealth_assistant.coverage", "Datenvollständigkeit"),
+            t("wealth_assistant.coverage"),
             "—",
         )
 
 with col4:
     if latest:
         st.metric(
-            t("wealth_assistant.is_manual", "Korrigiert"),
+            t("wealth_assistant.is_manual"),
             "✓" if latest.is_manual else "—",
         )
     else:
         st.metric(
-            t("wealth_assistant.is_manual", "Korrigiert"),
+            t("wealth_assistant.is_manual"),
             "—",
         )
 
@@ -82,17 +82,17 @@ snapshot_clicked = False
 
 with col_prep:
     if st.button(
-        f"🔄 {t('wealth_assistant.prepare', 'Vorbereiten')}",
+        f"🔄 {t('wealth_assistant.prepare')}",
         use_container_width=True,
-        help=t("wealth_assistant.prepare_help", "Marktdaten aktualisieren, veraltete Positionen prüfen"),
+        help=t("wealth_assistant.prepare_help"),
     ):
         prepare_clicked = True
 
 with col_snap:
     if st.button(
-        f"📸 {t('wealth_assistant.take_snapshot', 'Snapshot aufnehmen')}",
+        f"📸 {t('wealth_assistant.take_snapshot')}",
         use_container_width=True,
-        help=t("wealth_assistant.take_snapshot_help", "Vermögensstand speichern"),
+        help=t("wealth_assistant.take_snapshot_help"),
     ):
         snapshot_clicked = True
 
@@ -103,7 +103,7 @@ if prepare_clicked:
         preview = wealth_agent.prepare_snapshot()
         st.session_state["_prepare_preview"] = preview
         st.success(
-            t("wealth_assistant.prepare_success", "Vorbereitung abgeschlossen. ✓")
+            t("wealth_assistant.prepare_success")
         )
     except Exception as exc:
         st.error(f"⚠️ {t('common.agent_error')}: {exc}")
@@ -113,7 +113,7 @@ if snapshot_clicked:
     try:
         snapshot = wealth_agent.take_snapshot(is_manual=False)
         st.success(
-            t("wealth_assistant.snapshot_success", "Snapshot erstellt! ✓")
+            t("wealth_assistant.snapshot_success")
             + f"\n€ {snapshot.total_eur:,.0f} | {snapshot.coverage_pct:.0f}% Coverage"
         )
         st.rerun()
@@ -126,15 +126,15 @@ if snapshot_clicked:
 if st.session_state.get("_prepare_preview"):
     preview = st.session_state["_prepare_preview"]
     with st.expander(
-        t("wealth_assistant.preview_title", "📊 Snapshot-Vorschau"),
+        t("wealth_assistant.preview_title"),
         open=True,
     ):
-        st.write(f"**{t('dashboard.total_wealth', 'Gesamtvermögen')}**: € {preview.total_eur:,.0f}")
-        st.write(f"**{t('wealth_assistant.coverage', 'Datenvollständigkeit')}**: {preview.coverage_pct:.0f}%")
+        st.write(f"**{t('dashboard.total_wealth')}**: € {preview.total_eur:,.0f}")
+        st.write(f"**{t('wealth_assistant.coverage')}**: {preview.coverage_pct:.0f}%")
 
         if preview.stale_positions:
             st.warning(
-                f"**{t('wealth_assistant.stale_positions', 'Veraltete Positionen')}** ({len(preview.stale_positions)}):"
+                f"**{t('wealth_assistant.stale_positions')}** ({len(preview.stale_positions)}):"
             )
             for pos in preview.stale_positions:
                 st.write(
@@ -149,7 +149,7 @@ st.divider()
 # ------------------------------------------------------------------
 # LLM Chat: questions, corrections, analysis
 # ------------------------------------------------------------------
-st.subheader(t("wealth_assistant.chat_title", "Vermögens-Chat"))
+st.subheader(t("wealth_assistant.chat_title"))
 st.caption(
     t(
         "wealth_assistant.chat_help",
@@ -192,7 +192,7 @@ if st.session_state.get("_wealth_error"):
 
 # Chat input
 user_input = st.chat_input(
-    t("wealth_assistant.input_placeholder", "z.B. 'Warum ist das Vermögen gesunken?'")
+    t("wealth_assistant.input_placeholder")
 )
 
 if user_input:
@@ -231,7 +231,7 @@ Wenn der Nutzer einen Snapshot korrigieren möchte, bestätige die neue Informat
 
     # Call Ollama
     try:
-        with st.spinner(t("common.thinking", "Denke nach...")):
+        with st.spinner(t("common.thinking")):
             # Simple chat without streaming for now
             response = st.session_state["_wealth_llm"].chat_simple(
                 messages=[
