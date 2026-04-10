@@ -150,12 +150,7 @@ st.divider()
 # LLM Chat: questions, corrections, analysis
 # ------------------------------------------------------------------
 st.subheader(t("wealth_assistant.chat_title"))
-st.caption(
-    t(
-        "wealth_assistant.chat_help",
-        "Stelle Fragen zu deiner Vermögenshistorie, oder korrigiere Snapshots.",
-    )
-)
+st.caption(t("wealth_assistant.chat_help"))
 
 # Initialize chat state
 if "_wealth_session_id" not in st.session_state:
