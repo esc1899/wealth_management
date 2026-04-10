@@ -141,6 +141,8 @@ Copy `.env.example` to `.env` and fill in your values.
 | `DEMO_MODE` | Optional | Set to `true` to use the demo database |
 | `DB_PATH` | Optional | Default: `data/portfolio.db` |
 | `MARKET_DATA_FETCH_HOUR` | Optional | Hour (0–23) for automatic price refresh, default `18` |
+| `LOG_LEVEL` | Optional | Logging level: DEBUG, INFO (default), WARNING, ERROR, CRITICAL |
+| `BASE_CURRENCY` | Optional | Currency for display: EUR (default), CHF, GBP, USD, JPY |
 
 *`ANTHROPIC_API_KEY` is required to use Research Chat, News Digest, Investment Search, Story Checker, Structural Change Scanner, Consensus Gap Analysis, or Fundamental Value.
 
