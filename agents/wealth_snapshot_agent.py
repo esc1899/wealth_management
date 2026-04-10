@@ -86,8 +86,11 @@ class WealthSnapshotAgent:
         # Calculate current portfolio valuation
         valuations = self._market_data_agent.get_portfolio_valuation(include_watchlist=False)
 
-        # Group by asset class
-        breakdown: Dict[str, float] = {}
+        # Initialize breakdown with all asset classes (0.0 as default)
+        from core.asset_class_config import get_asset_class_registry
+        registry = get_asset_class_registry()
+        breakdown: Dict[str, float] = {ac: 0.0 for ac in registry.all_names()}
+
         missing_positions = []
         total = 0.0
 
@@ -142,8 +145,9 @@ class WealthSnapshotAgent:
         # Get all positions for stale-check
         positions = self._positions.get_portfolio()
 
-        # Build breakdown
-        breakdown: Dict[str, float] = {}
+        # Build breakdown — initialize all asset classes with 0.0
+        registry = get_asset_class_registry()
+        breakdown: Dict[str, float] = {ac: 0.0 for ac in registry.all_names()}
         missing_positions = []
         total = 0.0
 
