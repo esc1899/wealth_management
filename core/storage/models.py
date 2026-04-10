@@ -462,3 +462,21 @@ class ScheduledJob(BaseModel):
     enabled: bool = True
     last_run: Optional[datetime] = None
     created_at: Optional[datetime] = None
+
+
+# ---------------------------------------------------------------------------
+# Wealth snapshot models
+# ---------------------------------------------------------------------------
+
+class WealthSnapshot(BaseModel):
+    """A historical snapshot of total wealth (portfolio value + non-tradeable assets)."""
+
+    id: Optional[int] = None
+    date: str                       # YYYY-MM-DD
+    total_eur: float
+    breakdown: Dict[str, float]     # {"Aktie": 120000, "Immobilie": 80000, ...}
+    coverage_pct: float             # % of positions with valid value
+    missing_pos: Optional[List[str]] = None  # position names without value
+    is_manual: bool = False         # True = manually created or corrected
+    note: Optional[str] = None      # optional comment
+    created_at: datetime

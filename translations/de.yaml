@@ -75,6 +75,12 @@ dashboard:
   easter_egg_title: "Ein Gedanke zum Tag"
   easter_egg_countdown: "Noch {days} Tage bis Ostersonntag (5. April 2026)."
   easter_egg_after: "Danke fürs Suchen. Bis nächstes Jahr! 🐣"
+  wealth_history: "Vermögenshistorie"
+  wealth_timeline: "Vermögenshistorie"
+  total_wealth: "Gesamtvermögen"
+  wealth_by_class: "Vermögen nach Asset-Klasse"
+  show_breakdown: "Nach Asset-Klasse anzeigen"
+  no_snapshots: "Noch keine Vermögenshistorie vorhanden. Snapshots werden über den Vermögens-Assistenten erstellt."
 
 portfolio_chat:
   title: "Portfolio Chat"

@@ -268,6 +268,18 @@ def init_db(conn: sqlite3.Connection) -> None:
             currency    TEXT,
             fetched_at  TEXT NOT NULL
         )""",
+        """CREATE TABLE IF NOT EXISTS wealth_snapshots (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            date          TEXT NOT NULL UNIQUE,
+            total_eur     REAL NOT NULL,
+            breakdown     TEXT NOT NULL,
+            coverage_pct  REAL NOT NULL DEFAULT 100.0,
+            missing_pos   TEXT,
+            is_manual     INTEGER NOT NULL DEFAULT 0,
+            note          TEXT,
+            created_at    TEXT NOT NULL
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_wealth_snapshots_date ON wealth_snapshots(date)",
     ]:
         conn.execute(stmt)
     conn.commit()

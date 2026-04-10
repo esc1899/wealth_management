@@ -75,6 +75,12 @@ dashboard:
   easter_egg_title: "A Thought for the Day"
   easter_egg_countdown: "{days} days until Easter Sunday (April 5, 2026)."
   easter_egg_after: "Thanks for finding this. See you next year! 🐣"
+  wealth_history: "Wealth History"
+  wealth_timeline: "Wealth Timeline"
+  total_wealth: "Total Wealth"
+  wealth_by_class: "Wealth by Asset Class"
+  show_breakdown: "Show by Asset Class"
+  no_snapshots: "No wealth history yet. Snapshots are created via the Wealth Assistant."
 
 portfolio_chat:
   title: "Portfolio Chat"

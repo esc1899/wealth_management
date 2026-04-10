@@ -19,9 +19,11 @@ from agents.research_agent import ResearchAgent
 from agents.search_agent import SearchAgent
 from agents.storychecker_agent import StorycheckerAgent
 from agents.structural_change_agent import StructuralChangeAgent
+from agents.wealth_snapshot_agent import WealthSnapshotAgent
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.storychecker import StorycheckerRepository
 from core.storage.structural_scans import StructuralScansRepository
+from core.storage.wealth_snapshots import WealthSnapshotRepository
 from core.asset_class_config import get_asset_class_registry, AssetClassRegistry
 from core.llm.claude import ClaudeProvider
 from core.llm.local import OllamaProvider
@@ -309,6 +311,21 @@ def get_agent_scheduler() -> AgentSchedulerService:
     )
     service.start()
     return service
+
+
+@st.cache_resource
+def get_wealth_snapshot_repo() -> WealthSnapshotRepository:
+    return WealthSnapshotRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_wealth_snapshot_agent() -> WealthSnapshotAgent:
+    return WealthSnapshotAgent(
+        positions_repo=get_positions_repo(),
+        market_repo=get_market_repo(),
+        wealth_repo=get_wealth_snapshot_repo(),
+        market_data_agent=get_market_agent(),
+    )
 
 
 @st.cache_resource

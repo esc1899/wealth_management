@@ -7,10 +7,11 @@ from datetime import date
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 from core.i18n import t
-from state import get_market_agent
+from state import get_market_agent, get_wealth_snapshot_agent
 
 # ---------------------------------------------------------------------------
 # Easter Egg dialog (defined at module level — Streamlit requirement)
@@ -181,3 +182,78 @@ if has_prices:
             fig2 = px.pie(names=list(alloc_pos.keys()), values=list(alloc_pos.values()), hole=0.4)
             fig2.update_layout(margin=dict(t=0, b=0, l=0, r=0))
             st.plotly_chart(fig2, use_container_width=True)
+
+# ------------------------------------------------------------------
+# Wealth timeline — historical snapshots
+# ------------------------------------------------------------------
+st.divider()
+st.subheader(t("dashboard.wealth_history"))
+
+try:
+    wealth_agent = get_wealth_snapshot_agent()
+    snapshots = wealth_agent.list_snapshots(days=None)
+
+    if snapshots:
+        # Prepare data for chart
+        dates = [s.date for s in snapshots]
+        totals = [s.total_eur for s in snapshots]
+
+        # Create line chart
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=dates,
+            y=totals,
+            mode="lines+markers",
+            name=t("dashboard.total_wealth"),
+            line=dict(color="rgb(31, 119, 180)", width=2),
+            marker=dict(size=6),
+            hovertemplate="<b>%{x}</b><br>€ %{y:,.0f}<extra></extra>",
+        ))
+        fig.update_layout(
+            title=t("dashboard.wealth_timeline"),
+            xaxis_title=t("common.date"),
+            yaxis_title="€",
+            hovermode="x unified",
+            height=400,
+            margin=dict(l=60, r=20, t=40, b=40),
+        )
+        fig.update_yaxes(tickformat="€,.0f")
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Optional: breakdown by asset class in stacked area
+        col_breakdown, col_options = st.columns([3, 1])
+        with col_options:
+            show_breakdown = st.checkbox(t("dashboard.show_breakdown"), value=False)
+
+        if show_breakdown:
+            # Aggregate breakdowns across all snapshots
+            asset_classes = set()
+            for s in snapshots:
+                asset_classes.update(s.breakdown.keys())
+
+            fig_area = go.Figure()
+            for ac in sorted(asset_classes):
+                values = [s.breakdown.get(ac, 0) for s in snapshots]
+                fig_area.add_trace(go.Scatter(
+                    x=dates,
+                    y=values,
+                    mode="lines",
+                    name=ac,
+                    stackgroup="one",
+                    hovertemplate=f"{ac}<br>€ %{{y:,.0f}}<extra></extra>",
+                ))
+            fig_area.update_layout(
+                title=t("dashboard.wealth_by_class"),
+                xaxis_title=t("common.date"),
+                yaxis_title="€",
+                hovermode="x unified",
+                height=350,
+                margin=dict(l=60, r=20, t=40, b=40),
+            )
+            fig_area.update_yaxes(tickformat="€,.0f")
+            st.plotly_chart(fig_area, use_container_width=True)
+    else:
+        st.info(t("dashboard.no_snapshots"))
+
+except Exception as exc:
+    st.warning(f"⚠️ {t('common.agent_error')}: {exc}")
