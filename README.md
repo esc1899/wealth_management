@@ -23,6 +23,13 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **P&L Analysis** — daily gains/losses, allocation charts, day performance
 - **Rebalancing** — Josef's Rule (1/3 each: equities / bonds+cash / real estate) as hidden strategy layer
 
+### Wealth Snapshots (historical tracking)
+- **Wealth Timeline** — automatic daily snapshots of total portfolio value over time; breakdown by asset class
+- **Manual Snapshots** — capture wealth state on demand with optional note
+- **Edit & Correct** — modify individual asset class values retroactively; total recalculates automatically
+- **Snapshot Management** — delete, view history, detect stale manual valuations (>30 days)
+- **Coverage Tracking** — visibility into which positions have valid values; warnings for incomplete data
+
 ### Local Assistants (private, Ollama)
 - **Portfolio Chat** — natural language CRUD interface; data never leaves your machine
 - **Invest / Rebalance** — portfolio rebalancing analysis including watchlist candidates and all cloud verdicts
