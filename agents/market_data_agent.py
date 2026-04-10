@@ -3,6 +3,8 @@ Market Data Agent — orchestrates price fetching, storage, and scheduling.
 """
 
 from __future__ import annotations
+import logging
+
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -18,6 +20,8 @@ from core.storage.market_data import MarketDataRepository
 from core.storage.positions import PositionsRepository
 
 
+
+logger = logging.getLogger(__name__)
 @dataclass
 class FetchResult:
     fetched: int = 0

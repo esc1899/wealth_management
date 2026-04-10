@@ -10,6 +10,8 @@ Flow per chat() call:
 """
 
 from __future__ import annotations
+import logging
+
 
 from datetime import date
 from typing import Optional
@@ -20,6 +22,8 @@ from core.storage.models import Position, SearchSession
 from core.storage.positions import PositionsRepository
 from core.storage.search import SearchRepository
 
+
+logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 # System prompt
 # ------------------------------------------------------------------

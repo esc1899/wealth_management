@@ -16,6 +16,8 @@ Flow per chat() call:
 """
 
 from __future__ import annotations
+import logging
+
 
 from datetime import date
 from typing import Optional, Tuple
@@ -30,6 +32,8 @@ from core.storage.positions import PositionsRepository
 from core.storage.rebalance import RebalanceRepository
 from core.storage.skills import SkillsRepository
 
+
+logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 # Asset class categorization for Josef's Regel + handelbar split
 # ------------------------------------------------------------------

@@ -14,6 +14,8 @@ Storage: reuses position_analyses table (agent='fundamental').
 """
 
 from __future__ import annotations
+import logging
+
 
 import asyncio
 import re
@@ -23,6 +25,8 @@ from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.models import Position
 
+
+logger = logging.getLogger(__name__)
 AGENT_NAME = "fundamental"
 
 VALID_VERDICTS = {"unterbewertet", "fair", "überbewertet", "unbekannt"}

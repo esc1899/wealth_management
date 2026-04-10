@@ -10,6 +10,8 @@ Flow per chat() call:
 """
 
 from __future__ import annotations
+import logging
+
 
 import json
 from datetime import date
@@ -21,6 +23,8 @@ from core.storage.positions import PositionsRepository
 from core.storage.research import ResearchRepository
 from core.strategy_config import StrategyConfig, StrategyRegistry
 
+
+logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 # System prompt base
 # ------------------------------------------------------------------

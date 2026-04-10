@@ -55,6 +55,9 @@ class Config:
         if m.strip()
     ]
 
+    # Logging
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+
     def validate(self) -> list[str]:
         """Return list of error messages for missing required config. Empty = OK."""
         errors = []

@@ -15,6 +15,8 @@ Flow per chat() call:
 """
 
 from __future__ import annotations
+import logging
+
 
 from typing import Optional, Tuple
 
@@ -23,6 +25,8 @@ from core.llm.claude import ClaudeProvider
 from core.storage.models import NewsRun
 from core.storage.news import NewsRepository
 
+
+logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 # System prompts
 # ------------------------------------------------------------------

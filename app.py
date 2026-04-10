@@ -6,8 +6,6 @@ Navigation is defined explicitly via st.navigation with grouped sections.
 import logging
 import streamlit as st
 
-logger = logging.getLogger(__name__)
-
 st.set_page_config(
     page_title="Wealth Management",
     page_icon="💰",
@@ -15,6 +13,15 @@ st.set_page_config(
 )
 
 from config import config  # noqa: E402
+
+# Configure root logger — all modules inherit this level
+_log_level = getattr(logging, config.LOG_LEVEL, logging.INFO)
+logging.basicConfig(
+    level=_log_level,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 from core.health import Severity, is_local_url, run_static_checks  # noqa: E402
 from core.i18n import t, set_language, current_language, SUPPORTED_LANGUAGES  # noqa: E402
 from core.cost_alert import check_alerts, get_period_costs  # noqa: E402

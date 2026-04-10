@@ -17,6 +17,8 @@ Flow per chat() call:
 """
 
 from __future__ import annotations
+import logging
+
 
 from datetime import date
 from typing import Optional, Tuple
@@ -29,6 +31,8 @@ from core.storage.models import Position, StructuralScanRun
 from core.storage.positions import PositionsRepository
 from core.storage.structural_scans import StructuralScansRepository
 
+
+logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 # System prompt
 # ------------------------------------------------------------------

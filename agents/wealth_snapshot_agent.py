@@ -7,6 +7,8 @@ completeness and warning about stale manual valuations.
 """
 
 from __future__ import annotations
+import logging
+
 
 from dataclasses import dataclass, field
 from datetime import datetime, date
@@ -20,6 +22,8 @@ from agents.market_data_agent import MarketDataAgent
 from core.asset_class_config import get_asset_class_registry
 
 
+
+logger = logging.getLogger(__name__)
 @dataclass
 class SnapshotPreview:
     """Preview of data available for taking a snapshot."""

@@ -14,6 +14,8 @@ batch_check_all() runs all eligible positions sequentially (background thread).
 """
 
 from __future__ import annotations
+import logging
+
 
 import asyncio
 from typing import List, Tuple
@@ -23,6 +25,8 @@ from core.storage.analyses import PositionAnalysesRepository
 from core.storage.models import Position, StorycheckerSession
 from core.storage.storychecker import StorycheckerRepository
 
+
+logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 # Tools
 # ------------------------------------------------------------------
