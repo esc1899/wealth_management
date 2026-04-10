@@ -554,6 +554,9 @@ if _ss("_pos_show_form"):
             else:
                 form_date = None
 
+        # Get existing extra_data early (needed for manual valuation fields)
+        _existing_extra_early = (editing.extra_data or {}) if editing else {}
+
         # Portfolio / Watchlist flags
         with col_h:
             if cfg.watchlist_eligible:
@@ -571,6 +574,29 @@ if _ss("_pos_show_form"):
             else:
                 in_portfolio = True
                 in_watchlist = False
+
+        # Manual valuation fields (Grundstück, Immobilie, Festgeld, Bargeld, Anleihe)
+        if cfg.manual_valuation:
+            st.markdown("---")
+            st.markdown("#### 💰 Schätzwert")
+            mv_col1, mv_col2 = st.columns(2)
+            with mv_col1:
+                form_estimated_value = st.number_input(
+                    t("positionen.estimated_value"),
+                    min_value=0.0,
+                    step=1000.0,
+                    format="%.2f",
+                    value=float(_existing_extra_early.get("estimated_value", 0.0)) if _existing_extra_early.get("estimated_value") else 0.0,
+                )
+            with mv_col2:
+                val_date_raw = _existing_extra_early.get("valuation_date")
+                form_valuation_date = st.date_input(
+                    t("positionen.valuation_date"),
+                    value=date.fromisoformat(val_date_raw) if val_date_raw else date.today(),
+                )
+        else:
+            form_estimated_value = None
+            form_valuation_date = None
 
         # Notes (always)
         form_notes = st.text_input(
@@ -707,14 +733,20 @@ if _ss("_pos_show_form"):
                 if form_maturity:
                     extra["maturity_date"] = form_maturity.isoformat()
 
+            # Manual valuation fields (Grundstück, Immobilie, Festgeld, Bargeld, Anleihe)
+            if cfg.manual_valuation:
+                if form_estimated_value and form_estimated_value > 0:
+                    extra["estimated_value"] = form_estimated_value
+                elif "estimated_value" in extra:
+                    del extra["estimated_value"]
+                if form_valuation_date:
+                    extra["valuation_date"] = form_valuation_date.isoformat()
+
             # Dividend yield override (all asset classes)
             if form_dividend_override and form_dividend_override > 0:
                 extra["dividend_yield_override"] = form_dividend_override
             elif "dividend_yield_override" in extra:
                 del extra["dividend_yield_override"]
-
-            # Preserve existing estimated_value for manual valuation types
-            # (updated via detail dialog, not the edit form)
 
             pos_data = dict(
                 asset_class=selected_ac,
