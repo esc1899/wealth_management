@@ -228,6 +228,31 @@ class TestAnalyze:
 # _get_position_value
 # ------------------------------------------------------------------
 
+class TestJosefCategorization:
+    """Unit tests for Josef's Regel category mapping."""
+
+    def test_josef_category_mapping_is_correct(self):
+        """Verify that _JOSEF_CATEGORY maps investment types to correct categories."""
+        from agents.rebalance_agent import _JOSEF_CATEGORY
+
+        assert _JOSEF_CATEGORY["Wertpapiere"] == "Aktien"
+        assert _JOSEF_CATEGORY["Edelmetalle"] == "Rohstoffe"
+        assert _JOSEF_CATEGORY["Renten"] == "Renten/Geld"
+        assert _JOSEF_CATEGORY["Geld"] == "Renten/Geld"
+        assert _JOSEF_CATEGORY["Immobilien"] == "Rohstoffe", \
+            "Immobilien must map to Rohstoffe (not separate category)"
+
+    def test_josef_only_has_3_categories_not_4(self):
+        """Verify that Immobilien is combined with Rohstoffe, not a separate category."""
+        from agents.rebalance_agent import _JOSEF_CATEGORY
+
+        # Extract unique category values
+        categories = set(_JOSEF_CATEGORY.values())
+        assert len(categories) == 3, \
+            f"Expected 3 categories (Aktien, Renten/Geld, Rohstoffe), got {len(categories)}: {categories}"
+        assert categories == {"Aktien", "Renten/Geld", "Rohstoffe"}
+
+
 class TestPositionValue:
     """
     Tests for _get_position_value — the calculation that fixed precious metals.
@@ -402,3 +427,153 @@ class TestJosefRule:
             assert total < 110, f"Ist allocation sum should be ~100%, got {total}% (suggests double-counting bug)"
             # Positive: should be close to 100%
             assert total > 90, f"Ist allocation sum should be ~100%, got {total}%"
+
+    @pytest.mark.asyncio
+    async def test_immobilien_combines_with_rohstoffe_in_josef_regel(self, mock_llm, mock_repo):
+        """
+        Test that Immobilien (investment_type="Immobilien") is categorized as "Rohstoffe"
+        in Josef's Regel, combining with Edelmetalle for the 1/3 allocation.
+
+        Setup:
+        - Aktie: €3000 (Wertpapiere)
+        - Edelmetall: €1000 (Edelmetalle → mapped to Rohstoffe)
+        - Immobilie: €2000 (Immobilien → mapped to Rohstoffe)
+        - Festgeld: €2000 (Geld → Renten/Geld)
+        - Total: €8000
+
+        Expected Josef breakdown:
+        - Aktien: €3000 (37.5%)
+        - Renten/Geld: €2000 (25.0%)
+        - Rohstoffe (Edelmetalle + Immobilien): €3000 (37.5%) ← Combined!
+        - Sum: 100%
+        """
+        from datetime import date as dt
+
+        pos_aktie = Position(
+            id=1,
+            ticker="STOCK",
+            name="Stock Co",
+            asset_class="Aktie",
+            investment_type="Wertpapiere",
+            quantity=10.0,
+            unit="Stück",
+            purchase_price=100.0,
+            purchase_date=dt(2022, 1, 1),
+            added_date=dt.today(),
+            in_portfolio=True,
+        )
+
+        pos_edelmetall = Position(
+            id=2,
+            ticker="GOLD",
+            name="Gold",
+            asset_class="Edelmetall",
+            investment_type="Edelmetalle",
+            quantity=50.0,
+            unit="g",
+            purchase_price=80.0,
+            purchase_date=dt(2022, 1, 1),
+            added_date=dt.today(),
+            in_portfolio=True,
+        )
+
+        pos_immobilie = Position(
+            id=3,
+            ticker=None,
+            name="My House",
+            asset_class="Immobilie",
+            investment_type="Immobilien",
+            quantity=1.0,
+            unit="Stück",
+            purchase_price=2000.0,
+            purchase_date=dt(2020, 1, 1),
+            added_date=dt.today(),
+            in_portfolio=True,
+            extra_data={"estimated_value": 2000.0},
+        )
+
+        pos_festgeld = Position(
+            id=4,
+            ticker=None,
+            name="Fixed Deposit",
+            asset_class="Festgeld",
+            investment_type="Geld",
+            quantity=1.0,
+            unit="Stück",
+            purchase_price=2000.0,
+            purchase_date=dt(2022, 1, 1),
+            added_date=dt.today(),
+            in_portfolio=True,
+            extra_data={"estimated_value": 2000.0},
+        )
+
+        positions_repo = MagicMock()
+        positions_repo.get_portfolio.return_value = [pos_aktie, pos_edelmetall, pos_immobilie, pos_festgeld]
+        positions_repo.get_watchlist.return_value = []
+
+        market_repo = MagicMock()
+        def price_side_effect(ticker):
+            prices = {
+                "STOCK": make_price("STOCK", 300.0),  # 10 × 300 = €3000
+                "GOLD": make_price("GOLD", 2800.0),   # 50g × (2800 / 31.1035) ≈ €4502
+            }
+            return prices.get(ticker)
+        market_repo.get_price.side_effect = price_side_effect
+
+        analyses_repo = MagicMock()
+        analyses_repo.get_latest_bulk.return_value = {}
+
+        agent = RebalanceAgent(
+            positions_repo=positions_repo,
+            market_repo=market_repo,
+            analyses_repo=analyses_repo,
+            llm=mock_llm,
+        )
+
+        await agent.start_session("Test", "Test strategy", user_context="", repo=mock_repo)
+
+        call_args = mock_llm.chat.call_args
+        messages = call_args[0][0]
+        system_msg = next((m for m in messages if m.role.value == "system"), None)
+        snapshot = system_msg.content
+
+        # Verify Josef's Regel section is present
+        assert "Josef" in snapshot, "Josef's Regel section should be present"
+
+        # Extract and verify category rows from the table
+        # The critical check: Rohstoffe + Immobilien should be COMBINED, not separate
+        assert "Rohstoffe + Immobilien" in snapshot, \
+            "Josef table should have combined 'Rohstoffe + Immobilien' row (not separate 'Immobilien' category)"
+
+        # Parse the Josef table to check totals
+        lines = snapshot.split("\n")
+        josef_start = -1
+        for i, line in enumerate(lines):
+            if "Josef's Regel" in line and "Ist-Verteilung" in line:
+                josef_start = i
+                break
+
+        if josef_start >= 0:
+            ist_percentages = []
+            categories = []
+            # Find the table rows (lines with %)
+            for line in lines[josef_start:josef_start+10]:
+                if "%" in line and "|" in line and "Ist" not in line and "Ziel" not in line:
+                    parts = [p.strip() for p in line.split("|")]
+                    if len(parts) >= 4:
+                        try:
+                            category = parts[1]
+                            ist_col = parts[3]
+                            if ist_col and "%" in ist_col and category:
+                                pct = float(ist_col.rstrip("%").strip())
+                                ist_percentages.append(pct)
+                                categories.append(category)
+                        except (ValueError, IndexError):
+                            pass
+
+            # Critical assertions
+            assert len(categories) == 3, \
+                f"Expected 3 Josef categories, got {len(categories)}: {categories}"
+            total_pct = sum(ist_percentages)
+            assert abs(total_pct - 100.0) < 5, \
+                f"Josef categories should sum to ~100%, got {total_pct}%"
