@@ -94,6 +94,27 @@ asset_classes:
     price_source: yfinance
     requires_ticker: true
 
+  Infrastrukturfonds:
+    investment_type: Immobilien
+    default_unit: Stück
+    auto_fetch: true
+    watchlist_eligible: true
+    anlagearten:
+      - ETF
+      - Infrastructure Fund
+      - Aktiv gemanagter Fonds
+    visible_fields:
+      - isin
+      - wkn
+      - ticker
+      - quantity
+      - purchase_price
+      - purchase_date
+      - strategy
+      - notes
+    price_source: yfinance
+    requires_ticker: true
+
   Edelmetall:
     investment_type: Edelmetalle
     default_unit: Troy Oz
