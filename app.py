@@ -49,25 +49,14 @@ if config.APP_PASSWORD and not st.session_state.get("authenticated"):
 if config.DEMO_MODE:
     st.warning(t("demo.banner"), icon="🎭")
 
-# Initialise shared resources (agents, repos, scheduler) on first load
+# Initialise critical shared resources on first load
+# Other agents are lazy-loaded when pages access them via @st.cache_resource
 from state import (  # noqa: E402
-    get_agent_scheduler, get_consensus_gap_agent, get_fundamental_agent, get_market_agent,
-    get_news_agent, get_portfolio_agent, get_rebalance_agent, get_research_agent,
-    get_search_agent, get_storychecker_agent, get_structural_change_agent,
-    get_wealth_snapshot_agent,
+    get_portfolio_agent, get_market_agent, get_agent_scheduler,
 )
-get_portfolio_agent()
-get_market_agent()
-get_research_agent()
-get_news_agent()
-get_search_agent()
-get_storychecker_agent()
-get_rebalance_agent()
-get_structural_change_agent()
-get_consensus_gap_agent()
-get_fundamental_agent()
-get_wealth_snapshot_agent()
-get_agent_scheduler()
+get_portfolio_agent()  # Portfolio Chat critical path
+get_market_agent()      # Price auto-fetch scheduler
+get_agent_scheduler()   # Scheduled cloud jobs runner
 
 @st.dialog("Disclaimer & Privacy Notice", width="large")
 def _legal_dialog():
