@@ -54,6 +54,7 @@ from state import (  # noqa: E402
     get_agent_scheduler, get_consensus_gap_agent, get_fundamental_agent, get_market_agent,
     get_news_agent, get_portfolio_agent, get_rebalance_agent, get_research_agent,
     get_search_agent, get_storychecker_agent, get_structural_change_agent,
+    get_wealth_snapshot_agent,
 )
 get_portfolio_agent()
 get_market_agent()
@@ -65,6 +66,7 @@ get_rebalance_agent()
 get_structural_change_agent()
 get_consensus_gap_agent()
 get_fundamental_agent()
+get_wealth_snapshot_agent()
 get_agent_scheduler()
 
 @st.dialog("Disclaimer & Privacy Notice", width="large")
@@ -99,6 +101,7 @@ pg = st.navigation({
     _assistant_group: [
         st.Page("pages/portfolio_chat.py",  title=t("nav.portfolio_chat"),   icon=":material/chat:"),
         st.Page("pages/rebalance_chat.py",  title=t("nav.rebalance_chat"),   icon=":material/balance:"),
+        st.Page("pages/wealth_assistant.py",title=t("nav.wealth_assistant"), icon=":material/savings:"),
     ],
     t("nav.group_research"): [
         st.Page("pages/research_chat.py",   title=t("nav.research_chat"),    icon=":material/search:"),
