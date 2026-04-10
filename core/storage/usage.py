@@ -24,12 +24,13 @@ class UsageRepository:
         skill: Optional[str] = None,
         source: str = "manual",
         duration_ms: Optional[int] = None,
+        position_count: Optional[int] = None,
     ) -> None:
         self._conn.execute(
             "INSERT INTO llm_usage"
-            " (agent, model, skill, source, input_tokens, output_tokens, duration_ms, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (agent, model, skill, source, input_tokens, output_tokens, duration_ms, datetime.utcnow().isoformat()),
+            " (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count, datetime.utcnow().isoformat()),
         )
         self._conn.commit()
 
@@ -150,37 +151,39 @@ class UsageRepository:
         """
         Average cost PER POSITION for a specific agent/model/skill combination.
 
-        Assumes each call processes multiple positions (e.g., StorycheckerAgent checks 24 positions).
-        Divides total tokens by number of calls to get per-position cost.
+        Uses position_count from llm_usage table if available (real data).
+        Falls back to avg_cost_per_call if position_count not recorded.
 
-        Returns 0.0 if no data or insufficient calls to estimate.
+        Returns 0.0 if no data.
         """
         skill_filter = "AND skill = ?" if skill else "AND skill IS NULL"
         params: list = [agent, model]
         if skill:
             params.append(skill)
 
-        rows = self._conn.execute(
-            f"""SELECT COUNT(*) AS call_count,
-                      AVG(input_tokens) AS avg_in,
-                      AVG(output_tokens) AS avg_out
-               FROM llm_usage lu
-               WHERE agent = ? AND model = ? {skill_filter}
-                 AND {self._RESET_FILTER}""",
+        # First try: get data from calls with position_count recorded
+        rows_with_positions = self._conn.execute(
+            f"""SELECT AVG(input_tokens) AS avg_in,
+                       AVG(output_tokens) AS avg_out,
+                       AVG(CAST(NULLIF(position_count, 0) AS FLOAT)) AS avg_positions
+                FROM llm_usage lu
+                WHERE agent = ? AND model = ? {skill_filter}
+                  AND position_count IS NOT NULL
+                  AND {self._RESET_FILTER}""",
             params,
         ).fetchone()
 
-        if not rows or rows["avg_in"] is None or rows["call_count"] < 1:
-            return 0.0
+        if rows_with_positions and rows_with_positions["avg_positions"]:
+            cost_per_call = _compute_cost(
+                rows_with_positions["avg_in"],
+                rows_with_positions["avg_out"],
+                model,
+                model_prices,
+            )
+            return cost_per_call / rows_with_positions["avg_positions"]
 
-        # Cost per call, divided by position count (estimated as 20 if no data)
-        # This is a conservative estimate; will improve as more data accumulates
-        cost_per_call = _compute_cost(rows["avg_in"], rows["avg_out"], model, model_prices)
-
-        # Conservative: assume ~20 positions per call as baseline
-        # Real position count will be passed in monthly_estimate()
-        estimated_positions_per_call = 20
-        return cost_per_call / estimated_positions_per_call
+        # Fallback: use avg_cost_per_call if no position_count data exists
+        return self.avg_cost_per_call(agent, model, skill, model_prices) / 20
 
     def monthly_estimate(
         self,

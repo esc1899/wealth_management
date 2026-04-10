@@ -155,6 +155,9 @@ class StructuralChangeAgent:
         )
 
         self._llm.skill_context = skill_name
+        # Structural scan analyzes entire portfolio
+        all_positions = self._positions.get_portfolio()
+        self._llm.position_count = len(all_positions) if all_positions else 1
         api_messages: list[dict] = [{"role": "user", "content": user_msg}]
         report = await self._run_agentic_loop(api_messages, system)
 

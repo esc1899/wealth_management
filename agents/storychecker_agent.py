@@ -167,6 +167,7 @@ class StorycheckerAgent:
         Returns list of (position_name, error_or_None).
         """
         eligible = [p for p in positions if p.story and p.id is not None]
+        self._llm.position_count = len(eligible)  # Track how many positions in this batch
         results: List[Tuple[str, str | None]] = []
         for i, pos in enumerate(eligible):
             try:

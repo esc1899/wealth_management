@@ -124,6 +124,7 @@ class FundamentalAgent:
             return output
 
         self._llm.skill_context = skill_name
+        self._llm.position_count = len(eligible)  # Track how many positions in this batch
         system = ANALYSIS_SYSTEM_PROMPT + f"\n\n## Bewertungs-Skill\n{skill_prompt}"
         all_results: List[Tuple[str, str, str, str, str, str]] = []
 

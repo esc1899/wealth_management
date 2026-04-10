@@ -110,7 +110,7 @@ class ClaudeProvider(LLMProvider):
         response = await self._client.messages.create(**kwargs)
         _duration_ms = int((time.monotonic() - _t0) * 1000)
         if self.on_usage:
-            self.on_usage(response.usage.input_tokens, response.usage.output_tokens, self.skill_context, _duration_ms)
+            self.on_usage(response.usage.input_tokens, response.usage.output_tokens, self.skill_context, _duration_ms, self.position_count)
         return response.content[0].text
 
     async def chat_with_tools(
@@ -235,7 +235,7 @@ class ClaudeProvider(LLMProvider):
 
         _duration_ms = int((time.monotonic() - _t0) * 1000)
         if self.on_usage:
-            self.on_usage(total_input, total_output, self.skill_context, _duration_ms)
+            self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count)
         return ClaudeResponse(
             content=content_text,
             tool_calls=tool_calls,

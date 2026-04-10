@@ -202,6 +202,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             input_tokens  INTEGER NOT NULL,
             output_tokens INTEGER NOT NULL,
             duration_ms   INTEGER,
+            position_count INTEGER,
             created_at    TEXT NOT NULL DEFAULT (datetime('now'))
         )""",
         "CREATE INDEX IF NOT EXISTS idx_llm_usage_agent ON llm_usage(agent)",
@@ -317,6 +318,8 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE llm_usage ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'")
     if "duration_ms" not in existing_usage:
         conn.execute("ALTER TABLE llm_usage ADD COLUMN duration_ms INTEGER")
+    if "position_count" not in existing_usage:
+        conn.execute("ALTER TABLE llm_usage ADD COLUMN position_count INTEGER")
 
     conn.execute("""CREATE TABLE IF NOT EXISTS usage_resets (
         id       INTEGER PRIMARY KEY AUTOINCREMENT,

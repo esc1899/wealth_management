@@ -94,6 +94,7 @@ class NewsAgent:
             repo:         NewsRepository for persistence
         """
         self._llm.skill_context = skill_name
+        self._llm.position_count = len(tickers)  # Track how many tickers in digest
         digest = await self._run_digest(tickers, ticker_names, skill_name, skill_prompt)
         run = repo.save_run(skill_name=skill_name, tickers=tickers, result=digest)
 

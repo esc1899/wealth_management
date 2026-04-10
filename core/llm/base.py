@@ -21,7 +21,7 @@ class Message:
     content: str
 
 
-UsageCallback = Callable[[int, int, Optional[str], Optional[int]], None]  # (input_tokens, output_tokens, skill, duration_ms)
+UsageCallback = Callable[[int, int, Optional[str], Optional[int], Optional[int]], None]  # (input_tokens, output_tokens, skill, duration_ms, position_count)
 
 
 class LLMProvider(ABC):
@@ -32,6 +32,9 @@ class LLMProvider(ABC):
 
     # Set by agents before each call so usage is attributed to the correct skill.
     skill_context: Optional[str] = None
+
+    # Set by agents before batch calls to track how many positions were processed.
+    position_count: Optional[int] = None
 
     @property
     def model(self) -> str:

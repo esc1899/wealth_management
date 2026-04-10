@@ -181,8 +181,8 @@ class AgentSchedulerService:
         from core.llm.claude import ClaudeProvider
         usage_repo = UsageRepository(conn)
         llm = ClaudeProvider(api_key=self._anthropic_key, model=model)
-        llm.on_usage = lambda i, o, skill=None, dur=None: usage_repo.record(
-            agent_name, model, i, o, skill=skill, source="scheduled", duration_ms=dur
+        llm.on_usage = lambda i, o, skill=None, dur=None, pos=None: usage_repo.record(
+            agent_name, model, i, o, skill=skill, source="scheduled", duration_ms=dur, position_count=pos
         )
         return llm
 

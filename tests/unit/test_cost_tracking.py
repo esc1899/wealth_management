@@ -202,7 +202,8 @@ def test_monthly_estimate_no_usage_data(usage_repo):
 
 
 def test_monthly_estimate_with_data(usage_repo):
-    usage_repo.record("news_digest", "claude-haiku-4-5-20251001", 1_000_000, 0, skill="Standard")
+    # Record with position_count = 20 (20 positions checked in one call)
+    usage_repo.record("news_digest", "claude-haiku-4-5-20251001", 1_000_000, 0, skill="Standard", position_count=20)
     job = MagicMock()
     job.enabled = True
     job.agent_name = "news_digest"
