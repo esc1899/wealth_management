@@ -218,6 +218,18 @@ class SearchAgent:
                 recommendation_source="search_agent",
             )
             saved = self._positions.add(position)
-            return f"'{name}' ({ticker}) added to watchlist (ID: {saved.id})."
+            msg = f"'{name}' ({ticker}) added to watchlist (ID: {saved.id})."
+
+            # Auto-validate with StorycheckerAgent if story exists
+            if story and saved.id:
+                try:
+                    from state import get_storychecker_agent
+                    storychecker = get_storychecker_agent()
+                    session = storychecker.start_session(position=saved)
+                    msg += f" Story validation started (session {session.id})."
+                except Exception as e:
+                    logger.warning(f"Could not auto-validate story: {e}")
+
+            return msg
         except Exception as exc:
             return f"Error adding to watchlist: {exc}"
