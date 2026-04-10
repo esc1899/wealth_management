@@ -10,13 +10,12 @@ from config import config
 from core.i18n import t
 from core.llm.local import OllamaProvider
 from core.llm.base import Message, Role
-from state import get_wealth_snapshot_agent, get_market_agent
+from state import get_wealth_snapshot_agent
 
 st.set_page_config(page_title="Wealth Assistant", page_icon="💰", layout="wide")
 st.title(f"💰 {t('wealth_assistant.title')}")
 
 wealth_agent = get_wealth_snapshot_agent()
-market_agent = get_market_agent()
 
 # ------------------------------------------------------------------
 # Header: Latest snapshot summary
@@ -136,8 +135,9 @@ if st.session_state.get("_prepare_preview"):
                 f"**{t('wealth_assistant.stale_positions')}** ({len(preview.stale_positions)}):"
             )
             for pos in preview.stale_positions:
+                value_str = f"€ {pos['value']:,.0f}" if pos['value'] is not None else "—"
                 st.write(
-                    f"  • {pos['name']}: € {pos['value']:,.0f} ({pos['days_old']} Tage alt)"
+                    f"  • {pos['name']}: {value_str} ({pos['days_old']} Tage alt)"
                 )
 
         if preview.warnings:
