@@ -40,12 +40,13 @@ _NON_TRADEABLE_CLASSES = {"Festgeld", "Bargeld", "Immobilie", "Grundstück"}
 
 # Josef's Regel: target 1/3 per category (Rohstoffe + Immobilien together = 1/3).
 # Maps investment_type → Josef category
+# Note: "Immobilien" investment_type maps to "Rohstoffe" category so they combine
 _JOSEF_CATEGORY = {
     "Wertpapiere": "Aktien",
     "Edelmetalle": "Rohstoffe",
     "Renten": "Renten/Geld",
     "Geld": "Renten/Geld",
-    "Immobilien": "Immobilien",
+    "Immobilien": "Rohstoffe",  # Combined with Edelmetalle, not separate
 }
 
 # ------------------------------------------------------------------
@@ -381,9 +382,9 @@ class RebalanceAgent:
             lines.append(f"**Gesamtvermögen: €{grand_total:,.0f}**")
 
         # ── Section 3: Josef's Regel breakdown ────────────────────────
-        # Aktien: 1/3, Renten/Geld: 1/3, Rohstoffe + Immobilien together: 1/3
+        # Aktien: 1/3, Renten/Geld: 1/3, Rohstoffe (Edelmetalle + Immobilien): 1/3
         lines.append("\n### Josef's Regel — Ist-Verteilung vs. Ziel (je 1/3 = 33,3%)")
-        josef_totals: dict[str, float] = {"Aktien": 0.0, "Renten/Geld": 0.0, "Rohstoffe": 0.0, "Immobilien": 0.0}
+        josef_totals: dict[str, float] = {"Aktien": 0.0, "Renten/Geld": 0.0, "Rohstoffe": 0.0}
         # Use portfolio_positions (not original 'positions') to avoid double-counting watchlist positions
         for pos in portfolio_positions:
             value = (
@@ -414,12 +415,13 @@ class RebalanceAgent:
                     f"| {cat:<22} | €{total:>10,.0f} | {pct:>5.1f}% | 33.3% | {delta_str:>10} |"
                 )
             # Rohstoffe + Immobilien combined (together = 1/3)
-            combined_raw = josef_totals.get("Rohstoffe", 0.0) + josef_totals.get("Immobilien", 0.0)
-            combined_pct = combined_raw / grand_total * 100
-            combined_delta = combined_pct - 33.33
-            combined_delta_str = f"+{combined_delta:.1f}%" if combined_delta >= 0 else f"{combined_delta:.1f}%"
+            # (Immobilien is already mapped to "Rohstoffe" category)
+            raw = josef_totals.get("Rohstoffe", 0.0)
+            pct = raw / grand_total * 100
+            delta = pct - 33.33
+            delta_str = f"+{delta:.1f}%" if delta >= 0 else f"{delta:.1f}%"
             lines.append(
-                f"| Rohstoffe + Immobilien | €{combined_raw:>10,.0f} | {combined_pct:>5.1f}% | 33.3% | {combined_delta_str:>10} |"
+                f"| Rohstoffe + Immobilien | €{raw:>10,.0f} | {pct:>5.1f}% | 33.3% | {delta_str:>10} |"
             )
         else:
             lines.append("*(kein Vermögen mit Wertangabe — Kursdaten oder Schätzwerte fehlen)*")
