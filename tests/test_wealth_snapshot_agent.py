@@ -494,6 +494,138 @@ class TestGettersAndListing:
         wealth_repo.get_by_date.assert_called_once_with("2026-04-10")
 
 
+class TestEditSnapshot:
+    """Tests for snapshot editing."""
+
+    def test_edit_snapshot_recalculates_total(self, agent):
+        """Test that edit_snapshot sums the new breakdown correctly."""
+        agent_obj, (pos_repo, market_repo, wealth_repo, market_agent) = agent
+
+        existing_snapshot = Mock(
+            id=1,
+            date="2026-04-10",
+            total_eur=100_000,
+            breakdown={"Aktie": 30_000, "Immobilie": 70_000},
+        )
+        wealth_repo.get_by_date.return_value = existing_snapshot
+
+        # User corrects Immobilie value
+        new_breakdown = {"Aktie": 30_000, "Immobilie": 85_000}
+        wealth_repo.update.return_value = Mock(
+            id=1,
+            date="2026-04-10",
+            total_eur=115_000,  # Auto-calculated from breakdown sum
+            breakdown=new_breakdown,
+            note="Immobilie korrigiert",
+        )
+
+        result = agent_obj.edit_snapshot(
+            date_str="2026-04-10",
+            new_breakdown=new_breakdown,
+            note="Immobilie korrigiert",
+        )
+
+        # Verify update was called with correct total
+        wealth_repo.update.assert_called_once()
+        call_kwargs = wealth_repo.update.call_args.kwargs
+        assert call_kwargs["total_eur"] == 115_000  # Sum of new breakdown
+        assert call_kwargs["breakdown"] == new_breakdown
+        assert result.total_eur == 115_000
+
+    def test_edit_snapshot_not_found_raises(self, agent):
+        """Test that editing non-existent snapshot raises ValueError."""
+        agent_obj, (pos_repo, market_repo, wealth_repo, market_agent) = agent
+
+        wealth_repo.get_by_date.return_value = None
+
+        with pytest.raises(ValueError, match="No snapshot"):
+            agent_obj.edit_snapshot("2026-04-10", {"Aktie": 100_000})
+
+
+class TestDeleteSnapshot:
+    """Tests for snapshot deletion."""
+
+    def test_delete_snapshot(self, agent):
+        """Test that delete_snapshot removes the snapshot."""
+        agent_obj, (pos_repo, market_repo, wealth_repo, market_agent) = agent
+
+        existing = Mock(id=1, date="2026-04-10")
+        wealth_repo.get_by_date.return_value = existing
+
+        agent_obj.delete_snapshot("2026-04-10")
+
+        wealth_repo.delete.assert_called_once_with(1)
+
+    def test_delete_nonexistent_snapshot_raises(self, agent):
+        """Test that deleting non-existent snapshot raises ValueError."""
+        agent_obj, (pos_repo, market_repo, wealth_repo, market_agent) = agent
+
+        wealth_repo.get_by_date.return_value = None
+
+        with pytest.raises(ValueError, match="No snapshot"):
+            agent_obj.delete_snapshot("2026-04-10")
+
+
+class TestTakeSnapshotOverwrite:
+    """Tests for the overwrite feature."""
+
+    def test_take_snapshot_overwrite_true_replaces_existing(self, agent):
+        """Test that overwrite=True deletes old snapshot and creates new one."""
+        agent_obj, (pos_repo, market_repo, wealth_repo, market_agent) = agent
+
+        existing = Mock(id=1, date="2026-04-10", total_eur=100_000)
+        wealth_repo.get_by_date.return_value = existing
+
+        valuations = [
+            PortfolioValuation(
+                symbol="AAPL",
+                name="Apple",
+                asset_class="Aktie",
+                investment_type="Aktie",
+                quantity=10,
+                unit="Stück",
+                purchase_price_eur=150,
+                current_price_eur=200,
+                current_value_eur=2_000,
+                cost_basis_eur=1_500,
+                pnl_eur=500,
+                pnl_pct=33.3,
+                fetched_at=datetime.utcnow(),
+            ),
+        ]
+        market_agent.get_portfolio_valuation.return_value = valuations
+
+        wealth_repo.create.return_value = Mock(
+            id=2,
+            date="2026-04-10",
+            total_eur=2_000,
+            breakdown={"Aktie": 2_000},
+            coverage_pct=100.0,
+        )
+
+        # Call with overwrite=True
+        result = agent_obj.take_snapshot(date_str="2026-04-10", overwrite=True)
+
+        # Verify delete was called first
+        wealth_repo.delete.assert_called_once_with(1)
+        # Verify create was called after
+        wealth_repo.create.assert_called_once()
+        assert result.total_eur == 2_000
+
+    def test_take_snapshot_overwrite_false_default_raises(self, agent):
+        """Test that overwrite=False (default) raises ValueError if exists."""
+        agent_obj, (pos_repo, market_repo, wealth_repo, market_agent) = agent
+
+        existing = Mock(id=1, date="2026-04-10", total_eur=100_000)
+        wealth_repo.get_by_date.return_value = existing
+
+        with pytest.raises(ValueError, match="already exists"):
+            agent_obj.take_snapshot(date_str="2026-04-10", overwrite=False)
+
+        # Delete should NOT be called
+        wealth_repo.delete.assert_not_called()
+
+
 class TestErrorHandling:
     """Tests for error handling and edge cases."""
 

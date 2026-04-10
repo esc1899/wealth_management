@@ -55,6 +55,7 @@ class WealthSnapshotAgent:
         date_str: Optional[str] = None,
         is_manual: bool = False,
         note: Optional[str] = None,
+        overwrite: bool = False,
     ) -> WealthSnapshot:
         """
         Take a snapshot of total wealth (portfolio + non-tradeable assets).
@@ -63,12 +64,13 @@ class WealthSnapshotAgent:
             date_str: Date in YYYY-MM-DD format (default: today)
             is_manual: True if created by user/agent chat, not scheduled
             note: Optional comment
+            overwrite: If True, delete existing snapshot for this date before creating new one
 
         Returns:
             Persisted WealthSnapshot
 
         Raises:
-            ValueError: If a snapshot for this date already exists
+            ValueError: If a snapshot for this date already exists and overwrite=False
         """
         if date_str is None:
             date_str = date.today().isoformat()
@@ -76,7 +78,10 @@ class WealthSnapshotAgent:
         # Check if snapshot already exists
         existing = self._wealth.get_by_date(date_str)
         if existing is not None:
-            raise ValueError(f"Snapshot for {date_str} already exists")
+            if not overwrite:
+                raise ValueError(f"Snapshot for {date_str} already exists")
+            # Delete old snapshot before creating new one
+            self._wealth.delete(existing.id)
 
         # Calculate current portfolio valuation
         valuations = self._market_data_agent.get_portfolio_valuation(include_watchlist=False)
@@ -231,6 +236,55 @@ class WealthSnapshotAgent:
         # Save updated position
         updated = self._positions.update(pos)
         return updated
+
+    def edit_snapshot(
+        self,
+        date_str: str,
+        new_breakdown: Dict[str, float],
+        note: Optional[str] = None,
+    ) -> WealthSnapshot:
+        """
+        Edit an existing snapshot — update breakdown and recalculate total.
+
+        Args:
+            date_str: Date in YYYY-MM-DD format
+            new_breakdown: New asset class breakdown dict {class: eur_value}
+            note: Optional note/comment
+
+        Returns:
+            Updated WealthSnapshot
+
+        Raises:
+            ValueError: If snapshot for this date doesn't exist
+        """
+        existing = self._wealth.get_by_date(date_str)
+        if existing is None:
+            raise ValueError(f"No snapshot for {date_str}")
+
+        # Recalculate total from breakdown
+        new_total = sum(new_breakdown.values())
+
+        return self._wealth.update(
+            snapshot_id=existing.id,
+            total_eur=new_total,
+            breakdown=new_breakdown,
+            note=note,
+        )
+
+    def delete_snapshot(self, date_str: str) -> None:
+        """
+        Delete a snapshot.
+
+        Args:
+            date_str: Date in YYYY-MM-DD format
+
+        Raises:
+            ValueError: If snapshot for this date doesn't exist
+        """
+        existing = self._wealth.get_by_date(date_str)
+        if existing is None:
+            raise ValueError(f"No snapshot for {date_str}")
+        self._wealth.delete(existing.id)
 
     # ------------------------------------------------------------------
     # List and access

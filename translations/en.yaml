@@ -96,9 +96,10 @@ wealth_assistant:
   snapshot_success: "Snapshot created! ✓"
   preview_title: "📊 Snapshot Preview"
   stale_positions: "Stale Positions"
-  chat_title: "Wealth Chat"
-  chat_help: "Ask about your wealth history or correct snapshots."
-  input_placeholder: "e.g. 'Why did wealth decrease?'"
+  overwrite_title: "Overwrite Snapshot?"
+  overwrite_message: "Snapshot for today already exists. Recalculate and overwrite?"
+  overwrite_confirm: "Overwrite"
+  overwrite_cancel: "Cancel"
 
 portfolio_chat:
   title: "Portfolio Chat"

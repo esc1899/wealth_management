@@ -1,15 +1,11 @@
 """
-Wealth Assistant — manage portfolio snapshots, view history, and discuss wealth trends.
-Private agent using local Ollama LLM.
+Wealth Assistant — manage portfolio snapshots and view history.
+Create, preview, edit, and delete wealth snapshots with asset class breakdown.
 """
 
-import asyncio
 from datetime import date
 import streamlit as st
-from config import config
 from core.i18n import t
-from core.llm.local import OllamaProvider
-from core.llm.base import Message, Role
 from state import get_wealth_snapshot_agent
 
 st.set_page_config(page_title="Wealth Assistant", page_icon="💰", layout="wide")
@@ -78,16 +74,19 @@ st.divider()
 # ------------------------------------------------------------------
 col_prep, col_snap, col_space = st.columns([2, 2, 4])
 
-prepare_clicked = False
-snapshot_clicked = False
-
 with col_prep:
     if st.button(
         f"🔄 {t('wealth_assistant.prepare')}",
         use_container_width=True,
         help=t("wealth_assistant.prepare_help"),
     ):
-        prepare_clicked = True
+        st.session_state["_prepare_preview"] = None
+        try:
+            preview = wealth_agent.prepare_snapshot()
+            st.session_state["_prepare_preview"] = preview
+            st.success(t("wealth_assistant.prepare_success"))
+        except Exception as exc:
+            st.error(f"⚠️ {t('common.agent_error')}: {exc}")
 
 with col_snap:
     if st.button(
@@ -95,33 +94,21 @@ with col_snap:
         use_container_width=True,
         help=t("wealth_assistant.take_snapshot_help"),
     ):
-        snapshot_clicked = True
-
-# Handle prepare action
-if prepare_clicked:
-    st.session_state["_prepare_preview"] = None
-    try:
-        preview = wealth_agent.prepare_snapshot()
-        st.session_state["_prepare_preview"] = preview
-        st.success(
-            t("wealth_assistant.prepare_success")
-        )
-    except Exception as exc:
-        st.error(f"⚠️ {t('common.agent_error')}: {exc}")
-
-# Handle snapshot action
-if snapshot_clicked:
-    try:
-        snapshot = wealth_agent.take_snapshot(is_manual=False)
-        st.success(
-            t("wealth_assistant.snapshot_success")
-            + f"\n€ {snapshot.total_eur:,.0f} | {snapshot.coverage_pct:.0f}% Coverage"
-        )
-        st.rerun()
-    except ValueError as exc:
-        st.warning(f"⚠️ {str(exc)}")
-    except Exception as exc:
-        st.error(f"⚠️ {t('common.agent_error')}: {exc}")
+        today = date.today().isoformat()
+        existing = wealth_agent.get_snapshot_for_date(today)
+        if existing:
+            st.session_state["_overwrite_pending"] = True
+            st.rerun()
+        else:
+            try:
+                snapshot = wealth_agent.take_snapshot(is_manual=False)
+                st.success(
+                    t("wealth_assistant.snapshot_success")
+                    + f"\n€ {snapshot.total_eur:,.0f} | {snapshot.coverage_pct:.0f}% Coverage"
+                )
+                st.rerun()
+            except Exception as exc:
+                st.error(f"⚠️ {t('common.agent_error')}: {exc}")
 
 # Show prepare preview if available
 if st.session_state.get("_prepare_preview"):
@@ -146,99 +133,116 @@ if st.session_state.get("_prepare_preview"):
 st.divider()
 
 # ------------------------------------------------------------------
-# LLM Chat: questions, corrections, analysis
+# Overwrite confirmation dialog
 # ------------------------------------------------------------------
-st.subheader(t("wealth_assistant.chat_title"))
-st.caption(t("wealth_assistant.chat_help"))
+@st.dialog(t("wealth_assistant.overwrite_title"), width="large")
+def _overwrite_confirm_dialog(date_str: str):
+    """Dialog to confirm overwriting an existing snapshot."""
+    existing = wealth_agent.get_snapshot_for_date(date_str)
+    st.write(f"**{t('wealth_assistant.overwrite_message')}**")
+    st.write(f"{date_str}: € {existing.total_eur:,.0f}")
 
-# Initialize chat state
-if "_wealth_session_id" not in st.session_state:
-    st.session_state["_wealth_session_id"] = None
-    st.session_state["_wealth_messages"] = []
-    st.session_state["_wealth_error"] = None
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button(t("wealth_assistant.overwrite_confirm"), type="primary"):
+            try:
+                wealth_agent.take_snapshot(date_str=date_str, overwrite=True, is_manual=True)
+                st.session_state.pop("_overwrite_pending", None)
+                st.success(t("wealth_assistant.snapshot_success"))
+                st.rerun()
+            except Exception as exc:
+                st.error(f"⚠️ {t('common.agent_error')}: {exc}")
+    with col2:
+        if st.button(t("wealth_assistant.overwrite_cancel")):
+            st.session_state.pop("_overwrite_pending", None)
+            st.rerun()
 
-# Create or load session
-if st.session_state["_wealth_session_id"] is None:
-    try:
-        # Initialize Ollama LLM (local) — reuse config from app settings
-        llm = OllamaProvider(
-            host=config.OLLAMA_HOST,
-            model=config.OLLAMA_MODEL,
-        )
-        st.session_state["_wealth_llm"] = llm
-        st.session_state["_wealth_session_id"] = "wealth_chat"
-    except Exception as exc:
-        st.error(f"⚠️ {t('common.agent_error')}: {exc}")
-        st.stop()
 
-# Display chat history
-for msg in st.session_state["_wealth_messages"]:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# Show overwrite dialog if pending
+if st.session_state.get("_overwrite_pending"):
+    _overwrite_confirm_dialog(date.today().isoformat())
 
-# Display any error from previous run
-if st.session_state.get("_wealth_error"):
-    st.error(f"⚠️ {st.session_state['_wealth_error']}")
-    st.session_state["_wealth_error"] = None
+st.divider()
 
-# Chat input
-user_input = st.chat_input(
-    t("wealth_assistant.input_placeholder")
-)
+# ------------------------------------------------------------------
+# Snapshot list with edit/delete
+# ------------------------------------------------------------------
+st.subheader("📋 Letzte Snapshots")
 
-if user_input:
-    # Add user message to history
-    st.session_state["_wealth_messages"].append({"role": "user", "content": user_input})
-
-    with st.chat_message("user"):
-        st.markdown(user_input)
-
-    # Build context for LLM
-    context = ""
-    snapshots = wealth_agent.list_snapshots(days=365)
+try:
+    snapshots = wealth_agent.list_snapshots(days=None)
     if snapshots:
-        context += f"**Letzte Snapshots (365 Tage):**\n"
-        for snap in snapshots[-10:]:  # Last 10 snapshots
-            context += f"- {snap.date}: € {snap.total_eur:,.0f} ({snap.coverage_pct:.0f}% Coverage)\n"
+        # Show last 10 snapshots
+        for snapshot in snapshots[-10:]:
+            col_info, col_actions = st.columns([4, 1])
+            with col_info:
+                st.write(f"**{snapshot.date}** — € {snapshot.total_eur:,.0f} ({snapshot.coverage_pct:.0f}% Coverage) {'✓ Manuell' if snapshot.is_manual else ''}")
+            with col_actions:
+                if st.button(f"✏️ Bearbeiten", key=f"edit_{snapshot.id}"):
+                    st.session_state["_edit_snapshot_id"] = snapshot.id
+                    st.rerun()
 
-    if latest:
-        context += f"\n**Letzter Snapshot Details:**\n"
-        context += f"- Datum: {latest.date}\n"
-        context += f"- Gesamtwert: € {latest.total_eur:,.0f}\n"
-        context += f"- Aufschlüsselung: {', '.join(f'{k}: € {v:,.0f}' for k, v in latest.breakdown.items())}\n"
-        context += f"- Coverage: {latest.coverage_pct:.0f}%\n"
-        if latest.missing_pos:
-            context += f"- Fehlende Werte: {', '.join(latest.missing_pos)}\n"
+        # Edit dialog
+        @st.dialog("Snapshot bearbeiten", width="large")
+        def _edit_snapshot_dialog(snapshot):
+            st.write(f"**{snapshot.date}**")
 
-    # Prepare prompt
-    system_prompt = f"""Du bist ein hilfsbereiter Vermögens-Assistent.
-Du antwortest auf Fragen zum Portfolio-Vermögen und seiner Entwicklung.
+            # Editable inputs for each asset class
+            new_breakdown = {}
+            for asset_class, value in sorted(snapshot.breakdown.items()):
+                new_breakdown[asset_class] = st.number_input(
+                    asset_class,
+                    value=float(value),
+                    min_value=0.0,
+                    step=1000.0,
+                    format="%.2f",
+                    key=f"_edit_{asset_class}_{snapshot.date}",
+                )
 
-{context}
+            # Auto-calculated total
+            new_total = sum(new_breakdown.values())
+            st.metric("Gesamtwert", f"€ {new_total:,.0f}")
 
-Sei sachlich und konkret. Wenn Snapshots fehlen oder Daten unvollständig sind, weise darauf hin.
-Wenn der Nutzer einen Snapshot korrigieren möchte, bestätige die neue Information.
-"""
-
-    # Call Ollama
-    try:
-        with st.spinner(t("common.thinking")):
-            messages = [
-                Message(Role.SYSTEM, system_prompt),
-                Message(Role.USER, user_input),
-            ]
-            assistant_message = asyncio.run(
-                st.session_state["_wealth_llm"].chat(messages, max_tokens=1024)
+            # Note field
+            new_note = st.text_input(
+                "Notiz",
+                value=snapshot.note or "",
+                key=f"_edit_note_{snapshot.date}",
             )
 
-        # Add response to history
-        st.session_state["_wealth_messages"].append(
-            {"role": "assistant", "content": assistant_message}
-        )
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button("Speichern", type="primary", key=f"_save_{snapshot.date}"):
+                    try:
+                        wealth_agent.edit_snapshot(
+                            snapshot.date,
+                            new_breakdown,
+                            new_note or None,
+                        )
+                        st.session_state.pop("_edit_snapshot_id", None)
+                        st.success("Snapshot gespeichert!")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"⚠️ {t('common.agent_error')}: {exc}")
+            with col2:
+                if st.button("Löschen", key=f"_del_{snapshot.date}"):
+                    try:
+                        wealth_agent.delete_snapshot(snapshot.date)
+                        st.session_state.pop("_edit_snapshot_id", None)
+                        st.success("Snapshot gelöscht!")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"⚠️ {t('common.agent_error')}: {exc}")
 
-        with st.chat_message("assistant"):
-            st.markdown(assistant_message)
+        # Show edit dialog if selected
+        if st.session_state.get("_edit_snapshot_id"):
+            for snap in snapshots:
+                if snap.id == st.session_state["_edit_snapshot_id"]:
+                    _edit_snapshot_dialog(snap)
+                    break
 
-    except Exception as exc:
-        st.session_state["_wealth_error"] = f"{t('common.agent_error')}: {exc}"
-        st.rerun()
+    else:
+        st.info(t("dashboard.no_snapshots"))
+
+except Exception as exc:
+    st.warning(f"⚠️ {t('common.agent_error')}: {exc}")
