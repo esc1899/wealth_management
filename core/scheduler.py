@@ -172,6 +172,8 @@ class AgentSchedulerService:
             await self._run_storychecker_job(job, conn)
         elif job.agent_name == "fundamental":
             await self._run_fundamental_job(job, conn)
+        elif job.agent_name == "wealth_snapshot":
+            await self._run_wealth_snapshot_job(job, conn)
         else:
             logger.warning("Unknown agent_name '%s' in job %s", job.agent_name, job.id)
 
@@ -311,6 +313,44 @@ class AgentSchedulerService:
             analyses_repo=analyses_repo,
         )
         logger.info("Fundamental job %s completed for %d positions", job.id, len(positions))
+
+    async def _run_wealth_snapshot_job(self, job: ScheduledJob, conn) -> None:
+        """Create a periodic wealth snapshot (no LLM needed)."""
+        from agents.wealth_snapshot_agent import WealthSnapshotAgent
+        from core.storage.market_data import MarketDataRepository
+        from core.storage.wealth_snapshots import WealthSnapshotRepository
+
+        enc = build_encryption_service(self._enc_key, self._salt_path)
+        positions_repo = PositionsRepository(conn, enc)
+        market_repo = MarketDataRepository(conn)
+        wealth_repo = WealthSnapshotRepository(conn)
+
+        # Create a temporary market data agent for portfolio valuation
+        from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
+        fetcher = MarketDataFetcher(rate_limiter=RateLimiter(calls_per_second=1))
+        market_data_agent = MarketDataAgent(
+            positions_repo=positions_repo,
+            market_repo=market_repo,
+            fetcher=fetcher,
+            db_path=self._db_path,
+            encryption_key=self._enc_key,
+        )
+
+        # Take snapshot
+        agent = WealthSnapshotAgent(
+            positions_repo=positions_repo,
+            market_repo=market_repo,
+            wealth_repo=wealth_repo,
+            market_data_agent=market_data_agent,
+        )
+
+        snapshot = agent.take_snapshot(is_manual=False)
+        logger.info(
+            "Wealth snapshot job %s completed: %s EUR (%d%% coverage)",
+            job.id,
+            f"{snapshot.total_eur:,.0f}",
+            int(snapshot.coverage_pct),
+        )
 
     def _open_conn(self):
         conn = get_connection(self._db_path)
