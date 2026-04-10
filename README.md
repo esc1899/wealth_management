@@ -24,7 +24,7 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Rebalancing** — Josef's Rule (1/3 each: equities / bonds+cash / real estate) as hidden strategy layer
 
 ### Wealth Snapshots (historical tracking)
-- **Wealth Timeline** — automatic daily snapshots of total portfolio value over time; breakdown by asset class
+- **Wealth Timeline** — view portfolio value over time with asset class breakdown
 - **Manual Snapshots** — capture wealth state on demand with optional note
 - **Edit & Correct** — modify individual asset class values retroactively; total recalculates automatically
 - **Snapshot Management** — delete, view history, detect stale manual valuations (>30 days)
