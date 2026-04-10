@@ -127,10 +127,7 @@ if snapshot_clicked:
 # Show prepare preview if available
 if st.session_state.get("_prepare_preview"):
     preview = st.session_state["_prepare_preview"]
-    with st.expander(
-        t("wealth_assistant.preview_title"),
-        open=True,
-    ):
+    with st.expander(t("wealth_assistant.preview_title"), expanded=True):
         st.write(f"**{t('dashboard.total_wealth')}**: € {preview.total_eur:,.0f}")
         st.write(f"**{t('wealth_assistant.coverage')}**: {preview.coverage_pct:.0f}%")
 
