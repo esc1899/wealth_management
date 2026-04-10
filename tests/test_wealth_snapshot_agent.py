@@ -278,6 +278,50 @@ class TestPrepareSnapshot:
             assert preview.stale_positions[0]["name"] == "Immobilie München"
             assert preview.stale_positions[0]["days_old"] > 30
 
+    def test_prepare_snapshot_stale_position_with_no_value(self, agent):
+        """Test stale position that has valuation_date but no estimated_value.
+
+        This covers the edge case where a manual position is > 30 days old
+        but has no estimated_value set. The UI must handle None values gracefully.
+        """
+        agent_obj, (pos_repo, market_repo, wealth_repo, market_agent) = agent
+
+        valuations = []
+        market_agent.get_portfolio_valuation.return_value = valuations
+
+        # Manual position: has valuation_date but NO estimated_value
+        old_valuation_date = "2026-03-01"  # > 30 days old
+        manual_pos = Position(
+            id=1,
+            asset_class="Festgeld",
+            investment_type="Geld",
+            name="Festgeld Sparkasse",
+            quantity=None,
+            unit="€",
+            added_date=date(2025, 1, 1),
+            # extra_data has valuation_date but NO estimated_value
+            extra_data={"valuation_date": old_valuation_date},
+        )
+        pos_repo.get_portfolio.return_value = [manual_pos]
+
+        # Mock asset class registry
+        import unittest.mock as mock
+        with mock.patch(
+            "agents.wealth_snapshot_agent.get_asset_class_registry"
+        ) as mock_registry:
+            mock_cfg = Mock()
+            mock_cfg.auto_fetch = False
+            mock_registry.return_value.get.return_value = mock_cfg
+
+            preview = agent_obj.prepare_snapshot(date_str="2026-04-10")
+
+            # Should detect stale position even without estimated_value
+            assert len(preview.stale_positions) > 0
+            stale = preview.stale_positions[0]
+            assert stale["name"] == "Festgeld Sparkasse"
+            assert stale["value"] is None  # Key assertion: value can be None
+            assert stale["days_old"] > 30
+
 
 class TestUpdateManualPosition:
     def test_update_position_value(self, agent):
@@ -335,6 +379,86 @@ class TestUpdateManualPosition:
             )
 
 
+class TestEndToEndWorkflow:
+    """Integration tests for prepare → take snapshot workflow."""
+
+    def test_prepare_then_take_snapshot_flow(self, agent):
+        """Test the complete prepare-preview-snapshot workflow."""
+        agent_obj, (pos_repo, market_repo, wealth_repo, market_agent) = agent
+
+        # Step 1: User calls prepare_snapshot() to preview data
+        valuations = [
+            PortfolioValuation(
+                symbol="AAPL",
+                name="Apple Inc.",
+                asset_class="Aktie",
+                investment_type="Aktie",
+                quantity=100,
+                unit="Stück",
+                purchase_price_eur=150,
+                current_price_eur=200,
+                current_value_eur=20_000,
+                cost_basis_eur=15_000,
+                pnl_eur=5_000,
+                pnl_pct=33.3,
+                fetched_at=datetime.utcnow(),
+            ),
+            PortfolioValuation(
+                symbol=None,
+                name="Immobilie München",
+                asset_class="Immobilie",
+                investment_type="Immobilien",
+                quantity=None,
+                unit="Stück",
+                purchase_price_eur=None,
+                current_price_eur=None,
+                current_value_eur=500_000,
+                cost_basis_eur=None,
+                pnl_eur=None,
+                pnl_pct=None,
+                fetched_at=None,
+            ),
+        ]
+        market_agent.get_portfolio_valuation.return_value = valuations
+        pos_repo.get_portfolio.return_value = []
+
+        # Prepare should show full breakdown
+        preview = agent_obj.prepare_snapshot(date_str="2026-04-10")
+        assert preview.total_eur == 520_000
+        assert preview.coverage_pct == 100.0
+        assert len(preview.missing_pos) == 0
+
+        # Step 2: User clicks take_snapshot
+        wealth_repo.get_by_date.return_value = None
+        wealth_repo.create.return_value = Mock(
+            id=1,
+            date="2026-04-10",
+            total_eur=520_000,
+            breakdown={"Aktie": 20_000, "Immobilie": 500_000},
+            coverage_pct=100.0,
+            missing_pos=None,
+            is_manual=False,
+            note=None,
+        )
+
+        # Take snapshot with same date
+        snapshot = agent_obj.take_snapshot(
+            date_str="2026-04-10",
+            is_manual=False,
+            note=None,
+        )
+
+        # Verify snapshot was created
+        assert snapshot.total_eur == 520_000
+        assert snapshot.coverage_pct == 100.0
+        wealth_repo.create.assert_called_once()
+
+        # Verify snapshot data matches prepare preview
+        call_args = wealth_repo.create.call_args
+        assert call_args.kwargs["total_eur"] == preview.total_eur
+        assert call_args.kwargs["coverage_pct"] == preview.coverage_pct
+
+
 class TestGettersAndListing:
     def test_get_latest_snapshot(self, agent):
         agent_obj, (pos_repo, market_repo, wealth_repo, market_agent) = agent
@@ -368,3 +492,70 @@ class TestGettersAndListing:
 
         assert result == mock_snapshot
         wealth_repo.get_by_date.assert_called_once_with("2026-04-10")
+
+
+class TestErrorHandling:
+    """Tests for error handling and edge cases."""
+
+    def test_prepare_with_empty_portfolio(self, agent):
+        """Prepare should handle empty portfolio gracefully."""
+        agent_obj, (pos_repo, market_repo, wealth_repo, market_agent) = agent
+
+        market_agent.get_portfolio_valuation.return_value = []
+        pos_repo.get_portfolio.return_value = []
+
+        preview = agent_obj.prepare_snapshot(date_str="2026-04-10")
+
+        # Should be valid SnapshotPreview with all empty/zero values
+        assert preview.total_eur == 0
+        assert preview.coverage_pct == 100.0  # 0 positions = 100% coverage
+        assert preview.missing_pos == []
+        assert preview.stale_positions == []
+
+    def test_prepare_all_positions_missing_values(self, agent):
+        """Prepare should handle portfolio with no valuations."""
+        agent_obj, (pos_repo, market_repo, wealth_repo, market_agent) = agent
+
+        valuations = [
+            PortfolioValuation(
+                symbol=None,
+                name="Festgeld 1",
+                asset_class="Festgeld",
+                investment_type="Geld",
+                quantity=None,
+                unit="€",
+                purchase_price_eur=None,
+                current_price_eur=None,
+                current_value_eur=None,  # No value
+                cost_basis_eur=None,
+                pnl_eur=None,
+                pnl_pct=None,
+                fetched_at=None,
+            ),
+            PortfolioValuation(
+                symbol=None,
+                name="Immobilie",
+                asset_class="Immobilie",
+                investment_type="Immobilien",
+                quantity=None,
+                unit="Stück",
+                purchase_price_eur=None,
+                current_price_eur=None,
+                current_value_eur=None,  # No value
+                cost_basis_eur=None,
+                pnl_eur=None,
+                pnl_pct=None,
+                fetched_at=None,
+            ),
+        ]
+        market_agent.get_portfolio_valuation.return_value = valuations
+        pos_repo.get_portfolio.return_value = []
+
+        preview = agent_obj.prepare_snapshot(date_str="2026-04-10")
+
+        # All positions missing
+        assert preview.total_eur == 0
+        assert preview.coverage_pct == 0  # 0 out of 2
+        assert len(preview.missing_pos) == 2
+        assert "Festgeld 1" in preview.missing_pos
+        assert "Immobilie" in preview.missing_pos
