@@ -31,6 +31,7 @@ nav:
   analysis: "Analysis"
   portfolio_chat: "Portfolio Chat"
   rebalance_chat: "Invest / Rebalance"
+  wealth_assistant: "Wealth Assistant"
   research_chat: "Research Chat"
   news_chat: "News Digest"
   search_chat: "Investment Search"
@@ -81,6 +82,23 @@ dashboard:
   wealth_by_class: "Wealth by Asset Class"
   show_breakdown: "Show by Asset Class"
   no_snapshots: "No wealth history yet. Snapshots are created via the Wealth Assistant."
+
+wealth_assistant:
+  title: "Wealth Assistant"
+  latest_snapshot: "Latest Snapshot"
+  coverage: "Data Completeness"
+  is_manual: "Corrected"
+  prepare: "Prepare"
+  prepare_help: "Refresh market data, check stale valuations"
+  take_snapshot: "Take Snapshot"
+  take_snapshot_help: "Save wealth state"
+  prepare_success: "Preparation complete. ✓"
+  snapshot_success: "Snapshot created! ✓"
+  preview_title: "📊 Snapshot Preview"
+  stale_positions: "Stale Positions"
+  chat_title: "Wealth Chat"
+  chat_help: "Ask about your wealth history or correct snapshots."
+  input_placeholder: "e.g. 'Why did wealth decrease?'"
 
 portfolio_chat:
   title: "Portfolio Chat"

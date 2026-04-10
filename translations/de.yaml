@@ -31,6 +31,7 @@ nav:
   analysis: "Analyse"
   portfolio_chat: "Portfolio Chat"
   rebalance_chat: "Investieren / Rebalancieren"
+  wealth_assistant: "Vermögens-Assistent"
   research_chat: "Research Chat"
   news_chat: "News Digest"
   search_chat: "Investment Search"
@@ -81,6 +82,23 @@ dashboard:
   wealth_by_class: "Vermögen nach Asset-Klasse"
   show_breakdown: "Nach Asset-Klasse anzeigen"
   no_snapshots: "Noch keine Vermögenshistorie vorhanden. Snapshots werden über den Vermögens-Assistenten erstellt."
+
+wealth_assistant:
+  title: "Vermögens-Assistent"
+  latest_snapshot: "Letzter Snapshot"
+  coverage: "Datenvollständigkeit"
+  is_manual: "Korrigiert"
+  prepare: "Vorbereiten"
+  prepare_help: "Marktdaten aktualisieren, veraltete Positionen prüfen"
+  take_snapshot: "Snapshot aufnehmen"
+  take_snapshot_help: "Vermögensstand speichern"
+  prepare_success: "Vorbereitung abgeschlossen. ✓"
+  snapshot_success: "Snapshot erstellt! ✓"
+  preview_title: "📊 Snapshot-Vorschau"
+  stale_positions: "Veraltete Positionen"
+  chat_title: "Vermögens-Chat"
+  chat_help: "Stelle Fragen zu deiner Vermögenshistorie, oder korrigiere Snapshots."
+  input_placeholder: "z.B. 'Warum ist das Vermögen gesunken?'"
 
 portfolio_chat:
   title: "Portfolio Chat"
