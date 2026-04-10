@@ -3,11 +3,13 @@ Wealth Assistant — manage portfolio snapshots, view history, and discuss wealt
 Private agent using local Ollama LLM.
 """
 
+import asyncio
 from datetime import date
 import streamlit as st
+from config import config
 from core.i18n import t
 from core.llm.local import OllamaProvider
-from core.storage.base import get_connection, init_db, migrate_db
+from core.llm.base import Message, Role
 from state import get_wealth_snapshot_agent, get_market_agent
 
 st.set_page_config(page_title="Wealth Assistant", page_icon="💰", layout="wide")
@@ -161,14 +163,11 @@ if "_wealth_session_id" not in st.session_state:
 # Create or load session
 if st.session_state["_wealth_session_id"] is None:
     try:
-        # Initialize Ollama LLM (local)
+        # Initialize Ollama LLM (local) — reuse config from app settings
         llm = OllamaProvider(
-            base_url="http://localhost:11434",
-            model="qwen3:8b",
+            host=config.OLLAMA_HOST,
+            model=config.OLLAMA_MODEL,
         )
-
-        # For now, we'll build a simple chat without persistent sessions
-        # (similar to portfolio_chat pattern)
         st.session_state["_wealth_llm"] = llm
         st.session_state["_wealth_session_id"] = "wealth_chat"
     except Exception as exc:
@@ -227,15 +226,13 @@ Wenn der Nutzer einen Snapshot korrigieren möchte, bestätige die neue Informat
     # Call Ollama
     try:
         with st.spinner(t("common.thinking")):
-            # Simple chat without streaming for now
-            response = st.session_state["_wealth_llm"].chat_simple(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_input},
-                ],
-                max_tokens=1024,
+            messages = [
+                Message(Role.SYSTEM, system_prompt),
+                Message(Role.USER, user_input),
+            ]
+            assistant_message = asyncio.run(
+                st.session_state["_wealth_llm"].chat(messages, max_tokens=1024)
             )
-            assistant_message = response
 
         # Add response to history
         st.session_state["_wealth_messages"].append(
