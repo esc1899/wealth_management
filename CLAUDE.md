@@ -1,5 +1,22 @@
 # Arbeitsweise in diesem Projekt
 
+## 📍 Dokumentations-Struktur (Single Source of Truth)
+
+Damit zukünftige Sessions alles finden:
+
+| Datei | Inhalt | Wer updatet |
+|---|---|---|
+| **CLAUDE.md** (diese Datei) | Arbeitsweise, Process, Stack-Fallstricke | Claude bei Prozess-Änderungen |
+| **ARCHITECTURE.md** | Architektur-Entscheidungen, Design-Patterns, Data-Model | Claude bei Arch-Änderungen |
+| **BACKLOG.md** | Features (geplant + abgeschlossen), Status, Prioritäten | User/Claude beim Planning |
+| **Memory/user_profile.md** | Wer ist Erik, wie arbeitet er | Claude nach User-Feedback |
+| **Memory/feedback.md** | Feedback zur Arbeitsweise mit Claude | Claude nach User-Feedback |
+| **Memory/private_skills.md** | Persönliche Skills (Wu-Wei, Lindy+Potential, etc) | User-Configured |
+
+**Regel**: Projekt-Sachen → Git-Repo (CLAUDE/ARCHITECTURE/BACKLOG). Persönliche Erkenntnisse → Memory. Nicht duplizieren.
+
+---
+
 ## Vor jeder Änderung
 - Alle relevanten Dateien lesen, bevor Code geändert wird
 - Bei nicht-trivialen Aufgaben: Plan Mode nutzen (`/plan`)
