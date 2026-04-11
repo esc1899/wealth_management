@@ -315,10 +315,10 @@ def _verdict_icon_short(verdict: str) -> str:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Section 3: Investment Overview
+# Section 3: Investment Overview — How each position fits the story
 # ──────────────────────────────────────────────────────────────────────
 
-st.subheader("3️⃣ Einzelne Investitionen")
+st.subheader("3️⃣ Einzelne Investitionen — Passung zur Portfolio Story")
 
 portfolio = positions_repo.get_portfolio()
 if not portfolio:
@@ -330,44 +330,76 @@ else:
     verdicts_fundamental = analyses_repo.get_latest_bulk(pos_ids, "fundamental")
     verdicts_consensus = analyses_repo.get_latest_bulk(pos_ids, "consensus_gap")
 
-    # Sort by worst verdict (simplified: just list them)
-    for pos in portfolio:
-        with st.container(border=True):
-            col1, col2 = st.columns([3, 2])
+    # Filter: only show positions with at least one verdict
+    positions_with_verdicts = [
+        pos for pos in portfolio
+        if pos.id and (
+            verdicts_story.get(pos.id)
+            or verdicts_fundamental.get(pos.id)
+            or verdicts_consensus.get(pos.id)
+        )
+    ]
 
-            with col1:
-                st.markdown(
-                    f"**{pos.ticker or pos.name}** — {pos.name}\n"
-                    f"_{pos.asset_class}_"
-                )
+    if not positions_with_verdicts:
+        st.info("ℹ️ Keine Positionen mit Analysen gefunden.")
+    else:
+        # Sort by worst verdict (simplified: just list them)
+        for pos in positions_with_verdicts:
+            vs = verdicts_story.get(pos.id)
+            vf = verdicts_fundamental.get(pos.id)
+            vc = verdicts_consensus.get(pos.id)
 
-            with col2:
-                # Show 3 verdicts inline
-                vs = verdicts_story.get(pos.id)
-                vf = verdicts_fundamental.get(pos.id)
-                vc = verdicts_consensus.get(pos.id)
+            with st.container(border=True):
+                col1, col2, col3 = st.columns([2, 2, 1])
 
-                verdict_str = ""
-                if vs:
-                    verdict_str += f"{_verdict_icon_short(vs.verdict)} "
-                if vf:
-                    verdict_str += f"{_verdict_icon_short(vf.verdict)} "
-                if vc:
-                    verdict_str += f"{_verdict_icon_short(vc.verdict)}"
-
-                st.text(verdict_str.strip() or "⚪ Keine Analyse")
-
-            # Expander for details
-            with st.expander("Details anzeigen"):
-                if vs:
+                with col1:
                     st.markdown(
-                        f"**Story:** {_verdict_icon_short(vs.verdict)} {vs.verdict}\n_{vs.summary}_"
+                        f"**{pos.ticker or pos.name}** — {pos.name}\n"
+                        f"_{pos.asset_class}_"
                     )
-                if vf:
-                    st.markdown(
-                        f"**Fundamental:** {_verdict_icon_short(vf.verdict)} {vf.verdict}\n_{vf.summary}_"
-                    )
-                if vc:
-                    st.markdown(
-                        f"**Consensus Gap:** {_verdict_icon_short(vc.verdict)} {vc.verdict}\n_{vc.summary}_"
-                    )
+
+                with col2:
+                    # Summary: How this position fits the story
+                    summary_lines = []
+                    if vs:
+                        summary_lines.append(f"• Story: {vs.verdict} — {vs.summary}")
+                    if vf:
+                        summary_lines.append(f"• Fundamental: {vf.verdict} — {vf.summary}")
+                    if vc:
+                        summary_lines.append(f"• Consensus: {vc.verdict} — {vc.summary}")
+
+                    if summary_lines:
+                        st.caption("\n".join(summary_lines))
+
+                with col3:
+                    # Show 3 verdicts inline
+                    verdict_str = ""
+                    if vs:
+                        verdict_str += f"{_verdict_icon_short(vs.verdict)} "
+                    if vf:
+                        verdict_str += f"{_verdict_icon_short(vf.verdict)} "
+                    if vc:
+                        verdict_str += f"{_verdict_icon_short(vc.verdict)}"
+
+                    st.text(verdict_str.strip() or "⚪")
+
+                # Expander for full details
+                with st.expander("Vollständige Details"):
+                    if vs:
+                        st.markdown(
+                            f"**🟢/🟡/🔴 Story-Check**\n"
+                            f"{_verdict_icon(vs.verdict)} **{vs.verdict.title()}**\n\n"
+                            f"> {vs.summary}"
+                        )
+                    if vf:
+                        st.markdown(
+                            f"**Fundamentalbewertung**\n"
+                            f"{_verdict_icon(vf.verdict)} **{vf.verdict.title()}**\n\n"
+                            f"> {vf.summary}"
+                        )
+                    if vc:
+                        st.markdown(
+                            f"**Konsens-Lücke**\n"
+                            f"{_verdict_icon(vc.verdict)} **{vc.verdict.title()}**\n\n"
+                            f"> {vc.summary}"
+                        )
