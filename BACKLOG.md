@@ -55,13 +55,16 @@ Stability-Check könnte zusätzliche Kriterien einbeziehen:
 - FX-Exposure summieren
 - Bargeld-Adäquatheit bewerten
 
-#### [P2] [FEAT] Portfolio Story: Per-Position Story-Fit Assessment ✅ UMGESETZT
-`PortfolioStoryPositionFit` Modell mit fit_verdict (stärkt/schwächt/neutral) und fit_summary. 
-Batch LLM-Call analysiert alle Positionen in einem Durchgang gegen Portfolio-These. 
-Integration: Story-Check führt automatisch auch Position-Fit-Analyse durch (parallel via asyncio.gather). 
-UI: Badge auf Investment-Übersicht zeigt Fit + Ein-Satz-Erklärung (🟢 Stärkt / 🔴 Schwächt / ⚪ Neutral).
-Filtert automatisch auf Positionen mit Analysen oder Fits (keine leeren Cards).
-Basis für kommende Rebalancer-Integration (Rebalancing goal-aware und story-aligned machen).
+#### [P2] [FEAT] Portfolio Story: Per-Position Story-Fit Assessment ✅ UMGESETZT (84d27bb)
+**Phase 1** (ursprünglich): Batch LLM-Call analysiert Positionen gegen Portfolio-These (stärkt/schwächt/neutral).
+
+**Phase 2** (2026-04-11): **Role-Based Redesign**
+- `fit_role` ersetzt `fit_verdict`: 5 Rollen statt 3 Verdicts (Wachstumsmotor 🔵 / Stabilitätsanker 🟡 / Einkommensquelle 🟢 / Diversifikationselement 🟣 / Fehlplatzierung 🔴)
+- **Story-Primacy**: Für bestehende Positionen ist Portfolio-Story #1, Fundamentals nur "confirmatory signal"
+- LLM-Prompt role-focused: "Rolle basiert auf Story-Logik, nicht absoluter Qualität"
+- **Sekundär: Position-Story Update Button** im Storychecker (nach Check) → AI schlägt aktualisierte Position-Story vor → User reviewt & speichert
+- Iterativer Prozess: Refined stories werden bei nächstem Check als Input genutzt
+- Alle 527 Tests grün
 
 #### [P2] [FEAT] Portfolio Story: Rebalancer-Integration
 Portfolio Story als Kontext in Rebalancer injizieren → Rebalancing-Vorschläge werden goal-aware und story-aligned.

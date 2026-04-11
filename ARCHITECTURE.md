@@ -384,6 +384,37 @@ LOG_LEVEL=ERROR streamlit run app.py  # Errors only
 
 ---
 
+## Architectural Decisions (Portfolio Story Subsystem)
+
+### Story-Primacy for Position Alignment
+**Decision**: For existing positions, Portfolio-Story alignment is the PRIMARY evaluation dimension. Fundamental analysis & Consensus-Gap verdicts are SECONDARY ("confirmatory signals only").
+
+**Rationale**: Portfolio Story captures the investor's goals and narrative. A volatile tech stock is not a "weakness" if the story prioritizes growth — it's exactly what's needed.
+
+**Implementation**: 
+- `PortfolioStoryPositionFit.fit_role` replaces verdicts (stärkt/schwächt/neutral)
+- LLM prompt instruction: "Role basiert auf Story-Logik, nicht absoluter Qualität"
+- Fundamental/Consensus only override to "Fehlplatzierung" if explicitly contradicted
+
+### Role-Based Position Model
+**Decision**: Each position has ONE ROLE describing its contribution to the portfolio story.
+
+**Roles** (5-taxonomy):
+- `Wachstumsmotor` (🔵): Drives capital growth (ok if volatile)
+- `Stabilitätsanker` (🟡): Hedges volatility (Anleihen, Immobilien)
+- `Einkommensquelle` (🟢): Generates income (Dividenden, Rentals)
+- `Diversifikationselement` (🟣): Low correlation to rest (Gold, Rohstoffe)
+- `Fehlplatzierung` (🔴): Doesn't fit story logic
+
+**Benefit**: Positions understood by contribution, not as "successes/failures"
+
+### Position-Story Iterative Refinement
+**Decision**: After Portfolio Story Check, users can update position-level stories (Position.story field) based on AI-generated suggestions.
+
+**Flow**: Story Check → Identify fit-role → User can request AI-drafted position story → Review & save → Next check uses refined story as input
+
+**Benefit**: Convergence: each iteration refines position descriptions, next analyses are more aligned
+
 ## Recent Changes (April 2026)
 
 ✅ Removed ANTHROPIC_BASE_URL (corporate proxy, non-commercial license)
@@ -392,8 +423,10 @@ LOG_LEVEL=ERROR streamlit run app.py  # Errors only
 ✅ Display-only currency flexibility (BASE_CURRENCY configurable)
 ✅ Infrastrukturfonds asset class added
 ✅ Fixed Josef's Rule bug (Immobilien mapping)
-✅ 526 tests passing
+✅ Role-based Position Fits (stärkt/schwächt/neutral → Rollen-Taxonomie) — 84d27bb
+✅ Storychecker Position-Story update button (iterative refinement) — 84d27bb
+✅ 527 tests passing
 
 ---
 
-*Last updated: 2026-04-10*
+*Last updated: 2026-04-11*
