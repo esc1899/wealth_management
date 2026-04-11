@@ -144,12 +144,11 @@ Dividenden-Snapshot:
         reply = await self._llm.complete(system_prompt + "\n\n" + user_message, max_tokens=2048)
 
         # Parse structured output
-        analysis = self._parse_analysis(reply)
-        analysis.full_text = reply
+        analysis = self._parse_analysis(reply, full_text=reply)
         return analysis
 
     @staticmethod
-    def _parse_analysis(text: str) -> PortfolioStoryAnalysis:
+    def _parse_analysis(text: str, full_text: str = "") -> PortfolioStoryAnalysis:
         """Extract verdicts and summaries from structured LLM output."""
         # Extract verdicts using emoji patterns
         story_verdict = _extract_verdict_from_section(text, "Portfolio Story-Check")
@@ -169,7 +168,7 @@ Dividenden-Snapshot:
             perf_summary=perf_summary or "Bewertung ausstehend",
             stability_verdict=stability_verdict or "unknown",
             stability_summary=stability_summary or "Einschätzung ausstehend",
-            full_text="",  # Will be set by caller
+            full_text=full_text,
             created_at=datetime.now(timezone.utc),
         )
 
