@@ -110,9 +110,11 @@ class PortfolioStoryRepository:
             ),
         )
         self._conn.commit()
-        analysis.id = cur.lastrowid
-        analysis.created_at = now
-        return analysis
+        # Return updated copy with DB-assigned id and timestamp
+        return analysis.model_copy(update={
+            "id": cur.lastrowid,
+            "created_at": now,
+        })
 
     def get_latest_analysis(self) -> Optional[PortfolioStoryAnalysis]:
         """Return the most recent analysis."""
