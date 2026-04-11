@@ -275,16 +275,8 @@ else:
 
                 # Save analysis and position fits
                 saved_analysis = repo.save_analysis(analysis)
-
-                # Debug output
-                with st.expander("🔍 Debug: Position Fits Info"):
-                    st.write(f"**Position Fits generated:** {len(position_fits) if position_fits else 0}")
-                    if position_fits:
-                        st.write(f"✅ Saving {len(position_fits)} position fits to DB")
-                        repo.save_position_fits(position_fits)
-                        st.success(f"✅ {len(position_fits)} position fits saved!")
-                    else:
-                        st.warning(f"⚠️ No position fits generated. Analyze output was: {type(position_fits)}")
+                if position_fits:
+                    repo.save_position_fits(position_fits)
 
                 st.success("✅ Story-Check durchgeführt!")
                 st.rerun()

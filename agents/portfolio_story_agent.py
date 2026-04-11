@@ -233,10 +233,15 @@ Ziele:
 Beurteile für JEDE Position unten ob sie die These stärkt, schwächt oder neutral beeinflusst.
 Die Bewertung basiert auf: Alignment mit Zielen, Diversifikation, Volatilität, Zeithorizont.
 
-Antworte IMMER in diesem Format — EINE Zeile pro Position:
-TICKER: [URTEIL] | [Ein-Satz-Erklärung]
+**WICHTIG: Antworte EXAKT in diesem Format — EINE Zeile pro Position:**
 
-Wobei [URTEIL] ist: "stärkt" (unterstützt Ziele) | "schwächt" (widerspricht Zielen) | "neutral" (unabhängig)
+TICKER: stärkt | Ein-Satz-Erklärung
+oder
+TICKER: schwächt | Ein-Satz-Erklärung
+oder
+TICKER: neutral | Ein-Satz-Erklärung
+
+Verwende NUR die Ticker aus der Liste unten. Keine Nummern, keine Worte vor dem Ticker.
 
 Positionen zur Bewertung:
 {positions_snapshot}"""
@@ -247,9 +252,6 @@ Positionen zur Bewertung:
 
         # Parse position fits from reply
         fits = self._parse_position_fits(reply, positions)
-        logger.info(f"analyze_positions: parsed {len(fits)} fits from LLM reply")
-        if not fits and reply:
-            logger.warning(f"No fits parsed. LLM reply preview: {reply[:300]}")
         return fits
 
     @staticmethod
@@ -257,69 +259,62 @@ Positionen zur Bewertung:
         """Extract position fit verdicts from LLM output."""
         from core.storage.models import PortfolioStoryPositionFit
         from datetime import datetime, timezone
-        import re
 
         fits = []
-        lines = text.split("\n")
 
         # Create lookup: ticker -> position for matching (case-insensitive)
         ticker_to_pos = {pos.ticker.upper(): pos for pos in positions if pos.ticker}
 
-        for line in lines:
+        if not ticker_to_pos:
+            return []  # No positions with tickers to match
+
+        # Parse each line: expect "TICKER: verdict | summary"
+        for line in text.split("\n"):
             line = line.strip()
-            if not line:
+            if not line or ":" not in line:
                 continue
 
-            # Try to find ticker at the start of the line
-            # Matches: "TICKER", "TICKER:", "- TICKER", "MSFT (Microsoft)", etc.
-            ticker_match = re.match(r'^[\-\s]*([A-Z0-9]+(?:\.[A-Z]{2})?)', line)
-            if not ticker_match:
+            # Split on first colon: "TICKER: rest"
+            parts = line.split(":", 1)
+            ticker = parts[0].strip().upper()
+            rest = parts[1].strip() if len(parts) > 1 else ""
+
+            # Must be a known ticker
+            if ticker not in ticker_to_pos:
                 continue
 
-            ticker = ticker_match.group(1).upper()
-            rest = line[ticker_match.end():].strip()
-
-            # Extract verdict: stärkt | schwächt | neutral
-            fit_verdict = None
+            # Extract verdict from rest
             rest_lower = rest.lower()
+            fit_verdict = None
             if "stärkt" in rest_lower:
                 fit_verdict = "stärkt"
             elif "schwächt" in rest_lower:
                 fit_verdict = "schwächt"
             elif "neutral" in rest_lower:
                 fit_verdict = "neutral"
-            else:
+
+            if not fit_verdict:
                 continue
 
-            # Extract summary (text after colon or verdict)
-            if ":" in rest:
-                fit_summary = rest.split(":", 1)[1].strip()
-            elif "|" in rest:
+            # Extract summary: text after "|" or just the rest with verdict removed
+            if "|" in rest:
                 fit_summary = rest.split("|", 1)[1].strip()
             else:
-                fit_summary = rest
+                fit_summary = rest.replace(fit_verdict, "").strip()
 
-            # Clean up: remove verdict word, brackets, pipes
-            fit_summary = (
-                fit_summary
-                .replace(fit_verdict, "")
-                .replace("[", "")
-                .replace("]", "")
-                .strip()
+            # Clean up
+            fit_summary = fit_summary.replace("[", "").replace("]", "").strip()
+            if not fit_summary:
+                fit_summary = f"Position {fit_verdict} die Portfolio-These"
+
+            pos = ticker_to_pos[ticker]
+            fit = PortfolioStoryPositionFit(
+                position_id=pos.id,
+                fit_verdict=fit_verdict,
+                fit_summary=fit_summary,
+                created_at=datetime.now(timezone.utc),
             )
-            if fit_summary.startswith("|"):
-                fit_summary = fit_summary[1:].strip()
-
-            # Match position by ticker
-            if ticker in ticker_to_pos:
-                pos = ticker_to_pos[ticker]
-                fit = PortfolioStoryPositionFit(
-                    position_id=pos.id,
-                    fit_verdict=fit_verdict,
-                    fit_summary=fit_summary or f"Position {fit_verdict} die Portfolio-These",
-                    created_at=datetime.now(timezone.utc),
-                )
-                fits.append(fit)
+            fits.append(fit)
 
         return fits
 
