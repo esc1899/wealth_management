@@ -161,6 +161,7 @@ Dividenden-Snapshot:
         stability_verdict = _extract_verdict_from_section(text, "Stabilität")
         stability_summary = _extract_summary(text, "Stabilität")
 
+        from datetime import datetime, timezone
         return PortfolioStoryAnalysis(
             verdict=story_verdict or "unknown",
             summary=story_summary or "Analyse ausstehend",
@@ -169,6 +170,7 @@ Dividenden-Snapshot:
             stability_verdict=stability_verdict or "unknown",
             stability_summary=stability_summary or "Einschätzung ausstehend",
             full_text="",  # Will be set by caller
+            created_at=datetime.now(timezone.utc),
         )
 
 
