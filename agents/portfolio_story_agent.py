@@ -252,39 +252,56 @@ Positionen zur Bewertung:
         """Extract position fit verdicts from LLM output."""
         from core.storage.models import PortfolioStoryPositionFit
         from datetime import datetime, timezone
+        import re
 
         fits = []
         lines = text.split("\n")
 
-        # Create lookup: ticker -> position for matching
-        ticker_to_pos = {pos.ticker: pos for pos in positions if pos.ticker}
+        # Create lookup: ticker -> position for matching (case-insensitive)
+        ticker_to_pos = {pos.ticker.upper(): pos for pos in positions if pos.ticker}
 
         for line in lines:
             line = line.strip()
-            if not line or ":" not in line:
+            if not line:
                 continue
 
-            # Parse "TICKER: [URTEIL] | explanation"
-            parts = line.split(":", 1)
-            if len(parts) != 2:
+            # Try to find ticker at the start of the line
+            # Matches: "TICKER", "TICKER:", "- TICKER", "MSFT (Microsoft)", etc.
+            ticker_match = re.match(r'^[\-\s]*([A-Z0-9]+(?:\.[A-Z]{2})?)', line)
+            if not ticker_match:
                 continue
 
-            ticker = parts[0].strip().upper()
-            rest = parts[1].strip()
+            ticker = ticker_match.group(1).upper()
+            rest = line[ticker_match.end():].strip()
 
             # Extract verdict: stärkt | schwächt | neutral
             fit_verdict = None
-            if "stärkt" in rest.lower():
+            rest_lower = rest.lower()
+            if "stärkt" in rest_lower:
                 fit_verdict = "stärkt"
-            elif "schwächt" in rest.lower():
+            elif "schwächt" in rest_lower:
                 fit_verdict = "schwächt"
-            elif "neutral" in rest.lower():
+            elif "neutral" in rest_lower:
                 fit_verdict = "neutral"
             else:
                 continue
 
-            # Extract summary (text after emoji/verdict)
-            fit_summary = rest.replace(fit_verdict, "").replace("[", "").replace("]", "").strip()
+            # Extract summary (text after colon or verdict)
+            if ":" in rest:
+                fit_summary = rest.split(":", 1)[1].strip()
+            elif "|" in rest:
+                fit_summary = rest.split("|", 1)[1].strip()
+            else:
+                fit_summary = rest
+
+            # Clean up: remove verdict word, brackets, pipes
+            fit_summary = (
+                fit_summary
+                .replace(fit_verdict, "")
+                .replace("[", "")
+                .replace("]", "")
+                .strip()
+            )
             if fit_summary.startswith("|"):
                 fit_summary = fit_summary[1:].strip()
 
