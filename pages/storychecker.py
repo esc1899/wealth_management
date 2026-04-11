@@ -133,12 +133,29 @@ with col_left:
                 t("storychecker.run_button"), use_container_width=True, type="primary"
             )
 
-        # Show stored story as reference
+        # Show stored story as reference + Story Update button
         if selected_position.story:
-            with st.expander(t("storychecker.show_story"), expanded=False):
-                st.markdown(selected_position.story)
-                if selected_position.story_skill:
-                    st.caption(f"{t('storychecker.skill_caption')}: {selected_position.story_skill}")
+            col_story, col_btn = st.columns([4, 1])
+            with col_story:
+                with st.expander(t("storychecker.show_story"), expanded=False):
+                    st.markdown(selected_position.story)
+                    if selected_position.story_skill:
+                        st.caption(f"{t('storychecker.skill_caption')}: {selected_position.story_skill}")
+
+            # Story Update button (only show if check completed)
+            session_id = st.session_state.get("sc_session_id")
+            if session_id:
+                session = agent.get_session(session_id)
+                if session and session.verdict:
+                    with col_btn:
+                        st.write("")  # Spacing for alignment
+                        if st.button("📝 Update", key=f"btn_story_update_{session_id}", help="Position-Story aktualisieren", use_container_width=True):
+                            with st.spinner("Generiere Vorschlag..."):
+                                try:
+                                    proposal = asyncio.run(agent.generate_story_proposal(session_id))
+                                    st.session_state[f"_sc_story_proposal_{session_id}"] = proposal
+                                except Exception as exc:
+                                    st.error(f"⚠️ Fehler: {exc}")
 
         # Verdict history for selected position
         past_analyses = analyses_repo.get_for_position(selected_position.id, limit=5)
@@ -231,43 +248,33 @@ with col_right:
                     st.caption(t("common.ai_disclaimer"))
                 st.rerun()
 
-            # Position Story Update Section
-            if session and session.verdict:  # Only show if check is complete
+            # Show proposal and save dialog if proposal was generated
+            if proposal := st.session_state.get(f"_sc_story_proposal_{session_id}"):
                 st.divider()
-                st.subheader("📝 Position-Story aktualisieren")
+                st.subheader("📝 Position-Story Vorschlag")
+                new_story = st.text_area(
+                    "Neue Position-Story (bearbeitbar)",
+                    value=proposal,
+                    height=120,
+                    key=f"story_textarea_{session_id}"
+                )
 
-                if st.button("Story-Vorschlag generieren", type="primary", key=f"gen_story_{session_id}"):
-                    with st.spinner("Generiere Vorschlag..."):
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    if st.button("✅ Speichern", type="primary", key=f"save_story_{session_id}", use_container_width=True):
                         try:
-                            proposal = asyncio.run(agent.generate_story_proposal(session_id))
-                            st.session_state[f"_sc_story_proposal_{session_id}"] = proposal
+                            pos = get_positions_repo().get(session.position_id)
+                            if pos:
+                                updated_pos = pos.model_copy(update={"story": new_story})
+                                get_positions_repo().update(updated_pos)
+                                st.session_state.pop(f"_sc_story_proposal_{session_id}", None)
+                                st.success("✅ Position-Story aktualisiert")
+                                st.rerun()
+                            else:
+                                st.error("Position nicht gefunden")
                         except Exception as exc:
-                            st.error(f"⚠️ Fehler beim Generieren: {exc}")
-
-                if proposal := st.session_state.get(f"_sc_story_proposal_{session_id}"):
-                    new_story = st.text_area(
-                        "Neue Position-Story",
-                        value=proposal,
-                        height=150,
-                        key=f"story_textarea_{session_id}"
-                    )
-
-                    col1, col2 = st.columns([1, 1])
-                    with col1:
-                        if st.button("Speichern", type="primary", key=f"save_story_{session_id}"):
-                            try:
-                                pos = get_positions_repo().get(session.position_id)
-                                if pos:
-                                    updated_pos = pos.model_copy(update={"story": new_story})
-                                    get_positions_repo().update(updated_pos)
-                                    st.session_state.pop(f"_sc_story_proposal_{session_id}", None)
-                                    st.success("✅ Position-Story aktualisiert")
-                                    st.rerun()
-                                else:
-                                    st.error("Position nicht gefunden")
-                            except Exception as exc:
-                                st.error(f"⚠️ Fehler beim Speichern: {exc}")
-                    with col2:
-                        if st.button("Verwerfen", key=f"discard_story_{session_id}"):
-                            st.session_state.pop(f"_sc_story_proposal_{session_id}", None)
-                            st.rerun()
+                            st.error(f"⚠️ Fehler beim Speichern: {exc}")
+                with col2:
+                    if st.button("❌ Verwerfen", key=f"discard_story_{session_id}", use_container_width=True):
+                        st.session_state.pop(f"_sc_story_proposal_{session_id}", None)
+                        st.rerun()
