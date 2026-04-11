@@ -197,6 +197,42 @@ class StorycheckerAgent:
     def delete_session(self, session_id: int) -> None:
         self._storychecker.delete_session(session_id)
 
+    async def generate_story_proposal(self, session_id: int) -> str:
+        """Generate an updated investment story based on the check session."""
+        import asyncio
+        session = self.get_session(session_id)
+        if not session:
+            raise ValueError(f"Session {session_id} not found")
+
+        position = self._positions.get(session.position_id)
+        if not position:
+            raise ValueError(f"Position {session.position_id} not found")
+
+        # Get session messages to use as context
+        messages = self.get_messages(session_id)
+        message_context = "\n".join([f"{m.role.upper()}: {m.content[:200]}" for m in messages[-4:]])
+
+        prompt = f"""Du bist ein Vermögensberater der Investment-Thesen schreibt.
+
+Basierend auf dieser Analyse wurde eine Investment-These überprüft:
+
+**Position:** {position.name} ({position.ticker or 'N/A'})
+**Asset-Klasse:** {position.asset_class}
+
+**Analyse-Auszug:**
+{message_context}
+
+**Aufgabe:** Schreibe eine kurze, prägnante aktualisierte Investment-These (2-3 Sätze) für diese Position.
+Die These sollte die neuen Erkenntnisse aus der Analyse berücksichtigen und prägnant erklären:
+- Warum diese Position im Portfolio?
+- Welche Rolle spielt sie?
+- Was sind die Key Points?
+
+Schreibe nur die These selbst, keine Einleitung oder Überschrift."""
+
+        self._llm.skill_context = "storychecker_story_update"
+        return await self._llm.complete(prompt, max_tokens=300)
+
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------

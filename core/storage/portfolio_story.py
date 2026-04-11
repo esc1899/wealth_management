@@ -144,9 +144,9 @@ class PortfolioStoryRepository:
         for fit in fits:
             cur = self._conn.execute(
                 """INSERT INTO portfolio_story_position_fits
-                   (position_id, fit_verdict, fit_summary, created_at)
+                   (position_id, fit_role, fit_summary, created_at)
                    VALUES (?, ?, ?, ?)""",
-                (fit.position_id, fit.fit_verdict, fit.fit_summary, now.isoformat()),
+                (fit.position_id, fit.fit_role, fit.fit_summary, now.isoformat()),
             )
             self._conn.commit()
             saved.append(fit.model_copy(update={"id": cur.lastrowid, "created_at": now}))
@@ -207,7 +207,7 @@ class PortfolioStoryRepository:
         return PortfolioStoryPositionFit(
             id=row["id"],
             position_id=row["position_id"],
-            fit_verdict=row["fit_verdict"],
+            fit_role=row["fit_role"],
             fit_summary=row["fit_summary"],
             created_at=datetime.fromisoformat(row["created_at"]),
         )

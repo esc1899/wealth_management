@@ -520,11 +520,22 @@ class PortfolioStoryAnalysis(BaseModel):
 
 class PortfolioStoryPositionFit(BaseModel):
     """
-    Per-position assessment of how a position strengthens/weakens the portfolio story.
+    Per-position assessment of how a position contributes to the portfolio story.
+    Roles: Wachstumsmotor | Stabilitätsanker | Einkommensquelle | Diversifikationselement | Fehlplatzierung
     """
 
     id: Optional[int] = None
     position_id: int
-    fit_verdict: str              # "stärkt" | "schwächt" | "neutral"
-    fit_summary: str              # Ein-Satz-Einschätzung
+    fit_role: str                 # "Wachstumsmotor" | "Stabilitätsanker" | "Einkommensquelle" | "Diversifikationselement" | "Fehlplatzierung"
+    fit_summary: str              # Ein-Satz-Begründung
     created_at: datetime
+
+
+# Constants for position fit roles
+FIT_ROLES = [
+    "Wachstumsmotor",
+    "Stabilitätsanker",
+    "Einkommensquelle",
+    "Diversifikationselement",
+    "Fehlplatzierung",
+]

@@ -221,7 +221,7 @@ Dividenden-Snapshot:
 
         positions_snapshot = "\n".join(position_lines)
 
-        system_prompt = f"""Du bist ein Portfolio-Berater der beurteilt wie einzelne Positionen zur Portfolio-These passen.
+        system_prompt = f"""Du bist ein Portfolio-Berater der bewertet welche Rolle jede Position in der Portfolio-These spielt.
 
 Portfolio-These:
 {story.story}
@@ -230,16 +230,19 @@ Ziele:
 - Ziel-Jahr: {story.target_year or 'offen'}
 - Priorität: {story.priority}
 
-Beurteile für JEDE Position unten ob sie die These stärkt, schwächt oder neutral beeinflusst.
-Die Bewertung basiert auf: Alignment mit Zielen, Diversifikation, Volatilität, Zeithorizont.
+Weise JEDE Position EINE Rolle zu, die sie in dieser Story erfüllt:
+- Wachstumsmotor: treibt Kapitalwachstum
+- Stabilitätsanker: reduziert Portfoliovolatilität
+- Einkommensquelle: generiert Ausschüttungen
+- Diversifikationselement: geringe Korrelation zum Rest
+- Fehlplatzierung: passt nicht zur Story-Logik
+
+Die Rolle richtet sich nach der STORY-LOGIK, nicht nach absoluter Qualität.
+"Fehlplatzierung" nur wenn die Position keinen erkennbaren Platz in dieser Story hat.
 
 **WICHTIG: Antworte EXAKT in diesem Format — EINE Zeile pro Position:**
 
-TICKER: stärkt | Ein-Satz-Erklärung
-oder
-TICKER: schwächt | Ein-Satz-Erklärung
-oder
-TICKER: neutral | Ein-Satz-Erklärung
+TICKER: Rolle | Ein-Satz-Begründung
 
 Verwende NUR die Ticker aus der Liste unten. Keine Nummern, keine Worte vor dem Ticker.
 
@@ -256,8 +259,8 @@ Positionen zur Bewertung:
 
     @staticmethod
     def _parse_position_fits(text: str, positions: list) -> list:
-        """Extract position fit verdicts from LLM output."""
-        from core.storage.models import PortfolioStoryPositionFit
+        """Extract position fit roles from LLM output."""
+        from core.storage.models import PortfolioStoryPositionFit, FIT_ROLES
         from datetime import datetime, timezone
 
         fits = []
@@ -268,7 +271,7 @@ Positionen zur Bewertung:
         if not ticker_to_pos:
             return []  # No positions with tickers to match
 
-        # Parse each line: expect "TICKER: verdict | summary"
+        # Parse each line: expect "TICKER: role | summary"
         for line in text.split("\n"):
             line = line.strip()
             if not line or ":" not in line:
@@ -283,34 +286,31 @@ Positionen zur Bewertung:
             if ticker not in ticker_to_pos:
                 continue
 
-            # Extract verdict from rest
-            rest_lower = rest.lower()
-            fit_verdict = None
-            if "stärkt" in rest_lower:
-                fit_verdict = "stärkt"
-            elif "schwächt" in rest_lower:
-                fit_verdict = "schwächt"
-            elif "neutral" in rest_lower:
-                fit_verdict = "neutral"
+            # Extract role from rest: match against FIT_ROLES
+            fit_role = None
+            for role in FIT_ROLES:
+                if role in rest:
+                    fit_role = role
+                    break
 
-            if not fit_verdict:
+            if not fit_role:
                 continue
 
-            # Extract summary: text after "|" or just the rest with verdict removed
+            # Extract summary: text after "|"
             if "|" in rest:
                 fit_summary = rest.split("|", 1)[1].strip()
             else:
-                fit_summary = rest.replace(fit_verdict, "").strip()
+                fit_summary = rest.replace(fit_role, "").strip()
 
             # Clean up
             fit_summary = fit_summary.replace("[", "").replace("]", "").strip()
             if not fit_summary:
-                fit_summary = f"Position {fit_verdict} die Portfolio-These"
+                fit_summary = f"Position spielt Rolle: {fit_role}"
 
             pos = ticker_to_pos[ticker]
             fit = PortfolioStoryPositionFit(
                 position_id=pos.id,
-                fit_verdict=fit_verdict,
+                fit_role=fit_role,
                 fit_summary=fit_summary,
                 created_at=datetime.now(timezone.utc),
             )

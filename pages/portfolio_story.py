@@ -50,14 +50,16 @@ def _verdict_icon_short(verdict: str) -> str:
     return _verdict_icon(verdict)
 
 
-def _fit_icon(fit_verdict: str) -> str:
-    """Return emoji icon for a position fit verdict."""
+def _fit_role_display(fit_role: str) -> tuple[str, str]:
+    """Return (icon, label) for a position fit role."""
     mapping = {
-        "stärkt": "🟢",
-        "schwächt": "🔴",
-        "neutral": "⚪",
+        "Wachstumsmotor": ("🔵", "Wachstumsmotor"),
+        "Stabilitätsanker": ("🟡", "Stabilitätsanker"),
+        "Einkommensquelle": ("🟢", "Einkommensquelle"),
+        "Diversifikationselement": ("🟣", "Diversifikationselement"),
+        "Fehlplatzierung": ("🔴", "Fehlplatzierung"),
     }
-    return mapping.get(fit_verdict.lower(), "⚪")
+    return mapping.get(fit_role, ("⚪", "Unbekannt"))
 
 
 st.set_page_config(page_title="Portfolio Story", page_icon="📖", layout="wide")
@@ -407,8 +409,7 @@ else:
                 with col2:
                     # Position fit badge (story alignment)
                     if pf:
-                        fit_emoji = _fit_icon(pf.fit_verdict)
-                        fit_label = pf.fit_verdict.capitalize()
+                        fit_emoji, fit_label = _fit_role_display(pf.fit_role)
                         st.markdown(f"{fit_emoji} **{fit_label}**\n_{pf.fit_summary}_")
                     else:
                         st.caption("_(Story-Fit ausstehend)_")

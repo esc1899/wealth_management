@@ -230,3 +230,44 @@ with col_right:
                     st.markdown(response)
                     st.caption(t("common.ai_disclaimer"))
                 st.rerun()
+
+            # Position Story Update Section
+            if session and session.verdict:  # Only show if check is complete
+                st.divider()
+                st.subheader("📝 Position-Story aktualisieren")
+
+                if st.button("Story-Vorschlag generieren", type="primary", key=f"gen_story_{session_id}"):
+                    with st.spinner("Generiere Vorschlag..."):
+                        try:
+                            proposal = asyncio.run(agent.generate_story_proposal(session_id))
+                            st.session_state[f"_sc_story_proposal_{session_id}"] = proposal
+                        except Exception as exc:
+                            st.error(f"⚠️ Fehler beim Generieren: {exc}")
+
+                if proposal := st.session_state.get(f"_sc_story_proposal_{session_id}"):
+                    new_story = st.text_area(
+                        "Neue Position-Story",
+                        value=proposal,
+                        height=150,
+                        key=f"story_textarea_{session_id}"
+                    )
+
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        if st.button("Speichern", type="primary", key=f"save_story_{session_id}"):
+                            try:
+                                pos = get_positions_repo().get(session.position_id)
+                                if pos:
+                                    updated_pos = pos.model_copy(update={"story": new_story})
+                                    get_positions_repo().update(updated_pos)
+                                    st.session_state.pop(f"_sc_story_proposal_{session_id}", None)
+                                    st.success("✅ Position-Story aktualisiert")
+                                    st.rerun()
+                                else:
+                                    st.error("Position nicht gefunden")
+                            except Exception as exc:
+                                st.error(f"⚠️ Fehler beim Speichern: {exc}")
+                    with col2:
+                        if st.button("Verwerfen", key=f"discard_story_{session_id}"):
+                            st.session_state.pop(f"_sc_story_proposal_{session_id}", None)
+                            st.rerun()

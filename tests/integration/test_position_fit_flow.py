@@ -12,9 +12,9 @@ class MockLLM:
         self.skill_context = None
     
     async def complete(self, prompt, max_tokens=None):
-        # Return response in expected format (TICKERS, not names!)
-        return """MSFT: stärkt | Technologie-Leadership aligned mit Wachstum
-BUNL: neutral | Stabilisierender Faktor"""
+        # Return response in expected format (TICKERS, roles, not verdicts!)
+        return """MSFT: Wachstumsmotor | Technologie-Leadership für langfristiges Kapitalwachstum
+BUNL: Stabilitätsanker | Stabilisierender Faktor gegen Volatilität"""
 
 
 @pytest.mark.asyncio
@@ -60,7 +60,7 @@ async def test_analyze_positions_generates_fits():
     assert fits is not None, "analyze_positions() should return a list"
     assert len(fits) == 2, f"Should parse 2 fits, got {len(fits)}"
     assert fits[0].position_id == 1
-    assert fits[0].fit_verdict == "stärkt"
+    assert fits[0].fit_role == "Wachstumsmotor"
     assert fits[1].position_id == 2
-    assert fits[1].fit_verdict == "neutral"
+    assert fits[1].fit_role == "Stabilitätsanker"
 

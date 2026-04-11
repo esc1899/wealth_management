@@ -392,6 +392,11 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     )""")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_portfolio_story_position_fits_position ON portfolio_story_position_fits(position_id)")
 
+    # Migrate fit_verdict → fit_role
+    existing_fits = {row[1] for row in conn.execute("PRAGMA table_info(portfolio_story_position_fits)")}
+    if "fit_verdict" in existing_fits and "fit_role" not in existing_fits:
+        conn.execute("ALTER TABLE portfolio_story_position_fits RENAME COLUMN fit_verdict TO fit_role")
+
     conn.execute("CREATE INDEX IF NOT EXISTS idx_benchmark_runs_scenario ON benchmark_runs(scenario_name)")
     conn.commit()
 
