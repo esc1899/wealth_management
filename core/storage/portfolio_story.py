@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from core.encryption import EncryptionService
-from core.storage.models import PortfolioStory, PortfolioStoryAnalysis
+from core.storage.models import PortfolioStory, PortfolioStoryAnalysis, PortfolioStoryPositionFit
 
 
 class PortfolioStoryRepository:
@@ -134,6 +134,42 @@ class PortfolioStoryRepository:
         return [self._row_to_analysis(row) for row in rows if row]
 
     # ────────────────────────────────────────────────────────────────────
+    # Position Fits CRUD
+    # ────────────────────────────────────────────────────────────────────
+
+    def save_position_fits(self, fits: list[PortfolioStoryPositionFit]) -> list[PortfolioStoryPositionFit]:
+        """Insert multiple position fit records. Returns the saved objects with DB-assigned IDs."""
+        now = datetime.now(timezone.utc)
+        saved = []
+        for fit in fits:
+            cur = self._conn.execute(
+                """INSERT INTO portfolio_story_position_fits
+                   (position_id, fit_verdict, fit_summary, created_at)
+                   VALUES (?, ?, ?, ?)""",
+                (fit.position_id, fit.fit_verdict, fit.fit_summary, now.isoformat()),
+            )
+            self._conn.commit()
+            saved.append(fit.model_copy(update={"id": cur.lastrowid, "created_at": now}))
+        return saved
+
+    def get_latest_position_fits(self, position_ids: list[int]) -> dict[int, PortfolioStoryPositionFit]:
+        """Return latest position fit for each position_id. Returns dict {position_id: fit}."""
+        if not position_ids:
+            return {}
+        placeholders = ",".join("?" * len(position_ids))
+        rows = self._conn.execute(
+            f"""SELECT * FROM portfolio_story_position_fits
+               WHERE position_id IN ({placeholders})
+               AND id IN (
+                   SELECT MAX(id) FROM portfolio_story_position_fits
+                   WHERE position_id IN ({placeholders})
+                   GROUP BY position_id
+               )""",
+            position_ids + position_ids,
+        ).fetchall()
+        return {row["position_id"]: self._row_to_position_fit(row) for row in rows if row}
+
+    # ────────────────────────────────────────────────────────────────────
     # Deserializers
     # ────────────────────────────────────────────────────────────────────
 
@@ -163,5 +199,15 @@ class PortfolioStoryRepository:
             stability_verdict=row["stability_verdict"],
             stability_summary=row["stability_summary"],
             full_text=row["full_text"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def _row_to_position_fit(self, row: sqlite3.Row) -> PortfolioStoryPositionFit:
+        """Deserialize a portfolio_story_position_fits row."""
+        return PortfolioStoryPositionFit(
+            id=row["id"],
+            position_id=row["position_id"],
+            fit_verdict=row["fit_verdict"],
+            fit_summary=row["fit_summary"],
             created_at=datetime.fromisoformat(row["created_at"]),
         )

@@ -185,6 +185,122 @@ Dividenden-Snapshot:
         analysis = self._parse_analysis(reply, full_text=reply)
         return analysis
 
+    async def analyze_positions(
+        self,
+        story: PortfolioStory,
+        positions: list,  # List of Position objects
+        verdicts: dict,   # position_id -> PositionAnalysis dicts from various agents
+    ) -> list:
+        """
+        Analyze how each position strengthens/weakens the portfolio story.
+        Returns list of PortfolioStoryPositionFit objects.
+        Single batch LLM call for all positions.
+        """
+        if not positions:
+            return []
+
+        # Build position snapshot with key info
+        position_lines = []
+        for pos in positions:
+            ticker = f" ({pos.ticker})" if pos.ticker else ""
+            verdicts_info = []
+
+            # Add existing verdicts if available
+            if pos.id in verdicts:
+                pos_verdicts = verdicts[pos.id]
+                for agent_name, verdict_obj in pos_verdicts.items():
+                    if verdict_obj:
+                        verdicts_info.append(f"{agent_name}: {verdict_obj.get('verdict', '?')}")
+
+            verdict_str = " | ".join(verdicts_info) if verdicts_info else "keine Analysen"
+            position_lines.append(
+                f"- {pos.name}{ticker} [{pos.asset_class}] — {verdict_str}"
+            )
+
+        positions_snapshot = "\n".join(position_lines)
+
+        system_prompt = f"""Du bist ein Portfolio-Berater der beurteilt wie einzelne Positionen zur Portfolio-These passen.
+
+Portfolio-These:
+{story.story}
+
+Ziele:
+- Ziel-Jahr: {story.target_year or 'offen'}
+- Priorität: {story.priority}
+
+Beurteile für JEDE Position unten ob sie die These stärkt, schwächt oder neutral beeinflusst.
+Die Bewertung basiert auf: Alignment mit Zielen, Diversifikation, Volatilität, Zeithorizont.
+
+Antworte IMMER in diesem Format — EINE Zeile pro Position:
+TICKER: [URTEIL] | [Ein-Satz-Erklärung]
+
+Wobei [URTEIL] ist: "stärkt" (unterstützt Ziele) | "schwächt" (widerspricht Zielen) | "neutral" (unabhängig)
+
+Positionen zur Bewertung:
+{positions_snapshot}"""
+
+        user_message = "Bitte bewerte jede Position."
+
+        reply = await self._llm.complete(system_prompt + "\n\n" + user_message, max_tokens=1024)
+
+        # Parse position fits from reply
+        fits = self._parse_position_fits(reply, positions)
+        return fits
+
+    @staticmethod
+    def _parse_position_fits(text: str, positions: list) -> list:
+        """Extract position fit verdicts from LLM output."""
+        from core.storage.models import PortfolioStoryPositionFit
+        from datetime import datetime, timezone
+
+        fits = []
+        lines = text.split("\n")
+
+        # Create lookup: ticker -> position for matching
+        ticker_to_pos = {pos.ticker: pos for pos in positions if pos.ticker}
+
+        for line in lines:
+            line = line.strip()
+            if not line or ":" not in line:
+                continue
+
+            # Parse "TICKER: [URTEIL] | explanation"
+            parts = line.split(":", 1)
+            if len(parts) != 2:
+                continue
+
+            ticker = parts[0].strip().upper()
+            rest = parts[1].strip()
+
+            # Extract verdict: stärkt | schwächt | neutral
+            fit_verdict = None
+            if "stärkt" in rest.lower():
+                fit_verdict = "stärkt"
+            elif "schwächt" in rest.lower():
+                fit_verdict = "schwächt"
+            elif "neutral" in rest.lower():
+                fit_verdict = "neutral"
+            else:
+                continue
+
+            # Extract summary (text after emoji/verdict)
+            fit_summary = rest.replace(fit_verdict, "").replace("[", "").replace("]", "").strip()
+            if fit_summary.startswith("|"):
+                fit_summary = fit_summary[1:].strip()
+
+            # Match position by ticker
+            if ticker in ticker_to_pos:
+                pos = ticker_to_pos[ticker]
+                fit = PortfolioStoryPositionFit(
+                    position_id=pos.id,
+                    fit_verdict=fit_verdict,
+                    fit_summary=fit_summary or f"Position {fit_verdict} die Portfolio-These",
+                    created_at=datetime.now(timezone.utc),
+                )
+                fits.append(fit)
+
+        return fits
+
     @staticmethod
     def _parse_analysis(text: str, full_text: str = "") -> PortfolioStoryAnalysis:
         """Extract verdicts and summaries from structured LLM output."""

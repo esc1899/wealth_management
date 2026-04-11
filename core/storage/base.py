@@ -301,6 +301,14 @@ def init_db(conn: sqlite3.Connection) -> None:
             full_text          TEXT NOT NULL,
             created_at         TEXT NOT NULL
         )""",
+        """CREATE TABLE IF NOT EXISTS portfolio_story_position_fits (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            position_id INTEGER NOT NULL,
+            fit_verdict TEXT NOT NULL,
+            fit_summary TEXT NOT NULL,
+            created_at  TEXT NOT NULL
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_portfolio_story_position_fits_position ON portfolio_story_position_fits(position_id)",
     ]:
         conn.execute(stmt)
     conn.commit()
@@ -373,6 +381,17 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         currency    TEXT,
         fetched_at  TEXT NOT NULL
     )""")
+
+    # Create portfolio_story_position_fits table if it doesn't exist
+    conn.execute("""CREATE TABLE IF NOT EXISTS portfolio_story_position_fits (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        position_id INTEGER NOT NULL,
+        fit_verdict TEXT NOT NULL,
+        fit_summary TEXT NOT NULL,
+        created_at  TEXT NOT NULL
+    )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_portfolio_story_position_fits_position ON portfolio_story_position_fits(position_id)")
+
     conn.execute("CREATE INDEX IF NOT EXISTS idx_benchmark_runs_scenario ON benchmark_runs(scenario_name)")
     conn.commit()
 

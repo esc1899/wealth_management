@@ -516,3 +516,15 @@ class PortfolioStoryAnalysis(BaseModel):
     stability_summary: str        # Ein-Satz-Fazit Stabilität
     full_text: str                # Vollständige LLM-Antwort (Markdown)
     created_at: datetime
+
+
+class PortfolioStoryPositionFit(BaseModel):
+    """
+    Per-position assessment of how a position strengthens/weakens the portfolio story.
+    """
+
+    id: Optional[int] = None
+    position_id: int
+    fit_verdict: str              # "stärkt" | "schwächt" | "neutral"
+    fit_summary: str              # Ein-Satz-Einschätzung
+    created_at: datetime

@@ -23,16 +23,45 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 #### [P2] [IMPR] Portfolio Story: Erweiterte Stabilitäts-Kriterien
 Stability-Check könnte zusätzliche Kriterien einbeziehen:
 
-1. **Diversifikation:** Position-Anzahl, Top-3-Klumpen-Risiko
-2. **Sektor-Konzentration:** "Zu viel Tech/Einzelbranchen?"
-3. **Währungsrisiko:** Non-EUR-Anteil (FX-Exposure)
+1. **Diversifikation:** Position-Anzahl, Top-3-Klumpen-Risiko (Konzentration)
+   - Warnung: Zu wenige Positionen → Klumpenrisiko
+   - Analyse: Top-3 Positionen sollten <60% des Portfolios nicht übersteigen
+
+2. **Sektor-Konzentration:** Branchenverteilung analysieren
+   - "Zu viel Tech/Finanzsektor/Einzelbranchen?"
+   - Vergleich: Ist Sektor-Gewichtung vs. Portfolio-Ziel angemessen?
+
+3. **Währungsrisiko (FX-Exposure):** Non-EUR-Anteil
+   - USD, CHF, GBP, etc. — Volatilität durch Wechselkurse
+   - Zielzonen je nach Risikotoleranz/Zeithorizont
+
 4. **Zeitlicher Horizont vs. Volatilität:** Je näher target_year, desto defensiver
+   - 2025: >50% Aktien → Warnung
+   - 2040+: Aktienanteil defensiv für Endjahrzehnt anpassen
+
 5. **Notfall-Reserve:** Bargeld für Emergencies
+   - Sollte 3–6 Monate Lebenshaltungskosten abdecken
+   - Zeigt Liquiditäts-Puffer für Krisen auf
 
-Status: Aktuell Josef's Rule (Aktien/Renten/Rohstoffe) + Immobilien + Dividenden.
+**Aktuell implementiert:**
+- Josef's Rule: Aktien/Renten/Rohstoffe Gewichtung (1/3 + 1/3 + 1/3 Richtlinie)
+- Inflationsschutz: Rohstoffe + Immobilien als Hedge
+- Liquidität: Renten + Dividenden (jährliche Cashflows)
+- Dividendenbewertung: Absolute Dividenden vs. Ziel/Priorität
 
-#### [P2] [FEAT] Portfolio Story: Per-Position Story-Fit Assessment
-Siehe [memory/portfolio_story_position_fit.md](../memory/portfolio_story_position_fit.md)
+**Zukünftig (gute Kandidaten für Phase 2):**
+- Top-3-Konzentration automatisch analysieren
+- Sektor-Mapping und Häufung identifizieren
+- FX-Exposure summieren
+- Bargeld-Adäquatheit bewerten
+
+#### [P2] [FEAT] Portfolio Story: Per-Position Story-Fit Assessment ✅ UMGESETZT
+`PortfolioStoryPositionFit` Modell mit fit_verdict (stärkt/schwächt/neutral) und fit_summary. 
+Batch LLM-Call analysiert alle Positionen in einem Durchgang gegen Portfolio-These. 
+Integration: Story-Check führt automatisch auch Position-Fit-Analyse durch (parallel via asyncio.gather). 
+UI: Badge auf Investment-Übersicht zeigt Fit + Ein-Satz-Erklärung (🟢 Stärkt / 🔴 Schwächt / ⚪ Neutral).
+Filtert automatisch auf Positionen mit Analysen oder Fits (keine leeren Cards).
+Basis für kommende Rebalancer-Integration (Rebalancing goal-aware und story-aligned machen).
 
 #### [P2] [FEAT] Portfolio Story: Rebalancer-Integration
 Portfolio Story als Kontext in Rebalancer injizieren → Rebalancing-Vorschläge werden goal-aware und story-aligned.

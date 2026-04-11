@@ -50,6 +50,16 @@ def _verdict_icon_short(verdict: str) -> str:
     return _verdict_icon(verdict)
 
 
+def _fit_icon(fit_verdict: str) -> str:
+    """Return emoji icon for a position fit verdict."""
+    mapping = {
+        "stärkt": "🟢",
+        "schwächt": "🔴",
+        "neutral": "⚪",
+    }
+    return mapping.get(fit_verdict.lower(), "⚪")
+
+
 st.set_page_config(page_title="Portfolio Story", page_icon="📖", layout="wide")
 st.title("📖 Portfolio Story")
 st.caption("Dein langfristiges Anlage-Narrativ und Alignment-Check")
@@ -229,19 +239,31 @@ else:
                     positions_count=len(portfolio),
                 )
 
-                # Run analysis
-                analysis = asyncio.run(
-                    agent.analyze(
-                        story=current_story,
-                        portfolio_snapshot=portfolio_snapshot,
-                        metrics=metrics,
-                        dividend_snapshot=dividend_snapshot,
-                        inflation_rate=None,  # TODO: fetch from Tavily
+                # Run analysis (portfolio-level + position-level in parallel)
+                async def run_checks():
+                    analysis, position_fits = await asyncio.gather(
+                        agent.analyze(
+                            story=current_story,
+                            portfolio_snapshot=portfolio_snapshot,
+                            metrics=metrics,
+                            dividend_snapshot=dividend_snapshot,
+                            inflation_rate=None,  # TODO: fetch from Tavily
+                        ),
+                        agent.analyze_positions(
+                            story=current_story,
+                            positions=portfolio,
+                            verdicts=analyses_repo.get_latest_bulk([p.id for p in portfolio if p.id]),
+                        )
                     )
-                )
+                    return analysis, position_fits
 
-                # Save analysis
+                analysis, position_fits = asyncio.run(run_checks())
+
+                # Save analysis and position fits
                 saved_analysis = repo.save_analysis(analysis)
+                if position_fits:
+                    repo.save_position_fits(position_fits)
+
                 st.success("✅ Story-Check durchgeführt!")
                 st.rerun()
 
@@ -331,19 +353,21 @@ portfolio = positions_repo.get_portfolio()
 if not portfolio:
     st.info("ℹ️ Portfolio ist leer.")
 else:
-    # Get all verdicts for positions
+    # Get all verdicts and position fits
     pos_ids = [p.id for p in portfolio if p.id]
     verdicts_story = analyses_repo.get_latest_bulk(pos_ids, "storychecker")
     verdicts_fundamental = analyses_repo.get_latest_bulk(pos_ids, "fundamental")
     verdicts_consensus = analyses_repo.get_latest_bulk(pos_ids, "consensus_gap")
+    position_fits = repo.get_latest_position_fits(pos_ids)
 
-    # Filter: only show positions with at least one verdict
+    # Filter: only show positions with at least one verdict or position fit
     positions_with_verdicts = [
         pos for pos in portfolio
         if pos.id and (
             verdicts_story.get(pos.id)
             or verdicts_fundamental.get(pos.id)
             or verdicts_consensus.get(pos.id)
+            or position_fits.get(pos.id)
         )
     ]
 
@@ -355,6 +379,7 @@ else:
             vs = verdicts_story.get(pos.id)
             vf = verdicts_fundamental.get(pos.id)
             vc = verdicts_consensus.get(pos.id)
+            pf = position_fits.get(pos.id)
 
             with st.container(border=True):
                 col1, col2, col3 = st.columns([2, 1.5, 1.5])
@@ -366,9 +391,13 @@ else:
                     )
 
                 with col2:
-                    # TODO: Story-Fit badge (per-position assessment)
-                    # Placeholder for future feature: "Stärkt Story" / "Schwächt Story" / "Neutral"
-                    st.caption("_(Story-Fit später)_")
+                    # Position fit badge (story alignment)
+                    if pf:
+                        fit_emoji = _fit_icon(pf.fit_verdict)
+                        fit_label = pf.fit_verdict.capitalize()
+                        st.markdown(f"{fit_emoji} **{fit_label}**\n_{pf.fit_summary}_")
+                    else:
+                        st.caption("_(Story-Fit ausstehend)_")
 
                 with col3:
                     # Show 3 verdicts inline
