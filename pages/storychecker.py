@@ -133,29 +133,25 @@ with col_left:
                 t("storychecker.run_button"), use_container_width=True, type="primary"
             )
 
-        # Show stored story as reference + Story Update button
+        # Show stored story as reference
         if selected_position.story:
-            col_story, col_btn = st.columns([4, 1])
-            with col_story:
-                with st.expander(t("storychecker.show_story"), expanded=False):
-                    st.markdown(selected_position.story)
-                    if selected_position.story_skill:
-                        st.caption(f"{t('storychecker.skill_caption')}: {selected_position.story_skill}")
+            with st.expander(t("storychecker.show_story"), expanded=False):
+                st.markdown(selected_position.story)
+                if selected_position.story_skill:
+                    st.caption(f"{t('storychecker.skill_caption')}: {selected_position.story_skill}")
 
             # Story Update button (only show if check completed)
             session_id = st.session_state.get("sc_session_id")
             if session_id:
                 session = agent.get_session(session_id)
                 if session and session.verdict:
-                    with col_btn:
-                        st.write("")  # Spacing for alignment
-                        if st.button("📝 Update", key=f"btn_story_update_{session_id}", help="Position-Story aktualisieren", use_container_width=True):
-                            with st.spinner("Generiere Vorschlag..."):
-                                try:
-                                    proposal = asyncio.run(agent.generate_story_proposal(session_id))
-                                    st.session_state[f"_sc_story_proposal_{session_id}"] = proposal
-                                except Exception as exc:
-                                    st.error(f"⚠️ Fehler: {exc}")
+                    if st.button("📝 Position-Story aktualisieren", key=f"btn_story_update_{session_id}", use_container_width=True):
+                        with st.spinner("Generiere Vorschlag..."):
+                            try:
+                                proposal = asyncio.run(agent.generate_story_proposal(session_id))
+                                st.session_state[f"_sc_story_proposal_{session_id}"] = proposal
+                            except Exception as exc:
+                                st.error(f"⚠️ Fehler: {exc}")
 
         # Verdict history for selected position
         past_analyses = analyses_repo.get_for_position(selected_position.id, limit=5)
