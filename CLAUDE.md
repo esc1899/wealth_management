@@ -5,6 +5,13 @@
 - Bei nicht-trivialen Aufgaben: Plan Mode nutzen (`/plan`)
 - Verwandte Fehler zusammen beheben — keine Einzelfix-Iterationen
 
+## Plan Mode – Systems Thinking
+Motto: **try to improve the whole**
+- **Teilsysteme**: Wie wirkt sich die Änderung auf einzelne Module/Komponenten aus?
+- **Gesamtsystem**: Wie verändert sich das Verhalten des Gesamtsystems? Entstehen neue Abhängigkeiten oder Feedback-Schleifen?
+- Vor Optimierungen: Nicht nur lokale Verbesserungen, sondern Auswirkungen auf das ganze System denken
+- Emergente Effekte identifizieren: Was ergibt sich unerwarteterweise aus den Interaktionen zwischen Systemen?
+
 ## Test-Disziplin (kritisch)
 - `pytest tests/` nach jeder Änderung ausführen — keine Ausnahme
 - Bug gefunden → erst **Failing Test schreiben**, dann fixen

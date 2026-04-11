@@ -14,6 +14,7 @@ from agents.market_data_agent import MarketDataAgent
 from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
 from agents.news_agent import NewsAgent
 from agents.portfolio_agent import PortfolioAgent
+from agents.portfolio_story_agent import PortfolioStoryAgent
 from agents.rebalance_agent import RebalanceAgent
 from agents.research_agent import ResearchAgent
 from agents.search_agent import SearchAgent
@@ -21,6 +22,7 @@ from agents.storychecker_agent import StorycheckerAgent
 from agents.structural_change_agent import StructuralChangeAgent
 from agents.wealth_snapshot_agent import WealthSnapshotAgent
 from core.storage.analyses import PositionAnalysesRepository
+from core.storage.portfolio_story import PortfolioStoryRepository
 from core.storage.storychecker import StorycheckerRepository
 from core.storage.structural_scans import StructuralScansRepository
 from core.storage.wealth_snapshots import WealthSnapshotRepository
@@ -325,6 +327,22 @@ def get_wealth_snapshot_agent() -> WealthSnapshotAgent:
         market_repo=get_market_repo(),
         wealth_repo=get_wealth_snapshot_repo(),
         market_data_agent=get_market_agent(),
+    )
+
+
+@st.cache_resource
+def get_portfolio_story_repo() -> PortfolioStoryRepository:
+    return PortfolioStoryRepository(get_db_connection(), get_encryption_service())
+
+
+@st.cache_resource
+def get_portfolio_story_agent() -> PortfolioStoryAgent:
+    model = _get_agent_model("portfolio_story", "ollama", _DEFAULT_OLLAMA_MODEL)
+    llm = _make_ollama_provider(model, "portfolio_story_check")
+    return PortfolioStoryAgent(
+        llm=llm,
+        positions_repo=get_positions_repo(),
+        market_repo=get_market_repo(),
     )
 
 

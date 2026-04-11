@@ -480,3 +480,39 @@ class WealthSnapshot(BaseModel):
     is_manual: bool = False         # True = manually created or corrected
     note: Optional[str] = None      # optional comment
     created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Portfolio Story models
+# ---------------------------------------------------------------------------
+
+class PortfolioStory(BaseModel):
+    """
+    The user's portfolio-level narrative — goals, time horizon, priorities.
+    Encrypted at rest: story field contains personal financial goals.
+    """
+
+    id: Optional[int] = None
+    story: str                            # Freies Narrativ, verschlüsselt
+    target_year: Optional[int] = None    # z.B. 2040
+    liquidity_need: Optional[str] = None  # z.B. "2028: Immobilienkauf ~150k"
+    priority: str = "Gemischt"           # "Wachstum" | "Einkommen" | "Sicherheit" | "Gemischt"
+    created_at: datetime
+    updated_at: datetime
+
+
+class PortfolioStoryAnalysis(BaseModel):
+    """
+    Persisted result of a portfolio story check run.
+    Three sections: story alignment, performance, stability — each with own verdict.
+    """
+
+    id: Optional[int] = None
+    verdict: str                  # "intact" | "gemischt" | "gefaehrdet"
+    summary: str                  # Ein-Satz-Fazit Story-Check
+    perf_verdict: str             # "on_track" | "achtung" | "kritisch"
+    perf_summary: str             # Ein-Satz-Fazit Performance
+    stability_verdict: str        # "stabil" | "achtung" | "instabil"
+    stability_summary: str        # Ein-Satz-Fazit Stabilität
+    full_text: str                # Vollständige LLM-Antwort (Markdown)
+    created_at: datetime
