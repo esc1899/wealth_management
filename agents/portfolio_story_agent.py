@@ -210,7 +210,7 @@ Dividenden-Snapshot:
                 pos_verdicts = verdicts[pos.id]
                 for agent_name, verdict_obj in pos_verdicts.items():
                     if verdict_obj:
-                        verdicts_info.append(f"{agent_name}: {verdict_obj.get('verdict', '?')}")
+                        verdicts_info.append(f"{agent_name}: {verdict_obj.verdict}")
 
             verdict_str = " | ".join(verdicts_info) if verdicts_info else "keine Analysen"
             position_lines.append(
