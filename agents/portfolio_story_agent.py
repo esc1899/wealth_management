@@ -53,17 +53,40 @@ class PortfolioStoryAgent:
         self,
         positions_summary: str,
         existing_story: Optional[PortfolioStory] = None,
+        story_text: Optional[str] = None,
+        target_year: Optional[int] = None,
+        liquidity_need: Optional[str] = None,
+        priority: Optional[str] = None,
     ) -> str:
         """
         Generate an AI-assisted portfolio story draft.
-        Guided by current portfolio composition and any existing story.
+        Guided by current portfolio composition, existing story, and new form inputs.
         """
         info = f"Aktuelle Portfolio-Zusammensetzung:\n{positions_summary}"
 
+        # Build goals section from form inputs
+        goals_lines = []
+        if priority:
+            goals_lines.append(f"- Priorität: {priority}")
+        if target_year:
+            goals_lines.append(f"- Ziel-Jahr: {target_year}")
+        if liquidity_need:
+            goals_lines.append(f"- Liquiditätsbedarf: {liquidity_need}")
+        goals_section = "\n".join(goals_lines) if goals_lines else ""
+
         if existing_story:
-            task = f"Aktualisiere und verbessere diese bestehende Portfolio-These:\n\n{existing_story.story}"
+            if story_text or target_year or liquidity_need or priority:
+                # User edited the story or changed goals — update based on changes
+                task = f"Aktualisiere diese Portfolio-These anhand der neuen Eingaben:\n\n{existing_story.story}"
+                if goals_section:
+                    task += f"\n\nNeue Ziele/Eingaben:\n{goals_section}"
+            else:
+                # No changes, just refine
+                task = f"Verbessere diese bestehende Portfolio-These:\n\n{existing_story.story}"
         else:
             task = "Schreibe ein prägnantes Portfolio-Narrativ (3–5 Sätze)."
+            if goals_section:
+                task += f"\n\nBerücksichtige diese Ziele:\n{goals_section}"
 
         prompt = (
             f"Du bist ein erfahrener Vermögensberater.\n\n"

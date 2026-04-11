@@ -131,7 +131,7 @@ with st.form("portfolio_story_form", clear_on_submit=False):
         st.rerun()
 
     if draft_clicked:
-        # Generate AI draft
+        # Generate AI draft with current form inputs
         with st.spinner("🤖 Generiere AI-Vorschlag…"):
             portfolio = positions_repo.get_portfolio()
             if portfolio:
@@ -142,7 +142,14 @@ with st.form("portfolio_story_form", clear_on_submit=False):
                 positions_summary = "(leeres Portfolio)"
 
             draft = asyncio.run(
-                agent.generate_story_draft(positions_summary, current_story)
+                agent.generate_story_draft(
+                    positions_summary=positions_summary,
+                    existing_story=current_story,
+                    story_text=story_text.strip() if story_text.strip() else None,
+                    target_year=int(target_year),
+                    liquidity_need=liquidity_need.strip() if liquidity_need.strip() else None,
+                    priority=priority,
+                )
             )
             st.session_state["_story_draft"] = draft
             st.rerun()
