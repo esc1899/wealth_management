@@ -239,6 +239,20 @@ else:
                     positions_count=len(portfolio),
                 )
 
+                # Build verdicts dict for position analysis
+                pos_ids = [p.id for p in portfolio if p.id]
+                verdicts_by_position = {}
+                if pos_ids:
+                    vs = analyses_repo.get_latest_bulk(pos_ids, "storychecker")
+                    vf = analyses_repo.get_latest_bulk(pos_ids, "fundamental")
+                    vc = analyses_repo.get_latest_bulk(pos_ids, "consensus_gap")
+                    for pos_id in pos_ids:
+                        verdicts_by_position[pos_id] = {
+                            "storychecker": vs.get(pos_id),
+                            "fundamental": vf.get(pos_id),
+                            "consensus_gap": vc.get(pos_id),
+                        }
+
                 # Run analysis (portfolio-level + position-level in parallel)
                 async def run_checks():
                     analysis, position_fits = await asyncio.gather(
@@ -252,7 +266,7 @@ else:
                         agent.analyze_positions(
                             story=current_story,
                             positions=portfolio,
-                            verdicts=analyses_repo.get_latest_bulk([p.id for p in portfolio if p.id]),
+                            verdicts=verdicts_by_position,
                         )
                     )
                     return analysis, position_fits
