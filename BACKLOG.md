@@ -55,16 +55,20 @@ Stability-Check könnte zusätzliche Kriterien einbeziehen:
 - FX-Exposure summieren
 - Bargeld-Adäquatheit bewerten
 
-#### [P2] [FEAT] Portfolio Story: Per-Position Story-Fit Assessment ✅ UMGESETZT (84d27bb)
+#### [P2] [FEAT] Portfolio Story: Per-Position Story-Fit Assessment ✅ UMGESETZT
 **Phase 1** (ursprünglich): Batch LLM-Call analysiert Positionen gegen Portfolio-These (stärkt/schwächt/neutral).
 
-**Phase 2** (2026-04-11): **Role-Based Redesign**
+**Phase 2** (2026-04-11): **Role-Based Redesign** (84d27bb)
 - `fit_role` ersetzt `fit_verdict`: 5 Rollen statt 3 Verdicts (Wachstumsmotor 🔵 / Stabilitätsanker 🟡 / Einkommensquelle 🟢 / Diversifikationselement 🟣 / Fehlplatzierung 🔴)
 - **Story-Primacy**: Für bestehende Positionen ist Portfolio-Story #1, Fundamentals nur "confirmatory signal"
 - LLM-Prompt role-focused: "Rolle basiert auf Story-Logik, nicht absoluter Qualität"
-- **Sekundär: Position-Story Update Button** im Storychecker (nach Check) → AI schlägt aktualisierte Position-Story vor → User reviewt & speichert
-- Iterativer Prozess: Refined stories werden bei nächstem Check als Input genutzt
 - Alle 527 Tests grün
+
+**Phase 3** (2026-04-11): **Position-Story Update — Expander Pattern, Check-unabhängig** (407d490)
+- Neuer Button "📝 Position-Story aktualisieren" im Storychecker (col_left, immer verfügbar, nicht Session-abhängig)
+- Expander-Pattern wie "Hinterlegte Story anzeigen" (kompakt, kollabiert)
+- `generate_story_proposal()` akzeptiert jetzt Position direkt (ohne Check-Kontext)
+- Iterativer Prozess: User kann jederzeit Story-Update generieren & speichern → wird bei nächstem Check genutzt
 
 #### [P2] [FEAT] Portfolio Story: Rebalancer-Integration
 Portfolio Story als Kontext in Rebalancer injizieren → Rebalancing-Vorschläge werden goal-aware und story-aligned.
