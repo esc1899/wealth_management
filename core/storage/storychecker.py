@@ -52,7 +52,13 @@ class StorycheckerRepository:
 
     def get_session(self, session_id: int) -> Optional[StorycheckerSession]:
         row = self._conn.execute(
-            "SELECT * FROM storychecker_sessions WHERE id = ?", (session_id,)
+            """
+            SELECT s.*, pa.verdict
+            FROM storychecker_sessions s
+            LEFT JOIN position_analyses pa ON pa.session_id = s.id AND pa.agent = 'storychecker'
+            WHERE s.id = ?
+            """,
+            (session_id,)
         ).fetchone()
         return self._row_to_session(row) if row else None
 
