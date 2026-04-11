@@ -196,6 +196,8 @@ Dividenden-Snapshot:
         Returns list of PortfolioStoryPositionFit objects.
         Single batch LLM call for all positions.
         """
+        self._llm.skill_context = "portfolio_story_position_fit"
+
         if not positions:
             return []
 
@@ -245,6 +247,9 @@ Positionen zur Bewertung:
 
         # Parse position fits from reply
         fits = self._parse_position_fits(reply, positions)
+        logger.info(f"analyze_positions: parsed {len(fits)} fits from LLM reply")
+        if not fits and reply:
+            logger.warning(f"No fits parsed. LLM reply preview: {reply[:300]}")
         return fits
 
     @staticmethod
