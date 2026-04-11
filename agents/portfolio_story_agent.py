@@ -139,8 +139,8 @@ Antworte IMMER in diesem exakten Format (drei Sektionen mit je eigenem Urteil):
 Beurteile die Stabilität anhand der Gewichtung:
 - Ist die Gewichtung defensiv genug für die Ziele (Priorität: {story.priority})?
 - Wertpapieranteil (Aktien {metrics.josef_aktien_pct:.0f}%): Zu hoch? Passt zum Zeithorizont?
-- Inflationsschutz: Rohstoffanteil ({metrics.josef_rohstoffe_pct:.0f}%) ausreichend angesichts der Ziele?
-- Liquidität: Rentenanteil ({metrics.josef_renten_pct:.0f}%) adequate für Liquiditätsbedarf?
+- Inflationsschutz: Rohstoffe + Immobilien ({metrics.josef_rohstoffe_pct:.0f}%) ausreichend für die Ziele?
+- Liquidität & Einkommen: Rentenanteil ({metrics.josef_renten_pct:.0f}%) + jährliche Dividenden ({metrics.total_annual_dividend_eur:.0f}€) adequate für Liquiditätsbedarf?
 
 ### Impact der Gewichtung auf Portfoliostabilität
 
