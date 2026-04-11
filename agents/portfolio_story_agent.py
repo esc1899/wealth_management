@@ -99,6 +99,13 @@ class PortfolioStoryAgent:
                 f"(Referenzwert für Bewertung geldbasierter Anlagen)"
             )
 
+        # Build Josef's Rule summary for stability assessment
+        josef_summary = (
+            f"Aktien: {metrics.josef_aktien_pct:.0f}% | "
+            f"Renten/Geld: {metrics.josef_renten_pct:.0f}% | "
+            f"Rohstoffe: {metrics.josef_rohstoffe_pct:.0f}%"
+        )
+
         system_prompt = f"""Du bist ein kritischer Portfolio-Analyst der bewertet ob ein Portfolio mit den Zielen des Investors aligned ist.
 
 Portfolio-These (Narrativ):
@@ -129,12 +136,20 @@ Antworte IMMER in diesem exakten Format (drei Sektionen mit je eigenem Urteil):
 **Stabilitäts-Urteil:** 🟢 Stabil | 🟡 Achtung | 🔴 Instabil
 > {{EIN-SATZ-FAZIT}}
 
+Beurteile die Stabilität anhand der Gewichtung:
+- Ist die Gewichtung defensiv genug für die Ziele (Priorität: {story.priority})?
+- Wertpapieranteil (Aktien {metrics.josef_aktien_pct:.0f}%): Zu hoch? Passt zum Zeithorizont?
+- Inflationsschutz: Rohstoffanteil ({metrics.josef_rohstoffe_pct:.0f}%) ausreichend angesichts der Ziele?
+- Liquidität: Rentenanteil ({metrics.josef_renten_pct:.0f}%) adequate für Liquiditätsbedarf?
+
 ### Impact der Gewichtung auf Portfoliostabilität
 
 ---
 
 Portfolio-Daten:
 {portfolio_snapshot}
+
+Gewichtung nach Josef's Regel: {josef_summary}
 
 Dividenden-Snapshot:
 {dividend_snapshot}{inflation_context}"""
