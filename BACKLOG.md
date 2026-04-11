@@ -18,6 +18,27 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 
 ---
 
+### Portfolio Story
+
+#### [P2] [IMPR] Portfolio Story: Erweiterte Stabilitäts-Kriterien
+Stability-Check könnte zusätzliche Kriterien einbeziehen:
+
+1. **Diversifikation:** Position-Anzahl, Top-3-Klumpen-Risiko
+2. **Sektor-Konzentration:** "Zu viel Tech/Einzelbranchen?"
+3. **Währungsrisiko:** Non-EUR-Anteil (FX-Exposure)
+4. **Zeitlicher Horizont vs. Volatilität:** Je näher target_year, desto defensiver
+5. **Notfall-Reserve:** Bargeld für Emergencies
+
+Status: Aktuell Josef's Rule (Aktien/Renten/Rohstoffe) + Immobilien + Dividenden.
+
+#### [P2] [FEAT] Portfolio Story: Per-Position Story-Fit Assessment
+Siehe [memory/portfolio_story_position_fit.md](../memory/portfolio_story_position_fit.md)
+
+#### [P2] [FEAT] Portfolio Story: Rebalancer-Integration
+Portfolio Story als Kontext in Rebalancer injizieren → Rebalancing-Vorschläge werden goal-aware und story-aligned.
+
+---
+
 ### Invest / Rebalance
 
 
