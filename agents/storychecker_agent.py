@@ -197,33 +197,48 @@ class StorycheckerAgent:
     def delete_session(self, session_id: int) -> None:
         self._storychecker.delete_session(session_id)
 
-    async def generate_story_proposal(self, session_id: int) -> str:
-        """Generate an updated investment story based on the check session."""
+    async def generate_story_proposal(self, session_id: int | None = None, position: Position | None = None) -> str:
+        """
+        Generate an updated investment story.
+
+        Can work in two modes:
+        - With session_id: uses check messages as context
+        - With position: generates from position info alone (no session context)
+
+        One of session_id or position must be provided.
+        """
         import asyncio
-        session = self.get_session(session_id)
-        if not session:
-            raise ValueError(f"Session {session_id} not found")
 
-        position = self._positions.get(session.position_id)
-        if not position:
-            raise ValueError(f"Position {session.position_id} not found")
+        if session_id is not None:
+            # Mode 1: Use session context
+            session = self.get_session(session_id)
+            if not session:
+                raise ValueError(f"Session {session_id} not found")
 
-        # Get session messages to use as context
-        messages = self.get_messages(session_id)
-        message_context = "\n".join([f"{m.role.upper()}: {m.content[:200]}" for m in messages[-4:]])
+            position = self._positions.get(session.position_id)
+            if not position:
+                raise ValueError(f"Position {session.position_id} not found")
+
+            messages = self.get_messages(session_id)
+            context_block = "\n".join([f"{m.role.upper()}: {m.content[:200]}" for m in messages[-4:]])
+            context_text = f"**Analyse-Auszug:**\n{context_block}"
+        elif position is not None:
+            # Mode 2: Direct position, no session context
+            context_text = "(kein aktueller Check — Story wird auf Basis der Positionsdaten generiert)"
+        else:
+            raise ValueError("Entweder session_id oder position muss angegeben werden")
 
         prompt = f"""Du bist ein Vermögensberater der Investment-Thesen schreibt.
 
-Basierend auf dieser Analyse wurde eine Investment-These überprüft:
-
 **Position:** {position.name} ({position.ticker or 'N/A'})
 **Asset-Klasse:** {position.asset_class}
+**Bestehende Story:**
+{position.story or '(keine)'}
 
-**Analyse-Auszug:**
-{message_context}
+{context_text}
 
-**Aufgabe:** Schreibe eine kurze, prägnante aktualisierte Investment-These (2-3 Sätze) für diese Position.
-Die These sollte die neuen Erkenntnisse aus der Analyse berücksichtigen und prägnant erklären:
+**Aufgabe:** Schreibe eine kurze, prägnante Investment-These (2-3 Sätze) für diese Position.
+Erkläre prägnant:
 - Warum diese Position im Portfolio?
 - Welche Rolle spielt sie?
 - Was sind die Key Points?
