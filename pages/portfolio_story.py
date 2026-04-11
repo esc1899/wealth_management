@@ -263,6 +263,32 @@ else:
 st.divider()
 
 # ──────────────────────────────────────────────────────────────────────
+# Helpers (define early so they can be used later)
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _verdict_icon(verdict: str) -> str:
+    """Return emoji icon for a verdict."""
+    mapping = {
+        "intact": "🟢",
+        "gemischt": "🟡",
+        "gefaehrdet": "🔴",
+        "on_track": "🟢",
+        "achtung": "🟡",
+        "kritisch": "🔴",
+        "stabil": "🟢",
+        "instabil": "🔴",
+        "unknown": "⚪",
+    }
+    return mapping.get(verdict.lower(), "⚪")
+
+
+def _verdict_icon_short(verdict: str) -> str:
+    """Return just the emoji for a verdict (for compact display)."""
+    return _verdict_icon(verdict)
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Section 3: Investment Overview
 # ──────────────────────────────────────────────────────────────────────
 
@@ -319,29 +345,3 @@ else:
                     st.markdown(
                         f"**Consensus Gap:** {_verdict_icon_short(vc.verdict)} {vc.verdict}\n_{vc.summary}_"
                     )
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Helpers
-# ──────────────────────────────────────────────────────────────────────
-
-
-def _verdict_icon(verdict: str) -> str:
-    """Return emoji icon for a verdict."""
-    mapping = {
-        "intact": "🟢",
-        "gemischt": "🟡",
-        "gefaehrdet": "🔴",
-        "on_track": "🟢",
-        "achtung": "🟡",
-        "kritisch": "🔴",
-        "stabil": "🟢",
-        "instabil": "🔴",
-        "unknown": "⚪",
-    }
-    return mapping.get(verdict.lower(), "⚪")
-
-
-def _verdict_icon_short(verdict: str) -> str:
-    """Return just the emoji for a verdict (for compact display)."""
-    return _verdict_icon(verdict)
