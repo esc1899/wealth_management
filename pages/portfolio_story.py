@@ -350,7 +350,7 @@ else:
             vc = verdicts_consensus.get(pos.id)
 
             with st.container(border=True):
-                col1, col2, col3 = st.columns([2, 2, 1])
+                col1, col2, col3 = st.columns([2, 1.5, 1.5])
 
                 with col1:
                     st.markdown(
@@ -359,17 +359,9 @@ else:
                     )
 
                 with col2:
-                    # Summary: How this position fits the story
-                    summary_lines = []
-                    if vs:
-                        summary_lines.append(f"• Story: {vs.verdict} — {vs.summary}")
-                    if vf:
-                        summary_lines.append(f"• Fundamental: {vf.verdict} — {vf.summary}")
-                    if vc:
-                        summary_lines.append(f"• Consensus: {vc.verdict} — {vc.summary}")
-
-                    if summary_lines:
-                        st.caption("\n".join(summary_lines))
+                    # TODO: Story-Fit badge (per-position assessment)
+                    # Placeholder for future feature: "Stärkt Story" / "Schwächt Story" / "Neutral"
+                    st.caption("_(Story-Fit später)_")
 
                 with col3:
                     # Show 3 verdicts inline
