@@ -24,6 +24,32 @@ from state import (
 
 logger = logging.getLogger(__name__)
 
+# ──────────────────────────────────────────────────────────────────────
+# Helper functions (must be defined early)
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _verdict_icon(verdict: str) -> str:
+    """Return emoji icon for a verdict."""
+    mapping = {
+        "intact": "🟢",
+        "gemischt": "🟡",
+        "gefaehrdet": "🔴",
+        "on_track": "🟢",
+        "achtung": "🟡",
+        "kritisch": "🔴",
+        "stabil": "🟢",
+        "instabil": "🔴",
+        "unknown": "⚪",
+    }
+    return mapping.get(verdict.lower(), "⚪")
+
+
+def _verdict_icon_short(verdict: str) -> str:
+    """Return just the emoji for a verdict (for compact display)."""
+    return _verdict_icon(verdict)
+
+
 st.set_page_config(page_title="Portfolio Story", page_icon="📖", layout="wide")
 st.title("📖 Portfolio Story")
 st.caption("Dein langfristiges Anlage-Narrativ und Alignment-Check")
