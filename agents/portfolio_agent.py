@@ -397,19 +397,11 @@ class PortfolioAgent:
         return {"success": deleted}
 
     def _tool_clear_portfolio(self) -> dict:
-        entries = self._positions.get_portfolio()
-        count = 0
-        for entry in entries:
-            if self._positions.delete(entry.id):
-                count += 1
+        count = self._positions.clear_portfolio()
         return {"deleted": count}
 
     def _tool_clear_watchlist(self) -> dict:
-        entries = self._positions.get_watchlist()
-        count = 0
-        for entry in entries:
-            if self._positions.delete(entry.id):
-                count += 1
+        count = self._positions.clear_watchlist()
         return {"deleted": count}
 
     def _tool_list_watchlist(self) -> dict:

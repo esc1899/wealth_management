@@ -131,6 +131,18 @@ class PositionsRepository:
         ).fetchall()
         return [r[0] for r in rows]
 
+    def clear_portfolio(self) -> int:
+        """Delete all positions from portfolio. Returns count of deleted rows."""
+        cursor = self._conn.execute("DELETE FROM positions WHERE in_portfolio = 1")
+        self._conn.commit()
+        return cursor.rowcount
+
+    def clear_watchlist(self) -> int:
+        """Delete all positions from watchlist. Returns count of deleted rows."""
+        cursor = self._conn.execute("DELETE FROM positions WHERE in_watchlist = 1")
+        self._conn.commit()
+        return cursor.rowcount
+
     # ------------------------------------------------------------------
     # Serialization helpers
     # ------------------------------------------------------------------

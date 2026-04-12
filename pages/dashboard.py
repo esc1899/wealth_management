@@ -14,33 +14,11 @@ from core.currency import fmt, symbol
 from core.i18n import t
 from state import get_market_agent, get_wealth_snapshot_agent
 
-# ---------------------------------------------------------------------------
-# Easter Egg dialog (defined at module level — Streamlit requirement)
-# ---------------------------------------------------------------------------
-
-_EASTER_SUNDAY = date(2026, 4, 5)
-_EGG_ACTIVE_UNTIL = date(2026, 4, 6)
-
-
-@st.dialog(t("dashboard.easter_egg_title"))
-def _show_easter_egg():
-    today = date.today()
-    if today < _EGG_ACTIVE_UNTIL:
-        days_left = (_EASTER_SUNDAY - today).days
-        st.markdown(t("dashboard.easter_egg_countdown").format(days=days_left))
-    else:
-        st.markdown(t("dashboard.easter_egg_after"))
-
 st.set_page_config(page_title="Dashboard", page_icon="📊", layout="wide")
 st.title(f"📊 {t('dashboard.title')}")
 st.caption("Agentic Wealth Manager")
 
 market_agent = get_market_agent()
-
-# Easter egg: open dialog after 3 clicks on hidden button
-if st.session_state.get("_egg_clicks", 0) >= 3:
-    st.session_state["_egg_clicks"] = 0
-    _show_easter_egg()
 
 col_title, col_refresh, col_egg = st.columns([5, 1, 0.15])
 with col_refresh:

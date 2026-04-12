@@ -89,9 +89,11 @@ st.subheader("1️⃣ Portfolio Story — Definieren & Updaten")
 with st.form("portfolio_story_form", clear_on_submit=False):
     col1, col2 = st.columns(2)
     with col1:
+        # Check if we need to use a draft that was just accepted
+        draft_to_accept = st.session_state.get("_story_draft_to_accept")
         story_text = st.text_area(
             "Dein Portfolio-Narrativ",
-            value=current_story.story if current_story else "",
+            value=draft_to_accept or (current_story.story if current_story else ""),
             height=150,
             help="Deine langfristigen Ziele, Zeithorizont, Prioritäten, Lebens-Meilensteine",
         )
@@ -139,6 +141,9 @@ with st.form("portfolio_story_form", clear_on_submit=False):
             updated_at=datetime.now(),
         )
         saved = repo.save(new_story)
+        # Clear any pending draft
+        if "_story_draft_to_accept" in st.session_state:
+            del st.session_state["_story_draft_to_accept"]
         st.success("✅ Portfolio Story gespeichert!")
         st.rerun()
 
@@ -168,11 +173,39 @@ with st.form("portfolio_story_form", clear_on_submit=False):
 
 # Show draft if available
 if "_story_draft" in st.session_state and st.session_state["_story_draft"]:
-    with st.info("🤖 **AI-Vorschlag** (in das Feld oben kopieren)"):
-        st.code(st.session_state["_story_draft"])
-    if st.button("❌ Verwerfen"):
-        del st.session_state["_story_draft"]
-        st.rerun()
+    st.divider()
+    st.subheader("🤖 AI-Vorschlag")
+
+    draft_col1, draft_col2 = st.columns(2)
+    with draft_col1:
+        st.text_area(
+            "Vorgeschlagenes Portfolio-Narrativ",
+            value=st.session_state["_story_draft"],
+            height=150,
+            disabled=True,
+            key="draft_story_display",
+        )
+    with draft_col2:
+        st.text_area(
+            "Aktueller Liquiditätsbedarf",
+            value=liquidity_need,
+            height=100,
+            disabled=True,
+            key="draft_liquidity_display",
+        )
+        st.markdown("**Aktuelle Priorität**")
+        st.markdown(f"*{priority}*")
+
+    col_accept, col_reject = st.columns([1, 1])
+    with col_accept:
+        if st.button("✅ Übernehmen", use_container_width=True):
+            st.session_state["_story_draft_to_accept"] = st.session_state["_story_draft"]
+            del st.session_state["_story_draft"]
+            st.rerun()
+    with col_reject:
+        if st.button("❌ Verwerfen", use_container_width=True):
+            del st.session_state["_story_draft"]
+            st.rerun()
 
 st.divider()
 
