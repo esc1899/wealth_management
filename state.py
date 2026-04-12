@@ -348,6 +348,17 @@ def get_portfolio_story_agent() -> PortfolioStoryAgent:
 
 
 @st.cache_resource
+def get_position_story_service():
+    """Service for generating individual position investment theses."""
+    from core.services.position_story_service import PositionStoryService
+    return PositionStoryService(
+        api_key=config.ANTHROPIC_API_KEY,
+        usage_repo=get_usage_repo(),
+        model=_get_agent_model("position_story", "claude", CLAUDE_HAIKU),
+    )
+
+
+@st.cache_resource
 def get_langfuse_client():
     return create_langfuse_client(
         public_key=config.LANGFUSE_PUBLIC_KEY,

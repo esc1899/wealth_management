@@ -4,14 +4,12 @@ Positionen — direktes CRUD für Portfolio und Watchlist, kein LLM.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import date, timedelta
 from typing import Optional
 
 import streamlit as st
 
-from core.constants import CLAUDE_HAIKU
 from core.currency import symbol
 from core.i18n import t
 
@@ -22,35 +20,7 @@ from core.asset_class_config import get_asset_class_registry
 from core.figi import RELEVANT_EXCH, openfigi_lookup, to_yahoo_ticker
 from core.i18n import t
 from core.storage.models import Position
-from state import get_analyses_repo, get_app_config_repo, get_market_agent, get_market_repo, get_positions_repo, get_skills_repo
-
-
-def _generate_story_proposal(name: str, ticker: str | None, asset_class: str, existing_story: str | None) -> str:
-    """Call Claude to generate an investment thesis for a position."""
-    from core.llm.claude import ClaudeProvider
-
-    llm = ClaudeProvider(api_key=config.ANTHROPIC_API_KEY, model=CLAUDE_HAIKU)
-
-    info = f"Name: {name}\nAsset-Klasse: {asset_class}"
-    if ticker:
-        info += f"\nTicker: {ticker}"
-
-    if existing_story:
-        task = f"Aktualisiere und verbessere diese bestehende Investment-These:\n\n{existing_story}"
-    else:
-        task = "Schreibe eine prägnante Investment-These (2–4 Sätze)."
-
-    prompt = (
-        f"Du bist ein erfahrener Investmentanalyst.\n\n"
-        f"Position:\n{info}\n\n"
-        f"{task}\n\n"
-        "Die These soll erklären: warum diese Position interessant ist, "
-        "was die Kernthese ist (Wachstum, Value, Dividende, Absicherung …) "
-        "und welche wichtigen Katalysatoren oder Risiken bestehen. "
-        "Antworte NUR mit der These, keine Einleitung, keine Überschrift."
-    )
-
-    return asyncio.run(llm.complete(prompt, max_tokens=400))
+from state import get_analyses_repo, get_app_config_repo, get_market_agent, get_market_repo, get_position_story_service, get_positions_repo, get_skills_repo
 
 st.set_page_config(page_title="Positionen", page_icon="📋", layout="wide")
 st.title(f"📋 {t('positionen.title')}")
@@ -419,7 +389,8 @@ if _ss("_pos_show_form"):
         _story_err = None
         with st.spinner(t("positionen.story_suggest_spinner")):
             try:
-                _draft = _generate_story_proposal(
+                story_service = get_position_story_service()
+                _draft = story_service.generate_position_story(
                     name=_suggest_name,
                     ticker=_suggest_ticker or None,
                     asset_class=_suggest_ac,
