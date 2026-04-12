@@ -159,22 +159,42 @@ else:
                 portfolio = positions_repo.get_portfolio()
                 watchlist = positions_repo.get_watchlist()
 
+                # Get valuations (includes all positions: tradeable + non-tradeable)
+                valuations = get_market_agent().get_portfolio_valuation()
+
                 if portfolio:
-                    from agents.rebalance_agent import RebalanceAgent
-                    # Reuse _build_portfolio_context from rebalance agent
-                    # For now, create a simple snapshot
-                    snapshot_lines = ["**Portfolio Snapshot**\n"]
+                    from agents.rebalance_agent import JOSEF_CATEGORY
+
+                    # Tradeable positions (börsengehandelt = haben ticker)
+                    snapshot_lines = ["**Portfolio Snapshot (Börsengehandelte Positionen)**\n"]
+                    tradeable_names = {p.name for p in portfolio if p.ticker}
+
                     for p in portfolio:
-                        ticker_str = f" ({p.ticker})" if p.ticker else ""
-                        snapshot_lines.append(
-                            f"- {p.name}{ticker_str} [{p.asset_class}]"
-                        )
+                        if p.ticker:  # Only show tradeable in main section
+                            ticker_str = f" ({p.ticker})"
+                            snapshot_lines.append(
+                                f"- {p.name}{ticker_str} [{p.asset_class}]"
+                            )
+
+                    # Non-tradeable positions (keine ticker = Immobilien, Festgeld, etc.)
+                    # Diese zählen in der Josef-Regel mit, müssen aber erklärt werden
+                    non_tradeable_lines = []
+                    for v in valuations:
+                        if v.in_portfolio and not v.symbol:  # in_portfolio aber kein symbol = non-tradeable
+                            josef_cat = JOSEF_CATEGORY.get(v.investment_type, "?")
+                            non_tradeable_lines.append(
+                                f"- {v.name} [{v.asset_class}] → {josef_cat} ({symbol()}{v.current_value_eur:,.0f})"
+                            )
+
+                    if non_tradeable_lines:
+                        snapshot_lines.append("\n**Nicht-börsengehandelt (in Josef-Regel enthalten):**")
+                        snapshot_lines.extend(non_tradeable_lines)
+
                     portfolio_snapshot = "\n".join(snapshot_lines)
                 else:
                     portfolio_snapshot = "(Leeres Portfolio)"
 
                 # Build dividend snapshot
-                valuations = get_market_agent().get_portfolio_valuation()
                 dividend_lines = []
                 for v in valuations:
                     if v.annual_dividend_eur and v.annual_dividend_eur > 0:
