@@ -4,6 +4,7 @@ Returns the correct provider based on the requested backend.
 """
 
 from enum import Enum
+from core.constants import CLAUDE_SONNET
 from core.llm.base import LLMProvider
 
 
@@ -29,6 +30,6 @@ def create_llm(backend: LLMBackend, **kwargs) -> LLMProvider:
         from core.llm.claude import ClaudeProvider
         return ClaudeProvider(
             api_key=kwargs["api_key"],
-            model=kwargs.get("model", "claude-sonnet-4-6"),
+            model=kwargs.get("model", CLAUDE_SONNET),
         )
     raise ValueError(f"Unknown LLM backend: {backend}")

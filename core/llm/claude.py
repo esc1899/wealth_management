@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
 import anthropic
+from core.constants import CLAUDE_SONNET
 from core.llm.base import LLMProvider, Message, Role
 
 _logger = logging.getLogger(__name__)
@@ -29,7 +30,7 @@ _OUTPUT_COMPILED_PATTERNS = [
 ]
 
 # Claude model to use — update when a newer version is preferred
-DEFAULT_MODEL = "claude-sonnet-4-6"
+DEFAULT_MODEL = CLAUDE_SONNET
 
 
 @dataclass

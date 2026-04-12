@@ -8,6 +8,7 @@ import streamlit as st
 nest_asyncio.apply()
 
 from config import config
+from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET
 from agents.consensus_gap_agent import ConsensusGapAgent
 from agents.fundamental_agent import FundamentalAgent
 from agents.market_data_agent import MarketDataAgent
@@ -47,7 +48,7 @@ from monitoring.langfuse_client import create_langfuse_client
 
 # Default model values (overridable via app_config)
 _DEFAULT_OLLAMA_MODEL = config.OLLAMA_MODEL
-_DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5-20251001"
+_DEFAULT_CLAUDE_MODEL = CLAUDE_HAIKU
 
 
 @st.cache_resource
@@ -224,7 +225,7 @@ def get_news_agent() -> NewsAgent:
 
 @st.cache_resource
 def get_search_agent() -> SearchAgent:
-    model = _get_agent_model("search", "claude", "claude-sonnet-4-6")
+    model = _get_agent_model("search", "claude", CLAUDE_SONNET)
     llm = _make_claude_provider(model, "investment_search")
     return SearchAgent(
         positions_repo=get_positions_repo(),
@@ -281,7 +282,7 @@ def get_structural_scans_repo() -> StructuralScansRepository:
 
 @st.cache_resource
 def get_structural_change_agent(claude_model: str = "") -> StructuralChangeAgent:
-    model = _get_agent_model("structural_scan", "claude", "claude-sonnet-4-6")
+    model = _get_agent_model("structural_scan", "claude", CLAUDE_SONNET)
     llm = _make_claude_provider(model, "structural_scan")
     return StructuralChangeAgent(
         positions_repo=get_positions_repo(),
@@ -291,14 +292,14 @@ def get_structural_change_agent(claude_model: str = "") -> StructuralChangeAgent
 
 @st.cache_resource
 def get_fundamental_agent() -> FundamentalAgent:
-    model = _get_agent_model("fundamental", "claude", "claude-sonnet-4-6")
+    model = _get_agent_model("fundamental", "claude", CLAUDE_SONNET)
     llm = _make_claude_provider(model, "fundamental")
     return FundamentalAgent(llm=llm)
 
 
 @st.cache_resource
 def get_consensus_gap_agent(claude_model: str = "") -> ConsensusGapAgent:
-    model = _get_agent_model("consensus_gap", "claude", "claude-sonnet-4-6")
+    model = _get_agent_model("consensus_gap", "claude", CLAUDE_SONNET)
     llm = _make_claude_provider(model, "consensus_gap")
     return ConsensusGapAgent(llm=llm)
 

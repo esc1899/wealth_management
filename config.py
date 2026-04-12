@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
 
+from core.constants import CLAUDE_MODELS_DEFAULT_LIST
+
 load_dotenv()
 # Optional profile override: ENV_PROFILE=work loads .env.work on top of .env
 _profile = os.getenv("ENV_PROFILE", "")
@@ -50,7 +52,7 @@ class Config:
         m.strip()
         for m in os.getenv(
             "CLAUDE_MODELS",
-            "claude-haiku-4-5-20251001,claude-sonnet-4-6,claude-opus-4-6",
+            CLAUDE_MODELS_DEFAULT_LIST,
         ).split(",")
         if m.strip()
     ]
