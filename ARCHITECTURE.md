@@ -417,9 +417,26 @@ LOG_LEVEL=ERROR streamlit run app.py  # Errors only
 
 ---
 
+---
+
+## Architektur-Guards (Anti-Patterns vermeiden)
+
+Diese Muster haben zu technischen Schulden geführt. **Nicht wiederholen** — siehe [CLAUDE.md § Architektur-Guards](CLAUDE.md) für detaillierte Code-Beispiele:
+
+| Guard | Problem | Rule |
+|-------|---------|------|
+| **Hardcoded Strings** | Model-Namen an 7+ Stellen | Alle Magic-Strings in `core/constants.py` |
+| **LLM in Pages** | Kein Usage-Tracking, unkonfigurierbar | LLM-Calls nur in Agents/Services via state.py Factory |
+| **Direkter Repo-Zugriff in Pages** | Pages untestbar, Business-Logic in UI | Pages sprechen nur mit Services, nicht direkt Repos |
+| **Private Attribute aus Pages** | Kapselung verletzt | Nur öffentliche Methods/Properties von Agents |
+| **Duplizierte DDL** | init_db + migrate_db Duplikate | Schema einmal definieren, Migrations idempotent |
+| **asyncio.run() in Streamlit** | Event-Loop Konflikte | Async nur in Services, Pages sind Sync |
+
+---
+
 ## Known Technical Debt
 
-A comprehensive technical debt analysis was conducted on **2026-04-12**. See **[BACKLOG.md § Technische Schulden](BACKLOG.md)** for the full inventory (16 items, prioritized P1–P3).
+A comprehensive technical debt analysis was conducted on **2026-04-12**. See **[BACKLOG.md § Technische Schulden](BACKLOG.md)** for the full inventory (16 items, prioritized P1–P3). Remediation status: **[CHANGELOG.md § Technische Schulden Status](CHANGELOG.md)** für aktuelle Fortschritte.
 
 ### High-Priority Items (P1)
 

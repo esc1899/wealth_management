@@ -6,14 +6,20 @@ Damit zukünftige Sessions alles finden:
 
 | Datei | Inhalt | Wer updatet |
 |---|---|---|
-| **CLAUDE.md** (diese Datei) | Arbeitsweise, Process, Stack-Fallstricke | Claude bei Prozess-Änderungen |
-| **ARCHITECTURE.md** | Architektur-Entscheidungen, Design-Patterns, Data-Model | Claude bei Arch-Änderungen |
-| **BACKLOG.md** | Features (geplant + abgeschlossen), Status, Prioritäten | User/Claude beim Planning |
+| **CLAUDE.md** (diese Datei) | Arbeitsweise, Process, Stack-Fallstricke, Architektur-Guards | Claude bei Prozess-Änderungen |
+| **ARCHITECTURE.md** | Architektur-Entscheidungen, Design-Patterns, Architektur-Guards, Schulden-Status | Claude bei Arch-Änderungen |
+| **CHANGELOG.md** | Version-Historie, Technische Schulden Remediation Status | Claude beim Release |
+| **BACKLOG.md** | Features (geplant + abgeschlossen), Technische Schulden Inventory | User/Claude beim Planning |
 | **Memory/user_profile.md** | Wer ist Erik, wie arbeitet er | Claude nach User-Feedback |
 | **Memory/feedback.md** | Feedback zur Arbeitsweise mit Claude | Claude nach User-Feedback |
 | **Memory/private_skills.md** | Persönliche Skills (Wu-Wei, Lindy+Potential, etc) | User-Configured |
 
-**Regel**: Projekt-Sachen → Git-Repo (CLAUDE/ARCHITECTURE/BACKLOG). Persönliche Erkenntnisse → Memory. Nicht duplizieren.
+**Regel**: Projekt-Sachen → Git-Repo (CLAUDE/ARCHITECTURE/CHANGELOG/BACKLOG). Persönliche Erkenntnisse → Memory. Nicht duplizieren.
+
+**Verwandte Abschnitte:**
+- [Architektur-Guards](#architektur-guards-anti-patterns-vermeiden) — siehe unten
+- [Technische Schulden Remediation](#technische-schulden--remediation-status) — siehe unten
+- Detaillierte Schulden-Inventory: [BACKLOG.md § Technische Schulden](BACKLOG.md)
 
 ---
 

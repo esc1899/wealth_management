@@ -8,10 +8,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Technical Debt Remediation (2026-04-12)
+
+**Status**: 5 of 16 debt items completed. See [BACKLOG.md § Technische Schulden](BACKLOG.md) for full inventory.
+
+#### Completed ✅
+- [DEBT-14] agentmonitor.py wired to navigation
+- [DEBT-15] Expired Easter egg removed
+- [DEBT-16] O(n) deletes replaced with batch SQL operations
+- [DEBT-11] Coverage configuration added to pytest.ini
+- [DEBT-3] core/constants.py created; 4/8 files updated with model imports
+
+#### In Progress 🚧
+- [DEBT-3] Remaining 4 files to update (benchmark, positionen, app_config, usage)
+
+#### Planned 📋
+- [DEBT-5] Story proposal extraction to service layer
+- [DEBT-6] Agent public APIs (model property, get_latest_fetch_time)
+- [DEBT-1] DDL deduplication cleanup
+- [DEBT-2] Legacy table removal
+- (See BACKLOG.md for full roadmap)
+
 ### Added
 
 - Documentation: Structured documentation framework (CLAUDE.md, ARCHITECTURE.md, BACKLOG.md as Single Source of Truth)
 - Memory system for session persistence and debugging context
+- Architektur-Guards section (anti-patterns to prevent)
+- Technical Debt tracking in CHANGELOG for visibility
 
 ---
 
