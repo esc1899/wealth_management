@@ -11,6 +11,7 @@ from typing import Optional
 
 import streamlit as st
 
+from core.constants import CLAUDE_HAIKU
 from core.currency import symbol
 from core.i18n import t
 
@@ -28,7 +29,7 @@ def _generate_story_proposal(name: str, ticker: str | None, asset_class: str, ex
     """Call Claude to generate an investment thesis for a position."""
     from core.llm.claude import ClaudeProvider
 
-    llm = ClaudeProvider(api_key=config.ANTHROPIC_API_KEY, model="claude-haiku-4-5-20251001")
+    llm = ClaudeProvider(api_key=config.ANTHROPIC_API_KEY, model=CLAUDE_HAIKU)
 
     info = f"Name: {name}\nAsset-Klasse: {asset_class}"
     if ticker:

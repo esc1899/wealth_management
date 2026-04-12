@@ -15,6 +15,7 @@ import threading
 import pandas as pd
 import streamlit as st
 
+from core.constants import CLAUDE_SONNET, CLAUDE_HAIKU
 from core.i18n import t
 from core.storage.usage import compute_cost
 from state import (
@@ -233,7 +234,7 @@ if st.button(t("benchmark.run_button"), disabled=_job["running"] or not _sel_ski
     if _scenario_key == "structural_scan":
         _agent = get_structural_change_agent()
         _repo = get_structural_scans_repo()
-        _model = config_repo.get(f"model_claude_structural_scan") or "claude-sonnet-4-6"
+        _model = config_repo.get(f"model_claude_structural_scan") or CLAUDE_SONNET
 
         def _bg_structural():
             _run_structural_benchmark(_agent, _sel_skill.name, _sel_skill.prompt, _repo, _job)
@@ -245,7 +246,7 @@ if st.button(t("benchmark.run_button"), disabled=_job["running"] or not _sel_ski
         _tickers = [tok.strip().upper() for tok in _tickers_raw.split(",") if tok.strip()]
         _news_agent = get_news_agent()
         _news_repo = get_news_repo()
-        _model = config_repo.get("model_claude_news") or "claude-haiku-4-5-20251001"
+        _model = config_repo.get("model_claude_news") or CLAUDE_HAIKU
 
         def _bg_news():
             _run_news_benchmark(

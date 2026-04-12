@@ -6,6 +6,8 @@ import sqlite3
 from datetime import datetime, date
 from typing import Optional
 
+from core.constants import CLAUDE_HAIKU
+
 
 class UsageRepository:
     def __init__(self, conn: sqlite3.Connection) -> None:
@@ -207,7 +209,7 @@ class UsageRepository:
             if not job.enabled:
                 continue
 
-            model = job.model or "claude-haiku-4-5-20251001"
+            model = job.model or CLAUDE_HAIKU
             calls = _CALLS_PER_MONTH.get(job.frequency, 0.0)
 
             # Count relevant positions for this agent
