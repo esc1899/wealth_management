@@ -40,6 +40,31 @@ Motto: **try to improve the whole**
 - Bug gefunden → erst **Failing Test schreiben**, dann fixen
 - Integration Tests nutzen echtes SQLite `:memory:`, kein Mocking von Repos
 
+## Test Coverage — Standards & Ziele
+
+**Wichtig:** Coverage misst nur "wieviel Code wurde ausgeführt", nicht "sind Tests gut". Eine gute Coverage sagt nicht automatisch: keine Bugs, sondern: meiste Fehler-Szenarien werden gefunden.
+
+| Coverage-Level | Bewertung | Anwendung |
+|---|---|---|
+| **< 50%** | ⚠️ Zu niedrig | Unakzeptabel — zu viele versteckte Bugs |
+| **50–70%** | 🟡 Okay | Einfache Projekte, aber verbesserungswürdig |
+| **70–80%** | ✅ Gut (Ziel) | Standard für professionelle Projekte — aktuell: **77.62%** |
+| **80–90%** | 🟢 Sehr gut | High-Quality Code mit guter Regression-Protection |
+| **90–95%** | 🌟 Ausgezeichnet | Für sicherheitskritische/finanzielle Systeme |
+| **95%+** | ⚠️ Overkill | Aufwand meist nicht proportional zum Nutzen |
+
+**Pro Code-Kategorie** (Richtlinien):
+- **Critical** (Auth, Sicherheit, Finanzen): 85–95% Coverage
+- **Business Logic** (Core Features): 70–85% Coverage
+- **Repositories/Services**: 80%+ Coverage (relativ leicht zu testen)
+- **Pages/UI**: 40–60% Coverage (schwer zu testen, weniger Priorität)
+- **Utils/Helpers**: 80%+ Coverage (leicht zu testen, sollte hoch sein)
+
+**Aktueller Stand:**
+- **77.62% Overall** ✅ Sehr gut — Fehler-Scenario-Detection ist hoch
+- Kommit-Befehl zeigt Abdeckung: `pytest tests/ --cov`
+- Ziel: 77–80% halten (nicht obsessiv verfolgen, sondern kritischer Code priorisieren)
+
 ## Debug-Hygiene
 - Kein Debug-Code committen (`/tmp`-Writes, print-Statements, Logging-Spam)
 - Debug in einem Scratch-Branch oder mit pytest `-s` — nicht im Hauptcode
