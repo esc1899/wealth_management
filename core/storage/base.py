@@ -21,26 +21,6 @@ def get_connection(db_path: str) -> sqlite3.Connection:
 def init_db(conn: sqlite3.Connection) -> None:
     """Create tables if they do not exist."""
     statements = [
-        """CREATE TABLE IF NOT EXISTS portfolio (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            symbol          TEXT NOT NULL,
-            name            TEXT NOT NULL,
-            quantity        TEXT NOT NULL,
-            purchase_price  TEXT,
-            purchase_date   TEXT NOT NULL,
-            asset_type      TEXT NOT NULL,
-            notes           TEXT
-        )""",
-        """CREATE TABLE IF NOT EXISTS watchlist (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            symbol       TEXT NOT NULL,
-            name         TEXT NOT NULL,
-            notes        TEXT,
-            target_price TEXT,
-            added_date   TEXT NOT NULL,
-            source       TEXT NOT NULL,
-            asset_type   TEXT NOT NULL
-        )""",
         """CREATE TABLE IF NOT EXISTS positions (
             id                    INTEGER PRIMARY KEY AUTOINCREMENT,
             asset_class           TEXT NOT NULL,
@@ -349,13 +329,9 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     if "position_count" not in existing_usage:
         conn.execute("ALTER TABLE llm_usage ADD COLUMN position_count INTEGER")
 
-    conn.execute("""CREATE TABLE IF NOT EXISTS usage_resets (
-        id       INTEGER PRIMARY KEY AUTOINCREMENT,
-        agent    TEXT,
-        model    TEXT,
-        skill    TEXT,
-        reset_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )""")
+    # NOTE: benchmark_runs and portfolio_story_position_fits are defined here (not just in init_db)
+    # because they have ALTER TABLE migrations that must run when present.
+    # Other tables (usage_resets, dividend_data) are defined only in init_db.
     conn.execute("""CREATE TABLE IF NOT EXISTS benchmark_runs (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
         scenario_name TEXT NOT NULL,
@@ -372,15 +348,6 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     existing_bm = {row[1] for row in conn.execute("PRAGMA table_info(benchmark_runs)")}
     if "duration_ms" not in existing_bm:
         conn.execute("ALTER TABLE benchmark_runs ADD COLUMN duration_ms INTEGER")
-
-    # Create dividend_data table if it doesn't exist
-    conn.execute("""CREATE TABLE IF NOT EXISTS dividend_data (
-        symbol      TEXT NOT NULL PRIMARY KEY,
-        rate_eur    REAL,
-        yield_pct   REAL,
-        currency    TEXT,
-        fetched_at  TEXT NOT NULL
-    )""")
 
     # Create portfolio_story_position_fits table if it doesn't exist
     conn.execute("""CREATE TABLE IF NOT EXISTS portfolio_story_position_fits (
