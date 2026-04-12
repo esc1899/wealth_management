@@ -188,8 +188,8 @@ def _make_claude_provider(model: str, agent_name: str) -> ClaudeProvider:
     return provider
 
 
-def _make_ollama_provider(model: str, agent_name: str) -> "OllamaProvider":
-    provider = OllamaProvider(host=config.OLLAMA_HOST, model=model)
+def _make_ollama_provider(model: str, agent_name: str, timeout: float = 120.0) -> "OllamaProvider":
+    provider = OllamaProvider(host=config.OLLAMA_HOST, model=model, timeout=timeout)
     provider.on_usage = lambda i, o, skill=None, dur=None, pos=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos)
     return provider
 
@@ -339,7 +339,8 @@ def get_portfolio_story_repo() -> PortfolioStoryRepository:
 @st.cache_resource
 def get_portfolio_story_agent() -> PortfolioStoryAgent:
     model = _get_agent_model("portfolio_story", "ollama", _DEFAULT_OLLAMA_MODEL)
-    llm = _make_ollama_provider(model, "portfolio_story_check")
+    # Portfolio story analysis has detailed prompt — needs longer timeout
+    llm = _make_ollama_provider(model, "portfolio_story_check", timeout=300.0)
     return PortfolioStoryAgent(
         llm=llm,
         positions_repo=get_positions_repo(),
