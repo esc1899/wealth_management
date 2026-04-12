@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from typing import Any, Optional
+from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET, CLAUDE_OPUS
 
 
 class AppConfigRepository:
@@ -65,12 +66,12 @@ class AppConfigRepository:
 
     # Anthropic list prices (USD per million tokens), April 2025
     _DEFAULT_MODEL_PRICES: dict = {
-        "claude-haiku-4-5-20251001":  {"input": 0.80,  "output": 4.00},
-        "claude-sonnet-4-6":          {"input": 3.00,  "output": 15.00},
-        "claude-opus-4-6":            {"input": 15.00, "output": 75.00},
+        CLAUDE_HAIKU:   {"input": 0.80,  "output": 4.00},
+        CLAUDE_SONNET:  {"input": 3.00,  "output": 15.00},
+        CLAUDE_OPUS:    {"input": 15.00, "output": 75.00},
         # Local models are free
-        "qwen3:8b":                   {"input": 0.0,   "output": 0.0},
-        "llama3.2":                   {"input": 0.0,   "output": 0.0},
+        "qwen3:8b":     {"input": 0.0,   "output": 0.0},
+        "llama3.2":     {"input": 0.0,   "output": 0.0},
     }
 
     def get_model_prices(self) -> dict:
