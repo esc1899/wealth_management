@@ -273,12 +273,15 @@ else:
                 st.rerun()
 
     with col_history:
-        st.caption("Bisherige Checks")
-        history = repo.get_analysis_history(limit=5)
-        for h in history:
-            date_str = h.created_at.strftime("%d.%m.%Y")
-            verdict_icon = _verdict_icon(h.verdict)
-            st.text(f"{verdict_icon} {date_str}")
+        st.caption("Analysen-Verlauf")
+        history = repo.get_analysis_history(limit=3)
+        if not history:
+            st.caption("_(noch keine Analysen)_")
+        else:
+            for h in history:
+                date_str = h.created_at.strftime("%d.%m.%Y %H:%M")
+                verdict_icon = _verdict_icon(h.verdict)
+                st.caption(f"{verdict_icon} {date_str}")
 
     if latest_analysis:
         st.divider()
@@ -287,38 +290,44 @@ else:
         st.markdown(f"### Aktuellste Analyse — {latest_analysis.created_at.strftime('%d.%m.%Y %H:%M')}")
 
         # Story Check
-        with st.container(border=True):
-            col1, col2 = st.columns([4, 1])
-            with col1:
-                st.markdown(
-                    f"**Story-Urteil:** {_verdict_icon(latest_analysis.verdict)} {latest_analysis.verdict.title()}"
-                )
-                st.markdown(f"_{latest_analysis.summary}_")
-            with col2:
-                if st.button("▼ Details", key="story_details"):
-                    st.session_state["_expand_story"] = not st.session_state.get(
-                        "_expand_story", False
+        if latest_analysis.verdict:
+            with st.container(border=True):
+                col1, col2 = st.columns([4, 1])
+                with col1:
+                    st.markdown(
+                        f"**Story-Urteil:** {_verdict_icon(latest_analysis.verdict)} {latest_analysis.verdict.title()}"
                     )
+                    if latest_analysis.summary:
+                        st.markdown(f"_{latest_analysis.summary}_")
+                with col2:
+                    if st.button("▼ Details", key="story_details"):
+                        st.session_state["_expand_story"] = not st.session_state.get(
+                            "_expand_story", False
+                        )
 
-            if st.session_state.get("_expand_story"):
-                st.markdown("---")
-                # Extract story sections from full_text
-                st.caption("Aus der vollständigen Analyse:")
-                st.text(latest_analysis.full_text)
+                if st.session_state.get("_expand_story"):
+                    st.markdown("---")
+                    # Extract story sections from full_text
+                    st.caption("Aus der vollständigen Analyse:")
+                    st.text(latest_analysis.full_text or "(kein Text)")
 
         # Performance Check
-        with st.container(border=True):
-            st.markdown(
-                f"**Performance-Urteil:** {_verdict_icon(latest_analysis.perf_verdict)} {latest_analysis.perf_verdict.title()}"
-            )
-            st.markdown(f"_{latest_analysis.perf_summary}_")
+        if latest_analysis.perf_verdict:
+            with st.container(border=True):
+                st.markdown(
+                    f"**Performance-Urteil:** {_verdict_icon(latest_analysis.perf_verdict)} {latest_analysis.perf_verdict.title()}"
+                )
+                if latest_analysis.perf_summary:
+                    st.markdown(f"_{latest_analysis.perf_summary}_")
 
         # Stability Check
-        with st.container(border=True):
-            st.markdown(
-                f"**Stabilitäts-Urteil:** {_verdict_icon(latest_analysis.stability_verdict)} {latest_analysis.stability_verdict.title()}"
-            )
-            st.markdown(f"_{latest_analysis.stability_summary}_")
+        if latest_analysis.stability_verdict:
+            with st.container(border=True):
+                st.markdown(
+                    f"**Stabilitäts-Urteil:** {_verdict_icon(latest_analysis.stability_verdict)} {latest_analysis.stability_verdict.title()}"
+                )
+                if latest_analysis.stability_summary:
+                    st.markdown(f"_{latest_analysis.stability_summary}_")
 
         # --- KI-Kommentar ----------------------------------------------------------
         from core.services.portfolio_comment_service import get_style_by_id
