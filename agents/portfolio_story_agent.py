@@ -157,24 +157,35 @@ Antworte IMMER in diesem exakten Format (drei Sektionen mit je eigenem Urteil):
 ### Einschätzung im Kontext der Ziele
 
 ## Josef's Regel — Krisenschutz-Prinzip
-Die angestrebte Verteilung (je ca. 1/3) ist BEWUSST konstruiert für Krisensicherheit:
-- **Aktien 1/3**: Wachstum + Schutz bei Inflation und wirtschaftlichem Boom
-- **Renten/Geld 1/3**: Sicherer Hafen bei Deflation, Rezession und Aktiencrash
-- **Rohstoffe + Immobilien 1/3**: Inflationsschutz + Sachwerterhalt (unabhängig von Märkten)
+Die angestrebte Verteilung (je ca. 1/3) ist BEWUSST konstruiert für Krisensicherheit.
+**WICHTIG: Drei unabhängige Säulen, NICHT addieren!**
+
+- **Säule 1 — Aktien: 1/3** (Wachstum + Schutz bei Inflation und wirtschaftlichem Boom)
+- **Säule 2 — Renten/Geld: 1/3** (Sicherer Hafen bei Deflation, Rezession und Aktiencrash)
+- **Säule 3 — Rohstoffe + Immobilien: 1/3 ZUSAMMEN**
+  (Edelmetalle + Infrastrukturfonds + physische Immobilien zählen ZUSAMMEN als eine Säule.
+  NICHT addieren: Rohstoffe 33% + Immobilien 33% = falsch! Es ist zusammen 1/3.)
+  Zweck: Inflationsschutz + Sachwerterhalt (unabhängig von Märkten)
 
 **Das Kernprinzip:** In JEDER Wirtschaftslage wächst oder stabilisiert sich mindestens eine Säule.
-Eine Verteilung **nahe bei 1/3 = bewusst krisensicher**. Dies ist die Stärke des Konzepts.
-Abweichungen von ±5–10 Prozentpunkten = erhöhtes Risiko für bestimmte Szenarien.
+Eine Verteilung **nahe bei 1/3 pro Säule = bewusst krisensicher**. Dies ist die Stärke des Konzepts.
+Abweichungen von ±5–10 Prozentpunkten pro Säule = erhöhtes Szenario-Risiko.
 
 ## Stabilität
 **Stabilitäts-Urteil:** 🟢 Stabil | 🟡 Achtung | 🔴 Instabil
 > {{EIN-SATZ-FAZIT}}
 
-Beurteile die Stabilität anhand der aktuellen Gewichtung:
-- **Abweichung vom 1/3-Ziel**: Aktien {metrics.josef_aktien_pct:.0f}% (Ziel: 33%), Renten/Geld {metrics.josef_renten_pct:.0f}% (Ziel: 33%), Rohstoffe + Immo {metrics.josef_rohstoffe_pct:.0f}% (Ziel: 33%). Größere Abweichungen?
-- **Szenario-Anfälligkeit**: Welche Wirtschaftsszenarien sind durch die aktuelle Gewichtung erhöht riskant (z.B. Übergewicht Aktien = Aktiencrash-Risiko)?
-- **Passung zu Zielen**: Passt die Gewichtung zum Zeithorizont ({story.target_year or 'offen'}) und Priorität ({story.priority})?
-- **Liquiditätsbedarf**: Sind Renten/Geld ({metrics.josef_renten_pct:.0f}%) + jährliche Dividenden ({metrics.total_annual_dividend_eur:.0f}€) ausreichend für Liquiditätsbedarf? ({story.liquidity_need or 'keiner angegeben'})
+Beurteile die Stabilität anhand der aktuellen Gewichtung (drei unabhängige Säulen):
+- **Säule-Bewertung (je 1/3-Ziel)**:
+  - Säule 1 Aktien: {metrics.josef_aktien_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_aktien_pct - 33:.0f}pp)
+  - Säule 2 Renten/Geld: {metrics.josef_renten_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_renten_pct - 33:.0f}pp)
+  - Säule 3 Rohstoffe + Immo: {metrics.josef_rohstoffe_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_rohstoffe_pct - 33:.0f}pp)
+- **Szenario-Anfälligkeit pro Säule**: Welche Wirtschaftsszenarien sind durch Über/Untergewicht einer Säule riskanther?
+  - Übergewicht Aktien = Aktiencrash-Risiko | Untergewicht = Inflations-Exposur
+  - Übergewicht Renten/Geld = Deflations-Exposur, aber weniger Wachstum | Untergewicht = Rezessions-Risiko
+  - Übergewicht Rohstoffe/Immo = Liquiditäts-Einschränkung | Untergewicht = Inflations-Risiko
+- **Passung zu Zielen**: Passt die Säulen-Gewichtung zum Zeithorizont ({story.target_year or 'offen'}) und Priorität ({story.priority})?
+- **Liquiditätsbedarf**: Sind Renten/Geld ({metrics.josef_renten_pct:.0f}%) + jährliche Dividenden ({metrics.total_annual_dividend_eur:.0f}€) ausreichend? ({story.liquidity_need or 'keiner angegeben'})
 
 ### Fazit zur Stabilität
 
