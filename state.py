@@ -359,6 +359,18 @@ def get_position_story_service():
 
 
 @st.cache_resource
+def get_portfolio_comment_service():
+    """Service for generating stylized financial commentary."""
+    from core.services.portfolio_comment_service import PortfolioCommentService
+    model = _get_agent_model("portfolio_comment", "ollama", _DEFAULT_OLLAMA_MODEL)
+    return PortfolioCommentService(
+        host=config.OLLAMA_HOST,
+        model=model,
+        usage_repo=get_usage_repo(),
+    )
+
+
+@st.cache_resource
 def get_langfuse_client():
     return create_langfuse_client(
         public_key=config.LANGFUSE_PUBLIC_KEY,

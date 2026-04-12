@@ -15,8 +15,10 @@ from core.i18n import t
 from core.storage.models import PortfolioStory
 from state import (
     get_analyses_repo,
+    get_app_config_repo,
     get_market_agent,
     get_market_repo,
+    get_portfolio_comment_service,
     get_portfolio_story_agent,
     get_portfolio_story_repo,
     get_positions_repo,
@@ -89,11 +91,9 @@ st.subheader("1️⃣ Portfolio Story — Definieren & Updaten")
 with st.form("portfolio_story_form", clear_on_submit=False):
     col1, col2 = st.columns(2)
     with col1:
-        # Check if we need to use a draft that was just accepted
-        draft_to_accept = st.session_state.get("_story_draft_to_accept")
         story_text = st.text_area(
             "Dein Portfolio-Narrativ",
-            value=draft_to_accept or (current_story.story if current_story else ""),
+            value=current_story.story if current_story else "",
             height=150,
             help="Deine langfristigen Ziele, Zeithorizont, Prioritäten, Lebens-Meilensteine",
         )
@@ -124,11 +124,7 @@ with st.form("portfolio_story_form", clear_on_submit=False):
             ),
         )
 
-    col_save, col_draft = st.columns([1, 1])
-    with col_save:
-        save_clicked = st.form_submit_button("💾 Speichern", use_container_width=True)
-    with col_draft:
-        draft_clicked = st.form_submit_button("🤖 AI-Vorschlag", use_container_width=True)
+    save_clicked = st.form_submit_button("💾 Speichern", use_container_width=True)
 
     if save_clicked and story_text.strip():
         new_story = PortfolioStory(
@@ -141,73 +137,9 @@ with st.form("portfolio_story_form", clear_on_submit=False):
             updated_at=datetime.now(),
         )
         saved = repo.save(new_story)
-        # Clear any pending draft
-        if "_story_draft_to_accept" in st.session_state:
-            del st.session_state["_story_draft_to_accept"]
         st.success("✅ Portfolio Story gespeichert!")
         st.rerun()
 
-    if draft_clicked:
-        # Generate AI draft with current form inputs
-        with st.spinner("🤖 Generiere AI-Vorschlag…"):
-            portfolio = positions_repo.get_portfolio()
-            if portfolio:
-                positions_summary = "\n".join(
-                    [f"- {p.name} ({p.ticker or 'n/a'}): {p.asset_class}" for p in portfolio]
-                )
-            else:
-                positions_summary = "(leeres Portfolio)"
-
-            draft = asyncio.run(
-                agent.generate_story_draft(
-                    positions_summary=positions_summary,
-                    existing_story=current_story,
-                    story_text=story_text.strip() if story_text.strip() else None,
-                    target_year=int(target_year),
-                    liquidity_need=liquidity_need.strip() if liquidity_need.strip() else None,
-                    priority=priority,
-                )
-            )
-            st.session_state["_story_draft"] = draft
-            st.rerun()
-
-# Show draft if available
-if "_story_draft" in st.session_state and st.session_state["_story_draft"]:
-    st.divider()
-    st.subheader("🤖 AI-Vorschlag")
-
-    draft_col1, draft_col2 = st.columns(2)
-    with draft_col1:
-        st.text_area(
-            "Vorgeschlagenes Portfolio-Narrativ",
-            value=st.session_state["_story_draft"],
-            height=150,
-            disabled=True,
-            key="draft_story_display",
-        )
-    with draft_col2:
-        st.text_area(
-            "Aktueller Liquiditätsbedarf",
-            value=liquidity_need,
-            height=100,
-            disabled=True,
-            key="draft_liquidity_display",
-        )
-        st.markdown("**Aktuelle Priorität**")
-        st.markdown(f"*{priority}*")
-
-    col_accept, col_reject = st.columns([1, 1])
-    with col_accept:
-        if st.button("✅ Übernehmen", use_container_width=True):
-            st.session_state["_story_draft_to_accept"] = st.session_state["_story_draft"]
-            del st.session_state["_story_draft"]
-            st.rerun()
-    with col_reject:
-        if st.button("❌ Verwerfen", use_container_width=True):
-            del st.session_state["_story_draft"]
-            st.rerun()
-
-st.divider()
 
 # ──────────────────────────────────────────────────────────────────────
 # Section 2: Story Check + Performance Check
@@ -363,6 +295,33 @@ else:
                 f"**Stabilitäts-Urteil:** {_verdict_icon(latest_analysis.stability_verdict)} {latest_analysis.stability_verdict.title()}"
             )
             st.markdown(f"_{latest_analysis.stability_summary}_")
+
+        # --- KI-Kommentar ----------------------------------------------------------
+        from core.services.portfolio_comment_service import get_style_by_id
+
+        _comment_style_id = get_app_config_repo().get("comment_style") or "humorvoll"
+        _comment_style = get_style_by_id(_comment_style_id)
+        comment_service = get_portfolio_comment_service()
+
+        col_c, _ = st.columns([1, 3])
+        with col_c:
+            if st.button(f"{_comment_style['emoji']} KI-Kommentar", key="_story_comment_btn"):
+                with st.spinner("..."):
+                    _ctx = (
+                        f"Story: {latest_analysis.verdict} — {latest_analysis.summary}\n"
+                        f"Performance: {latest_analysis.perf_verdict} — {latest_analysis.perf_summary}\n"
+                        f"Stabilität: {latest_analysis.stability_verdict} — {latest_analysis.stability_summary}\n"
+                        f"Volltext:\n{latest_analysis.full_text}"
+                    )
+                    st.session_state["_story_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
+
+        if st.session_state.get("_story_comment"):
+            with st.container(border=True):
+                st.caption(f"{_comment_style['emoji']} **{_comment_style['name']}**")
+                st.markdown(st.session_state["_story_comment"])
+                if st.button("🔄 Nochmal", key="_story_comment_retry"):
+                    del st.session_state["_story_comment"]
+                    st.rerun()
 
 st.divider()
 
