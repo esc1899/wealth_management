@@ -415,6 +415,54 @@ LOG_LEVEL=ERROR streamlit run app.py  # Errors only
 
 **Benefit**: Convergence: each iteration refines position descriptions, next analyses are more aligned
 
+---
+
+## Known Technical Debt
+
+A comprehensive technical debt analysis was conducted on **2026-04-12**. See **[BACKLOG.md § Technische Schulden](BACKLOG.md)** for the full inventory (16 items, prioritized P1–P3).
+
+### High-Priority Items (P1)
+
+| Item | Description | Impact | Solution |
+|---|---|---|---|
+| **[DEBT-1]** | Duplicate DDL in `init_db()`/`migrate_db()` | Schema changes require manual sync at 2 locations | Centralized migration system (Alembic/Flyway) |
+| **[DEBT-3]** | Hardcoded model names at 7+ locations | Model updates require changes across codebase | Central `constants.py` with model registry |
+| **[DEBT-4]** | No Service Layer — direct Repo access in Pages | Mixed UI/Business Logic; Pages untestable | Introduce Service classes (PortfolioService, etc.) |
+| **[DEBT-5]** | LLM instantiated in UI without usage tracking | Bypasses cost/usage monitoring | Move LLM calls to Agents/Services with callbacks |
+
+### Medium-Priority Items (P2)
+
+| Item | Description | Impact | Solution |
+|---|---|---|---|
+| **[DEBT-6]** | Private attribute access from Pages (`_market`, `_llm`) | Breaks encapsulation; hard to refactor | Expose public properties/methods on Agents |
+| **[DEBT-7]** | `state.py` is God Module (imports all Agents/Repos) | Import failures cascade; hard to extend | Lazy-load or module-per-feature structure |
+| **[DEBT-8]** | `migrate_db()` called at 3 independent locations | No central migration guard; hard to debug | Single entry-point with idempotent guard |
+| **[DEBT-9]** | `asyncio.run()` + `nest_asyncio` anti-pattern | Not production-ready; race conditions possible | Streamlit-native async integration or Task Queue |
+| **[DEBT-10]** | Pages completely untested (19 files, 0 tests) | Regressions hard to catch | Extract logic to Services, test separately |
+| **[DEBT-12]** | `peewee` installed but not in `requirements.txt` | Fresh installs will fail | Add to `requirements.txt` or remove if unused |
+
+### Low-Priority Items (P3)
+
+See BACKLOG.md for items **[DEBT-2, DEBT-11, DEBT-13, DEBT-14, DEBT-15, DEBT-16]**.
+
+### Architectural Improvements (Future)
+
+**Service Layer Introduction** (blocks: DEBT-4, DEBT-5, DEBT-10)
+- Proposed `core/services/` module with business logic facades
+- Example: `PortfolioService` encapsulates portfolio queries + calculations
+- Benefits: Testable, reusable, decoupled from Streamlit
+
+**Migration System** (blocks: DEBT-1, DEBT-8)
+- Replace manual DDL duplication with formal migration tracking
+- Each migration numbered (001_create_positions.sql, 002_add_story.sql, etc.)
+- `migrate_db()` runs all unexecuted migrations idempotently
+
+**Centralized Constants** (blocks: DEBT-3, dependencies: DEBT-5)
+- `core/constants.py` with model registries, feature flags, default values
+- Reduces hardcoded strings across codebase
+
+---
+
 ## Recent Changes (April 2026)
 
 ✅ Removed ANTHROPIC_BASE_URL (corporate proxy, non-commercial license)

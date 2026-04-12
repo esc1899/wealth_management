@@ -125,6 +125,203 @@ Privater Bereich (Ollama 🔒) und Cloud-Bereich (Claude ☁️) klarer abheben 
 
 ---
 
+## Technische Schulden
+
+Identified during code review (2026-04-12). Impacts on architecture, maintainability, and testing.
+
+### Datenverwaltung & Migrations
+
+#### [DEBT-1] [P1] Duplizierter DDL-Code in init_db() und migrate_db()
+**Problem:** Tabellen wie `portfolio_story_position_fits`, `benchmark_runs`, `usage_resets`, `dividend_data` sind in beiden Funktionen mit identischen `CREATE TABLE IF NOT EXISTS`-Statements definiert.
+
+**Impact:** Schema-Änderungen müssen an 2 Stellen synchron gehalten werden. Fehlerquelle für Inkonsistenzen zwischen Init und Migration.
+
+**Lösung:** Schema zu Migrationssystem (Alembic/Flyway) oder zentrales Migrations-Register, `init_db()` nur für Fresh-Start, `migrate_db()` für alle Updates.
+
+**Files:** `core/storage/base.py` (init_db: Zeilen 24-46, 210-229, 265-271, 303-311; migrate_db: Zeilen 352-393)
+
+#### [DEBT-2] [P2] Legacy-Tabellen portfolio / watchlist noch in init_db
+**Problem:** Alte Tabellen `portfolio` und `watchlist` werden noch bei `init_db()` angelegt, obwohl `positions`-Modell diese vollständig ersetzt hat.
+
+**Impact:** Verwirrung für neue Entwickler, unnötige Tabellen in Schema, Migration-Pfade unklar.
+
+**Lösung:** Legacy-Tabellen entfernen oder Migrations-Dokumentation schreiben, warum sie noch da sind.
+
+**Files:** `core/storage/base.py` (Zeilen 24-46), `core/storage/models.py` (comment: "legacy models")
+
+---
+
+### Konfiguration & Konstanten
+
+#### [DEBT-3] [P1] Hardcoded Modellnamen an 7+ Stellen
+**Problem:** Model-Strings wie `"claude-haiku-4-5-20251001"`, `"claude-sonnet-4-6"` sind verstreut in State, Pages, Config, Agents.
+
+**Impact:** Modell-Update erfordert Änderungen an mindestens 7 Dateien. Inkonsistente Defaults. Schwer zu testen.
+
+**Lösung:** Zentrale `constants.py` mit `CLAUDE_MODELS` dict, überall importieren.
+
+**Files:** 
+- `state.py` (Zeilen 50, 227, 284, 294, 301)
+- `positionen.py` (Zeile 31)
+- `benchmark.py` (Zeilen 236, 248)
+- `core/llm/factory.py` (Zeile 32)
+- `core/llm/claude.py` (Zeile 32)
+- `core/storage/app_config.py` (Zeilen 68-70)
+- `core/storage/usage.py` (Zeile 210)
+
+---
+
+### Architektur & Layering
+
+#### [DEBT-4] [P1] Keine Service-Layer — Direkte Repo-Zugriffe in UI-Pages
+**Problem:** Pages greifen direkt auf Repositories zu statt über Agents/Services. Beispiele:
+- `positionen.py`: `get_positions_repo()`, `_market_repo.get_price()`, `app_config.get()`
+- `portfolio_chat.py`: `repo.get_portfolio()` direkt in UI
+- `rebalance_chat.py`: `_positions_repo.get_portfolio()` + `_analyses_repo.get_latest_bulk()`
+
+**Impact:** UI-Code vermischt mit Business Logic. Schwer testbar (Pages haben keine Tests). Datenbeschaffung bei jedem Rerun (Performance).
+
+**Lösung:** Service-Layer (z.B. `PortfolioService`, `DashboardService`) kapselt Repo-Zugriffe. Pages sprechen nur mit Services.
+
+**Files:** `pages/positionen.py`, `portfolio_chat.py`, `rebalance_chat.py`, `portfolio_story.py`, `fundamental.py`, `statistics.py`
+
+#### [DEBT-5] [P1] LLM direkt in positionen.py instanziiert — kein Usage-Tracking
+**Problem:** `_generate_story_proposal()` in `positionen.py:29–52` erstellt `ClaudeProvider` direkt mit hartkodiertem Modell, kein Usage-Tracking Callback.
+
+**Impact:** Verwendung wird nicht getrackt (nicht in Cost/Statistics). Modell nicht über `AppConfigRepository` konfigurierbar. Umgeht gesamtes Tracking-System.
+
+**Lösung:** LLM-Calls in Agent/Service-Klasse verschieben, mit `on_usage` Callback verkabeln.
+
+**Files:** `pages/positionen.py` (Zeilen 29–52), `pages/settings.py` (Zeilen 184–191)
+
+#### [DEBT-6] [P2] Private Attribut-Zugriff aus Pages — verletzt Kapselung
+**Problem:** Pages greifen direkt auf private Attribute von Agents zu:
+- `dashboard.py:56`: `market_agent._market.get_latest_fetch_time()`
+- `marktdaten.py:33`: `agent._market.get_latest_fetch_time()`
+- `analyse.py:136`: `agent._market.get_historical()`
+- `research_chat.py:17`: `agent._llm.model`
+- `portfolio_chat.py:22, 28–30`: `agent._llm.model`
+
+**Impact:** Kapselung verletzt. Schwer zu refaktorieren. Abhängigkeit von Implementierungsdetails.
+
+**Lösung:** Öffentliche Properties/Methods (z.B. `agent.model`, `agent.get_latest_fetch_time()`) exponieren.
+
+**Files:** `pages/dashboard.py`, `marktdaten.py`, `analyse.py`, `research_chat.py`, `portfolio_chat.py`, `rebalance_chat.py`
+
+#### [DEBT-7] [P2] state.py ist ein God-Module
+**Problem:** `state.py` importiert alle 13 Agents, alle 16 Repositories, versteckt hinter `@st.cache_resource` Factories.
+
+**Impact:** Massive Abhängigkeit. Jeder neue Agent verlängert Datei. Import-Error in einem Agenten lädt ganze App.
+
+**Lösung:** Dependency-Registry mit Lazy-Loading oder Module-per-Feature-Struktur.
+
+**Files:** `state.py`
+
+#### [DEBT-8] [P2] migrate_db() wird an 3 unabhängigen Stellen aufgerufen
+**Problem:** Migrations werden aufgerufen in:
+1. `state.py:57` (App startup)
+2. `agents/market_data_agent.py:344` (Background thread)
+3. `core/scheduler.py:357–358` (Scheduler)
+
+**Impact:** Keine zentralen Migration-Guard. Schwer zu debuggen wenn Migrations asymmetrisch laufen.
+
+**Lösung:** Single Entry-Point für Migrations (z.B. `migrate_if_needed()` Guard), oder Background-Services kriegen bereits-initialisierte Connections.
+
+**Files:** `state.py`, `agents/market_data_agent.py`, `core/scheduler.py`, `core/storage/base.py`
+
+---
+
+### Async & Events
+
+#### [DEBT-9] [P2] asyncio.run() + nest_asyncio Anti-Pattern
+**Problem:** Streamlit-Pages rufen `asyncio.run()` direkt auf (~17 Stellen). `nest_asyncio.apply()` als Workaround in `state.py` patcht den globalen Event-Loop.
+
+**Impact:** Nicht produktionstauglich. Anti-Pattern für Streamlit. Race Conditions bei gleichzeitigen Requests möglich.
+
+**Lösung:** Durchgehend async-kompatible Streamlit-Integration (z.B. `st.experimental_fragment` für async Teile) oder Task-Queue.
+
+**Files:** `state.py` (Zeile 5-8), 17+ Pages
+
+---
+
+### Testing & Quality
+
+#### [DEBT-10] [P2] Pages sind vollständig ungetestet (19 Dateien, 0 Tests)
+**Problem:** Alle `pages/*.py` Dateien enthalten Business Logic aber keine Tests. Beispiele:
+- `_generate_story_proposal()` in `positionen.py`
+- Formatting-Funktionen in `dashboard.py`
+- Session State Management in vielen Pages
+
+**Impact:** Regressionen sind schwer zu finden. UI-Logic kann ungetestet brechen.
+
+**Lösung:** Factories/Services aus Pages extrahieren und testen, Pages selbst haben minimale Logik.
+
+**Files:** All `pages/*.py`
+
+#### [DEBT-11] [P3] Keine Coverage-Konfiguration
+**Problem:** `pytest.ini` hat keine `--cov` Einstellungen. `.coverage` existiert, aber kein Coverage-Ziel ist definiert.
+
+**Impact:** Unbekannte tatsächliche Coverage. Schwer zu messen ob neue Code-Pfade getestet sind.
+
+**Lösung:** Coverage-Target (z.B. >80%) in pytest.ini, `--cov=.` in CI.
+
+**Files:** `pytest.ini`, `.github/workflows/` (falls vorhanden)
+
+---
+
+### Dependencies & Tooling
+
+#### [DEBT-12] [P2] peewee 4.0.4 ist installiert aber nicht in requirements.txt
+**Problem:** `peewee` ist eine Dependency (vermutlich transitive), erscheint aber nicht in `requirements.txt`.
+
+**Impact:** Fresh install via `pip install -r requirements.txt` würde fehlen. Nicht reproduzierbar.
+
+**Lösung:** `peewee` explizit zu `requirements.txt` hinzufügen oder Dependency überprüfen ob noch notwendig.
+
+**Files:** `requirements.txt`
+
+#### [DEBT-13] [P3] Keine oberen Versionsgrenzen in requirements.txt
+**Problem:** Alle Packages spezifiziert als `>=` ohne obere Grenze. `langfuse>=2.0.0` aber installiert `3.7.0`.
+
+**Impact:** Breaking Changes in zukünftigen Releases können Installation brechen.
+
+**Lösung:** Lock-File (`requirements.lock` oder `poetry.lock`) oder präzisere Constraints.
+
+**Files:** `requirements.txt`
+
+---
+
+### Bugs & Minor Debt
+
+#### [DEBT-14] [P3] agentmonitor.py nicht in app.py Navigation
+**Problem:** `/pages/agentmonitor.py` existiert als Datei, erscheint aber nicht in `st.navigation()`.
+
+**Impact:** Seite ist nur via direktem URL-Aufruf erreichbar.
+
+**Solution:** Seite zu Navigation hinzufügen oder löschen wenn nicht mehr nötig.
+
+**Files:** `app.py`, `pages/agentmonitor.py`
+
+#### [DEBT-15] [P3] Easter-Egg mit abgelaufenem Datum
+**Problem:** `_EASTER_SUNDAY = date(2026, 4, 5)` und `_EGG_ACTIVE_UNTIL = date(2026, 4, 6)` in `dashboard.py:21–22` sind hart eincodiert.
+
+**Impact:** Toter Code ab 2026-04-07 (bereits abgelaufen ab heute 2026-04-12). Harmlos aber confusing.
+
+**Lösung:** Datum entfernen oder Dynamic-Easter-Egg-System bauen.
+
+**Files:** `pages/dashboard.py` (Zeilen 21-22)
+
+#### [DEBT-16] [P3] O(n) Einzeldeletes in portfolio_agent.py
+**Problem:** `_tool_clear_portfolio()` und `_tool_clear_watchlist()` loopen und rufen `delete()` einzeln auf.
+
+**Impact:** Ineffizient, O(n) Transaktionen statt 1. Auch weniger atomar.
+
+**Lösung:** `DELETE FROM positions WHERE in_portfolio = 1` o.ä.
+
+**Files:** `agents/portfolio_agent.py` (Zeilen 399–413)
+
+---
+
 ## Done
 
 #### [P2] [FEAT] Storychecker: Alle Positionen auf einmal prüfen
