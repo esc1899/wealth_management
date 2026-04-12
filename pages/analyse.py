@@ -133,7 +133,7 @@ symbols = [v.symbol for v in valuations]
 selected = st.selectbox(t("analysis.select_symbol"), symbols)
 
 if selected:
-    history = agent._market.get_historical(selected, days=365)
+    history = agent.get_historical(selected, days=365)
     if history:
         col_date = t("common.date")
         col_price = t("market_data.price_col")

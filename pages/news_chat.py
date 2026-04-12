@@ -13,7 +13,7 @@ st.set_page_config(page_title="News Digest", page_icon="📰", layout="wide")
 st.title(f"📰 {t('news_chat.title')}")
 st.caption(t("news_chat.subtitle"))
 agent = get_news_agent()
-st.info(t("news_chat.cloud_notice").format(model=agent._llm.model), icon="ℹ️")
+st.info(t("news_chat.cloud_notice").format(model=agent.model), icon="ℹ️")
 news_repo = get_news_repo()
 positions_repo = get_positions_repo()
 

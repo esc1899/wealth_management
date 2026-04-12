@@ -94,6 +94,10 @@ class RebalanceAgent:
         self._llm = llm
         self._skills_repo = skills_repo
 
+    @property
+    def model(self) -> str:
+        return self._llm.model
+
     async def start_session(
         self,
         skill_name: str,

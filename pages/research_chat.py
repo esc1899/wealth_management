@@ -14,7 +14,7 @@ st.set_page_config(page_title="Research Chat", page_icon="🔍", layout="wide")
 st.title(f"🔍 {t('research_chat.title')}")
 st.caption(t("research_chat.subtitle"))
 agent = get_research_agent()
-st.info(t("research_chat.cloud_notice").format(model=agent._llm.model), icon="ℹ️")
+st.info(t("research_chat.cloud_notice").format(model=agent.model), icon="ℹ️")
 
 # Load research skills from DB; fall back gracefully if none exist
 research_skills = get_skills_repo().get_by_area("research")

@@ -19,9 +19,9 @@ st.caption(t("rebalance_chat.subtitle"))
 agent = get_rebalance_agent()
 
 if is_local_url(config.OLLAMA_HOST):
-    st.info(t("rebalance_chat.private_notice").format(model=agent._llm.model), icon="🔒")
+    st.info(t("rebalance_chat.private_notice").format(model=agent.model), icon="🔒")
 else:
-    st.warning(t("rebalance_chat.remote_notice").format(host=config.OLLAMA_HOST, model=agent._llm.model), icon="⚠️")
+    st.warning(t("rebalance_chat.remote_notice").format(host=config.OLLAMA_HOST, model=agent.model), icon="⚠️")
 repo = get_rebalance_repo()
 
 # ------------------------------------------------------------------

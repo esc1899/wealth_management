@@ -326,6 +326,18 @@ class MarketDataAgent:
         return sum(values) if values else None
 
     # ------------------------------------------------------------------
+    # Public data access methods (eliminates private _market access from pages)
+    # ------------------------------------------------------------------
+
+    def get_latest_fetch_time(self) -> Optional[datetime]:
+        """Return the most recent market data fetch timestamp."""
+        return self._market.get_latest_fetch_time()
+
+    def get_historical(self, symbol: str, days: int = 365) -> list:
+        """Return historical price records for a symbol (default last 365 days)."""
+        return self._market.get_historical(symbol, days=days)
+
+    # ------------------------------------------------------------------
     # Scheduler
     # ------------------------------------------------------------------
 

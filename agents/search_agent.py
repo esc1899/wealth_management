@@ -101,6 +101,10 @@ class SearchAgent:
         self._search = search_repo
         self._llm = llm
 
+    @property
+    def model(self) -> str:
+        return self._llm.model
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------

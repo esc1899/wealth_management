@@ -21,7 +21,7 @@ st.caption(t("storychecker.subtitle"))
 
 agent = get_storychecker_agent()
 analyses_repo = get_analyses_repo()
-st.info(t("storychecker.cloud_notice").format(model=agent._llm.model), icon="ℹ️")
+st.info(t("storychecker.cloud_notice").format(model=agent.model), icon="ℹ️")
 
 with st.expander(t("storychecker.what_is_this"), expanded=False):
     st.markdown(t("storychecker.explanation"))

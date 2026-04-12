@@ -182,6 +182,10 @@ class PortfolioAgent:
         self._market_fetcher = market_fetcher
         self._market_repo = market_repo
 
+    @property
+    def model(self) -> str:
+        return self._llm.model
+
     # ------------------------------------------------------------------
     # Public API for other agents
     # ------------------------------------------------------------------

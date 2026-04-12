@@ -31,7 +31,7 @@ with col_egg:
 
 try:
     valuations = market_agent.get_portfolio_valuation()
-    last_fetch = market_agent._market.get_latest_fetch_time()
+    last_fetch = market_agent.get_latest_fetch_time()
 except Exception as exc:
     st.error(f"⚠️ {t('common.agent_error')}: {exc}")
     st.stop()

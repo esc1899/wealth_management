@@ -106,6 +106,10 @@ class StorycheckerAgent:
         self._llm = llm
         self._skills_repo = skills_repo
 
+    @property
+    def model(self) -> str:
+        return self._llm.model
+
     # ------------------------------------------------------------------
     # Session management
     # ------------------------------------------------------------------

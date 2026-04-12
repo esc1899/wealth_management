@@ -73,6 +73,10 @@ class NewsAgent:
     def __init__(self, llm: ClaudeProvider):
         self._llm = llm
 
+    @property
+    def model(self) -> str:
+        return self._llm.model
+
     async def start_run(
         self,
         tickers: list[str],

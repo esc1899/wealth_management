@@ -30,7 +30,7 @@ with col_refresh:
                 st.error(f"{t('market_data.fetch_exception')}: {e}")
         st.rerun()
 
-last_fetch = agent._market.get_latest_fetch_time()
+last_fetch = agent.get_latest_fetch_time()
 if last_fetch:
     st.caption(f"{t('market_data.last_updated')}: {last_fetch.strftime('%d.%m.%Y %H:%M')} UTC")
 else:

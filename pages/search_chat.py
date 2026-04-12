@@ -13,7 +13,7 @@ st.set_page_config(page_title="Investment Search", page_icon="🔎", layout="wid
 st.title(f"🔎 {t('search_chat.title')}")
 st.caption(t("search_chat.subtitle"))
 agent = get_search_agent()
-st.info(t("search_chat.cloud_notice").format(model=agent._llm.model), icon="ℹ️")
+st.info(t("search_chat.cloud_notice").format(model=agent.model), icon="ℹ️")
 
 # Load search skills from DB
 search_skills = get_skills_repo().get_by_area("search")
