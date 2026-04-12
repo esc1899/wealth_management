@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Fixed — Portfolio Story: Josef's Regel Comprehension (2026-04-13)
+- **LLM prompt clarification**: Added explicit warning that three Säulen are independent and must NOT be summed together
+- Previously LLM incorrectly calculated (e.g., "Aktien 40% + Rohstoffe 30% = 70% = too high")
+- Now prompt clearly explains:
+  - Säule 1 = Aktien, Säule 2 = Renten/Geld, Säule 3 = Rohstoffe + Immobilien TOGETHER
+  - Crisis-protection works because in any scenario, at least one Säule stabilizes or grows
+  - 1/3 distribution IS the strength, not a problem to fix
+- Restructured stability assessment to evaluate each Säule independently with deviation metrics
+
 ### Technical Debt Remediation (2026-04-12)
 
 **Status**: 10 of 16 debt items completed. See [BACKLOG.md § Technische Schulden](BACKLOG.md) for full inventory.
