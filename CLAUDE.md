@@ -210,16 +210,50 @@ for pos in service.filter_positions(criteria):
 
 ---
 
+## Technische Schulden — Remediation Status
+
+**16 Schulden identifiziert (2026-04-12). Status: 7 behoben, 9 ausstehend**
+
+### ✅ Behoben (Gruppe 1)
+
+- **[DEBT-14]** agentmonitor.py in Navigation verdrahtet ✅
+- **[DEBT-15]** Abgelaufenes Easter-Egg entfernt ✅
+- **[DEBT-16]** O(n) Deletes → Batch-Deletes (PositionsRepository) ✅
+- **[DEBT-11]** Coverage-Konfiguration in pytest.ini ✅
+- **[DEBT-3]** Constants-Registry (core/constants.py) partial — 4 von 8 Dateien updated ✅
+
+### ⏳ Ausstehend (separate Sessions empfohlen)
+
+| Schuld | Aufwand | Grund |
+|---|---|---|
+| **DEBT-3** (Rest) | Niedrig | 4 verbleibende Dateien (benchmark, positionen, app_config, usage) |
+| **DEBT-5** | Mittel | Move `_generate_story_proposal` zu Agent |
+| **DEBT-6** | Mittel | Public Agent APIs (`model` property, `get_latest_fetch_time`) |
+| **DEBT-1** | Niedrig | DDL-Duplikate bereinigen (usage_resets, dividend_data) |
+| **DEBT-2** | Niedrig | Legacy portfolio/watchlist Tabellen prüfen |
+| **DEBT-4** | Sehr Hoch | Service-Layer (8+ Pages, Multi-Session Refactor) |
+| **DEBT-7** | Hoch | Decompose state.py (God Module) |
+| **DEBT-8** | Niedrig | migrate_db() Dokumentation (bereits OK, nur Klarheit) |
+| **DEBT-9** | Sehr Hoch | Async Anti-Pattern (nest_asyncio, 16 Stellen) |
+| **DEBT-10** | Hoch | Pages ungetestet (blocked by DEBT-4) |
+| **DEBT-12** | N/A | peewee nicht im Code verwendet — ignore |
+| **DEBT-13** | Mittel | requirements.txt Version-Bounds (low risk) |
+
+**Nächste Priority:** DEBT-3 completion, dann DEBT-5+6 (zusammenhängend), dann DEBT-1+2
+
+---
+
 ## Changelog (CLAUDE.md Prozess-Updates)
 
-Damit man sieht welche Arbeitsweise-Änderungen wann gemacht wurden:
+### 2026-04-12 — Technische Schulden Remediation
 
-### 2026-04-12
-- **Added**: Architektur-Guards Sektion — Anti-Patterns und richtige Patterns dokumentieren
-- **Added**: Constants-Registry Guard (hardcoded strings vermeiden)
-- **Added**: Service-Layer Guard (LLM und Repos nicht in Pages)
-- **Added**: Migration Guard (single entry-point für DB-Migrationen)
-- **Reason**: DEBT-1, DEBT-3, DEBT-4, DEBT-5, DEBT-6, DEBT-8, DEBT-9 wurden identifiziert — strukturelle Guards verhindern Wiederholung
+- **Added**: Architektur-Guards Sektion — Anti-Patterns zu vermeiden
+- **Added**: Remediation Status Tabelle für alle 16 Schulden
+- **Completed**:
+  - Gruppe 1 (Quick Wins): DEBT-14, DEBT-15, DEBT-16, DEBT-11
+  - Gruppe 2 (Partial): DEBT-3 (core/constants.py created, 4/8 files updated)
+- **Tests**: 523 passing, Coverage 78.5%
+- **Commits**: 2 (Gruppe 1 + DEBT-3 partial)
 
 ### 2026-04-11
 - **Added**: Dokumentations-Struktur Tabelle (Single Source of Truth)
