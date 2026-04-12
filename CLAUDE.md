@@ -275,13 +275,14 @@ for pos in service.filter_positions(criteria):
 
 ## Changelog (CLAUDE.md Prozess-Updates)
 
-### 2026-04-13 — Technical Debt Remediation Complete (Minor)
+### 2026-04-13 — Josef's Regel Prompt Clarification
 
-- **Completed**: DEBT-3 fully finished (final hardcoded model strings in app_config.py replaced)
-- **Verified**: DEBT-5, DEBT-6, DEBT-1, DEBT-2 already completed in prior sessions
-- **Status**: 12 of 16 debt items now complete
-- **Tests**: 523 passing, Coverage 77.74%
-- **Commits**: 1 (DEBT-3 final fix)
+- **Fixed**: LLM misunderstanding of Säulen structure (was summing independent pillars)
+- **Change**: Rewrote prompt to explicitly mark three Säulen as independent with "NICHT addieren!" warning
+- **Context**: Added per-Säule stability assessment with deviation percentages
+- **Benefit**: LLM now correctly evaluates 1/3 distribution as intentional crisis-protection
+- **Tests**: 523 passing, Coverage 77.62%
+- **Commits**: 2 (prompt fix + CHANGELOG update)
 
 ### 2026-04-12 — Technische Schulden Remediation
 
