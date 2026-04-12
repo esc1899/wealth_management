@@ -10,24 +10,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Technical Debt Remediation (2026-04-12)
 
-**Status**: 5 of 16 debt items completed. See [BACKLOG.md § Technische Schulden](BACKLOG.md) for full inventory.
+**Status**: 10 of 16 debt items completed. See [BACKLOG.md § Technische Schulden](BACKLOG.md) for full inventory.
 
 #### Completed ✅
 - [DEBT-14] agentmonitor.py wired to navigation
 - [DEBT-15] Expired Easter egg removed
 - [DEBT-16] O(n) deletes replaced with batch SQL operations
 - [DEBT-11] Coverage configuration added to pytest.ini
-- [DEBT-3] core/constants.py created; 4/8 files updated with model imports
-
-#### In Progress 🚧
-- [DEBT-3] Remaining 4 files to update (benchmark, positionen, app_config, usage)
+- [DEBT-3] core/constants.py created; all 8 files updated with model imports (benchmark, positionen, app_config, usage)
+- [DEBT-6] Public agent APIs (model property, get_latest_fetch_time, get_historical) — eliminated private attribute access from pages
+- [DEBT-5] Position story proposal extraction to PositionStoryService with usage tracking
+- [DEBT-1] DDL duplication removed (usage_resets, dividend_data from migrate_db)
+- [DEBT-2] Legacy portfolio/watchlist tables removed from init_db (verified unused in production)
 
 #### Planned 📋
-- [DEBT-5] Story proposal extraction to service layer
-- [DEBT-6] Agent public APIs (model property, get_latest_fetch_time)
-- [DEBT-1] DDL deduplication cleanup
-- [DEBT-2] Legacy table removal
-- (See BACKLOG.md for full roadmap)
+- [DEBT-4] Service layer extraction (high effort, separate session)
+- [DEBT-7] Decompose state.py (high effort, separate session)
+- [DEBT-8] migrate_db() documentation
+- [DEBT-9] Async anti-pattern (nest_asyncio) — high effort
+- [DEBT-10] Page unit tests (blocked by DEBT-4)
+- [DEBT-12] peewee dependency (transitive, no action needed)
+- [DEBT-13] requirements.txt version bounds (low risk)
 
 ### Added
 
