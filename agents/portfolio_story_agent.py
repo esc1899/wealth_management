@@ -123,10 +123,11 @@ class PortfolioStoryAgent:
             )
 
         # Build Josef's Rule summary for stability assessment
+        # Note: "Rohstoffe" includes Edelmetalle + Immobilien combined
         josef_summary = (
             f"Aktien: {metrics.josef_aktien_pct:.0f}% | "
             f"Renten/Geld: {metrics.josef_renten_pct:.0f}% | "
-            f"Rohstoffe: {metrics.josef_rohstoffe_pct:.0f}%"
+            f"Rohstoffe + Immo: {metrics.josef_rohstoffe_pct:.0f}%"
         )
 
         system_prompt = f"""Du bist ein kritischer Portfolio-Analyst der bewertet ob ein Portfolio mit den Zielen des Investors aligned ist.
@@ -155,17 +156,27 @@ Antworte IMMER in diesem exakten Format (drei Sektionen mit je eigenem Urteil):
 
 ### Einschätzung im Kontext der Ziele
 
+## Josef's Regel — Krisenschutz-Prinzip
+Die angestrebte Verteilung (je ca. 1/3) ist BEWUSST konstruiert für Krisensicherheit:
+- **Aktien 1/3**: Wachstum + Schutz bei Inflation und wirtschaftlichem Boom
+- **Renten/Geld 1/3**: Sicherer Hafen bei Deflation, Rezession und Aktiencrash
+- **Rohstoffe + Immobilien 1/3**: Inflationsschutz + Sachwerterhalt (unabhängig von Märkten)
+
+**Das Kernprinzip:** In JEDER Wirtschaftslage wächst oder stabilisiert sich mindestens eine Säule.
+Eine Verteilung **nahe bei 1/3 = bewusst krisensicher**. Dies ist die Stärke des Konzepts.
+Abweichungen von ±5–10 Prozentpunkten = erhöhtes Risiko für bestimmte Szenarien.
+
 ## Stabilität
 **Stabilitäts-Urteil:** 🟢 Stabil | 🟡 Achtung | 🔴 Instabil
 > {{EIN-SATZ-FAZIT}}
 
-Beurteile die Stabilität anhand der Gewichtung:
-- Ist die Gewichtung defensiv genug für die Ziele (Priorität: {story.priority})?
-- Wertpapieranteil (Aktien {metrics.josef_aktien_pct:.0f}%): Zu hoch? Passt zum Zeithorizont?
-- Inflationsschutz: Rohstoffe + Immobilien ({metrics.josef_rohstoffe_pct:.0f}%) ausreichend für die Ziele?
-- Liquidität & Einkommen: Rentenanteil ({metrics.josef_renten_pct:.0f}%) + jährliche Dividenden ({metrics.total_annual_dividend_eur:.0f}€) adequate für Liquiditätsbedarf?
+Beurteile die Stabilität anhand der aktuellen Gewichtung:
+- **Abweichung vom 1/3-Ziel**: Aktien {metrics.josef_aktien_pct:.0f}% (Ziel: 33%), Renten/Geld {metrics.josef_renten_pct:.0f}% (Ziel: 33%), Rohstoffe + Immo {metrics.josef_rohstoffe_pct:.0f}% (Ziel: 33%). Größere Abweichungen?
+- **Szenario-Anfälligkeit**: Welche Wirtschaftsszenarien sind durch die aktuelle Gewichtung erhöht riskant (z.B. Übergewicht Aktien = Aktiencrash-Risiko)?
+- **Passung zu Zielen**: Passt die Gewichtung zum Zeithorizont ({story.target_year or 'offen'}) und Priorität ({story.priority})?
+- **Liquiditätsbedarf**: Sind Renten/Geld ({metrics.josef_renten_pct:.0f}%) + jährliche Dividenden ({metrics.total_annual_dividend_eur:.0f}€) ausreichend für Liquiditätsbedarf? ({story.liquidity_need or 'keiner angegeben'})
 
-### Impact der Gewichtung auf Portfoliostabilität
+### Fazit zur Stabilität
 
 ---
 

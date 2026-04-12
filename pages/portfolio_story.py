@@ -193,6 +193,10 @@ else:
                 dividend_yield = (total_dividend / total_value * 100) if total_value > 0 else 0
 
                 from agents.portfolio_story_agent import PortfolioMetrics
+                from agents.rebalance_agent import compute_josef_allocation
+
+                # Compute real Josef-Regel allocation from actual portfolio valuations
+                josef = compute_josef_allocation(valuations)
 
                 metrics = PortfolioMetrics(
                     total_value_eur=total_value,
@@ -200,9 +204,9 @@ else:
                     total_pnl_pct=total_pnl_pct,
                     total_annual_dividend_eur=total_dividend,
                     portfolio_dividend_yield_pct=dividend_yield,
-                    josef_aktien_pct=33.3,  # Placeholder
-                    josef_renten_pct=33.3,
-                    josef_rohstoffe_pct=33.3,
+                    josef_aktien_pct=josef["Aktien"],
+                    josef_renten_pct=josef["Renten/Geld"],
+                    josef_rohstoffe_pct=josef["Rohstoffe"],
                     positions_count=len(portfolio),
                 )
 
