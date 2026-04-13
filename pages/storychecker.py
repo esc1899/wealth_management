@@ -196,6 +196,11 @@ with col_left:
         if submitted:
             with st.spinner(t("storychecker.thinking")):
                 try:
+                    # Clear old session if position changed
+                    current_session = agent.get_session(st.session_state.get("sc_session_id")) if st.session_state.get("sc_session_id") else None
+                    if current_session and current_session.position_id != selected_position.id:
+                        st.session_state.pop("sc_session_id", None)
+
                     session = agent.start_session(position=selected_position)
                     st.session_state["sc_session_id"] = session.id
                 except Exception as exc:
