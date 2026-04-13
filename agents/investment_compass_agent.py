@@ -152,7 +152,7 @@ class InvestmentCompassAgent:
             context_parts.append(watchlist_text)
 
         # Portfolio story
-        story = self._portfolio_story.get_current()
+        story = self._portfolio_story.get_current() if self._portfolio_story else None
         if story:
             context_parts.append("")
             context_parts.append(f"## Portfolio Story")
@@ -184,7 +184,7 @@ class InvestmentCompassAgent:
 
         # -------- Ebene 2: Portfolio story analysis (if available) --------
 
-        story_analyses = self._portfolio_story.get_latest_analysis()
+        story_analyses = self._portfolio_story.get_latest_analysis() if self._portfolio_story else None
         if story_analyses:
             context_parts.append("")
             context_parts.append("## Portfolio Story Analyse")

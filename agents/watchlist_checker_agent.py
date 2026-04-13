@@ -170,7 +170,7 @@ class WatchlistCheckerAgent:
             self._analyses.save(
                 position_id=fit.position_id,
                 agent="watchlist_checker",
-                skill_name=None,
+                skill_name="",  # Watchlist checker is not skill-based
                 verdict=fit.verdict,
                 summary=fit.summary,
             )
