@@ -11,6 +11,7 @@ from config import config
 from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET
 from agents.consensus_gap_agent import ConsensusGapAgent
 from agents.fundamental_agent import FundamentalAgent
+from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
 from agents.investment_compass_agent import InvestmentCompassAgent
 from agents.market_data_agent import MarketDataAgent
 from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
@@ -298,6 +299,18 @@ def get_fundamental_agent() -> FundamentalAgent:
     model = _get_agent_model("fundamental", "claude", CLAUDE_SONNET)
     llm = _make_claude_provider(model, "fundamental")
     return FundamentalAgent(llm=llm)
+
+
+@st.cache_resource
+def get_fundamental_analyzer_agent() -> FundamentalAnalyzerAgent:
+    model = _get_agent_model("fundamental_analyzer", "claude", _DEFAULT_CLAUDE_MODEL)
+    llm = _make_claude_provider(model, "fundamental_analyzer")
+    return FundamentalAnalyzerAgent(
+        positions_repo=get_positions_repo(),
+        analyses_repo=get_analyses_repo(),
+        llm=llm,
+        skills_repo=get_skills_repo(),
+    )
 
 
 @st.cache_resource

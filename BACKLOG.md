@@ -77,6 +77,47 @@ Portfolio Story als Kontext in Rebalancer injizieren → Rebalancing-Vorschläge
 
 ### Invest / Rebalance
 
+#### [P1] [BUG] Story Checker: Story wechselt bei Position-Neuauswahl nicht
+**Problem:** Wenn man die Position im Selectbox ändert und eine neue Session startet, zeigt die rechte Chat-Seite weiterhin die alte Session statt der neuen.
+
+**Ursache:** Das `sc_session_id` wird nicht geleert, wenn die Position gewechselt wird. Die neue Session wird zwar erstellt, aber die alte bleibt im Session-State.
+
+**Lösung:** Beim Positionswechsel (selectbox change) → `st.session_state.pop("sc_session_id", None)` aufrufen, bevor der neue Check läuft.
+
+**Files:** `pages/storychecker.py` (Zeilen 124-203)
+
+---
+
+#### [P2] [FEAT] Fundamental Analyzer: Einzelpositions-Analyse (neu)
+**Anforderung:** Neuer Agent/Page "Fundamental Analyzer" für tiefere Fundamentalwert-Analyse von einzelnen Positionen.
+
+**Scope:**
+- Sollte sowohl Portfolio-Positionen als auch Watchlist-Positionen analysieren können
+- Ähnliche Struktur wie Story Checker (selectbox + chat interface)
+- Analysiert: Kennzahlen (KGV, EPS, Dividendenrendite), Branchenposition, Wettbewerbsvorteil, Risiken
+- Optional: Integration mit Market Data Agent für aktuelle Daten
+
+**Template:** Story Checker kann als Basis dienen (Session-Management, Chat-History, Past Sessions).
+
+**Kontext:** Feature-Request aus realer Nutzung — Nutzer möchte einzelne Positionen tiefergehend analysieren können.
+
+---
+
+#### [P2] [IMPR] Watchlist Checker: Aussagekräftige Details pro Position
+**Problem:** Die "📊 Kontext-Details" Expander zeigen nur technische Infos (Agent Run, vollständiger LLM-Text), keine aussagekräftigen Details pro Position.
+
+**Anforderung:** Detailansicht sollte zeigen:
+1. **Fit-Begründung:** Warum ist diese Position passend/nicht passend für das Portfolio?
+2. **Potential Risks:** Was könnte gegen diese Position sprechen?
+3. **Sektor/Region:** Wie diversifiziert die neue Position das Portfolio?
+4. **Preis-Kontext:** Kaufsignal? Zu hoch bewertet?
+
+**Lösung:** Nach Story Checker + Fundamental Analyzer Implementierung: Diese Agents als Kontext-Expander einbinden (z.B. "📊 Story Analysis", "📊 Fundamental Assessment").
+
+**Status:** Könnte auch daran liegen, dass Fundamental Analyzer noch nicht implementiert ist.
+
+---
+
 #### [P2] [IMPR] Investment Kompass & Watchlist Checker: Inhaltlicher Feinschliff
 **Status:** Funktional fertig (2026-04-13), alle Tests grün, 78.69% Coverage
 
