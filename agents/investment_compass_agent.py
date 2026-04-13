@@ -17,6 +17,7 @@ from typing import Optional
 from core.llm.base import Message, Role
 from core.llm.local import OllamaProvider
 from core.storage.analyses import PositionAnalysesRepository
+from core.storage.models import Position
 from core.storage.portfolio_story import PortfolioStoryRepository
 
 logger = logging.getLogger(__name__)
@@ -202,7 +203,7 @@ class InvestmentCompassAgent:
         return context, lineage
 
 
-def _build_portfolio_snapshot(positions: list, market_repo) -> str:
+def _build_portfolio_snapshot(positions: list[Position], market_repo) -> str:
     """Build portfolio text summary (shows only portfolio positions, not watchlist)."""
     portfolio_positions = [p for p in positions if p.in_portfolio]
     if not portfolio_positions:
@@ -228,7 +229,7 @@ def _build_portfolio_snapshot(positions: list, market_repo) -> str:
     return "\n".join(lines)
 
 
-def _build_watchlist_summary(watchlist: list) -> str:
+def _build_watchlist_summary(watchlist: list[Position]) -> str:
     """Build watchlist text summary."""
     if not watchlist:
         return "(Leer)"
