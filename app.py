@@ -98,7 +98,7 @@ pg = st.navigation({
         st.Page("pages/portfolio_chat.py",    title=t("nav.portfolio_chat"),     icon=":material/chat:"),
         st.Page("pages/portfolio_story.py",   title="Portfolio Story",           icon=":material/description:"),
         st.Page("pages/watchlist_checker.py", title="Watchlist Checker",         icon=":material/check_circle:"),
-        st.Page("pages/investment_compass.py",title="🧭 Investment Kompass",      icon=":material/explore:"),
+        st.Page("pages/investment_compass.py",title="Investment Kompass",         icon=":material/explore:"),
         st.Page("pages/wealth_assistant.py",  title=t("nav.wealth_assistant"),   icon=":material/savings:"),
     ],
     t("nav.group_research"): [
