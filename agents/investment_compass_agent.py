@@ -154,7 +154,7 @@ class InvestmentCompassAgent:
             context_parts.append(watchlist_text)
 
         # Portfolio story
-        story = self._portfolio_story.get_latest()
+        story = self._portfolio_story.get_current()
         if story:
             context_parts.append("")
             context_parts.append(f"## Portfolio Story")
