@@ -120,6 +120,42 @@ if st.session_state.get("_watchlist_check_result"):
                 with col2:
                     st.metric("Fit", fit.verdict.replace("_", " ").title())
 
+                # Position details (Story, Fundamental Analysis)
+                with st.expander("📋 Position-Details"):
+                    detail_cols = st.columns(2)
+
+                    # Story Analysis
+                    with detail_cols[0]:
+                        st.caption("**Story Checker**")
+                        story_analyses = analyses_repo.get_for_position(pos.id, limit=1)
+                        if story_analyses:
+                            latest_story = story_analyses[0]
+                            if latest_story.verdict:
+                                verdict_icon = "🟢" if latest_story.verdict == "intact" else "🟡" if latest_story.verdict == "gemischt" else "🔴"
+                                st.markdown(f"{verdict_icon} {latest_story.verdict}")
+                                if latest_story.summary:
+                                    st.caption(latest_story.summary)
+                        else:
+                            st.caption("⚪ Noch nicht analysiert")
+
+                    # Fundamental Analysis
+                    with detail_cols[1]:
+                        st.caption("**Fundamentalwert**")
+                        fund_analyses = analyses_repo.get_for_position(
+                            pos.id,
+                            limit=1
+                        )
+                        if fund_analyses:
+                            latest_fund = [a for a in fund_analyses if a.agent == "fundamental"]
+                            if latest_fund:
+                                verdict = latest_fund[0].verdict
+                                verdict_icon = "🟢" if verdict == "unterbewertet" else "🟡" if verdict == "fair" else "🔴" if verdict == "überbewertet" else "⚪"
+                                st.markdown(f"{verdict_icon} {verdict or 'unbekannt'}")
+                                if latest_fund[0].summary:
+                                    st.caption(latest_fund[0].summary)
+                        else:
+                            st.caption("⚪ Noch nicht analysiert")
+
     # --- KI-Kommentar --
 
     st.divider()
@@ -142,7 +178,7 @@ if st.session_state.get("_watchlist_check_result"):
     # --- Details --
 
     with st.expander("📊 Kontext-Details"):
-        st.caption("Agent Lineage")
+        st.caption("**Agent Metadata**")
         latest_run = agent_runs_repo.get_latest_run("watchlist_checker")
         if latest_run:
             st.json({
@@ -151,5 +187,33 @@ if st.session_state.get("_watchlist_check_result"):
                 "timestamp": latest_run["created_at"],
                 "context": latest_run["context_summary"],
             })
-        st.caption("Vollständige Analyse")
+
+        st.divider()
+        st.caption("**Portfolio Story Context**")
+        story_analysis = portfolio_story_repo.get_latest_analysis()
+        if story_analysis:
+            st.markdown(f"**Story Verdict:** {story_analysis.verdict}")
+            st.caption(f"Performance: {story_analysis.perf_verdict}")
+            st.caption(f"Stabilität: {story_analysis.stability_verdict}")
+        else:
+            st.caption("(Noch keine Portfolio-Story erstellt)")
+
+        st.divider()
+        st.caption("**Watchlist-Positionen: Zusammenfassung**")
+        st.caption(f"Gesamt: {len(watchlist)} Positionen analysiert")
+        fit_counts = {
+            "sehr_passend": sum(1 for f in result.position_fits if f.verdict == "sehr_passend"),
+            "passend": sum(1 for f in result.position_fits if f.verdict == "passend"),
+            "neutral": sum(1 for f in result.position_fits if f.verdict == "neutral"),
+            "nicht_passend": sum(1 for f in result.position_fits if f.verdict == "nicht_passend"),
+        }
+        st.markdown(
+            f"🟢 Sehr passend: {fit_counts['sehr_passend']} | "
+            f"🟡 Passend: {fit_counts['passend']} | "
+            f"⚪ Neutral: {fit_counts['neutral']} | "
+            f"🔴 Nicht passend: {fit_counts['nicht_passend']}"
+        )
+
+        st.divider()
+        st.caption("**Vollständige LLM-Analyse**")
         st.text(result.full_text)
