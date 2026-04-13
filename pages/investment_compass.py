@@ -25,9 +25,10 @@ st.title("🧭 Investment Kompass")
 st.warning(
     """**🚧 Learning Project — Experimental Agent**
 
-Dieser Agent zeigt, wie mehrere Datenquellen zu einer kohärenten Analyse kombiniert werden.
-Die "unter Konstruktion"-Markierung erinnert daran: Das Ergebnis ist ein strukturiertes Gedankenexperiment,
-keine Finanzberatung. Nutze die Lineage-Details um zu sehen, welche Agenten welche Inputs beigetragen haben.
+Dieser Agent kombiniert dein Portfolio mit einer gewählten **Strategie** (z.B. Value Investing, Wachstum)
+um strukturierte Analysen zu liefern. Die "unter Konstruktion"-Markierung erinnert daran: Das Ergebnis
+ist ein Gedankenexperiment, keine Finanzberatung. Nutze die Lineage-Details um zu sehen,
+welche Datenquellen in die Analyse eingeflossen sind.
 """
 )
 
