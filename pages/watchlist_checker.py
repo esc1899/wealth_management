@@ -13,8 +13,10 @@ from state import (
     get_watchlist_checker_agent,
     get_portfolio_story_repo,
     get_agent_runs_repo,
+    get_portfolio_comment_service,
+    get_app_config_repo,
 )
-from core.services.portfolio_comment_service import get_portfolio_comment_service, get_style_by_id
+from core.services.portfolio_comment_service import get_style_by_id
 from agents.rebalance_agent import compute_josef_allocation
 
 # ─────────────────────────────────────────────────────────────────────
@@ -123,7 +125,6 @@ if st.session_state.get("_watchlist_check_result"):
     st.divider()
     st.subheader("3️⃣ KI-Kommentar")
 
-    from state import get_app_config_repo
     _comment_style_id = get_app_config_repo().get("comment_style") or "humorvoll"
     _comment_style = get_style_by_id(_comment_style_id)
     comment_service = get_portfolio_comment_service()

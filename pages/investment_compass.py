@@ -14,8 +14,8 @@ from state import (
     get_skills_repo,
     get_agent_runs_repo,
     get_app_config_repo,
+    get_portfolio_comment_service,
 )
-from core.services.portfolio_comment_service import get_style_by_id
 
 # ─────────────────────────────────────────────────────────────────────
 
