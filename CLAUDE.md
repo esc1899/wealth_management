@@ -275,6 +275,25 @@ for pos in service.filter_positions(criteria):
 
 ## Changelog (CLAUDE.md Prozess-Updates)
 
+### 2026-04-13 — Investment Kompass Phase 2: Usecase-Specific Context
+
+- **Completed**: Phase 1 (Query Validation) + Phase 2 (Usecase-Specific Execution)
+- **Architecture**: Systems Thinking model with 3 nested levels (Portfolio Story → Query Validation → Usecase Execution)
+- **New Methods**:
+  - `_execute_usecase()`: Phase 2 main dispatcher, manages skill injection and context filtering
+  - `_build_context_for_usecase()`: Filters context (portfolio, verdicts, story analysis) based on usecase
+  - `_should_use_skill_for_usecase()`: Gate that controls skill usage (enabled for ALLOCATION/REBALANCING/ANALYSIS, disabled for WITHDRAWAL)
+  - `_get_usecase_prompt()`: Usecase-specific system prompts (4 variants for each usecase)
+- **Skill Integration**: Phase 3 complete — skills now modulate how analysis is performed, not whether it happens
+- **Context Filtering**:
+  - ALLOCATION: portfolio + watchlist + story (for position selection)
+  - REBALANCING: + analyst verdicts (storychecker, fundamental, consensus_gap)
+  - WITHDRAWAL: portfolio + watchlist + story (simpler context for fixed logic)
+  - ANALYSIS: + analyst verdicts + portfolio story analysis (full context for robustness assessment)
+- **Tests**: All 565 passing, Investment Compass agent at 100% coverage, overall 79.31%
+- **Commits**: 1 (Phase 2 complete)
+- **Next**: Phase 4 (prompt refinement, continuous), or features from larger plan (Watchlist Checker, Navigation reorg)
+
 ### 2026-04-13 — Josef's Regel Prompt Clarification
 
 - **Fixed**: LLM misunderstanding of Säulen structure (was summing independent pillars)
