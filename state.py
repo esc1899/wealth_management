@@ -11,6 +11,7 @@ from config import config
 from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET
 from agents.consensus_gap_agent import ConsensusGapAgent
 from agents.fundamental_agent import FundamentalAgent
+from agents.investment_compass_agent import InvestmentCompassAgent
 from agents.market_data_agent import MarketDataAgent
 from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
 from agents.news_agent import NewsAgent
@@ -21,8 +22,10 @@ from agents.research_agent import ResearchAgent
 from agents.search_agent import SearchAgent
 from agents.storychecker_agent import StorycheckerAgent
 from agents.structural_change_agent import StructuralChangeAgent
+from agents.watchlist_checker_agent import WatchlistCheckerAgent
 from agents.wealth_snapshot_agent import WealthSnapshotAgent
 from core.storage.analyses import PositionAnalysesRepository
+from core.storage.agent_runs import AgentRunsRepository
 from core.storage.portfolio_story import PortfolioStoryRepository
 from core.storage.storychecker import StorycheckerRepository
 from core.storage.structural_scans import StructuralScansRepository
@@ -345,6 +348,36 @@ def get_portfolio_story_agent() -> PortfolioStoryAgent:
         llm=llm,
         positions_repo=get_positions_repo(),
         market_repo=get_market_repo(),
+    )
+
+
+@st.cache_resource
+def get_agent_runs_repo() -> AgentRunsRepository:
+    return AgentRunsRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_watchlist_checker_agent() -> WatchlistCheckerAgent:
+    model = _get_agent_model("watchlist_checker", "ollama", _DEFAULT_OLLAMA_MODEL)
+    llm = _make_ollama_provider(model, "watchlist_checker", timeout=300.0)
+    return WatchlistCheckerAgent(
+        positions_repo=get_positions_repo(),
+        analyses_repo=get_analyses_repo(),
+        llm=llm,
+    )
+
+
+@st.cache_resource
+def get_investment_compass_agent() -> InvestmentCompassAgent:
+    model = _get_agent_model("investment_compass", "ollama", _DEFAULT_OLLAMA_MODEL)
+    llm = _make_ollama_provider(model, "investment_compass")
+    return InvestmentCompassAgent(
+        positions_repo=get_positions_repo(),
+        market_repo=get_market_repo(),
+        analyses_repo=get_analyses_repo(),
+        portfolio_story_repo=get_portfolio_story_repo(),
+        llm=llm,
+        skills_repo=get_skills_repo(),
     )
 
 

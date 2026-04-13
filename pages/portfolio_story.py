@@ -16,6 +16,7 @@ from core.storage.models import PortfolioStory
 from state import (
     get_analyses_repo,
     get_app_config_repo,
+    get_agent_runs_repo,
     get_market_agent,
     get_market_repo,
     get_portfolio_comment_service,
@@ -268,6 +269,15 @@ else:
                 saved_analysis = repo.save_analysis(analysis)
                 if position_fits:
                     repo.save_position_fits(position_fits)
+
+                # Log to agent_runs
+                agent_runs_repo = get_agent_runs_repo()
+                agent_runs_repo.log_run(
+                    agent_name="portfolio_story",
+                    model=agent.model,
+                    output_summary=f"Story: {analysis.verdict}, Performance: {analysis.perf_verdict}, Stability: {analysis.stability_verdict}",
+                    context_summary=f"Portfolio ({len(portfolio)} positions), Story (target_year: {current_story.target_year})",
+                )
 
                 st.success("✅ Story-Check durchgeführt!")
                 st.rerun()

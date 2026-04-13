@@ -289,6 +289,21 @@ def init_db(conn: sqlite3.Connection) -> None:
             created_at  TEXT NOT NULL
         )""",
         "CREATE INDEX IF NOT EXISTS idx_portfolio_story_position_fits_position ON portfolio_story_position_fits(position_id)",
+        """CREATE TABLE IF NOT EXISTS agent_runs (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_name       TEXT NOT NULL,
+            model            TEXT,
+            skills_used      TEXT,
+            agent_deps       TEXT,
+            status           TEXT NOT NULL DEFAULT 'done',
+            started_at       TEXT NOT NULL,
+            finished_at      TEXT,
+            output_summary   TEXT,
+            context_summary  TEXT,
+            created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_agent_runs_agent ON agent_runs(agent_name)",
+        "CREATE INDEX IF NOT EXISTS idx_agent_runs_created ON agent_runs(created_at)",
     ]:
         conn.execute(stmt)
     conn.commit()
@@ -365,6 +380,24 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE portfolio_story_position_fits RENAME COLUMN fit_verdict TO fit_role")
 
     conn.execute("CREATE INDEX IF NOT EXISTS idx_benchmark_runs_scenario ON benchmark_runs(scenario_name)")
+
+    # Create agent_runs table if it doesn't exist
+    conn.execute("""CREATE TABLE IF NOT EXISTS agent_runs (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_name       TEXT NOT NULL,
+        model            TEXT,
+        skills_used      TEXT,
+        agent_deps       TEXT,
+        status           TEXT NOT NULL DEFAULT 'done',
+        started_at       TEXT NOT NULL,
+        finished_at      TEXT,
+        output_summary   TEXT,
+        context_summary  TEXT,
+        created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_runs_agent ON agent_runs(agent_name)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_runs_created ON agent_runs(created_at)")
+
     conn.commit()
 
 

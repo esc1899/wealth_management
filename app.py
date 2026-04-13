@@ -90,15 +90,16 @@ _assistant_group = (
 pg = st.navigation({
     t("nav.group_portfolio"): [
         st.Page("pages/dashboard.py",      title=t("nav.dashboard"),   icon=":material/dashboard:"),
-        st.Page("pages/portfolio_story.py", title="Portfolio Story",    icon=":material/description:"),
         st.Page("pages/positionen.py",     title=t("nav.positions"),   icon=":material/edit_note:"),
         st.Page("pages/marktdaten.py",     title=t("nav.market_data"), icon=":material/trending_up:"),
         st.Page("pages/analyse.py",        title=t("nav.analysis"),    icon=":material/bar_chart:"),
     ],
     _assistant_group: [
-        st.Page("pages/portfolio_chat.py",  title=t("nav.portfolio_chat"),   icon=":material/chat:"),
-        st.Page("pages/rebalance_chat.py",  title=t("nav.rebalance_chat"),   icon=":material/balance:"),
-        st.Page("pages/wealth_assistant.py",title=t("nav.wealth_assistant"), icon=":material/savings:"),
+        st.Page("pages/portfolio_chat.py",    title=t("nav.portfolio_chat"),     icon=":material/chat:"),
+        st.Page("pages/portfolio_story.py",   title="Portfolio Story",           icon=":material/description:"),
+        st.Page("pages/watchlist_checker.py", title="Watchlist Checker",         icon=":material/check_circle:"),
+        st.Page("pages/investment_compass.py",title="🧭 Investment Kompass",      icon=":material/explore:"),
+        st.Page("pages/wealth_assistant.py",  title=t("nav.wealth_assistant"),   icon=":material/savings:"),
     ],
     t("nav.group_research"): [
         st.Page("pages/research_chat.py",   title=t("nav.research_chat"),    icon=":material/search:"),
