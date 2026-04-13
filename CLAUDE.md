@@ -14,7 +14,47 @@ Damit zukünftige Sessions alles finden:
 | **Memory/feedback.md** | Feedback zur Arbeitsweise mit Claude | Claude nach User-Feedback |
 | **Memory/private_skills.md** | Persönliche Skills (Wu-Wei, Lindy+Potential, etc) | User-Configured |
 
-**Regel**: Projekt-Sachen → Git-Repo (CLAUDE/ARCHITECTURE/CHANGELOG/BACKLOG). Persönliche Erkenntnisse → Memory. Nicht duplizieren.
+**Governance Rule**: Projekt-Sachen → Git-Repo (CLAUDE/ARCHITECTURE/CHANGELOG/BACKLOG). Persönliche Erkenntnisse → Memory. **Nicht duplizieren.**
+
+---
+
+## 📋 Dokumentations-Governance (Sessions-übergreifend konsistent)
+
+**Problem**: Ohne explizite Regeln landen Informationen überall verteilt → nächste Session findet Dinge nicht.
+
+### Konkrete Zuordnung (was gehört wohin)
+
+| Art der Info | Ziel-Datei | Beispiel | Wann |
+|---|---|---|---|
+| **Bug/Issue entdeckt** | BACKLOG.md § Issues | "Hardcoded 'Antworte auf Deutsch' verletzt i18n" | sofort nach Discovery |
+| **Neue technische Schuld** | BACKLOG.md § Technische Schulden | "DEBT-20: Skills nicht in DB gepflegt" | sofort |
+| **Feature-Idee / zukünftige Arbeit** | BACKLOG.md § Features (geplant) | "Watchlist Checker sollte X auch können" | sofort |
+| **Feature fertig & gemerged** | BACKLOG.md § Features (abgeschlossen) | "✅ Investment Kompass Phase 1+2" | nach Commit |
+| **Prototyp-Learning (was wir lernten)** | BACKLOG.md § Discovery-Notes | "Investment Kompass zu konkret, Rebalance Agent zu vage" | sofort nach Test |
+| **Architektur-Entscheidung getroffen** | ARCHITECTURE.md | "Systems Thinking Model mit 3 Ebenen" | bei Arch-Change |
+| **Process/Arbeitsweise ändert sich** | CLAUDE.md § Changelog | "Begonnen mit Phase-based Implementation" | bei Process-Change |
+| **Major Release / Milestone** | CHANGELOG.md | "v0.5: Investment Kompass MVP + Watchlist Checker" | bei Release |
+| **Persönliches Feedback zu Claude Code** | Memory/feedback.md | "Claude arbeitet besser in Plan Mode" | nach User-Feedback |
+| **Persönliche Skill-Definition** | Memory/private_skills.md | "Wu-Wei: Minimal Critical Path" | User-konfiguriert |
+
+### Explizite Ausschlusskriterien
+
+❌ **Nicht** in Memory.md:
+- Code-Patterns, Konventionen, Architektur (→ CLAUDE.md/ARCHITECTURE.md)
+- Issues/Bugs (→ BACKLOG.md)
+- Feature-Status (→ BACKLOG.md)
+
+❌ **Nicht** in CLAUDE.md:
+- Detaillierte Feature-Status (→ BACKLOG.md)
+- Issues einzeln auflisten (→ BACKLOG.md)
+- Private Erkenntnisse über den Nutzer (→ Memory/user_profile.md)
+
+❌ **Nicht** in BACKLOG.md:
+- Wie ich arbeite (→ CLAUDE.md)
+- Architektur-Begründungen (→ ARCHITECTURE.md)
+- Persönliche Feedback-Notizen (→ Memory/)
+
+---
 
 **Verwandte Abschnitte:**
 - [Architektur-Guards](#architektur-guards-anti-patterns-vermeiden) — siehe unten

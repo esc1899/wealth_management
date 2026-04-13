@@ -139,6 +139,31 @@ Privater Bereich (Ollama 🔒) und Cloud-Bereich (Claude ☁️) klarer abheben 
 
 ---
 
+## Discovery: Investment Kompass Prototype (2026-04-13)
+
+**Outcome:** Funktioniert technisch, aber Anforderungen noch unklar. Iteratives Lernen durch Testen.
+
+### Learnings & Open Questions
+
+#### [P1] [DISC] Investment Kompass: Zu konkret vs. Portfolio Story Agent
+**Finding:** Investment Kompass erzeugt zu granulare Handlungsempfehlungen (10k€ auf 5 kleine Positionen verteilt statt 1-2 große).
+- Portfolio Story Agent: Zu vage
+- Rebalance Agent (alt): Zu vage
+- Investment Kompass (neu): Zu konkret & detailliert
+- **Open:** Ist Investment Kompass nötig oder nur alternative UI zum Portfolio Story Agent?
+
+**Next:** Klären ob Investment Kompass eine echte Lösung ist oder ob das Problem beim Portfolio Story Agent liegt.
+
+#### [P2] [DISC] Farmer Strategy wird nicht richtig eingebaut
+**Finding:** User wählte "Farmer Strategy" aber LLM ignoriert sie. Prompts sind nicht skill+usecase kombiniert.
+- Allocation + Farmer sollte andere Empfehlungen als Allocation + Growth
+- Skills sind im Code, aber nicht in Prompt eingebaut
+- **Cause:** Phase 2 baut skill_prompt rein, aber nicht skill-spezifisch für Usecase
+
+**Next:** Prompts überarbeiten — ALLOCATION sollte Farmer berücksichtigen (Dividenden, Einkommen, nicht "Sow/Harvest/Prune")
+
+---
+
 ## Technische Schulden
 
 Identified during code review (2026-04-12). Impacts on architecture, maintainability, and testing.
@@ -333,6 +358,51 @@ Identified during code review (2026-04-12). Impacts on architecture, maintainabi
 **Lösung:** `DELETE FROM positions WHERE in_portfolio = 1` o.ä.
 
 **Files:** `agents/portfolio_agent.py` (Zeilen 399–413)
+
+---
+
+### Investment Kompass & Agents (2026-04-13)
+
+#### [DEBT-17] [P2] Skills nicht in Datenbank gepflegt
+**Problem:** 6 Strategien (FARMER, VALUE, GROWTH, BALANCE, CRISIS-RESILIENCE, TAX-OPTIMIZED) sind nur im Code/Design definiert, nicht als Skill-Einträge in der Datenbank gespeichert.
+
+**Impact:** Pages laden Skills aus DB via `skills_repo.get_by_area()`, finden nichts → leere Auswahl oder Fallback. User können Strategien nicht wählen.
+
+**Lösung:** Seed-Daten (`config/default_skills.yaml` oder `seed_demo.py`) mit allen 6 Strategien + usecase-spezifischen Prompts erstellen.
+
+**Files:** `agents/investment_compass_agent.py`, `config/default_skills.yaml`, `scripts/seed_demo.py`
+
+#### [DEBT-18] [P2] Prompts nicht skill+usecase kombiniert
+**Problem:** Investment Kompass Phase 2 injiziert skill_prompt, aber Prompts sind nicht usecase-spezifisch für jede Skill.
+- Beispiel: ALLOCATION + Farmer Strategy sollte Dividenden-fokussiert sein, aber aktueller Prompt ist generic
+- Aktuelle Architektur: ALLOCATION prompt + skill_prompt konkateniert, aber nicht intelligent kombiniert
+
+**Impact:** Skills modifizieren Behavior nicht wirklich. Farmer Strategy und Value Strategy erzeugen ähnliche Outputs.
+
+**Lösung:** Skill-Datenbank sollte usecase_mapping haben — pro Skill 4 Prompts (ALLOCATION, REBALANCING, WITHDRAWAL, ANALYSIS).
+
+**Files:** `agents/investment_compass_agent.py` (Prompts Zeilen 152–186), `core/storage/skills.py` (Skill-Schema)
+
+#### [DEBT-19] [P2] Hardcoded "Antworte auf Deutsch" verletzt i18n
+**Problem:** Alle neuen Agent-Prompts (Investment Kompass, Watchlist Checker, etc.) enthalten hardcoded `"Antworte auf Deutsch"`.
+
+**Impact:** Verletzung von DEBT-3 (Magic Strings). App hat i18n-System, sollte das nutzen statt hardcoded Sprache.
+
+**Lösung:** Prompts sollten `{LANGUAGE}` placeholder haben, zur Laufzeit mit `app_config.get("ui_language")` gefüllt.
+
+**Files:** `agents/investment_compass_agent.py` (Zeilen 152–186), `agents/watchlist_checker_agent.py` (Zeilen 44–84)
+
+#### [DEBT-20] [P3] Neue Agents nicht in Settings/Monitoring sichtbar
+**Problem:** Investment Kompass, Watchlist Checker sind implementiert, aber tauchen nicht auf in:
+- Skill-Management UI
+- Agent Runs Übersicht
+- Settings-Seite (wo User LLM-Auswahl treffen können)
+
+**Impact:** User können nicht sehen, welche Agents laufen oder mit welchem Modell.
+
+**Lösung:** Agent Runs-Page erweitern oder neue "Agent Management" Dashboard erstellen.
+
+**Files:** `pages/` (neue oder bestehende Settings-Page)
 
 ---
 
