@@ -10,6 +10,7 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
+from core.llm.base import Message, Role
 from core.llm.local import OllamaProvider
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.models import Position
@@ -157,10 +158,7 @@ class WatchlistCheckerAgent:
 
         # LLM call (combine system prompt with context, send as user message)
         messages = [
-            {
-                "role": "user",
-                "content": f"{BASE_SYSTEM_PROMPT}\n\n{context}",
-            }
+            Message(role=Role.USER, content=f"{BASE_SYSTEM_PROMPT}\n\n{context}")
         ]
 
         response = await self._llm.chat(messages)

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
+from core.llm.base import Message, Role
 from core.llm.local import OllamaProvider
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.portfolio_story import PortfolioStoryRepository
@@ -107,10 +108,7 @@ class InvestmentCompassAgent:
         # LLM call - combine system and context with user query
         full_prompt = f"{system_prompt}\n\n{user_query}"
         messages = [
-            {
-                "role": "user",
-                "content": full_prompt,
-            }
+            Message(role=Role.USER, content=full_prompt)
         ]
 
         full_response = await self._llm.chat(messages)
