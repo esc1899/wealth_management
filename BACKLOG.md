@@ -77,6 +77,20 @@ Portfolio Story als Kontext in Rebalancer injizieren → Rebalancing-Vorschläge
 
 ### Invest / Rebalance
 
+#### [P2] [IMPR] Investment Kompass & Watchlist Checker: Inhaltlicher Feinschliff
+**Status:** Funktional fertig (2026-04-13), alle Tests grün, 78.69% Coverage
+
+**Was noch poliert werden kann:**
+1. **System-Prompts:** Präzision/Nuance bei komplexen Portfolio-Szenarien
+2. **Output-Formatierung:** Wie Ergebnisse präsentiert werden (Reihenfolge, Länge, Fokus)
+3. **Context-Priorität:** Welche Verdicts/Analysen werden zuerst gezeigt?
+4. **Parsing-Robustheit:** Edge-Cases in LLM-Response-Extraktion
+5. **Watchlist-Parsing:** Zusammenfassung der LLM-Responses aus 🟢🟡⚪🔴 verdicts
+6. **Investment Kompass UX:** Query-Beispiele, Strategy-Auswahl Klarheit
+
+**Approach:** Nach echtem Einsatz (User-Feedback) iterativ verfeinern.
+
+---
 
 #### [P3] [FEAT] Invest/Rebalance: Zusammenhang Skill ↔ geplante Cloud-Agents
 Architektur-Frage: Wenn Agents (News, Storychecker) automatisch eingeplant werden, sollen ihre Ergebnisse als Kontext in Invest/Rebalance einfließen. Skill-Auswahl im Rebalance könnte steuern, welche Agent-Outputs relevant sind.
