@@ -82,9 +82,27 @@ if not st.session_state.get("legal_accepted"):
     _legal_dialog()
     st.stop()
 
+_is_local = is_local_url(config.OLLAMA_HOST)
 _assistant_group = (
-    t("nav.group_assistant") if is_local_url(config.OLLAMA_HOST)
+    t("nav.group_assistant") if _is_local
     else t("nav.group_assistant_remote")
+)
+
+# Assistant pages: local experimental features (Watchlist Checker, Investment Kompass) only visible locally
+_assistant_pages = [
+    st.Page("pages/portfolio_chat.py",    title=t("nav.portfolio_chat"),     icon=":material/chat:"),
+    st.Page("pages/portfolio_story.py",   title="Portfolio Story",           icon=":material/description:"),
+]
+
+# Experimental local-only features
+if _is_local:
+    _assistant_pages.extend([
+        st.Page("pages/watchlist_checker.py", title="Watchlist Checker",         icon=":material/check_circle:"),
+        st.Page("pages/investment_compass.py",title="Investment Kompass",         icon=":material/explore:"),
+    ])
+
+_assistant_pages.append(
+    st.Page("pages/wealth_assistant.py",  title=t("nav.wealth_assistant"),   icon=":material/savings:")
 )
 
 pg = st.navigation({
@@ -94,13 +112,7 @@ pg = st.navigation({
         st.Page("pages/marktdaten.py",     title=t("nav.market_data"), icon=":material/trending_up:"),
         st.Page("pages/analyse.py",        title=t("nav.analysis"),    icon=":material/bar_chart:"),
     ],
-    _assistant_group: [
-        st.Page("pages/portfolio_chat.py",    title=t("nav.portfolio_chat"),     icon=":material/chat:"),
-        st.Page("pages/portfolio_story.py",   title="Portfolio Story",           icon=":material/description:"),
-        st.Page("pages/watchlist_checker.py", title="Watchlist Checker",         icon=":material/check_circle:"),
-        st.Page("pages/investment_compass.py",title="Investment Kompass",         icon=":material/explore:"),
-        st.Page("pages/wealth_assistant.py",  title=t("nav.wealth_assistant"),   icon=":material/savings:"),
-    ],
+    _assistant_group: _assistant_pages,
     t("nav.group_research"): [
         st.Page("pages/research_chat.py",   title=t("nav.research_chat"),    icon=":material/search:"),
         st.Page("pages/news_chat.py",       title=t("nav.news_chat"),        icon=":material/newspaper:"),
