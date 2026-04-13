@@ -147,11 +147,12 @@ class WatchlistCheckerAgent:
 
             # Add any existing verdicts from other agents
             if pos.id:
-                existing_verdicts = self._analyses.get_latest_bulk([pos.id], agent=None)
-                if existing_verdicts:
-                    for av in existing_verdicts:
-                        agent_name = av["agent"].capitalize()
-                        verdict = av.get("verdict", "?")
+                # Try to fetch verdicts from each known agent
+                for agent_to_check in ["storychecker", "fundamental", "consensus_gap"]:
+                    existing_verdict = self._analyses.get_latest(pos.id, agent_to_check)
+                    if existing_verdict:
+                        agent_name = existing_verdict.agent.capitalize()
+                        verdict = existing_verdict.verdict or "?"
                         context_parts.append(f"  - {agent_name}: {verdict}")
 
         context = "\n".join(context_parts)

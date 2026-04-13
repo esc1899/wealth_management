@@ -2,9 +2,11 @@
 
 import pytest
 from datetime import date
+from unittest.mock import AsyncMock, MagicMock
 from agents.watchlist_checker_agent import (
     WatchlistFit,
     WatchlistCheckResult,
+    WatchlistCheckerAgent,
     _parse_watchlist_results,
 )
 from core.storage.models import Position
@@ -135,3 +137,158 @@ Aber nicht dringend."""
         fits = _parse_watchlist_results(positions, response)
         # Position not in lookup, so no match
         assert len(fits) == 0
+
+
+class TestWatchlistCheckerAgent:
+    """Test WatchlistCheckerAgent behavior and integration."""
+
+    @pytest.mark.asyncio
+    async def test_empty_watchlist(self):
+        """Agent handles empty watchlist gracefully."""
+        mock_llm = AsyncMock()
+        mock_analyses_repo = MagicMock()
+
+        agent = WatchlistCheckerAgent(
+            positions_repo=MagicMock(),
+            analyses_repo=mock_analyses_repo,
+            llm=mock_llm,
+        )
+
+        result = await agent.check_watchlist(
+            portfolio_snapshot="Test portfolio",
+            watchlist_positions=[],
+        )
+
+        # Should return empty result without calling LLM
+        assert result.position_fits == []
+        assert "Keine Watchlist-Positionen" in result.full_text
+        mock_llm.chat.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_agent_calls_llm_with_context(self):
+        """Agent builds context and calls LLM."""
+        positions = [
+            make_position(id=1, name="Tesla", ticker="TSLA"),
+            make_position(id=2, name="Microsoft", ticker="MSFT"),
+        ]
+
+        mock_llm = AsyncMock()
+        mock_llm.model = "test-model"
+        mock_llm.chat = AsyncMock(return_value="""## Tesla (TSLA)
+**Fit:** 🟢 Sehr passend
+> Good fit
+
+## Microsoft (MSFT)
+**Fit:** 🟡 Passend
+> Okay fit""")
+
+        mock_analyses_repo = MagicMock()
+        mock_analyses_repo.get_latest_bulk.return_value = {}
+
+        agent = WatchlistCheckerAgent(
+            positions_repo=MagicMock(),
+            analyses_repo=mock_analyses_repo,
+            llm=mock_llm,
+        )
+
+        await agent.check_watchlist(
+            portfolio_snapshot="Portfolio with 5 positions",
+            watchlist_positions=positions,
+        )
+
+        # Verify LLM was called
+        mock_llm.chat.assert_called_once()
+        call_args = mock_llm.chat.call_args
+        messages = call_args[0][0]
+        content = messages[0].content
+
+        # Context should include portfolio snapshot
+        assert "Portfolio with 5 positions" in content
+        # And watchlist positions
+        assert "Tesla" in content
+        assert "TSLA" in content
+
+    @pytest.mark.asyncio
+    async def test_agent_persists_results(self):
+        """Agent saves parsing results to repository."""
+        positions = [
+            make_position(id=1, name="Apple", ticker="AAPL"),
+        ]
+
+        mock_llm = AsyncMock()
+        mock_llm.model = "test-model"
+        mock_llm.chat = AsyncMock(return_value="""## Apple (AAPL)
+**Fit:** 🟢 Sehr passend
+> Good fit""")
+
+        mock_analyses_repo = MagicMock()
+        mock_analyses_repo.get_latest_bulk.return_value = {}
+
+        agent = WatchlistCheckerAgent(
+            positions_repo=MagicMock(),
+            analyses_repo=mock_analyses_repo,
+            llm=mock_llm,
+        )
+
+        result = await agent.check_watchlist(
+            portfolio_snapshot="Test portfolio",
+            watchlist_positions=positions,
+        )
+
+        # Verify results were saved
+        assert len(result.position_fits) == 1
+        mock_analyses_repo.save.assert_called_once()
+        save_call = mock_analyses_repo.save.call_args
+        assert save_call[1]["position_id"] == 1
+        assert save_call[1]["agent"] == "watchlist_checker"
+        assert save_call[1]["verdict"] == "sehr_passend"
+
+    @pytest.mark.asyncio
+    async def test_agent_with_existing_verdicts(self):
+        """Agent includes existing verdicts in context."""
+        positions = [
+            make_position(id=1, name="Apple", ticker="AAPL"),
+        ]
+
+        mock_llm = AsyncMock()
+        mock_llm.model = "test-model"
+        mock_llm.chat = AsyncMock(return_value="""## Apple (AAPL)
+**Fit:** 🟢 Sehr passend
+> Good fit""")
+
+        mock_analyses_repo = MagicMock()
+        # Simulate existing storychecker verdict
+        mock_analyses_repo.get_latest_bulk.return_value = {
+            1: MagicMock(agent="storychecker", verdict="intact", summary="Good")
+        }
+
+        agent = WatchlistCheckerAgent(
+            positions_repo=MagicMock(),
+            analyses_repo=mock_analyses_repo,
+            llm=mock_llm,
+        )
+
+        await agent.check_watchlist(
+            portfolio_snapshot="Test portfolio",
+            watchlist_positions=positions,
+        )
+
+        # Verify context included existing verdicts
+        call_args = mock_llm.chat.call_args
+        content = call_args[0][0][0].content
+        # Should mention storychecker results
+        assert "Storychecker" in content or "storychecker" in content.lower()
+
+    @pytest.mark.asyncio
+    async def test_model_property(self):
+        """Agent exposes model name via property."""
+        mock_llm = AsyncMock()
+        mock_llm.model = "test-model-123"
+
+        agent = WatchlistCheckerAgent(
+            positions_repo=MagicMock(),
+            analyses_repo=MagicMock(),
+            llm=mock_llm,
+        )
+
+        assert agent.model == "test-model-123"
