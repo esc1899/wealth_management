@@ -21,12 +21,13 @@ from state import (
 
 st.title("🧭 Investment Kompass")
 
-# Baustellenschild — permanent (Humor)
+# Permanent "under construction" for transparency about AI limitations
 st.warning(
-    """**🚧 UNDER CONSTRUCTION**
+    """**🚧 Learning Project — Experimental Agent**
 
-Dieser Agent ist dauerhaft im Bau. KI-Investmentberatung wäre sowieso illegal —
-wir nennen das lieber "strukturierte Gedankenexperimente".
+Dieser Agent zeigt, wie mehrere Datenquellen zu einer kohärenten Analyse kombiniert werden.
+Die "unter Konstruktion"-Markierung erinnert daran: Das Ergebnis ist ein strukturiertes Gedankenexperiment,
+keine Finanzberatung. Nutze die Lineage-Details um zu sehen, welche Agenten welche Inputs beigetragen haben.
 """
 )
 
