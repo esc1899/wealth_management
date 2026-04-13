@@ -172,11 +172,12 @@ class InvestmentCompassAgent:
                 if verdicts:
                     context_parts.append("")
                     context_parts.append(f"## {agent_name.capitalize()}-Verdicts")
-                    for v in verdicts:
-                        pos = next((p for p in positions if p.id == v["position_id"]), None)
+                    # verdicts is a dict[int, PositionAnalysis]
+                    for verdict_obj in verdicts.values():
+                        pos = next((p for p in positions if p.id == verdict_obj.position_id), None)
                         if pos:
-                            verdict = v.get("verdict", "?")
-                            summary = v.get("summary", "")
+                            verdict = verdict_obj.verdict or "?"
+                            summary = verdict_obj.summary or ""
                             line = f"- {pos.name}: {verdict}"
                             if summary:
                                 line += f" — {summary[:80]}"
