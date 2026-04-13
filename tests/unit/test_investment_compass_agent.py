@@ -145,11 +145,13 @@ class TestInvestmentCompassContextBuilding:
             skills_repo=None,
         )
 
-        result = await agent.analyze(user_query="Test query")
+        # Use a valid usecase query (ANALYSIS) — "Test query" would be UNKNOWN and rejected
+        result = await agent.analyze(user_query="Wie robust ist mein Portfolio?")
 
         # Should not crash and should return valid result
         assert result.response == "Test response"
         assert "portfolio_data" in result.lineage["agents_used"]
+        assert result.lineage["usecase"] == "ANALYSIS"
 
     @pytest.mark.asyncio
     async def test_lineage_includes_agents_used(self):
@@ -205,7 +207,7 @@ class TestInvestmentCompassContextBuilding:
             skills_repo=None,
         )
 
-        result = await agent.analyze(user_query="Test", skill_name="Buffett")
+        result = await agent.analyze(user_query="Wie robust ist das Portfolio?", skill_name="Buffett")
 
         assert "Buffett" in result.lineage["skills_used"]
 
@@ -234,7 +236,7 @@ class TestInvestmentCompassContextBuilding:
             skills_repo=None,
         )
 
-        await agent.analyze(user_query="My question?")
+        await agent.analyze(user_query="Soll ich mehr Tech-Positionen kaufen?")
 
         # Verify LLM was called
         mock_llm.chat.assert_called_once()
@@ -245,7 +247,7 @@ class TestInvestmentCompassContextBuilding:
         # Content should include portfolio data and query
         content = messages[0].content
         assert "Portfolio (aktuell)" in content  # Portfolio snapshot header
-        assert "My question?" in content  # User query
+        assert "Soll ich mehr Tech-Positionen kaufen?" in content  # User query
 
     @pytest.mark.asyncio
     async def test_empty_portfolio_analysis(self):
@@ -270,7 +272,7 @@ class TestInvestmentCompassContextBuilding:
             skills_repo=None,
         )
 
-        result = await agent.analyze(user_query="Empty portfolio query")
+        result = await agent.analyze(user_query="Wie sieht eine gute Allokation aus?")
 
         assert result.response == "No portfolio data"
         # Should still track portfolio_data as agent used
@@ -293,7 +295,7 @@ class TestInvestmentCompassContextBuilding:
         )
 
         skill_prompt = "Fokus: Value investing und Moats"
-        await agent.analyze(user_query="Query", skill_name="Buffett", skill_prompt=skill_prompt)
+        await agent.analyze(user_query="Welche Positionen sind unterbewertet?", skill_name="Buffett", skill_prompt=skill_prompt)
 
         # Verify skill prompt was included in the LLM call
         call_args = mock_llm.chat.call_args
