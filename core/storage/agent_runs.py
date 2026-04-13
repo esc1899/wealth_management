@@ -53,13 +53,13 @@ class AgentRunsRepository:
         return cursor.lastrowid
 
     def get_recent_runs(self, limit: int = 20) -> list[dict]:
-        """Get recent agent runs, ordered by created_at DESC."""
+        """Get recent agent runs, ordered by id DESC (most recent first)."""
         rows = self.conn.execute(
             """
             SELECT id, agent_name, model, skills_used, agent_deps, status,
                    started_at, finished_at, output_summary, context_summary, created_at
             FROM agent_runs
-            ORDER BY created_at DESC
+            ORDER BY id DESC
             LIMIT ?
             """,
             (limit,),
@@ -91,7 +91,7 @@ class AgentRunsRepository:
                    started_at, finished_at, output_summary, context_summary, created_at
             FROM agent_runs
             WHERE agent_name IN ({placeholders})
-            ORDER BY created_at DESC
+            ORDER BY id DESC
             LIMIT ?
             """,
             (*agent_names, limit),
@@ -122,7 +122,7 @@ class AgentRunsRepository:
                    started_at, finished_at, output_summary, context_summary, created_at
             FROM agent_runs
             WHERE agent_name = ?
-            ORDER BY created_at DESC
+            ORDER BY id DESC
             LIMIT 1
             """,
             (agent_name,),
