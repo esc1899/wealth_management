@@ -77,44 +77,47 @@ Portfolio Story als Kontext in Rebalancer injizieren → Rebalancing-Vorschläge
 
 ### Invest / Rebalance
 
-#### [P1] [BUG] Story Checker: Story wechselt bei Position-Neuauswahl nicht
-**Problem:** Wenn man die Position im Selectbox ändert und eine neue Session startet, zeigt die rechte Chat-Seite weiterhin die alte Session statt der neuen.
+#### [P1] [BUG] Story Checker: Story wechselt bei Position-Neuauswahl nicht ✅ BEHOBEN
+**Status:** Commited (68640b3)
 
-**Ursache:** Das `sc_session_id` wird nicht geleert, wenn die Position gewechselt wird. Die neue Session wird zwar erstellt, aber die alte bleibt im Session-State.
+**Problem:** Wenn man die Position im Selectbox ändert und eine neue Session startet, zeigte die rechte Chat-Seite weiterhin die alte Session.
 
-**Lösung:** Beim Positionswechsel (selectbox change) → `st.session_state.pop("sc_session_id", None)` aufrufen, bevor der neue Check läuft.
-
-**Files:** `pages/storychecker.py` (Zeilen 124-203)
+**Fix:** Vor dem Start einer neuen Session wird geprüft, ob sich die Position geändert hat. Falls ja, wird die alte session_id geleert.
 
 ---
 
-#### [P2] [FEAT] Fundamental Analyzer: Einzelpositions-Analyse (neu)
-**Anforderung:** Neuer Agent/Page "Fundamental Analyzer" für tiefere Fundamentalwert-Analyse von einzelnen Positionen.
+#### [P2] [FEAT] Fundamental Analyzer: Einzelpositions-Analyse ✅ IMPLEMENTIERT
+**Status:** Commited (737486d)
 
-**Scope:**
-- Sollte sowohl Portfolio-Positionen als auch Watchlist-Positionen analysieren können
-- Ähnliche Struktur wie Story Checker (selectbox + chat interface)
-- Analysiert: Kennzahlen (KGV, EPS, Dividendenrendite), Branchenposition, Wettbewerbsvorteil, Risiken
-- Optional: Integration mit Market Data Agent für aktuelle Daten
+**Components:**
+- `agents/fundamental_analyzer_agent.py`: Cloud-Agent mit Session-Management
+- `pages/fundamental_analyzer.py`: Interaktive Chat-Seite
+- Tests: 21 Unit-Tests (100% Coverage)
 
-**Template:** Story Checker kann als Basis dienen (Session-Management, Chat-History, Past Sessions).
+**Features:**
+- Tiefgehende Analyse von Portfolio- und Watchlist-Positionen
+- Multi-turn Chat für Follow-up-Fragen
+- Web-Search Integration für aktuelle Finanzdaten
+- Fokus: Geschäftsmodell, Bewertung, Wachstum, Risiken, Katalysatoren
+- Session-Management (in-Memory), Verdict-Persistierung
 
-**Kontext:** Feature-Request aus realer Nutzung — Nutzer möchte einzelne Positionen tiefergehend analysieren können.
+**Architecture:** Ähnlich StorycheckerAgent aber vereinfacht (keine separate DB Repo, nutzt PositionAnalysesRepository).
 
 ---
 
-#### [P2] [IMPR] Watchlist Checker: Aussagekräftige Details pro Position
-**Problem:** Die "📊 Kontext-Details" Expander zeigen nur technische Infos (Agent Run, vollständiger LLM-Text), keine aussagekräftigen Details pro Position.
+#### [P2] [IMPR] Watchlist Checker: Aussagekräftige Details pro Position ✅ VERBESSERT
+**Status:** Commited (6b8dcce)
 
-**Anforderung:** Detailansicht sollte zeigen:
-1. **Fit-Begründung:** Warum ist diese Position passend/nicht passend für das Portfolio?
-2. **Potential Risks:** Was könnte gegen diese Position sprechen?
-3. **Sektor/Region:** Wie diversifiziert die neue Position das Portfolio?
-4. **Preis-Kontext:** Kaufsignal? Zu hoch bewertet?
+**Changes:**
+- Per-Position Details-Expander mit:
+  - Story Checker Verdict (letzte Analyse)
+  - Fundamental Analysis Verdict (wenn vorhanden)
+- Verbesserte Kontext-Details:
+  - Portfolio Story Context (Verdict, Performance, Stabilität)
+  - Watchlist Summary (Verteilung nach Fit: sehr_passend/passend/neutral/nicht_passend)
+  - Vollständige LLM-Analyse am Ende
 
-**Lösung:** Nach Story Checker + Fundamental Analyzer Implementierung: Diese Agents als Kontext-Expander einbinden (z.B. "📊 Story Analysis", "📊 Fundamental Assessment").
-
-**Status:** Könnte auch daran liegen, dass Fundamental Analyzer noch nicht implementiert ist.
+**Fallback:** Zeigt "noch nicht analysiert" wenn Analysen nicht vorhanden sind.
 
 ---
 

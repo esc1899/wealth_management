@@ -315,6 +315,38 @@ for pos in service.filter_positions(criteria):
 
 ## Changelog (CLAUDE.md Prozess-Updates)
 
+### 2026-04-13 — Analyst Agent Expansion & UX Improvements (Session 2)
+
+**User Feedback Issues:**
+1. Story Checker Sessions würden nicht wechseln bei Position-Neuauswahl
+2. Fehlte Fundamental Analyzer für Einzelpositions-Analyse (Chat-basiert)
+3. Watchlist Checker Details waren zu technisch (nur Agent Metadata)
+
+**Completed:**
+- **Story Checker Bug** (68640b3): Position-Wechsel leert jetzt alte Session-ID → neue Chat-Session wird angezeigt
+- **Fundamental Analyzer** (737486d): 
+  - Neuer Cloud-Agent für tiefgehende Fundamentalwert-Analyse
+  - 100% Test-Coverage (21 Unit-Tests)
+  - In-Memory Sessions, Verdict-Persistierung
+  - Feature-Parity mit Story Checker aber für Fundamentalwerte
+- **Watchlist Checker UX** (6b8dcce):
+  - Per-Position Details-Expander (Story + Fundamental Verdicts)
+  - Verbesserte Kontext-Details (Portfolio Story Context, Fit-Summaries)
+  - Bessere visuelle Organisation
+
+**Architecture:**
+- FundamentalAnalyzerAgent: Vereinfacht vs. StorycheckerAgent (keine separate Repo)
+- Sessions in Streamlit session_state, nicht persistent (können später zu DB migrieren)
+- Nutzt PositionAnalysesRepository für Verdict-Tracking
+
+**Tests:** All 586 passing, Coverage 91.85%, FundamentalAnalyzer 100%
+
+**Commits:** 3 (Bug-Fix, Feature, UX-Impr)
+
+**Next:** Integration mit Navigation (Fundamental Analyzer in Sidebar), oder andere Features aus Backlog
+
+---
+
 ### 2026-04-13 — Investment Kompass Phase 2: Usecase-Specific Context
 
 - **Completed**: Phase 1 (Query Validation) + Phase 2 (Usecase-Specific Execution)
