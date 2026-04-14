@@ -101,7 +101,7 @@ if _is_local:
     ])
 
 _assistant_pages.append(
-    st.Page("pages/wealth_history.py",     title=t("nav.wealth_history", default="Vermögenshistorie"), icon=":material/show_chart:")
+    st.Page("pages/wealth_history.py",     title=t("nav.wealth_history"), icon=":material/show_chart:")
 )
 
 pg = st.navigation({
