@@ -79,10 +79,10 @@ def _verdict_badge(verdict: str) -> str:
 
 
 # ------------------------------------------------------------------
-# Load positions
+# Load positions (portfolio + watchlist)
 # ------------------------------------------------------------------
 
-_all_positions = _positions_repo.get_portfolio()
+_all_positions = _positions_repo.get_all()  # Include watchlist positions
 _eligible = [p for p in _all_positions if p.ticker]
 
 if not _eligible:

@@ -487,6 +487,12 @@ Stabilität: {story_analysis.stability_verdict}
 # Section 2: Display Results
 # ─────────────────────────────────────────────────────────────────────
 
+# If session_state is empty but a result exists in agent_runs, show hint
+if not st.session_state.get("_watchlist_check_result"):
+    latest_run = agent_runs_repo.get_latest_run("watchlist_checker")
+    if latest_run and latest_run.get("created_at"):
+        st.info(f"📌 Letzter Check: {latest_run['created_at']} — Seite neu laden um Ergebnis zu sehen")
+
 if st.session_state.get("_watchlist_check_result"):
     st.divider()
     st.subheader("2️⃣ Ergebnisse")

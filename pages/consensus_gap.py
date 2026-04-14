@@ -79,10 +79,10 @@ def _verdict_badge(verdict: str) -> str:
 
 
 # ------------------------------------------------------------------
-# Portfolio positions with stories
+# Portfolio + Watchlist positions with stories
 # ------------------------------------------------------------------
 
-_all_positions = _positions_repo.get_portfolio()
+_all_positions = _positions_repo.get_all()  # Include watchlist positions
 _eligible = [p for p in _all_positions if p.story]
 _all_ids = [p.id for p in _eligible if p.id]
 
