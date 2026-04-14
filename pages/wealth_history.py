@@ -73,7 +73,7 @@ if wealth_snapshots:
         margin=dict(l=50, r=50, t=20, b=50),
         xaxis_title=t("wealth_history.date_label"),
         yaxis_title=t("wealth_history.value_eur"),
-        template="plotly_light",
+        template="plotly_white",
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -105,7 +105,7 @@ if wealth_snapshots:
             margin=dict(l=50, r=50, t=20, b=50),
             xaxis_title=t("wealth_history.date_label"),
             yaxis_title=t("wealth_history.value_eur"),
-            template="plotly_light",
+            template="plotly_white",
         )
         st.plotly_chart(fig_breakdown, use_container_width=True)
 
@@ -154,7 +154,7 @@ if dividend_snapshots:
         margin=dict(l=50, r=50, t=20, b=50),
         xaxis_title=t("wealth_history.date_label"),
         yaxis_title=t("wealth_history.value_eur"),
-        template="plotly_light",
+        template="plotly_white",
         showlegend=False,
     )
     st.plotly_chart(fig_div, use_container_width=True)
@@ -185,7 +185,7 @@ if dividend_snapshots:
             margin=dict(l=50, r=50, t=20, b=50),
             xaxis_title=t("wealth_history.date_label"),
             yaxis_title=t("wealth_history.value_eur"),
-            template="plotly_light",
+            template="plotly_white",
             barmode="stack",
         )
         st.plotly_chart(fig_div_breakdown, use_container_width=True)
