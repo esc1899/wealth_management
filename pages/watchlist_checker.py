@@ -29,8 +29,7 @@ from state import (
 )
 from core.services.portfolio_comment_service import get_style_by_id
 from config import config
-from core.encryption import build_encryption_service
-from core.storage.base import get_connection, init_db, migrate_db
+from core.storage.base import get_connection, init_db, migrate_db, build_encryption_service
 from core.storage.positions import PositionsRepository
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.storychecker import StorycheckerRepository
