@@ -45,6 +45,18 @@ logger = logging.getLogger(__name__)
 
 
 # ------------------------------------------------------------------
+# Helper: Logging (write to job dict for UI visibility)
+# ------------------------------------------------------------------
+
+def _log_to_job(job: dict, msg: str) -> None:
+    """Add message to job logs for UI display."""
+    if "logs" not in job:
+        job["logs"] = []
+    job["logs"].append(msg)
+    logger.info(msg)  # Also log to stderr for CLI access
+
+
+# ------------------------------------------------------------------
 # Helper: Skill Resolution (Modul-Level)
 # ------------------------------------------------------------------
 
@@ -118,7 +130,7 @@ def _run_storychecker_consensus_job(
         jobs_repo = ScheduledJobsRepository(conn)
 
         watchlist_positions = [p for p in watchlist if p.id]
-        logger.info(f"SC+CG job: {len(watchlist_positions)} positions, agents: {agents_to_run}")
+        _log_to_job(job, f"SC+CG job: {len(watchlist_positions)} positions, agents: {agents_to_run}")
 
         # StorycheckerAgent
         if "storychecker" in agents_to_run:
@@ -134,14 +146,15 @@ def _run_storychecker_consensus_job(
                 skills_repo=skills_repo,
             )
             try:
-                logger.info(f"Running StorycheckerAgent with skill '{sc_skill_name}'")
+                _log_to_job(job, f"Running StorycheckerAgent with skill '{sc_skill_name}'")
                 results = loop.run_until_complete(sc_agent.batch_check_all(positions=watchlist_positions))
                 sc_count = sum(1 for _, err in results if err is None)
                 count += sc_count
-                logger.info(f"StorycheckerAgent: {sc_count}/{len(watchlist_positions)} analyses completed")
+                _log_to_job(job, f"StorycheckerAgent: {sc_count}/{len(watchlist_positions)} analyses completed")
             except Exception as exc:
                 logger.exception("StorycheckerAgent failed")
                 error_msg = f"StorycheckerAgent: {str(exc)}"
+                _log_to_job(job, f"❌ StorycheckerAgent failed: {error_msg}")
                 job["error"] = error_msg
 
         # ConsensusGapAgent
@@ -157,16 +170,17 @@ def _run_storychecker_consensus_job(
             cg_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET)
             cg_agent = ConsensusGapAgent(llm=cg_llm)
             try:
-                logger.info(f"Running ConsensusGapAgent with skill '{cg_skill_name}'")
+                _log_to_job(job, f"Running ConsensusGapAgent with skill '{cg_skill_name}'")
                 loop.run_until_complete(
                     cg_agent.analyze_portfolio(watchlist_positions, cg_skill_name, cg_skill_prompt, analyses_repo)
                 )
                 cg_count = len(watchlist_positions)
                 count += cg_count
-                logger.info(f"ConsensusGapAgent: {cg_count} analyses completed")
+                _log_to_job(job, f"ConsensusGapAgent: {cg_count} analyses completed")
             except Exception as exc:
                 logger.exception("ConsensusGapAgent failed")
                 error_msg = f"ConsensusGapAgent: {str(exc)}"
+                _log_to_job(job, f"❌ ConsensusGapAgent failed: {error_msg}")
                 job["error"] = error_msg
 
         job.update({"running": False, "done": True, "count": count, "error": error_msg})
@@ -221,8 +235,9 @@ def _run_fundamental_job(
         # Resolve skill
         fund_skill_name, fund_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "fundamental")
 
+        _log_to_job(job, f"Skill resolved: '{fund_skill_name}'")
         if not fund_skill_prompt:
-            logger.warning(f"No skill prompt found for 'fundamental', using empty")
+            _log_to_job(job, "⚠️ No skill prompt found, using empty")
 
         # Create agent with thread-safe repos (same as Scheduler does)
         fund_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET)
@@ -232,20 +247,25 @@ def _run_fundamental_job(
         positions = [p for p in watchlist if p.id]
 
         if not positions:
-            logger.warning("No positions with ID found in watchlist")
+            _log_to_job(job, "❌ Keine Positionen mit ID in Watchlist")
             error_msg = "Keine Positionen mit ID in Watchlist"
         else:
-            logger.info(f"Running FundamentalAgent on {len(positions)} positions")
-            results = loop.run_until_complete(
-                fund_agent.analyze_portfolio(
-                    positions=positions,
-                    skill_name=fund_skill_name,
-                    skill_prompt=fund_skill_prompt,
-                    analyses_repo=analyses_repo,
+            _log_to_job(job, f"Running FundamentalAgent on {len(positions)} positions")
+            try:
+                results = loop.run_until_complete(
+                    fund_agent.analyze_portfolio(
+                        positions=positions,
+                        skill_name=fund_skill_name,
+                        skill_prompt=fund_skill_prompt,
+                        analyses_repo=analyses_repo,
+                    )
                 )
-            )
-            count = len(results) if results else len(positions)
-            logger.info(f"FundamentalAgent completed: {count} analyzed")
+                count = len(results) if results else len(positions)
+                _log_to_job(job, f"✅ FundamentalAgent completed: {count} analyzed")
+            except Exception as exc:
+                error_msg = f"FundamentalAgent failed: {str(exc)}"
+                _log_to_job(job, f"❌ {error_msg}")
+                raise
 
         job.update({"running": False, "done": True, "count": count, "error": error_msg})
 
@@ -280,7 +300,7 @@ agent_runs_repo = get_agent_runs_repo()
 watchlist = positions_repo.get_watchlist()
 
 # Initialize background job state for two separate jobs
-_JOB_DEFAULTS = {"running": False, "done": False, "count": 0, "errors": 0, "error": None, "agents": []}
+_JOB_DEFAULTS = {"running": False, "done": False, "count": 0, "errors": 0, "error": None, "agents": [], "logs": []}
 
 if "_wc_agents_job" not in st.session_state:
     st.session_state["_wc_agents_job"] = dict(_JOB_DEFAULTS)
@@ -304,6 +324,12 @@ for _job, _label in [(_WC_JOB, "Story+Konsens"), (_WC_FUND_JOB, "Fundamental")]:
             st.error(f"❌ {_label}: {_job['error']}")
         else:
             st.success(f"✅ {_label}: {_job['count']} Analysen abgeschlossen.")
+
+        # Show logs if available
+        if _job.get("logs"):
+            with st.expander("📋 Logs"):
+                st.text("\n".join(_job.get("logs", [])))
+
         if st.button("Dismiss", key=f"dismiss_{_label}"):
             _job.update(dict(_JOB_DEFAULTS))
             st.rerun()
