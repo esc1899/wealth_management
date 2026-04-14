@@ -421,8 +421,8 @@ if not _WC_JOB["running"] and not _WC_FUND_JOB["running"]:
                 type="primary",
                 use_container_width=True,
             ):
-                # Only run if fundamental_analyzer has missing analyses
-                if any(s["n_missing"] > 0 and s["agent_name"] == "fundamental_analyzer" for s in _analyses_status):
+                # Only run if fundamental has missing analyses
+                if any(s["n_missing"] > 0 and s["agent_name"] == "fundamental" for s in _analyses_status):
                     _WC_FUND_JOB.update({**_JOB_DEFAULTS, "running": True, "agents": ["Fundamental Analyzer"]})
                     threading.Thread(
                         target=_run_fundamental_job,
