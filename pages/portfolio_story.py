@@ -151,6 +151,28 @@ st.subheader("2️⃣ Checks — Ausrichtung & Performance")
 if not current_story:
     st.warning("⚠️ Bitte definiere zuerst deine Portfolio Story oben.")
 else:
+    # Pre-check: Load portfolio once for pre-check before button
+    _portfolio_for_precheck = positions_repo.get_portfolio()
+
+    if _portfolio_for_precheck:
+        _pre_ids = [p.id for p in _portfolio_for_precheck if p.id]
+        _missing_pre = []
+        for agent_name, agent_label in [
+            ("storychecker", "Story Checker"),
+            ("fundamental", "Fundamental Analyzer"),
+            ("consensus_gap", "Konsens-Lücken"),
+        ]:
+            b = analyses_repo.get_latest_bulk(_pre_ids, agent_name)
+            n = sum(1 for pid in _pre_ids if pid not in b)
+            if n:
+                _missing_pre.append(f"{agent_label} ({n}/{len(_pre_ids)} ausstehend)")
+
+        if _missing_pre:
+            st.info(
+                "💡 Für bessere Story-Check-Ergebnisse zuerst folgende Analysen ausführen:\n"
+                + "\n".join(f"- {m}" for m in _missing_pre)
+            )
+
     col_check, col_history = st.columns([2, 1])
 
     with col_check:

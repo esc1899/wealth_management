@@ -452,6 +452,33 @@ Identified during code review (2026-04-12). Impacts on architecture, maintainabi
 
 ## Done
 
+#### [P2] [FEAT] Vermögenshistorie Automation + Dividenden-Zeitreihe ✅ IMPLEMENTIERT
+**Status:** Commited (Session 3, 2026-04-14)
+
+4 Tasks (geplant via Plan Mode):
+1. **Rebalancing-Ausschluss-Toggle entfernt** — Dead feature aus View-Dialog gelöscht (`pages/positionen.py`)
+2. **Auto-Snapshots nach Marktdaten-Fetch** — Callback-Pattern in `MarketDataAgent` (Circular Dependency gelöst)
+3. **Dividenden-Zeitreihe neu** — `DividendSnapshotRepository` + `take_dividend_snapshot()` in WealthSnapshotAgent
+4. **Vermögenshistorie-Page** — Plotly Charts (Scatter + Stacked Area für Wealth, Bar + Stacked Bar für Dividenden)
+
+**Components:**
+- `core/storage/dividend_snapshots.py`: Neue Repository (analog zu WealthSnapshot)
+- `core/storage/models.py`: `DividendSnapshot` Model (date, total_eur, breakdown, coverage_pct, is_manual, note)
+- `agents/wealth_snapshot_agent.py`: `take_dividend_snapshot()` + optional `dividend_repo` dependency
+- `agents/market_data_agent.py`: `set_post_fetch_callback()` + Hook in `fetch_all_now()` + `_scheduled_fetch()`
+- `pages/wealth_history.py`: Neue Seite (3 Sections: Wealth, Dividends, Raw Data Tables)
+- `app.py`: Vermögenshistorie zu Navigation hinzufügt (nicht `_is_local` gebunden)
+- `translations/de.yaml` + `en.yaml`: 18 neue i18n Keys
+- `pages/dashboard.py`: Duplikat Wealth-Timeline-Section entfernt (Zeilen 165-238)
+
+**Bugs fixed during implementation:**
+- i18n `t()` akzeptiert kein `default=` Parameter (19 Stellen in wealth_history.py)
+- Plotly template `plotly_light` ungültig → `plotly_white` (6 Stellen)
+- Duplikat Vermögenshistorie in dashboard.py + wealth_history.py
+
+**Tests:** 586/586 grün, Coverage 78.96%
+**Lernpunkt:** UI Integration Tests nötig — nach neuen Pages `streamlit run app.py` vor Commit (Checklist in CLAUDE.md)
+
 #### [P2] [FEAT] Storychecker: Alle Positionen auf einmal prüfen
 `batch_check_all()` async Methode im `StorycheckerAgent`: iteriert alle Positionen mit Story sequenziell, 15s Sleep zwischen Calls wegen Rate Limit. `start_session_async()` als async Pendant zu `start_session()`. Storychecker-Page: "Alle prüfen" Expander oben mit Background-Thread-Pattern (session_state), Skill-Auswahl, Auto-Refresh alle 5s, Fehler-Count in Erfolgsmeldung. Konsistent mit Fundamental- und Konsens-Lücken-Page.
 

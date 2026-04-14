@@ -137,6 +137,17 @@ class WatchlistCheckerAgent:
                 story_analysis_text,
             ])
 
+        # Bulk-fetch verdicts for all positions upfront (3 calls instead of N×3)
+        watchlist_ids = [pos.id for pos in watchlist_positions if pos.id]
+        bulk_verdicts = {}
+        if watchlist_ids:
+            for agent_name in ["storychecker", "fundamental", "consensus_gap"]:
+                results = self._analyses.get_latest_bulk(watchlist_ids, agent_name)
+                for pos_id, verdict_obj in results.items():
+                    if pos_id not in bulk_verdicts:
+                        bulk_verdicts[pos_id] = {}
+                    bulk_verdicts[pos_id][agent_name] = verdict_obj
+
         # Add watchlist positions with any existing verdicts
         context_parts.extend(["", "## Watchlist-Positionen"])
         for pos in watchlist_positions:
@@ -146,14 +157,12 @@ class WatchlistCheckerAgent:
             context_parts.append(pos_line)
 
             # Add any existing verdicts from other agents
-            if pos.id:
-                # Try to fetch verdicts from each known agent
-                for agent_to_check in ["storychecker", "fundamental", "consensus_gap"]:
-                    existing_verdict = self._analyses.get_latest(pos.id, agent_to_check)
-                    if existing_verdict:
-                        agent_name = existing_verdict.agent.capitalize()
-                        verdict = existing_verdict.verdict or "?"
-                        context_parts.append(f"  - {agent_name}: {verdict}")
+            if pos.id and pos.id in bulk_verdicts:
+                for agent_name, verdict_obj in bulk_verdicts[pos.id].items():
+                    if verdict_obj:
+                        agent_display = verdict_obj.agent.capitalize()
+                        verdict = verdict_obj.verdict or "?"
+                        context_parts.append(f"  - {agent_display}: {verdict}")
 
         context = "\n".join(context_parts)
 
