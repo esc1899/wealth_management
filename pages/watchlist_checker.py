@@ -101,6 +101,7 @@ def _run_storychecker_consensus_job(
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     count = 0
+    error_msg = None
 
     try:
         # Create fresh thread-local connection
@@ -117,6 +118,7 @@ def _run_storychecker_consensus_job(
         jobs_repo = ScheduledJobsRepository(conn)
 
         watchlist_positions = [p for p in watchlist if p.id]
+        logger.info(f"SC+CG job: {len(watchlist_positions)} positions, agents: {agents_to_run}")
 
         # StorycheckerAgent
         if "storychecker" in agents_to_run:
@@ -132,13 +134,15 @@ def _run_storychecker_consensus_job(
                 skills_repo=skills_repo,
             )
             try:
+                logger.info(f"Running StorycheckerAgent with skill '{sc_skill_name}'")
                 results = loop.run_until_complete(sc_agent.batch_check_all(positions=watchlist_positions))
                 sc_count = sum(1 for _, err in results if err is None)
                 count += sc_count
-                logger.info(f"StorycheckerAgent: {sc_count} analyses completed")
+                logger.info(f"StorycheckerAgent: {sc_count}/{len(watchlist_positions)} analyses completed")
             except Exception as exc:
                 logger.exception("StorycheckerAgent failed")
-                job["error"] = f"StorycheckerAgent: {str(exc)}"
+                error_msg = f"StorycheckerAgent: {str(exc)}"
+                job["error"] = error_msg
 
         # ConsensusGapAgent
         if "consensus_gap" in agents_to_run:
@@ -153,6 +157,7 @@ def _run_storychecker_consensus_job(
             cg_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET)
             cg_agent = ConsensusGapAgent(llm=cg_llm)
             try:
+                logger.info(f"Running ConsensusGapAgent with skill '{cg_skill_name}'")
                 loop.run_until_complete(
                     cg_agent.analyze_portfolio(watchlist_positions, cg_skill_name, cg_skill_prompt, analyses_repo)
                 )
@@ -161,13 +166,15 @@ def _run_storychecker_consensus_job(
                 logger.info(f"ConsensusGapAgent: {cg_count} analyses completed")
             except Exception as exc:
                 logger.exception("ConsensusGapAgent failed")
-                job["error"] = f"ConsensusGapAgent: {str(exc)}"
+                error_msg = f"ConsensusGapAgent: {str(exc)}"
+                job["error"] = error_msg
 
-        job.update({"running": False, "done": True, "count": count, "error": None})
+        job.update({"running": False, "done": True, "count": count, "error": error_msg})
 
     except Exception as exc:
+        error_msg = str(exc)
         logger.exception("Background SC+CG job failed")
-        job.update({"running": False, "done": True, "count": count, "error": str(exc)})
+        job.update({"running": False, "done": True, "count": count, "error": error_msg})
 
     finally:
         loop.close()
@@ -190,10 +197,13 @@ def _run_fundamental_job(
     Run Fundamental Agent in background (matches Scheduler pattern).
     Thread-local connection and repos.
     """
+    from core.storage.analyses import PositionAnalysesRepository
+
     conn = None
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     count = 0
+    error_msg = None
 
     try:
         # Create fresh thread-local connection
@@ -202,7 +212,6 @@ def _run_fundamental_job(
         migrate_db(conn)
 
         # Build repos with thread-safe connection
-        from core.storage.analyses import PositionAnalysesRepository
         enc = build_encryption_service(enc_key, "data/salt.bin")
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
@@ -212,14 +221,22 @@ def _run_fundamental_job(
         # Resolve skill
         fund_skill_name, fund_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "fundamental")
 
+        if not fund_skill_prompt:
+            logger.warning(f"No skill prompt found for 'fundamental', using empty")
+
         # Create agent with thread-safe repos (same as Scheduler does)
         fund_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET)
         fund_agent = FundamentalAgent(llm=fund_llm)
 
         job["agents"] = ["Fundamental"]
         positions = [p for p in watchlist if p.id]
-        if positions:
-            loop.run_until_complete(
+
+        if not positions:
+            logger.warning("No positions with ID found in watchlist")
+            error_msg = "Keine Positionen mit ID in Watchlist"
+        else:
+            logger.info(f"Running FundamentalAgent on {len(positions)} positions")
+            results = loop.run_until_complete(
                 fund_agent.analyze_portfolio(
                     positions=positions,
                     skill_name=fund_skill_name,
@@ -227,13 +244,15 @@ def _run_fundamental_job(
                     analyses_repo=analyses_repo,
                 )
             )
-            count = len(positions)
+            count = len(results) if results else len(positions)
+            logger.info(f"FundamentalAgent completed: {count} analyzed")
 
-        job.update({"running": False, "done": True, "count": count, "error": None})
+        job.update({"running": False, "done": True, "count": count, "error": error_msg})
 
     except Exception as exc:
+        error_msg = str(exc)
         logger.exception("Background Fundamental job failed")
-        job.update({"running": False, "done": True, "count": count, "error": str(exc)})
+        job.update({"running": False, "done": True, "count": count, "error": error_msg})
 
     finally:
         loop.close()
