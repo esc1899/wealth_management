@@ -36,7 +36,7 @@ from core.storage.storychecker import StorycheckerRepository
 from core.storage.scheduled_jobs import ScheduledJobsRepository
 from agents.storychecker_agent import StorycheckerAgent
 from agents.consensus_gap_agent import ConsensusGapAgent
-from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
+from agents.fundamental_agent import FundamentalAgent
 from core.llm.claude import ClaudeProvider
 from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET, AGENT_SKILL_DEFAULTS
 
@@ -176,7 +176,7 @@ def _run_storychecker_consensus_job(
 
 
 # ------------------------------------------------------------------
-# Background Job 2: FundamentalAnalyzerAgent
+# Background Job 2: FundamentalAgent
 # ------------------------------------------------------------------
 
 def _run_fundamental_job(
@@ -187,7 +187,7 @@ def _run_fundamental_job(
     api_key: str,
 ) -> None:
     """
-    Run Fundamental Analyzer agent in background.
+    Run Fundamental Agent in background (matches Scheduler pattern).
     Thread-local connection and repos.
     """
     conn = None
@@ -202,6 +202,7 @@ def _run_fundamental_job(
         migrate_db(conn)
 
         # Build repos with thread-safe connection
+        from core.storage.analyses import PositionAnalysesRepository
         enc = build_encryption_service(enc_key, "data/salt.bin")
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
@@ -209,35 +210,29 @@ def _run_fundamental_job(
         jobs_repo = ScheduledJobsRepository(conn)
 
         # Resolve skill
-        fund_skill_name, fund_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "fundamental_analyzer")
+        fund_skill_name, fund_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "fundamental")
 
-        # Create agent with thread-safe repos
+        # Create agent with thread-safe repos (same as Scheduler does)
         fund_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET)
-        fund_llm.skill_context = fund_skill_name
-        fund_agent = FundamentalAnalyzerAgent(
-            positions_repo=positions_repo,
-            analyses_repo=analyses_repo,
-            llm=fund_llm,
-            skills_repo=skills_repo,
-        )
+        fund_agent = FundamentalAgent(llm=fund_llm)
 
-        job["agents"] = ["Fundamental Analyzer"]
-        eligible = [p for p in watchlist if p.id]
-        for i, pos in enumerate(eligible):
-            try:
-                fund_agent.start_session(pos)
-                count += 1
-            except Exception as exc:
-                logger.warning(f"FundamentalAnalyzer failed for {pos.name}: {exc}")
-                job["error"] = f"{pos.name}: {exc}"
-            # Rate limit between positions
-            if i < len(eligible) - 1:
-                time.sleep(8)
+        job["agents"] = ["Fundamental"]
+        positions = [p for p in watchlist if p.id]
+        if positions:
+            loop.run_until_complete(
+                fund_agent.analyze_portfolio(
+                    positions=positions,
+                    skill_name=fund_skill_name,
+                    skill_prompt=fund_skill_prompt,
+                    analyses_repo=analyses_repo,
+                )
+            )
+            count = len(positions)
 
         job.update({"running": False, "done": True, "count": count, "error": None})
 
     except Exception as exc:
-        logger.exception("Background FA job failed")
+        logger.exception("Background Fundamental job failed")
         job.update({"running": False, "done": True, "count": count, "error": str(exc)})
 
     finally:

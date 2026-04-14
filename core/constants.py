@@ -30,7 +30,7 @@ CLAUDE_MODELS_DEFAULT_LIST = f"{CLAUDE_HAIKU},{CLAUDE_SONNET},{CLAUDE_OPUS}"
 # Default skills for background agents when no scheduled job is defined
 AGENT_SKILL_DEFAULTS = {
     "storychecker": "Standard",
-    "fundamental_analyzer": "Standard",
+    "fundamental": "Standard",
     "consensus_gap": "Standard",
     "structural_scan": "Standard",
     "news": "Standard",
