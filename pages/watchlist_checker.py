@@ -354,7 +354,7 @@ if not _WC_JOB["running"] and not _WC_FUND_JOB["running"]:
 
     for agent_name, agent_label, page_path in [
         ("storychecker", "Story Checker", "pages/storychecker.py"),
-        ("fundamental_analyzer", "Fundamental Analyzer", "pages/fundamental.py"),
+        ("fundamental", "Fundamental Analyzer", "pages/fundamental.py"),
         ("consensus_gap", "Konsens-Lücken", "pages/consensus_gap.py"),
     ]:
         bulk = analyses_repo.get_latest_bulk(watchlist_ids, agent_name)
