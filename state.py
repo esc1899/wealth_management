@@ -31,6 +31,7 @@ from core.storage.portfolio_story import PortfolioStoryRepository
 from core.storage.storychecker import StorycheckerRepository
 from core.storage.structural_scans import StructuralScansRepository
 from core.storage.wealth_snapshots import WealthSnapshotRepository
+from core.storage.dividend_snapshots import DividendSnapshotRepository
 from core.asset_class_config import get_asset_class_registry, AssetClassRegistry
 from core.llm.claude import ClaudeProvider
 from core.llm.local import OllamaProvider
@@ -107,6 +108,27 @@ def get_portfolio_agent() -> PortfolioAgent:
     )
 
 
+def _safe_take_snapshot() -> None:
+    """Helper: take wealth and dividend snapshots after market fetch, fail silently on errors."""
+    agent = get_wealth_snapshot_agent()
+
+    # Take wealth snapshot
+    try:
+        agent.take_snapshot(is_manual=False, overwrite=False)
+    except ValueError:
+        pass  # Snapshot for today already exists — ok
+    except Exception as e:
+        logger.warning("Auto wealth snapshot failed: %s", e)
+
+    # Take dividend snapshot
+    try:
+        agent.take_dividend_snapshot(is_manual=False, overwrite=False)
+    except ValueError:
+        pass  # Snapshot for today already exists — ok
+    except Exception as e:
+        logger.warning("Auto dividend snapshot failed: %s", e)
+
+
 @st.cache_resource
 def get_market_agent() -> MarketDataAgent:
     fetcher = MarketDataFetcher(
@@ -121,6 +143,10 @@ def get_market_agent() -> MarketDataAgent:
     )
     scheduler = agent.setup_scheduler(fetch_hour=config.MARKET_DATA_FETCH_HOUR)
     scheduler.start()
+
+    # Register post-fetch callback for automatic wealth snapshots
+    agent.set_post_fetch_callback(lambda: _safe_take_snapshot())
+
     return agent
 
 
@@ -333,6 +359,11 @@ def get_agent_scheduler() -> AgentSchedulerService:
 
 
 @st.cache_resource
+def get_dividend_snapshot_repo() -> DividendSnapshotRepository:
+    return DividendSnapshotRepository(get_db_connection())
+
+
+@st.cache_resource
 def get_wealth_snapshot_repo() -> WealthSnapshotRepository:
     return WealthSnapshotRepository(get_db_connection())
 
@@ -344,6 +375,7 @@ def get_wealth_snapshot_agent() -> WealthSnapshotAgent:
         market_repo=get_market_repo(),
         wealth_repo=get_wealth_snapshot_repo(),
         market_data_agent=get_market_agent(),
+        dividend_repo=get_dividend_snapshot_repo(),
     )
 
 

@@ -17,7 +17,8 @@ from typing import Optional, Dict, List
 from core.storage.market_data import MarketDataRepository
 from core.storage.positions import PositionsRepository
 from core.storage.wealth_snapshots import WealthSnapshotRepository
-from core.storage.models import WealthSnapshot, Position
+from core.storage.dividend_snapshots import DividendSnapshotRepository
+from core.storage.models import WealthSnapshot, DividendSnapshot, Position
 from agents.market_data_agent import MarketDataAgent
 from core.asset_class_config import get_asset_class_registry
 
@@ -44,11 +45,13 @@ class WealthSnapshotAgent:
         market_repo: MarketDataRepository,
         wealth_repo: WealthSnapshotRepository,
         market_data_agent: MarketDataAgent,
+        dividend_repo: Optional[DividendSnapshotRepository] = None,
     ):
         self._positions = positions_repo
         self._market = market_repo
         self._wealth = wealth_repo
         self._market_data_agent = market_data_agent
+        self._dividend = dividend_repo
 
     # ------------------------------------------------------------------
     # Snapshot-Logik
@@ -293,6 +296,73 @@ class WealthSnapshotAgent:
         if existing is None:
             raise ValueError(f"No snapshot for {date_str}")
         self._wealth.delete(existing.id)
+
+    def take_dividend_snapshot(
+        self,
+        date_str: Optional[str] = None,
+        is_manual: bool = False,
+        note: Optional[str] = None,
+        overwrite: bool = False,
+    ) -> DividendSnapshot:
+        """
+        Take a snapshot of total annual dividend income (portfolio-wide, per asset class).
+
+        Args:
+            date_str: Date in YYYY-MM-DD format (default: today)
+            is_manual: True if created by user/agent chat, not scheduled
+            note: Optional comment
+            overwrite: If True, delete existing snapshot for this date before creating new one
+
+        Returns:
+            Persisted DividendSnapshot
+
+        Raises:
+            ValueError: If dividend_repo not initialized, or snapshot exists and overwrite=False
+        """
+        if self._dividend is None:
+            raise ValueError("Dividend snapshot repository not initialized")
+
+        if date_str is None:
+            date_str = date.today().isoformat()
+
+        # Check if snapshot already exists
+        existing = self._dividend.get_by_date(date_str)
+        if existing is not None:
+            if not overwrite:
+                raise ValueError(f"Dividend snapshot for {date_str} already exists")
+            # Delete old snapshot before creating new one
+            self._dividend.delete(existing.id)
+
+        # Get portfolio valuation to extract dividend data
+        valuations = self._market_data_agent.get_portfolio_valuation(include_watchlist=False)
+
+        # Initialize breakdown with all asset classes (0.0 as default)
+        registry = get_asset_class_registry()
+        breakdown: Dict[str, float] = {ac: 0.0 for ac in registry.all_names()}
+
+        total = 0.0
+
+        for val in valuations:
+            if val.annual_dividend_eur is not None and val.annual_dividend_eur > 0:
+                total += val.annual_dividend_eur
+                asset_class = val.asset_class
+                breakdown[asset_class] = breakdown.get(asset_class, 0) + val.annual_dividend_eur
+
+        # For dividend snapshots, coverage is typically 100% (0 annual dividend is valid/expected)
+        coverage_pct = 100.0
+
+        # Create snapshot
+        snapshot = self._dividend.create(
+            date_str=date_str,
+            total_eur=total,
+            breakdown=breakdown,
+            coverage_pct=coverage_pct,
+            missing_pos=None,
+            is_manual=is_manual,
+            note=note,
+        )
+
+        return snapshot
 
     # ------------------------------------------------------------------
     # List and access

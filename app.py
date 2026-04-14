@@ -100,6 +100,10 @@ if _is_local:
         st.Page("pages/watchlist_checker.py", title="Watchlist Checker",         icon=":material/check_circle:"),
     ])
 
+_assistant_pages.append(
+    st.Page("pages/wealth_history.py",     title=t("nav.wealth_history", default="Vermögenshistorie"), icon=":material/show_chart:")
+)
+
 pg = st.navigation({
     t("nav.group_portfolio"): [
         st.Page("pages/dashboard.py",      title=t("nav.dashboard"),   icon=":material/dashboard:"),

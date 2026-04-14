@@ -482,6 +482,20 @@ class WealthSnapshot(BaseModel):
     created_at: datetime
 
 
+class DividendSnapshot(BaseModel):
+    """A historical snapshot of annual dividend income (portfolio-wide, per asset class)."""
+
+    id: Optional[int] = None
+    date: str                       # YYYY-MM-DD
+    total_eur: float                # Total annual dividend income in EUR
+    breakdown: Dict[str, float]     # {"Aktie": 3200.0, "Anleihe": 800.0, ...}
+    coverage_pct: float             # % of positions with dividend data (default 100%)
+    missing_pos: Optional[List[str]] = None  # positions without dividend data
+    is_manual: bool = False         # True = manually created or corrected
+    note: Optional[str] = None      # optional comment
+    created_at: datetime
+
+
 # ---------------------------------------------------------------------------
 # Portfolio Story models
 # ---------------------------------------------------------------------------

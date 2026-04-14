@@ -8,7 +8,7 @@ import logging
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Callable
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -73,6 +73,11 @@ class MarketDataAgent:
         self._fetcher = fetcher
         self._db_path = db_path
         self._encryption_key = encryption_key
+        self._post_fetch_callback: Optional[Callable[[], None]] = None
+
+    def set_post_fetch_callback(self, callback: Callable[[], None]) -> None:
+        """Register an optional callback to be invoked after fetch_all_now() completes."""
+        self._post_fetch_callback = callback
 
     # ------------------------------------------------------------------
     # On-demand fetch
@@ -108,6 +113,13 @@ class MarketDataAgent:
                 for h in history:
                     self._market.upsert_historical(h)
                 result.history_fetched += len(history)
+
+        # Invoke post-fetch callback if registered (e.g., automatic wealth snapshot)
+        if self._post_fetch_callback:
+            try:
+                self._post_fetch_callback()
+            except Exception:
+                logger.warning("Post-fetch callback failed", exc_info=True)
 
         return result
 
@@ -367,4 +379,21 @@ class MarketDataAgent:
             encryption_key=self._encryption_key,
         )
         agent.fetch_all_now(fetch_history=True)
+
+        # Automatically take wealth and dividend snapshots after scheduled fetch
+        try:
+            from core.storage.wealth_snapshots import WealthSnapshotRepository
+            from core.storage.dividend_snapshots import DividendSnapshotRepository
+            from agents.wealth_snapshot_agent import WealthSnapshotAgent
+
+            snap_repo = WealthSnapshotRepository(conn)
+            div_repo = DividendSnapshotRepository(conn)
+            snap_agent = WealthSnapshotAgent(positions_repo, market_repo, snap_repo, agent, div_repo)
+            snap_agent.take_snapshot(is_manual=False, overwrite=False)
+            snap_agent.take_dividend_snapshot(is_manual=False, overwrite=False)
+        except ValueError:
+            pass  # Snapshot for today already exists — ok
+        except Exception:
+            logger.warning("Post-fetch snapshot failed", exc_info=True)
+
         conn.close()

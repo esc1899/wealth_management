@@ -251,19 +251,6 @@ def _show_detail(pos_id: int):
             st.toast(t("positionen.value_updated"), icon="✅")
             st.rerun()
 
-    # ── Rebalance exclusion toggle ───────────────────────────────────────────
-    if pos.in_portfolio:
-        st.divider()
-        new_excluded = st.toggle(
-            t("positionen.rebalance_excluded_label"),
-            value=pos.rebalance_excluded,
-            help=t("positionen.rebalance_excluded_help"),
-            key=f"_detail_rebalance_excl_{pos_id}",
-        )
-        if new_excluded != pos.rebalance_excluded:
-            repo.update(pos.model_copy(update={"rebalance_excluded": new_excluded}))
-            st.rerun()
-
     st.divider()
     if st.button(t("positionen.close_button"), use_container_width=True):
         _clear_detail()
