@@ -80,6 +80,22 @@ Motto: **try to improve the whole**
 - Bug gefunden → erst **Failing Test schreiben**, dann fixen
 - Integration Tests nutzen echtes SQLite `:memory:`, kein Mocking von Repos
 
+## UI Integration Tests (kritisch für Pages & Navigation)
+**Lernpunkt (2026-04-14):** 3 Fehler hintereinander in wealth_history.py (i18n default-param, plotly template, duplikat) weil ich nur Unit-Tests lief, nicht die App.
+
+**Regel:** Nach jeder neuen Page oder großen UI-Änderung:
+1. `streamlit run app.py` starten
+2. Zur neuen/geänderten Seite navigieren
+3. Verifizieren: Charts rendern, Buttons funktionieren, keine Exceptions
+4. **Erst dann** committen
+
+**Checkpoints für neue Pages:**
+- [ ] Page startet ohne Fehler
+- [ ] Alle `t()` Calls funktionieren (keine `default=` Parameter!)
+- [ ] Charts/Plotly: nur gültige Template-Namen (`plotly_white`, `plotly`, nicht `plotly_light`)
+- [ ] Keine Duplikate in Navigation oder anderen Pages
+- [ ] `pytest tests/` noch grün
+
 ## Test Coverage — Standards & Ziele
 
 **Wichtig:** Coverage misst nur "wieviel Code wurde ausgeführt", nicht "sind Tests gut". Eine gute Coverage sagt nicht automatisch: keine Bugs, sondern: meiste Fehler-Szenarien werden gefunden.
@@ -314,6 +330,31 @@ for pos in service.filter_positions(criteria):
 ---
 
 ## Changelog (CLAUDE.md Prozess-Updates)
+
+### 2026-04-14 — UI Integration Tests Rule + Vermögenshistorie Automation (Session 3)
+
+**Lernpunkt:** 3 UI-Fehler hintereinander in `wealth_history.py` weil Unit-Tests liefen (grün), aber App nicht gestartet wurde
+- i18n: `t()` akzeptiert kein `default=` Parameter
+- Plotly: `plotly_light` ist kein gültiger Template-Name
+- Duplikat: Vermögenshistorie war sowohl im Dashboard als auch in Navigation
+
+**Neue Regel — "UI Integration Tests (kritisch für Pages & Navigation)":**
+- Nach jeder neuen Page/großen UI-Änderung: `streamlit run app.py` starten
+- Zur neuen Seite navigieren → Charts/Buttons funktionieren, keine Exceptions
+- Checkpoints: `t()` Calls, Plotly Templates, keine Duplikate, `pytest` grün
+- **Erst dann** committen
+
+**Completed:**
+1. Rebalancing-Toggle aus Positions-Dialog entfernt
+2. Auto-Snapshots nach Marktdaten-Fetch (Callback-Pattern in MarketDataAgent)
+3. Dividenden-Zeitreihe neu (DividendSnapshotRepository + take_dividend_snapshot)
+4. Vermögenshistorie-Page (mit Plotly Charts, i18n)
+5. Entfernt Duplikat aus Dashboard
+
+**Tests**: 586/586 grün, Coverage 78.96%
+**Commits**: 5 (3 Fixes after errors, rest clean)
+
+---
 
 ### 2026-04-13 — Analyst Agent Expansion & UX Improvements (Session 2)
 
