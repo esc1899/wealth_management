@@ -156,22 +156,50 @@ else:
 
     if _portfolio_for_precheck:
         _pre_ids = [p.id for p in _portfolio_for_precheck if p.id]
-        _missing_pre = []
-        for agent_name, agent_label in [
-            ("storychecker", "Story Checker"),
-            ("fundamental", "Fundamental Analyzer"),
-            ("consensus_gap", "Konsens-Lücken"),
+        _pre_status = []
+
+        for agent_name, agent_label, page_path in [
+            ("storychecker", "Story Checker", "pages/storychecker.py"),
+            ("fundamental", "Fundamental Analyzer", "pages/fundamental.py"),
+            ("consensus_gap", "Konsens-Lücken", "pages/consensus_gap.py"),
         ]:
             b = analyses_repo.get_latest_bulk(_pre_ids, agent_name)
             n = sum(1 for pid in _pre_ids if pid not in b)
-            if n:
-                _missing_pre.append(f"{agent_label} ({n}/{len(_pre_ids)} ausstehend)")
 
-        if _missing_pre:
+            # Get timestamp of latest analysis
+            latest_ts = None
+            for verdict_obj in b.values():
+                if verdict_obj and hasattr(verdict_obj, 'created_at') and verdict_obj.created_at:
+                    if latest_ts is None or verdict_obj.created_at > latest_ts:
+                        latest_ts = verdict_obj.created_at
+
+            ts_str = f" (zuletzt: {latest_ts.strftime('%d.%m. %H:%M')})" if latest_ts else " (noch nicht gelaufen)"
+
+            _pre_status.append({
+                "label": agent_label,
+                "page": page_path,
+                "n_missing": n,
+                "total": len(_pre_ids),
+                "timestamp": ts_str,
+                "agent_name": agent_name,
+            })
+
+        _has_missing_pre = any(s["n_missing"] > 0 for s in _pre_status)
+        if _has_missing_pre:
             st.info(
-                "💡 Für bessere Story-Check-Ergebnisse zuerst folgende Analysen ausführen:\n"
-                + "\n".join(f"- {m}" for m in _missing_pre)
+                "💡 Für bessere Story-Check-Ergebnisse folgende Analysen ausführen:\n"
+                + "\n".join(
+                    f"- {s['label']} ({s['n_missing']}/{s['total']} ausstehend){s['timestamp']}"
+                    for s in _pre_status if s["n_missing"] > 0
+                )
             )
+
+            # Buttons to run missing analyses
+            col_buttons_pre = st.columns(len([s for s in _pre_status if s["n_missing"] > 0]))
+            for idx, s in enumerate([s for s in _pre_status if s["n_missing"] > 0]):
+                with col_buttons_pre[idx]:
+                    if st.button(f"→ {s['label']}", key=f"_nav_pre_{s['agent_name']}", use_container_width=True):
+                        st.switch_page(s["page"])
 
     col_check, col_history = st.columns([2, 1])
 

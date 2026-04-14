@@ -47,22 +47,51 @@ st.caption(f"**{len(watchlist)} Positionen** auf der Watchlist")
 
 # Pre-check: Which agents haven't analyzed watchlist positions yet?
 watchlist_ids = [pos.id for pos in watchlist if pos.id]
-_missing_analyses = []
-for agent_name, agent_label in [
-    ("storychecker", "Story Checker"),
-    ("fundamental", "Fundamental Analyzer"),
-    ("consensus_gap", "Konsens-Lücken"),
+_analyses_status = []
+
+for agent_name, agent_label, page_path in [
+    ("storychecker", "Story Checker", "pages/storychecker.py"),
+    ("fundamental", "Fundamental Analyzer", "pages/fundamental.py"),
+    ("consensus_gap", "Konsens-Lücken", "pages/consensus_gap.py"),
 ]:
     bulk = analyses_repo.get_latest_bulk(watchlist_ids, agent_name)
     n_missing = sum(1 for pid in watchlist_ids if pid not in bulk)
-    if n_missing:
-        _missing_analyses.append(f"{agent_label} ({n_missing}/{len(watchlist_ids)} ausstehend)")
 
-if _missing_analyses:
+    # Get timestamp of latest analysis across all watchlist positions
+    latest_ts = None
+    for verdict_obj in bulk.values():
+        if verdict_obj and hasattr(verdict_obj, 'created_at') and verdict_obj.created_at:
+            if latest_ts is None or verdict_obj.created_at > latest_ts:
+                latest_ts = verdict_obj.created_at
+
+    ts_str = f" (zuletzt: {latest_ts.strftime('%d.%m. %H:%M')})" if latest_ts else " (noch nicht gelaufen)"
+
+    _analyses_status.append({
+        "label": agent_label,
+        "page": page_path,
+        "n_missing": n_missing,
+        "total": len(watchlist_ids),
+        "timestamp": ts_str,
+        "agent_name": agent_name,
+    })
+
+# Show info box + action buttons if any missing
+_has_missing = any(s["n_missing"] > 0 for s in _analyses_status)
+if _has_missing:
     st.info(
-        "💡 Für bessere Ergebnisse zuerst folgende Analysen ausführen:\n"
-        + "\n".join(f"- {m}" for m in _missing_analyses)
+        "💡 Für bessere Ergebnisse folgende Analysen ausführen:\n"
+        + "\n".join(
+            f"- {s['label']} ({s['n_missing']}/{s['total']} ausstehend){s['timestamp']}"
+            for s in _analyses_status if s["n_missing"] > 0
+        )
     )
+
+    # Buttons to run missing analyses
+    col_buttons = st.columns(len([s for s in _analyses_status if s["n_missing"] > 0]))
+    for idx, s in enumerate([s for s in _analyses_status if s["n_missing"] > 0]):
+        with col_buttons[idx]:
+            if st.button(f"→ {s['label']}", key=f"_nav_{s['agent_name']}", use_container_width=True):
+                st.switch_page(s["page"])
 
 if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
     with st.spinner("Watchlist wird geprüft..."):
