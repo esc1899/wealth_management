@@ -331,6 +331,11 @@ for _job, _label in [(_WC_JOB, "Story+Konsens"), (_WC_FUND_JOB, "Fundamental")]:
                 st.text("\n".join(_job.get("logs", [])))
 
         if st.button("Dismiss", key=f"dismiss_{_label}"):
+            # Clear repo caches so next render gets fresh data from DB
+            try:
+                get_analyses_repo.clear()
+            except Exception:
+                pass
             _job.update(dict(_JOB_DEFAULTS))
             st.rerun()
         st.divider()
