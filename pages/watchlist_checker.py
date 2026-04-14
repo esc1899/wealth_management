@@ -3,6 +3,8 @@ Watchlist Checker — evaluates which watchlist positions fit into the portfolio
 """
 
 import asyncio
+import threading
+import time
 import streamlit as st
 from datetime import datetime
 
@@ -16,9 +18,52 @@ from state import (
     get_portfolio_comment_service,
     get_app_config_repo,
     get_analyses_repo,
+    get_storychecker_agent,
+    get_fundamental_analyzer_agent,
+    get_consensus_gap_agent,
 )
 from core.services.portfolio_comment_service import get_style_by_id
 from agents.rebalance_agent import compute_josef_allocation
+
+
+# ------------------------------------------------------------------
+# Background Agent Runner
+# ------------------------------------------------------------------
+
+def _run_agents_for_watchlist(watchlist_positions, agents_to_run, job, sc_agent, fund_agent, cg_agent, analyses_repo_inst):
+    """Run missing agents for watchlist positions in background thread."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    count = 0
+    try:
+        # StorycheckerAgent: batch check
+        if "storychecker" in agents_to_run:
+            results = loop.run_until_complete(sc_agent.batch_check_all(positions=watchlist_positions))
+            count += sum(1 for _, err in results if err is None)
+
+        # FundamentalAnalyzerAgent: loop over positions
+        if "fundamental" in agents_to_run:
+            for pos in watchlist_positions:
+                if pos.id:
+                    try:
+                        fund_agent.start_session(pos)
+                        count += 1
+                    except Exception:
+                        job["errors"] = job.get("errors", 0) + 1
+
+        # ConsensusGapAgent: batch analyze
+        if "consensus_gap" in agents_to_run:
+            results = loop.run_until_complete(
+                cg_agent.analyze_portfolio(watchlist_positions, "", "", analyses_repo_inst)
+            )
+            count += len(results)
+
+        job.update({"running": False, "done": True, "count": count, "error": None})
+    except Exception as exc:
+        job.update({"running": False, "done": True, "count": count, "error": str(exc)})
+    finally:
+        loop.close()
+
 
 # ─────────────────────────────────────────────────────────────────────
 
@@ -38,6 +83,35 @@ agent = get_watchlist_checker_agent()
 agent_runs_repo = get_agent_runs_repo()
 
 watchlist = positions_repo.get_watchlist()
+
+# Initialize background job state for agent runs
+if "_wc_agents_job" not in st.session_state:
+    st.session_state["_wc_agents_job"] = {
+        "running": False, "done": False,
+        "count": 0, "errors": 0, "error": None,
+        "agents": [],
+    }
+_WC_JOB = st.session_state["_wc_agents_job"]
+
+# Polling: Show progress while agents are running
+if _WC_JOB["running"]:
+    agents_running = ", ".join(_WC_JOB.get("agents", []))
+    st.info(f"⏳ Analysen laufen im Hintergrund: {agents_running}...", icon=":material/hourglass_top:")
+    time.sleep(5)
+    st.rerun()
+
+# Show result when done
+if _WC_JOB["done"]:
+    if _WC_JOB["error"]:
+        st.error(f"❌ Fehler bei Analyse: {_WC_JOB['error']}")
+    else:
+        st.success(f"✅ {_WC_JOB['count']} Analysen abgeschlossen.")
+    if st.button("✕ Schließen", key="_wc_job_dismiss"):
+        st.session_state["_wc_agents_job"] = {
+            "running": False, "done": False, "count": 0, "errors": 0, "error": None, "agents": []
+        }
+        st.rerun()
+    st.divider()
 
 if not watchlist:
     st.info("📭 Keine Watchlist-Positionen vorhanden. Starten Sie mit dem Portfolio Chat um Watchlist-Einträge hinzuzufügen.")
@@ -86,12 +160,33 @@ if _has_missing:
         )
     )
 
-    # Buttons to run missing analyses
-    col_buttons = st.columns(len([s for s in _analyses_status if s["n_missing"] > 0]))
-    for idx, s in enumerate([s for s in _analyses_status if s["n_missing"] > 0]):
-        with col_buttons[idx]:
-            if st.button(f"→ {s['label']}", key=f"_nav_{s['agent_name']}", use_container_width=True):
-                st.switch_page(s["page"])
+    # Button to start missing analyses in background
+    _agents_to_run = [s["agent_name"] for s in _analyses_status if s["n_missing"] > 0]
+    n_agents = len(_agents_to_run)
+    agent_labels = ", ".join(s["label"] for s in _analyses_status if s["n_missing"] > 0)
+
+    col_btn, col_spacer = st.columns([2, 3])
+    with col_btn:
+        if st.button(
+            f"▶️ {n_agents} Analyse{'n' if n_agents > 1 else ''} im Hintergrund starten",
+            key="_wc_start_agents",
+            disabled=_WC_JOB["running"],
+            type="primary",
+            use_container_width=True,
+        ):
+            _WC_JOB["running"] = True
+            _WC_JOB["done"] = False
+            _WC_JOB["error"] = None
+            _WC_JOB["count"] = 0
+            _WC_JOB["agents"] = [s["label"] for s in _analyses_status if s["n_missing"] > 0]
+            threading.Thread(
+                target=_run_agents_for_watchlist,
+                args=(watchlist, _agents_to_run, _WC_JOB,
+                      get_storychecker_agent(), get_fundamental_analyzer_agent(),
+                      get_consensus_gap_agent(), analyses_repo),
+                daemon=True,
+            ).start()
+            st.rerun()
 
 if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
     with st.spinner("Watchlist wird geprüft..."):
