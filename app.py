@@ -98,7 +98,6 @@ _assistant_pages = [
 if _is_local:
     _assistant_pages.extend([
         st.Page("pages/watchlist_checker.py", title="Watchlist Checker",         icon=":material/check_circle:"),
-        st.Page("pages/investment_compass.py",title="Investment Kompass",         icon=":material/explore:"),
     ])
 
 _assistant_pages.append(
