@@ -158,20 +158,19 @@ class FundamentalAnalyzerAgent:
 
         session.add_message("assistant", response)
 
-        # Save verdict for tracking
+        # Save verdict for tracking (always, since _extract_verdict defaults to 'unbekannt')
         verdict = _extract_verdict(response)
         summary = _extract_summary(response)
-        if verdict:
-            self._analyses.save(
-                position_id=position.id,
-                agent="fundamental_analyzer",
-                skill_name=skill_name,
-                verdict=verdict,
-                summary=summary,
-                session_id=session_id,
-            )
-            session.verdict = verdict
-            session.summary = summary
+        self._analyses.save(
+            position_id=position.id,
+            agent="fundamental_analyzer",
+            skill_name=skill_name,
+            verdict=verdict,
+            summary=summary,
+            session_id=session_id,
+        )
+        session.verdict = verdict
+        session.summary = summary
 
         self._sessions[session_id] = session
         return session
@@ -281,12 +280,12 @@ def _build_initial_message(position: Position, skill_name: Optional[str], skill_
 
 
 def _extract_verdict(response: str) -> Optional[str]:
-    """Extract verdict from LLM response."""
+    """Extract verdict from LLM response. Defaults to 'unbekannt' if no verdict found."""
     response_lower = response.lower()
     for verdict in VALID_VERDICTS:
         if verdict in response_lower:
             return verdict
-    return None
+    return "unbekannt"
 
 
 def _extract_summary(response: str) -> Optional[str]:

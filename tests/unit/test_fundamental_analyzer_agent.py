@@ -215,9 +215,9 @@ def test_extract_verdict_case_insensitive():
 
 
 def test_extract_verdict_not_found():
-    """Test extraction when no verdict is present."""
+    """Test extraction when no verdict is present. Defaults to 'unbekannt'."""
     result = _extract_verdict("Keine verwandten Wörter hier")
-    assert result is None
+    assert result == "unbekannt"
 
 
 def test_extract_summary():

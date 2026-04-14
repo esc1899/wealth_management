@@ -1,8 +1,14 @@
 """
 Watchlist Checker — evaluates which watchlist positions fit into the portfolio.
+
+Cleanroom Neuimplementierung (2026-04-14):
+- Two separate background jobs: Story+Consensus (Button 1) & Fundamental (Button 2)
+- Thread-local DB connections (not Streamlit singletons)
+- Skill resolution from scheduled jobs or defaults
 """
 
 import asyncio
+import logging
 import threading
 import time
 import streamlit as st
@@ -18,51 +24,227 @@ from state import (
     get_portfolio_comment_service,
     get_app_config_repo,
     get_analyses_repo,
-    get_storychecker_agent,
-    get_fundamental_analyzer_agent,
-    get_consensus_gap_agent,
+    get_storychecker_repo,
+    get_skills_repo,
 )
 from core.services.portfolio_comment_service import get_style_by_id
-from agents.rebalance_agent import compute_josef_allocation
+from config import config
+from core.encryption import build_encryption_service
+from core.storage.base import get_connection, init_db, migrate_db
+from core.storage.positions import PositionsRepository
+from core.storage.analyses import PositionAnalysesRepository
+from core.storage.storychecker import StorycheckerRepository
+from core.storage.scheduled_jobs import ScheduledJobsRepository
+from agents.storychecker_agent import StorycheckerAgent
+from agents.consensus_gap_agent import ConsensusGapAgent
+from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
+from core.llm.claude import ClaudeProvider
+from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET, AGENT_SKILL_DEFAULTS
+
+
+logger = logging.getLogger(__name__)
 
 
 # ------------------------------------------------------------------
-# Background Agent Runner
+# Helper: Skill Resolution (Modul-Level)
 # ------------------------------------------------------------------
 
-def _run_agents_for_watchlist(watchlist_positions, agents_to_run, job, sc_agent, fund_agent, cg_agent, analyses_repo_inst):
-    """Run missing agents for watchlist positions in background thread."""
+def _resolve_skill(
+    jobs_repo: ScheduledJobsRepository,
+    skills_repo,
+    agent_name: str,
+) -> tuple[str, str]:
+    """
+    Resolve skill_name and skill_prompt for an agent from scheduled jobs or defaults.
+
+    Priority:
+    1. First enabled scheduled job for this agent_name
+    2. Default skill from AGENT_SKILL_DEFAULTS
+    3. "Standard" as fallback
+
+    Returns: (skill_name, skill_prompt)
+    """
+    try:
+        for job in jobs_repo.get_all():
+            if job.agent_name == agent_name and job.enabled:
+                skill_name = job.skill_name or "Standard"
+                skill_prompt = ""
+                if job.skill_name:
+                    skill = skills_repo.get_by_name(job.skill_name)
+                    if skill:
+                        skill_prompt = skill.prompt or ""
+                return skill_name, skill_prompt
+    except Exception as exc:
+        logger.warning(f"Error resolving skill for {agent_name}: {exc}")
+
+    # Default if no scheduled job found
+    default_skill = AGENT_SKILL_DEFAULTS.get(agent_name, "Standard")
+    return default_skill, ""
+
+
+# ------------------------------------------------------------------
+# Background Job 1: StorycheckerAgent + ConsensusGapAgent
+# ------------------------------------------------------------------
+
+def _run_storychecker_consensus_job(
+    watchlist: list,
+    agents_to_run: list[str],  # ["storychecker", "consensus_gap"]
+    job: dict,
+    db_path: str,
+    enc_key: str,
+    api_key: str,
+) -> None:
+    """
+    Run Story Checker and Consensus Gap agents in background.
+    Thread-local connection and repos.
+    """
+    conn = None
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     count = 0
+
     try:
-        # StorycheckerAgent: batch check
+        # Create fresh thread-local connection
+        conn = get_connection(db_path)
+        init_db(conn)
+        migrate_db(conn)
+
+        # Build repos with thread-safe connection
+        enc = build_encryption_service(enc_key, "data/salt.bin")
+        positions_repo = PositionsRepository(conn, enc)
+        analyses_repo = PositionAnalysesRepository(conn)
+        storychecker_repo = StorycheckerRepository(conn)
+        skills_repo = get_skills_repo()  # Read-only for skill resolution
+        jobs_repo = ScheduledJobsRepository(conn)
+
+        watchlist_positions = [p for p in watchlist if p.id]
+
+        # StorycheckerAgent
         if "storychecker" in agents_to_run:
-            results = loop.run_until_complete(sc_agent.batch_check_all(positions=watchlist_positions))
-            count += sum(1 for _, err in results if err is None)
-
-        # FundamentalAnalyzerAgent: loop over positions
-        if "fundamental" in agents_to_run:
-            for pos in watchlist_positions:
-                if pos.id:
-                    try:
-                        fund_agent.start_session(pos)
-                        count += 1
-                    except Exception:
-                        job["errors"] = job.get("errors", 0) + 1
-
-        # ConsensusGapAgent: batch analyze
-        if "consensus_gap" in agents_to_run:
-            results = loop.run_until_complete(
-                cg_agent.analyze_portfolio(watchlist_positions, "", "", analyses_repo_inst)
+            job["agents"] = ["Story Checker"]
+            sc_skill_name, sc_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "storychecker")
+            sc_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_HAIKU)
+            sc_llm.skill_context = sc_skill_name
+            sc_agent = StorycheckerAgent(
+                positions_repo=positions_repo,
+                storychecker_repo=storychecker_repo,
+                analyses_repo=analyses_repo,
+                llm=sc_llm,
+                skills_repo=skills_repo,
             )
-            count += len(results)
+            try:
+                results = loop.run_until_complete(sc_agent.batch_check_all(positions=watchlist_positions))
+                sc_count = sum(1 for _, err in results if err is None)
+                count += sc_count
+                logger.info(f"StorycheckerAgent: {sc_count} analyses completed")
+            except Exception as exc:
+                logger.exception("StorycheckerAgent failed")
+                job["error"] = f"StorycheckerAgent: {str(exc)}"
+
+        # ConsensusGapAgent
+        if "consensus_gap" in agents_to_run:
+            if "agents" not in job or not job["agents"]:
+                job["agents"] = []
+            if "Story Checker" not in job["agents"]:
+                job["agents"].append("Konsens-Lücken")
+            else:
+                job["agents"] = ["Story Checker", "Konsens-Lücken"]
+
+            cg_skill_name, cg_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "consensus_gap")
+            cg_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET)
+            cg_agent = ConsensusGapAgent(llm=cg_llm)
+            try:
+                loop.run_until_complete(
+                    cg_agent.analyze_portfolio(watchlist_positions, cg_skill_name, cg_skill_prompt, analyses_repo)
+                )
+                cg_count = len(watchlist_positions)
+                count += cg_count
+                logger.info(f"ConsensusGapAgent: {cg_count} analyses completed")
+            except Exception as exc:
+                logger.exception("ConsensusGapAgent failed")
+                job["error"] = f"ConsensusGapAgent: {str(exc)}"
 
         job.update({"running": False, "done": True, "count": count, "error": None})
+
     except Exception as exc:
+        logger.exception("Background SC+CG job failed")
         job.update({"running": False, "done": True, "count": count, "error": str(exc)})
+
     finally:
         loop.close()
+        if conn:
+            conn.close()
+
+
+# ------------------------------------------------------------------
+# Background Job 2: FundamentalAnalyzerAgent
+# ------------------------------------------------------------------
+
+def _run_fundamental_job(
+    watchlist: list,
+    job: dict,
+    db_path: str,
+    enc_key: str,
+    api_key: str,
+) -> None:
+    """
+    Run Fundamental Analyzer agent in background.
+    Thread-local connection and repos.
+    """
+    conn = None
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    count = 0
+
+    try:
+        # Create fresh thread-local connection
+        conn = get_connection(db_path)
+        init_db(conn)
+        migrate_db(conn)
+
+        # Build repos with thread-safe connection
+        enc = build_encryption_service(enc_key, "data/salt.bin")
+        positions_repo = PositionsRepository(conn, enc)
+        analyses_repo = PositionAnalysesRepository(conn)
+        skills_repo = get_skills_repo()  # Read-only for skill resolution
+        jobs_repo = ScheduledJobsRepository(conn)
+
+        # Resolve skill
+        fund_skill_name, fund_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "fundamental_analyzer")
+
+        # Create agent with thread-safe repos
+        fund_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET)
+        fund_llm.skill_context = fund_skill_name
+        fund_agent = FundamentalAnalyzerAgent(
+            positions_repo=positions_repo,
+            analyses_repo=analyses_repo,
+            llm=fund_llm,
+            skills_repo=skills_repo,
+        )
+
+        job["agents"] = ["Fundamental Analyzer"]
+        eligible = [p for p in watchlist if p.id]
+        for i, pos in enumerate(eligible):
+            try:
+                fund_agent.start_session(pos)
+                count += 1
+            except Exception as exc:
+                logger.warning(f"FundamentalAnalyzer failed for {pos.name}: {exc}")
+                job["error"] = f"{pos.name}: {exc}"
+            # Rate limit between positions
+            if i < len(eligible) - 1:
+                time.sleep(8)
+
+        job.update({"running": False, "done": True, "count": count, "error": None})
+
+    except Exception as exc:
+        logger.exception("Background FA job failed")
+        job.update({"running": False, "done": True, "count": count, "error": str(exc)})
+
+    finally:
+        loop.close()
+        if conn:
+            conn.close()
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -84,34 +266,35 @@ agent_runs_repo = get_agent_runs_repo()
 
 watchlist = positions_repo.get_watchlist()
 
-# Initialize background job state for agent runs
-if "_wc_agents_job" not in st.session_state:
-    st.session_state["_wc_agents_job"] = {
-        "running": False, "done": False,
-        "count": 0, "errors": 0, "error": None,
-        "agents": [],
-    }
-_WC_JOB = st.session_state["_wc_agents_job"]
+# Initialize background job state for two separate jobs
+_JOB_DEFAULTS = {"running": False, "done": False, "count": 0, "errors": 0, "error": None, "agents": []}
 
-# Polling: Show progress while agents are running
-if _WC_JOB["running"]:
-    agents_running = ", ".join(_WC_JOB.get("agents", []))
-    st.info(f"⏳ Analysen laufen im Hintergrund: {agents_running}...", icon=":material/hourglass_top:")
+if "_wc_agents_job" not in st.session_state:
+    st.session_state["_wc_agents_job"] = dict(_JOB_DEFAULTS)
+if "_wc_fund_job" not in st.session_state:
+    st.session_state["_wc_fund_job"] = dict(_JOB_DEFAULTS)
+
+_WC_JOB = st.session_state["_wc_agents_job"]
+_WC_FUND_JOB = st.session_state["_wc_fund_job"]
+
+# Polling: Show progress while ANY job is running
+if _WC_JOB["running"] or _WC_FUND_JOB["running"]:
+    labels = _WC_JOB.get("agents", []) + _WC_FUND_JOB.get("agents", [])
+    st.info(f"⏳ Analysen laufen: {', '.join(labels) or '...'}", icon=":material/hourglass_top:")
     time.sleep(5)
     st.rerun()
 
-# Show result when done
-if _WC_JOB["done"]:
-    if _WC_JOB["error"]:
-        st.error(f"❌ Fehler bei Analyse: {_WC_JOB['error']}")
-    else:
-        st.success(f"✅ {_WC_JOB['count']} Analysen abgeschlossen.")
-    if st.button("✕ Schließen", key="_wc_job_dismiss"):
-        st.session_state["_wc_agents_job"] = {
-            "running": False, "done": False, "count": 0, "errors": 0, "error": None, "agents": []
-        }
-        st.rerun()
-    st.divider()
+# Done-Block: Show results for each job separately
+for _job, _label in [(_WC_JOB, "Story+Konsens"), (_WC_FUND_JOB, "Fundamental")]:
+    if _job["done"]:
+        if _job["error"]:
+            st.error(f"❌ {_label}: {_job['error']}")
+        else:
+            st.success(f"✅ {_label}: {_job['count']} Analysen abgeschlossen.")
+        if st.button("Dismiss", key=f"dismiss_{_label}"):
+            _job.update(dict(_JOB_DEFAULTS))
+            st.rerun()
+        st.divider()
 
 if not watchlist:
     st.info("📭 Keine Watchlist-Positionen vorhanden. Starten Sie mit dem Portfolio Chat um Watchlist-Einträge hinzuzufügen.")
@@ -120,73 +303,90 @@ if not watchlist:
 st.caption(f"**{len(watchlist)} Positionen** auf der Watchlist")
 
 # Pre-check: Which agents haven't analyzed watchlist positions yet?
-watchlist_ids = [pos.id for pos in watchlist if pos.id]
-_analyses_status = []
+# (Only show if no job is currently running)
+if not _WC_JOB["running"] and not _WC_FUND_JOB["running"]:
+    watchlist_ids = [pos.id for pos in watchlist if pos.id]
+    _analyses_status = []
 
-for agent_name, agent_label, page_path in [
-    ("storychecker", "Story Checker", "pages/storychecker.py"),
-    ("fundamental", "Fundamental Analyzer", "pages/fundamental.py"),
-    ("consensus_gap", "Konsens-Lücken", "pages/consensus_gap.py"),
-]:
-    bulk = analyses_repo.get_latest_bulk(watchlist_ids, agent_name)
-    n_missing = sum(1 for pid in watchlist_ids if pid not in bulk)
+    for agent_name, agent_label, page_path in [
+        ("storychecker", "Story Checker", "pages/storychecker.py"),
+        ("fundamental_analyzer", "Fundamental Analyzer", "pages/fundamental.py"),
+        ("consensus_gap", "Konsens-Lücken", "pages/consensus_gap.py"),
+    ]:
+        bulk = analyses_repo.get_latest_bulk(watchlist_ids, agent_name)
+        n_missing = sum(1 for pid in watchlist_ids if pid not in bulk)
 
-    # Get timestamp of latest analysis across all watchlist positions
-    latest_ts = None
-    for verdict_obj in bulk.values():
-        if verdict_obj and hasattr(verdict_obj, 'created_at') and verdict_obj.created_at:
-            if latest_ts is None or verdict_obj.created_at > latest_ts:
-                latest_ts = verdict_obj.created_at
+        # Get timestamp of latest analysis across all watchlist positions
+        latest_ts = None
+        for verdict_obj in bulk.values():
+            if verdict_obj and hasattr(verdict_obj, 'created_at') and verdict_obj.created_at:
+                if latest_ts is None or verdict_obj.created_at > latest_ts:
+                    latest_ts = verdict_obj.created_at
 
-    ts_str = f" (zuletzt: {latest_ts.strftime('%d.%m. %H:%M')})" if latest_ts else " (noch nicht gelaufen)"
+        ts_str = f" (zuletzt: {latest_ts.strftime('%d.%m. %H:%M')})" if latest_ts else " (noch nicht gelaufen)"
 
-    _analyses_status.append({
-        "label": agent_label,
-        "page": page_path,
-        "n_missing": n_missing,
-        "total": len(watchlist_ids),
-        "timestamp": ts_str,
-        "agent_name": agent_name,
-    })
+        _analyses_status.append({
+            "label": agent_label,
+            "page": page_path,
+            "n_missing": n_missing,
+            "total": len(watchlist_ids),
+            "timestamp": ts_str,
+            "agent_name": agent_name,
+        })
 
-# Show info box + action buttons if any missing
-_has_missing = any(s["n_missing"] > 0 for s in _analyses_status)
-if _has_missing:
-    st.info(
-        "💡 Für bessere Ergebnisse folgende Analysen ausführen:\n"
-        + "\n".join(
-            f"- {s['label']} ({s['n_missing']}/{s['total']} ausstehend){s['timestamp']}"
-            for s in _analyses_status if s["n_missing"] > 0
+    # Show info box + action buttons if any missing
+    _has_missing = any(s["n_missing"] > 0 for s in _analyses_status)
+    if _has_missing:
+        st.info(
+            "💡 Für bessere Ergebnisse folgende Analysen ausführen:\n"
+            + "\n".join(
+                f"- {s['label']} ({s['n_missing']}/{s['total']} ausstehend){s['timestamp']}"
+                for s in _analyses_status if s["n_missing"] > 0
+            )
         )
-    )
 
-    # Button to start missing analyses in background
-    _agents_to_run = [s["agent_name"] for s in _analyses_status if s["n_missing"] > 0]
-    n_agents = len(_agents_to_run)
-    agent_labels = ", ".join(s["label"] for s in _analyses_status if s["n_missing"] > 0)
+        # Two separate buttons: Story+Consensus vs. Fundamental
+        col1, col2 = st.columns(2)
 
-    col_btn, col_spacer = st.columns([2, 3])
-    with col_btn:
-        if st.button(
-            f"▶️ {n_agents} Analyse{'n' if n_agents > 1 else ''} im Hintergrund starten",
-            key="_wc_start_agents",
-            disabled=_WC_JOB["running"],
-            type="primary",
-            use_container_width=True,
-        ):
-            _WC_JOB["running"] = True
-            _WC_JOB["done"] = False
-            _WC_JOB["error"] = None
-            _WC_JOB["count"] = 0
-            _WC_JOB["agents"] = [s["label"] for s in _analyses_status if s["n_missing"] > 0]
-            threading.Thread(
-                target=_run_agents_for_watchlist,
-                args=(watchlist, _agents_to_run, _WC_JOB,
-                      get_storychecker_agent(), get_fundamental_analyzer_agent(),
-                      get_consensus_gap_agent(), analyses_repo),
-                daemon=True,
-            ).start()
-            st.rerun()
+        with col1:
+            if st.button(
+                "Story + Konsens starten",
+                key="_wc_start_sc_cg",
+                disabled=_WC_JOB["running"] or _WC_FUND_JOB["running"],
+                type="primary",
+                use_container_width=True,
+            ):
+                # Filter agents to run (only those with missing analyses)
+                agents_to_run = [s["agent_name"] for s in _analyses_status
+                                if s["n_missing"] > 0 and s["agent_name"] in ["storychecker", "consensus_gap"]]
+                if agents_to_run:
+                    _WC_JOB.update({**_JOB_DEFAULTS, "running": True, "agents": ["Story Checker", "Konsens-Lücken"]})
+                    threading.Thread(
+                        target=_run_storychecker_consensus_job,
+                        args=(watchlist, agents_to_run, _WC_JOB,
+                              config.DB_PATH, config.ENCRYPTION_KEY, config.ANTHROPIC_API_KEY),
+                        daemon=True,
+                    ).start()
+                    st.rerun()
+
+        with col2:
+            if st.button(
+                "Fundamental-Analysen starten",
+                key="_wc_start_fund",
+                disabled=_WC_JOB["running"] or _WC_FUND_JOB["running"],
+                type="primary",
+                use_container_width=True,
+            ):
+                # Only run if fundamental_analyzer has missing analyses
+                if any(s["n_missing"] > 0 and s["agent_name"] == "fundamental_analyzer" for s in _analyses_status):
+                    _WC_FUND_JOB.update({**_JOB_DEFAULTS, "running": True, "agents": ["Fundamental Analyzer"]})
+                    threading.Thread(
+                        target=_run_fundamental_job,
+                        args=(watchlist, _WC_FUND_JOB,
+                              config.DB_PATH, config.ENCRYPTION_KEY, config.ANTHROPIC_API_KEY),
+                        daemon=True,
+                    ).start()
+                    st.rerun()
 
 if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
     with st.spinner("Watchlist wird geprüft..."):

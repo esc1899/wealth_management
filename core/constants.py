@@ -22,3 +22,16 @@ CLAUDE_MODEL_DEFAULTS = {
 
 # Comma-separated list for config.py environment default
 CLAUDE_MODELS_DEFAULT_LIST = f"{CLAUDE_HAIKU},{CLAUDE_SONNET},{CLAUDE_OPUS}"
+
+# =========================================================================
+# Agent Skill Defaults
+# =========================================================================
+
+# Default skills for background agents when no scheduled job is defined
+AGENT_SKILL_DEFAULTS = {
+    "storychecker": "Standard",
+    "fundamental_analyzer": "Standard",
+    "consensus_gap": "Standard",
+    "structural_scan": "Standard",
+    "news": "Standard",
+}
