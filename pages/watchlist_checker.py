@@ -555,6 +555,35 @@ Full Analysis:
 # Section 2: Display Results (persistent from DB)
 # ─────────────────────────────────────────────────────────────────────
 
+from dataclasses import dataclass as _dataclass
+
+@_dataclass
+class _DisplayFit:
+    """Normalized fit object for display."""
+    position_id: int
+    verdict: str
+    summary: str
+
+
+def _normalize_result(result):
+    """Convert WatchlistCheckerAnalysis or WatchlistCheckResult to normalized form."""
+    # If it has position_fits directly (fresh from agent), return as-is
+    if hasattr(result, 'position_fits') and result.position_fits:
+        return result, result.position_fits
+
+    # If it has position_fits_json (from DB), deserialize
+    if hasattr(result, 'position_fits_json') and result.position_fits_json:
+        try:
+            fits_data = json.loads(result.position_fits_json)
+            position_fits = [_DisplayFit(**fit) for fit in fits_data]
+            return result, position_fits
+        except Exception as e:
+            logger.warning(f"Failed to deserialize position_fits_json: {e}")
+            return result, []
+
+    return result, []
+
+
 wc_repo = get_watchlist_checker_repo()
 
 # Try to load from session_state first, else from DB
@@ -573,6 +602,7 @@ if st.session_state.get("_watchlist_check_result"):
     st.subheader("2️⃣ Ergebnisse")
 
     result = st.session_state["_watchlist_check_result"]
+    result, position_fits = _normalize_result(result)
 
     # Display summary + fit counts prominently
     if hasattr(result, 'summary') and result.summary:
@@ -588,17 +618,17 @@ if st.session_state.get("_watchlist_check_result"):
                 fit_counts = result.fit_counts or {}
         except:
             fit_counts = {
-                "sehr_passend": sum(1 for f in result.position_fits if f.verdict == "sehr_passend"),
-                "passend": sum(1 for f in result.position_fits if f.verdict == "passend"),
-                "neutral": sum(1 for f in result.position_fits if f.verdict == "neutral"),
-                "nicht_passend": sum(1 for f in result.position_fits if f.verdict == "nicht_passend"),
+                "sehr_passend": sum(1 for f in position_fits if f.verdict == "sehr_passend"),
+                "passend": sum(1 for f in position_fits if f.verdict == "passend"),
+                "neutral": sum(1 for f in position_fits if f.verdict == "neutral"),
+                "nicht_passend": sum(1 for f in position_fits if f.verdict == "nicht_passend"),
             }
     else:
         fit_counts = {
-            "sehr_passend": sum(1 for f in result.position_fits if f.verdict == "sehr_passend"),
-            "passend": sum(1 for f in result.position_fits if f.verdict == "passend"),
-            "neutral": sum(1 for f in result.position_fits if f.verdict == "neutral"),
-            "nicht_passend": sum(1 for f in result.position_fits if f.verdict == "nicht_passend"),
+            "sehr_passend": sum(1 for f in position_fits if f.verdict == "sehr_passend"),
+            "passend": sum(1 for f in position_fits if f.verdict == "passend"),
+            "neutral": sum(1 for f in position_fits if f.verdict == "neutral"),
+            "nicht_passend": sum(1 for f in position_fits if f.verdict == "nicht_passend"),
         }
 
     st.markdown(
@@ -612,12 +642,12 @@ if st.session_state.get("_watchlist_check_result"):
     st.markdown("**Position-Details**")
 
     # Bulk-fetch analyses for all watchlist positions (used in expanders below)
-    _all_fit_ids = [fit.position_id for fit in result.position_fits if fit.position_id]
+    _all_fit_ids = [fit.position_id for fit in position_fits if fit.position_id]
     _bulk_story = analyses_repo.get_latest_bulk(_all_fit_ids, "storychecker") if _all_fit_ids else {}
     _bulk_fund = analyses_repo.get_latest_bulk(_all_fit_ids, "fundamental") if _all_fit_ids else {}
 
     # Display position fits
-    for fit in result.position_fits:
+    for fit in position_fits:
         pos = next((p for p in watchlist if p.id == fit.position_id), None)
         if pos:
             with st.container(border=True):
