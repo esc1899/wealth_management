@@ -43,7 +43,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             empfehlung            TEXT,
             story                 TEXT,
             story_skill           TEXT,
-            rebalance_excluded    INTEGER NOT NULL DEFAULT 0,
+            analysis_excluded     INTEGER NOT NULL DEFAULT 0,
             anlageart             TEXT
         )""",
         "CREATE INDEX IF NOT EXISTS idx_positions_ticker ON positions(ticker)",
@@ -335,8 +335,12 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE positions ADD COLUMN story TEXT")
     if "story_skill" not in existing_pos:
         conn.execute("ALTER TABLE positions ADD COLUMN story_skill TEXT")
-    if "rebalance_excluded" not in existing_pos:
-        conn.execute("ALTER TABLE positions ADD COLUMN rebalance_excluded INTEGER NOT NULL DEFAULT 0")
+    if "rebalance_excluded" in existing_pos and "analysis_excluded" not in existing_pos:
+        # Migrate rebalance_excluded → analysis_excluded (SQLite 3.25+)
+        conn.execute("ALTER TABLE positions RENAME COLUMN rebalance_excluded TO analysis_excluded")
+    elif "analysis_excluded" not in existing_pos:
+        # Fresh install: add analysis_excluded directly
+        conn.execute("ALTER TABLE positions ADD COLUMN analysis_excluded INTEGER NOT NULL DEFAULT 0")
     if "anlageart" not in existing_pos:
         conn.execute("ALTER TABLE positions ADD COLUMN anlageart TEXT")
 

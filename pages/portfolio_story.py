@@ -156,16 +156,25 @@ else:
     _portfolio_for_precheck = positions_repo.get_portfolio()
 
     if _portfolio_for_precheck:
-        _pre_ids = [p.id for p in _portfolio_for_precheck if p.id]
+        # Per-agent eligible IDs — mirrors each dedicated page's filter logic
+        _eligible_ids_per_agent = {
+            "storychecker": [p.id for p in _portfolio_for_precheck
+                             if p.id and p.story and not p.analysis_excluded],
+            "fundamental":  [p.id for p in _portfolio_for_precheck
+                             if p.id and p.ticker and not p.analysis_excluded],
+            "consensus_gap":[p.id for p in _portfolio_for_precheck
+                             if p.id and p.story and not p.analysis_excluded],
+        }
         _pre_status = []
 
         for agent_name, agent_label, page_path in [
             ("storychecker", "Story Checker", "pages/storychecker.py"),
-            ("fundamental", "Fundamental Analyzer", "pages/fundamental.py"),
+            ("fundamental", "Fundamental Analyzer", "pages/fundamental_analyzer.py"),
             ("consensus_gap", "Konsens-Lücken", "pages/consensus_gap.py"),
         ]:
-            b = analyses_repo.get_latest_bulk(_pre_ids, agent_name)
-            n = sum(1 for pid in _pre_ids if pid not in b)
+            ids = _eligible_ids_per_agent[agent_name]
+            b = analyses_repo.get_latest_bulk(ids, agent_name)
+            n = sum(1 for pid in ids if pid not in b)
 
             # Get timestamp of latest analysis
             latest_ts = None
@@ -180,7 +189,7 @@ else:
                 "label": agent_label,
                 "page": page_path,
                 "n_missing": n,
-                "total": len(_pre_ids),
+                "total": len(ids),
                 "timestamp": ts_str,
                 "agent_name": agent_name,
             })

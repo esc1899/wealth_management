@@ -195,7 +195,7 @@ class Position(BaseModel):
     # State
     in_portfolio: bool = False
     in_watchlist: bool = False
-    rebalance_excluded: bool = False  # True = shown in rebalance snapshot but no action recommended
+    analysis_excluded: bool = False  # True = counted in allocation (Josef's Regel) but skipped by agents
 
     # Sub-type (optional, driven by asset_classes.yaml anlagearten list)
     anlageart: Optional[str] = None

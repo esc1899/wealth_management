@@ -571,8 +571,8 @@ positionen:
   watchlist_ineligible_note: "Anlagearten ohne Auto-Fetch (Festgeld, Immobilien etc.) können nicht auf der Watchlist stehen."
   close_button: "Schließen"
   crypto_warning: "Kryptowährungen sind hochspekulative Assets und kein klassisches Anlageinstrument. Bewertungen im Storychecker und Rebalancing sollten diese Einschätzung widerspiegeln."
-  rebalance_excluded_label: "Vom Rebalancing ausschließen"
-  rebalance_excluded_help: "Position wird bewertet und in der Gesamtverteilung berücksichtigt, aber es werden keine Kauf-/Verkaufsempfehlungen gemacht."
+  analysis_excluded_label: "Von Analyse ausschließen"
+  analysis_excluded_help: "Position wird in der Gesamtallokation (Josef's Regel) berücksichtigt, aber nicht von Story Checker, Fundamental Analyzer oder Konsens-Lücken analysiert."
 
 demo:
   banner: "⚠️ Demo-Modus aktiv — Daten werden unverschlüsselt gespeichert"

@@ -34,7 +34,7 @@ class PositionsRepository:
                 notes, extra_data,
                 recommendation_source, strategy,
                 added_date, in_portfolio, in_watchlist,
-                empfehlung, story, story_skill, rebalance_excluded, anlageart
+                empfehlung, story, story_skill, analysis_excluded, anlageart
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             self._serialize(position),
@@ -76,7 +76,7 @@ class PositionsRepository:
                 notes=?, extra_data=?,
                 recommendation_source=?, strategy=?,
                 added_date=?, in_portfolio=?, in_watchlist=?,
-                empfehlung=?, story=?, story_skill=?, rebalance_excluded=?, anlageart=?
+                empfehlung=?, story=?, story_skill=?, analysis_excluded=?, anlageart=?
             WHERE id=?
             """,
             self._serialize(position) + (position.id,),
@@ -169,7 +169,7 @@ class PositionsRepository:
             p.empfehlung,
             self._enc.encrypt(p.story) if p.story else None,
             p.story_skill,
-            1 if p.rebalance_excluded else 0,
+            1 if p.analysis_excluded else 0,
             p.anlageart,
         )
 
@@ -197,6 +197,6 @@ class PositionsRepository:
             empfehlung=row["empfehlung"] if "empfehlung" in keys else None,
             story=self._enc.decrypt(row["story"]) if ("story" in keys and row["story"]) else None,
             story_skill=row["story_skill"] if "story_skill" in keys else None,
-            rebalance_excluded=bool(row["rebalance_excluded"]) if "rebalance_excluded" in keys else False,
+            analysis_excluded=bool(row["analysis_excluded"]) if "analysis_excluded" in keys else False,
             anlageart=row["anlageart"] if "anlageart" in keys else None,
         )

@@ -252,6 +252,21 @@ def _show_detail(pos_id: int):
             st.rerun()
 
     st.divider()
+
+    # ── Analysis exclusion toggle ────────────────────────────────────────────
+    new_excl = st.toggle(
+        t("positionen.analysis_excluded_label"),
+        value=pos.analysis_excluded,
+        help=t("positionen.analysis_excluded_help"),
+        key=f"_detail_excl_{pos_id}",
+    )
+    if new_excl != pos.analysis_excluded:
+        updated = pos.model_copy(update={"analysis_excluded": new_excl})
+        repo.update(updated)
+        st.success(t("positionen.saved"))
+        st.rerun()
+
+    st.divider()
     if st.button(t("positionen.close_button"), use_container_width=True):
         _clear_detail()
         st.rerun()

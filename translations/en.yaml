@@ -566,8 +566,8 @@ positionen:
   watchlist_ineligible_note: "Asset types without auto-fetch (fixed deposits, real estate, etc.) cannot be added to the watchlist."
   close_button: "Close"
   crypto_warning: "Cryptocurrencies are highly speculative assets and not a conventional investment. Story Checker assessments and rebalancing recommendations should reflect this."
-  rebalance_excluded_label: "Exclude from rebalancing"
-  rebalance_excluded_help: "Position is assessed and counted in the overall allocation, but no buy/sell recommendations will be made."
+  analysis_excluded_label: "Exclude from analysis"
+  analysis_excluded_help: "Position is counted in overall allocation (Josef's Rule) but will not be analyzed by Story Checker, Fundamental Analyzer, or Consensus Gap."
 
 demo:
   banner: "⚠️ Demo Mode active — data is stored unencrypted"
