@@ -192,6 +192,8 @@ def _seed_default_skills(repo: SkillsRepository) -> None:
     repo.seed_new_skills("structural_scan", _skills_data.get("structural_scan", []))
     repo.seed_new_skills("consensus_gap", _skills_data.get("consensus_gap", []))
     repo.seed_new_skills("fundamental", _skills_data.get("fundamental", []))
+    repo.seed_new_skills("portfolio_story", _skills_data.get("portfolio_story", []))
+    repo.seed_new_skills("watchlist_checker", _skills_data.get("watchlist_checker", []))
     # Load private skills if config/private_skills.yaml exists (gitignored)
     private_path = Path(__file__).parent / "config" / "private_skills.yaml"
     if private_path.exists():
