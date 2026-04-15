@@ -516,7 +516,8 @@ Full Analysis:
             # Save to DB
             from core.storage.models import WatchlistCheckerAnalysis
 
-            # Extract summary from "## Zusammenfassung" section (not the first line, which is a header)
+            # Extract summary from "## Zusammenfassung" section if present
+            # Fallback: use fit_counts summary if Zusammenfassung not found
             summary = None
             if result.full_text:
                 zusammenfassung_idx = result.full_text.find("## Zusammenfassung")
@@ -528,7 +529,10 @@ Full Analysis:
                         # First non-empty line is the summary
                         first_line = next((l.strip() for l in body.split('\n') if l.strip()), None)
                         summary = first_line[:200] if first_line else None
-                # If no Zusammenfassung section, leave summary empty (better than showing wrong header)
+
+            # Fallback: if no Zusammenfassung section found, create summary from fit counts
+            if not summary:
+                summary = f"Geprüft: {fit_counts['sehr_passend']} sehr passend, {fit_counts['passend']} passend, {fit_counts['neutral']} neutral, {fit_counts['nicht_passend']} nicht passend"
 
             analysis = WatchlistCheckerAnalysis(
                 summary=summary,
