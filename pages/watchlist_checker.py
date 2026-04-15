@@ -438,17 +438,15 @@ skills_repo = get_skills_repo()
 watchlist_skills = skills_repo.get_by_area("watchlist_checker")
 skill_options = {s.name: s for s in watchlist_skills if not s.hidden}
 
-# Add "Standard (kein Fokus)" option to allow using base system prompt without skill override
-all_options = ["Standard (kein Fokus)"] + list(skill_options.keys())
-
-if all_options:
+if skill_options:
+    skill_names = list(skill_options.keys())
     selected_skill_name = st.selectbox(
         "Fokus-Bereich",
-        options=all_options,
-        index=0,  # Default to Standard
+        options=skill_names,
+        index=0,  # Default to first skill (Josef's Regel)
         key="watchlist_checker_skill",
     )
-    selected_skill = skill_options.get(selected_skill_name) if selected_skill_name != "Standard (kein Fokus)" else None
+    selected_skill = skill_options[selected_skill_name]
 else:
     selected_skill = None
 
