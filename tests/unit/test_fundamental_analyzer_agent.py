@@ -1,7 +1,7 @@
 """Unit tests for FundamentalAnalyzerAgent."""
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, MagicMock, AsyncMock, patch
 
 from agents.fundamental_analyzer_agent import (
     FundamentalAnalyzerAgent,
@@ -39,7 +39,7 @@ def mock_llm():
     """Create a mock LLM provider."""
     mock = Mock()
     mock.model = "claude-sonnet-4-6"
-    mock.chat = Mock(return_value="🟢 **Intakt** — Das Geschäftsmodell ist stabil")
+    mock.chat = AsyncMock(return_value="🟢 **Intakt** — Das Geschäftsmodell ist stabil")
     return mock
 
 
