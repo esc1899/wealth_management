@@ -138,6 +138,95 @@ Aber nicht dringend."""
         # Position not in lookup, so no match
         assert len(fits) == 0
 
+    def test_parse_with_asset_class_suffix(self):
+        """Parse position header with asset class suffix: NAME (TICKER) (AssetClass)."""
+        positions = [
+            make_position(id=1, name="nVent Electric plc", ticker="NVT", asset_class="Aktie"),
+        ]
+
+        response = """## nVent Electric plc (NVT) (Aktie)
+**Fit:** 🟡 Passend
+
+> Passt zum Portfolio
+
+Details here."""
+
+        fits = _parse_watchlist_results(positions, response)
+
+        # Should find NVT (first bracket pair), not Aktie
+        assert len(fits) == 1
+        assert fits[0].position_id == 1
+        assert fits[0].verdict == "passend"
+
+    def test_parse_unknown_verdict_emoji(self):
+        """Parse position with no recognized emoji → verdict = 'unknown'."""
+        positions = [
+            make_position(id=1, name="Test Stock", ticker="TST"),
+        ]
+
+        response = """## Test Stock (TST)
+**Fit:** ✨ Mystery Verdict
+
+> Some mysterious summary
+
+No emoji match."""
+
+        fits = _parse_watchlist_results(positions, response)
+
+        assert len(fits) == 1
+        assert fits[0].position_id == 1
+        assert fits[0].verdict == "unknown"  # Fallback when no emoji matches
+
+    def test_parse_last_position_without_divider(self):
+        """Parse last position without trailing '---' divider."""
+        positions = [
+            make_position(id=1, name="First", ticker="FST"),
+            make_position(id=2, name="Last", ticker="LST"),
+        ]
+
+        response = """## First (FST)
+**Fit:** 🟢 Sehr passend
+
+> Good
+
+---
+
+## Last (LST)
+**Fit:** 🟡 Passend
+
+> Also good
+
+No divider after this one."""
+
+        fits = _parse_watchlist_results(positions, response)
+
+        assert len(fits) == 2
+        assert fits[1].position_id == 2
+        assert fits[1].verdict == "passend"
+
+    def test_parse_zusammenfassung_header_not_parsed_as_position(self):
+        """Ensure '## Zusammenfassung' section is NOT parsed as a position."""
+        positions = [
+            make_position(id=1, name="Test Stock", ticker="TST"),
+        ]
+
+        response = """## Test Stock (TST)
+**Fit:** 🟢 Sehr passend
+
+> Good fit
+
+---
+
+## Zusammenfassung
+
+Both positions are excellent additions to the portfolio."""
+
+        fits = _parse_watchlist_results(positions, response)
+
+        # Should only find Test Stock, not "Zusammenfassung"
+        assert len(fits) == 1
+        assert fits[0].position_id == 1
+
 
 class TestWatchlistCheckerAgent:
     """Test WatchlistCheckerAgent behavior and integration."""

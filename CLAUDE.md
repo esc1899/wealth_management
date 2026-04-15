@@ -96,6 +96,48 @@ Motto: **try to improve the whole**
 - [ ] Keine Duplikate in Navigation oder anderen Pages
 - [ ] `pytest tests/` noch grün
 
+## Debug-Vorgehensweise (UI-Bugs mit Datenfluss)
+
+**Lernpunkt (2026-04-15):** Watchlist Checker hatte 3 zusammenhängende Bugs (Parsing, Summary, Session State).
+Es gab 4 Commits für dasselbe Problem, weil die Fehler nur durch manuelle App-Tests sichtbar wurden.
+Ursache: Kritische Code-Pfade hatten keine Tests — Parser-Edge-Cases, Repo-Serialisierung, State-Management.
+
+**Neue Regel — vor dem ersten Code-Fix:**
+
+1. **Datenfluss-Script schreiben** (kein Streamlit):
+   - Rufe LLM auf → parst Response → speichere in DB → lade wieder
+   - Teste jeden Schritt isoliert — nicht über die UI
+   - Reproduziere das Problem im Skript bevor du Code änderst
+
+2. **Alle Symptome sammeln**:
+   - Was sieht man in der UI? (z.B. Zähler = 0, Fazit = Header)
+   - Was sieht man im Debug-Skript? (z.B. fit_counts = {}, summary = None)
+   - Wo stoppt der Datenfluss? (LLM → Parser → DB → Display)
+
+3. **Tests schreiben für kritische Stellen**:
+   - Edge Cases im Parser (asset-class-suffix, unknown verdict, etc.)
+   - Repository-Serialisierung (dict → JSON → dict)
+   - State-Management (session state vs. DB)
+   - **Erst dann** ein Commit der alles zusammen fixt
+
+**Anti-Pattern:**
+```python
+# ❌ FALSCH: Fix einzelne Symptome, teste manuell, neue Fehler erscheinen
+# Commit 1: "Fix rfind() → Zähler zeigt jetzt was"
+# Manual test → "Aber Fazit ist falsch"
+# Commit 2: "Fix Summary extraction"
+# Manual test → "Aber Fazit ist noch immer nicht sichtbar"
+# Commit 3: "Fix session state"
+```
+
+**Richtig:**
+```python
+# ✅ RICHTIG: Datenfluss komplett verstehen, dann einen Commit schreiben
+# Script: Teste LLM → Parser → DB → Display vollständig
+# Tests: Schreibe Unit Tests für Parser + Repo
+# Commit 1: "Fix all watchlist checker data flow issues" mit Tests
+```
+
 ## Test Coverage — Standards & Ziele
 
 **Wichtig:** Coverage misst nur "wieviel Code wurde ausgeführt", nicht "sind Tests gut". Eine gute Coverage sagt nicht automatisch: keine Bugs, sondern: meiste Fehler-Szenarien werden gefunden.
