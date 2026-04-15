@@ -432,6 +432,22 @@ if not _WC_JOB["running"] and not _WC_FUND_JOB["running"]:
                     ).start()
                     st.rerun()
 
+# Skill selector for Watchlist Checker
+st.divider()
+skills_repo = get_skills_repo()
+watchlist_skills = skills_repo.get_by_area("watchlist_checker")
+skill_options = {s.name: s for s in watchlist_skills if not s.hidden}
+
+if skill_options:
+    selected_skill_name = st.selectbox(
+        "Fokus-Bereich",
+        options=list(skill_options.keys()),
+        key="watchlist_checker_skill",
+    )
+    selected_skill = skill_options.get(selected_skill_name)
+else:
+    selected_skill = None
+
 if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
     with st.spinner("Watchlist wird geprüft..."):
         # Build context
@@ -464,6 +480,7 @@ Stabilität: {story_analysis.stability_verdict}
                     portfolio_snapshot=portfolio_snapshot,
                     watchlist_positions=watchlist,
                     story_analysis_text=story_analysis_text,
+                    selected_skill=selected_skill,
                 )
             )
 

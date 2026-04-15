@@ -23,6 +23,7 @@ from state import (
     get_portfolio_story_agent,
     get_portfolio_story_repo,
     get_positions_repo,
+    get_skills_repo,
 )
 
 logger = logging.getLogger(__name__)
@@ -204,6 +205,21 @@ else:
     col_check, col_history = st.columns([2, 1])
 
     with col_check:
+        # Skill selector for Portfolio Story
+        skills_repo = get_skills_repo()
+        portfolio_story_skills = skills_repo.get_by_area("portfolio_story")
+        skill_options = {s.name: s for s in portfolio_story_skills if not s.hidden}
+
+        if skill_options:
+            selected_skill_name = st.selectbox(
+                "Fokus-Bereich",
+                options=list(skill_options.keys()),
+                key="portfolio_story_skill",
+            )
+            selected_skill = skill_options.get(selected_skill_name)
+        else:
+            selected_skill = None
+
         if st.button("🔄 Story-Check durchführen", use_container_width=True):
             with st.spinner("Analysiere Portfolio gegen Story…"):
                 # Build portfolio snapshot
@@ -304,6 +320,7 @@ else:
                             metrics=metrics,
                             dividend_snapshot=dividend_snapshot,
                             inflation_rate=None,  # TODO: fetch from Tavily
+                            selected_skill=selected_skill,
                         ),
                         agent.analyze_positions(
                             story=current_story,

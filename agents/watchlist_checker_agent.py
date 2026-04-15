@@ -13,7 +13,8 @@ from typing import Optional
 from core.llm.base import Message, Role
 from core.llm.local import OllamaProvider
 from core.storage.analyses import PositionAnalysesRepository
-from core.storage.models import Position
+from core.storage.models import Position, Skill
+from core.storage.skills import SkillsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -100,10 +101,12 @@ class WatchlistCheckerAgent:
         positions_repo,
         analyses_repo: PositionAnalysesRepository,
         llm: OllamaProvider,
+        skills_repo: Optional[SkillsRepository] = None,
     ) -> None:
         self._positions = positions_repo
         self._analyses = analyses_repo
         self._llm = llm
+        self._skills_repo = skills_repo
 
     @property
     def model(self) -> str:
@@ -114,6 +117,7 @@ class WatchlistCheckerAgent:
         portfolio_snapshot: str,
         watchlist_positions: list[Position],
         story_analysis_text: Optional[str] = None,
+        selected_skill: Optional[Skill] = None,
     ) -> WatchlistCheckResult:
         """Evaluate which watchlist positions fit into the current portfolio."""
         if not watchlist_positions:
@@ -166,9 +170,14 @@ class WatchlistCheckerAgent:
 
         context = "\n".join(context_parts)
 
+        # Build system prompt with optional skill injection
+        system_prompt = BASE_SYSTEM_PROMPT
+        if selected_skill and selected_skill.prompt:
+            system_prompt = f"{BASE_SYSTEM_PROMPT}\n\n## Fokus-Bereich ({selected_skill.name}):\n{selected_skill.prompt}"
+
         # LLM call (combine system prompt with context, send as user message)
         messages = [
-            Message(role=Role.USER, content=f"{BASE_SYSTEM_PROMPT}\n\n{context}")
+            Message(role=Role.USER, content=f"{system_prompt}\n\n{context}")
         ]
 
         response = await self._llm.chat(messages)
@@ -176,11 +185,12 @@ class WatchlistCheckerAgent:
 
         # Parse and persist results
         fits = _parse_watchlist_results(watchlist_positions, response)
+        skill_name = selected_skill.name if selected_skill else ""
         for fit in fits:
             self._analyses.save(
                 position_id=fit.position_id,
                 agent="watchlist_checker",
-                skill_name="",  # Watchlist checker is not skill-based
+                skill_name=skill_name,
                 verdict=fit.verdict,
                 summary=fit.summary,
             )

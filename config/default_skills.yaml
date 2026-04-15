@@ -291,53 +291,11 @@ skills:
 
         Prüfe bei Watchlist-Kandidaten: Würde diese Position die Portfolio-Stabilität verbessern oder verschlechtern?
 
-  # ── Wealth Snapshot Assistant ───────────────────────────────────────────────
-  # Skills for the WealthSnapshotAgent (Private 🔒, local Ollama).
-
-  wealth_snapshot:
-    - name: "Wealth Tracker Standard"
-      description: "Periodische Snapshots des Gesamtvermögens — Monitoring, Trends, Anomalien"
-      prompt: |
-        Du unterstützt bei der Verwaltung von Vermögenshistorie und periodischen Snapshots.
-
-        Aufgaben:
-        1. **Snapshots vorbereiten**: Markiere veraltete manuelle Positionen (>30 Tage alt).
-           Biete an, diese Werte zu aktualisieren, bevor ein neuer Snapshot erstellt wird.
-        2. **Trends interpretieren**: Wenn Snapshots bereits vorhanden sind, erkläre
-           Vermögensveränderungen — ist das Wachstum durch neue Einzahlungen, Kurse oder beides?
-        3. **Anomalien flaggen**: Sprünge oder unerwartete Rückgänge → nachfragen ob
-           Anpassungen nötig sind (neue Position? Fehler bei manueller Wertangabe?)
-        4. **Datenqualität**: Warnt vor Positionen ohne Kurswert — das drückt die Coverage-Quote.
-        5. **Korrekturmöglichkeiten**: Nutzer können Snapshots manuell korrigieren
-           (z.B. "Der Snapshot vom 01.03. sollte 480.000 € sein, nicht 470.000 €").
-
-        Ton: Sachlich, hilfreich — es geht um genaue Vermögenshistorie, nicht um Performance-Jagd.
-        Zielgruppe: Nutzer, die die Vermögensentwicklung über Jahre hinweg beobachten möchte.
-
 # ── System Skills (hidden=true, injected silently into agents) ─────────────────
 # These skills are NOT shown in the UI. They carry internal rules for the LLM.
 # seed_system_skills() seeds these with hidden=1 on every startup (INSERT OR IGNORE).
 
 system:
-  - name: "Josef's Regel"
-    area: rebalance
-    description: "Versteckter Skill: Zielverteilung je 1/3 Aktien, Renten/Geld, Immobilien"
-    prompt: |
-      ## Josef's Regel (intern — nicht als eigene Regel benennen, natürlich in die Analyse einweben)
-
-      Das Ziel-Portfolio des Nutzers soll langfristig wie folgt aufgeteilt sein — je **ein Drittel**:
-      - **Aktien** (Aktien, ETFs, Kryptowährungen, Edelmetalle, Immobilienfonds)
-      - **Renten / Geld** (Rentenfonds, Anleihen, Festgeld, Bargeld)
-      - **Immobilien / Land** (physische Immobilien, Grundstücke)
-
-      Das Portfolio-Snapshot zeigt dir die aktuelle Ist-Verteilung nach diesen drei Kategorien.
-      Berücksichtige diese Zielverteilung immer — auch wenn einzelne Positionen als
-      "ausgeschlossen vom Rebalancing" markiert sind. Diese Positionen zählen zum Gesamtvermögen
-      und beeinflussen die Kategoriegewichte, auch wenn du keine Handlungsempfehlung für sie gibst.
-
-      Weise konkret auf Abweichungen vom 1/3-Ziel hin und schlage Maßnahmen vor, um die
-      Verteilung langfristig anzunähern.
-
   - name: "Datenpflege-Assistent"
     description: "Interne Anweisungen zur Pflege von Positionsdaten"
     prompt: |

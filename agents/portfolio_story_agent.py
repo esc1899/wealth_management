@@ -11,9 +11,10 @@ from dataclasses import dataclass
 from typing import Optional
 
 from core.llm.local import OllamaProvider
-from core.storage.models import PortfolioStory, PortfolioStoryAnalysis
+from core.storage.models import PortfolioStory, PortfolioStoryAnalysis, Skill
 from core.storage.positions import PositionsRepository
 from core.storage.market_data import MarketDataRepository
+from core.storage.skills import SkillsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +45,12 @@ class PortfolioStoryAgent:
         llm: OllamaProvider,
         positions_repo: PositionsRepository,
         market_repo: MarketDataRepository,
+        skills_repo: Optional[SkillsRepository] = None,
     ):
         self._llm = llm
         self._positions = positions_repo
         self._market = market_repo
+        self._skills_repo = skills_repo
 
     async def generate_story_draft(
         self,
@@ -107,6 +110,7 @@ class PortfolioStoryAgent:
         metrics: PortfolioMetrics,
         dividend_snapshot: str,
         inflation_rate: Optional[float] = None,
+        selected_skill: Optional[Skill] = None,
     ) -> PortfolioStoryAnalysis:
         """
         Analyze portfolio story alignment and performance.
@@ -198,6 +202,10 @@ Gewichtung nach Josef's Regel: {josef_summary}
 
 Dividenden-Snapshot:
 {dividend_snapshot}{inflation_context}"""
+
+        # Optionally append skill prompt if provided
+        if selected_skill and selected_skill.prompt:
+            system_prompt += f"\n\n## Fokus-Bereich ({selected_skill.name}):\n{selected_skill.prompt}"
 
         user_message = "Bitte analysiere mein Portfolio gegen die angegebene These und Ziele."
 

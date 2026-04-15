@@ -372,6 +372,7 @@ def get_portfolio_story_agent() -> PortfolioStoryAgent:
         llm=llm,
         positions_repo=get_positions_repo(),
         market_repo=get_market_repo(),
+        skills_repo=get_skills_repo(),
     )
 
 
@@ -388,6 +389,7 @@ def get_watchlist_checker_agent() -> WatchlistCheckerAgent:
         positions_repo=get_positions_repo(),
         analyses_repo=get_analyses_repo(),
         llm=llm,
+        skills_repo=get_skills_repo(),
     )
 
 

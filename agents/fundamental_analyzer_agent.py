@@ -167,7 +167,6 @@ class FundamentalAnalyzerAgent:
             skill_name=skill_name,
             verdict=verdict,
             summary=summary,
-            session_id=session_id,
         )
         session.verdict = verdict
         session.summary = summary
@@ -207,6 +206,7 @@ class FundamentalAnalyzerAgent:
 
     def _run_llm(self, session: AnalyzerSession) -> str:
         """Execute LLM call — inject system message into session messages."""
+        import asyncio
         from core.llm.base import Message, Role
 
         self._llm.skill_context = "fundamental_analyzer"
@@ -219,10 +219,13 @@ class FundamentalAnalyzerAgent:
             role = Role.USER if msg["role"] == "user" else Role.ASSISTANT
             messages.append(Message(role=role, content=msg["content"]))
 
-        # Call chat (non-tool version for now — web search via prompt instruction)
-        response = self._llm.chat(
-            messages=messages,
-            max_tokens=4096,
+        # Call async chat method
+        loop = asyncio.get_event_loop()
+        response = loop.run_until_complete(
+            self._llm.chat(
+                messages=messages,
+                max_tokens=4096,
+            )
         )
         return response
 
