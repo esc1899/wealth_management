@@ -5,20 +5,23 @@
 ```
 Streamlit UI (Multi-page)
   ↓
-Pages (14)
+Pages (15)
   ├─ Dashboard, Positionen, Marktdaten, Analyse (Portfolio management)
-  ├─ Portfolio Chat, Rebalance Chat (Local Ollama 🔒)
+  ├─ Portfolio Chat, Portfolio Story (Local Ollama 🔒)
   ├─ Research Chat, News, Search, Story Checker (Cloud Claude ☁️)
-  └─ Structural Scan, Consensus Gap, Fundamental Value (Claude Strategy)
+  ├─ Fundamental Analyzer, Watchlist Checker (Cloud + Local)
+  ├─ Structural Scan, Consensus Gap (Claude Strategy ☁️)
+  └─ System: Statistics, Benchmark, Agentmonitor, Skills, Settings
   ↓
-Agents (10)
-  ├─ Local (Ollama): PortfolioAgent, RebalanceAgent, MarketDataAgent
+Agents (12)
+  ├─ Local (Ollama): PortfolioAgent, MarketDataAgent, PortfolioStoryAgent, WatchlistCheckerAgent
   └─ Cloud (Claude): ResearchAgent, NewsAgent, SearchAgent, StorycheckerAgent,
-                     StructuralChangeAgent, ConsensusGapAgent, FundamentalAgent
+                     FundamentalAnalyzerAgent, StructuralChangeAgent, 
+                     ConsensusGapAgent, FundamentalAgent, WealthSnapshotAgent
   ↓
 Storage (SQLite, encrypted)
   └─ Repositories: Positions, MarketData, Research, News, Search, Skills,
-                   Rebalance, Analyses, StructuralScans, WealthSnapshots, etc.
+                   Analyses, StructuralScans, WealthSnapshots, ScheduledJobs, etc.
 ```
 
 ---
@@ -54,11 +57,10 @@ High-level: One repository per entity. Each wraps SQLite + encryption.
 | **MarketDataRepository** | Current prices + history | market_data, price_history |
 | **SkillsRepository** | Prompt templates per agent area | skills, INSERT OR IGNORE on seed |
 | **AppConfigRepository** | User settings (models, cost alerts) | app_config |
-| **RebalanceRepository** | Session chat history | rebalance_sessions, rebalance_messages |
 | **ResearchRepository** | Research chat sessions | research_sessions, research_messages |
 | **SearchRepository** | Investment search sessions | search_sessions, search_messages |
 | **StorycheckerRepository** | Story validation sessions | storychecker_sessions, storychecker_messages |
-| **PositionAnalysesRepository** | Verdicts from 3 agents (storychecker/consensus_gap/fundamental) | position_analyses (agent field) |
+| **PositionAnalysesRepository** | Verdicts from 3+ agents (storychecker/consensus_gap/fundamental) | position_analyses (agent field) |
 | **StructuralScansRepository** | Structural change scan runs | structural_scan_runs, structural_scan_messages |
 | **WealthSnapshotRepository** | Historical portfolio snapshots | wealth_snapshots |
 | **ScheduledJobsRepository** | Periodic agent runs | scheduled_jobs |
@@ -73,7 +75,7 @@ High-level: One repository per entity. Each wraps SQLite + encryption.
 
 ---
 
-## Agents (10 total)
+## Agents (12 total)
 
 ### Local (Private 🔒, Ollama)
 
@@ -83,13 +85,19 @@ High-level: One repository per entity. Each wraps SQLite + encryption.
 - **Tools**: `add_portfolio`, `get_positions`, `update_position`, `delete_position`
 - **Storage**: None (stateless, tools hit repos directly)
 
-#### RebalanceAgent
-- **Purpose**: Portfolio rebalancing analysis using Josef's Rule (1/3 Aktien / 1/3 Renten+Geld / 1/3 Rohstoffe)
-- **Input**: Selected skill + optional user context
-- **Session**: rebalance_sessions (portfolio snapshot + skill stored)
-- **Context**: Handelbares + Nicht-handelbares Vermögen, Cloud verdicts (fundamental/consensus_gap), Kaufkandidaten (Watchlist)
-- **Output**: Rebalancing recommendations + chat history
-- **Storage**: RebalanceRepository (sessions + messages)
+#### PortfolioStoryAgent
+- **Purpose**: Evaluate portfolio positions against investment narrative
+- **Input**: Portfolio context + position list + optional skill selection
+- **Skills**: Optional narrative focus (e.g., Josef's Regel, defensive investing)
+- **Session**: Stateless single-call analysis with optional skill guidance
+- **Storage**: PositionAnalysesRepository (story fit assessments, optional)
+
+#### WatchlistCheckerAgent
+- **Purpose**: Evaluate watchlist candidates for portfolio fit
+- **Input**: Watchlist candidates + portfolio story + optional skill selection
+- **Skills**: Optional evaluation focus (e.g., Josef's Regel alignment)
+- **Output**: Per-position fit assessment and recommendations
+- **Storage**: PositionAnalysesRepository (watchlist verdicts)
 
 #### MarketDataAgent
 - **Purpose**: Fetch and store current prices + historical data
@@ -152,6 +160,14 @@ High-level: One repository per entity. Each wraps SQLite + encryption.
 - **Batch Mode**: `analyze_portfolio()` checks all positions
 - **Storage**: PositionAnalysesRepository (agent='fundamental')
 
+#### FundamentalAnalyzerAgent
+- **Purpose**: Deep multi-turn fundamental analysis for individual positions
+- **Model**: Claude Sonnet (requires web_search)
+- **Session**: In-memory sessions with multi-turn chat
+- **Method**: Session-based conversation; verdicts extracted and persisted
+- **Output**: Detailed fundamental analysis + investment memo
+- **Storage**: PositionAnalysesRepository (agent='fundamental_analyzer')
+
 ---
 
 ## Data Model Highlights
@@ -176,17 +192,19 @@ High-level: One repository per entity. Each wraps SQLite + encryption.
 - **Renten/Geld**: investment_type ∈ {Renten, Geld}
 - **Rohstoffe+Immobilien**: investment_type ∈ {Edelmetalle, Krypto, Immobilien}
 
-Mapping in `agents/rebalance_agent.py`:
+Mapping in `core/portfolio_stability.py`:
 ```python
-_JOSEF_CATEGORY = {
+JOSEF_CATEGORY = {
     "Wertpapiere": "Aktien",
     "Renten": "Renten/Geld",
     "Geld": "Renten/Geld",
     "Edelmetalle": "Rohstoffe",
     "Krypto": "Rohstoffe",
-    "Immobilien": "Rohstoffe",  # ← Fixed in Commit 19abc12
+    "Immobilien": "Rohstoffe",  # Rents + Real Estate as one pillar
 }
 ```
+
+**Reusable Module**: `core/portfolio_stability.py` provides `compute_josef_allocation(valuations)` for use across agents and pages.
 
 ### position_analyses (agent-agnostisch)
 Shared table for 3 agents; `agent` field distinguishes:
@@ -270,8 +288,8 @@ skills:
 ```
 
 **System Skills** (hidden from UI, never user-editable):
-- `rebalance.josef_rule` — 1/3 allocation hint
-- `rebalance.cash_split` — handelbares vs. nicht-handelbares distinction
+- None currently; Josef's Regel now in core module and injected via agents where needed
+- Skills are user-editable and visible per agent area (portfolio, research, watchlist_checker, portfolio_story, etc.)
 
 ### `config/asset_classes.yaml`
 12 asset classes with metadata. No DB migration needed; read on startup.
@@ -494,4 +512,4 @@ See BACKLOG.md for items **[DEBT-2, DEBT-11, DEBT-13, DEBT-14, DEBT-15, DEBT-16]
 
 ---
 
-*Last updated: 2026-04-11*
+*Last updated: 2026-04-15 (Skills Architecture Refactoring Phase Complete)*

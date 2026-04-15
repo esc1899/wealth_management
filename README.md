@@ -39,15 +39,17 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **News Digest** — recent news for all portfolio positions, filtered by investment strategy
 - **Investment Search** — screen for new opportunities; thesis saved automatically to watchlist
 - **Story Checker** — validates investment theses against current news and fundamentals
-- **Fundamental Value** — per-position valuation via P/E, P/B, EV/EBITDA, DCF, PEG; verdict: undervalued / fair / overvalued
+- **Fundamental Analyzer** — in-depth fundamental analysis of individual positions with multi-turn chat (cloud, Claude)
+- **Watchlist Checker** — evaluates which watchlist positions fit into current portfolio (local, Ollama)
 
 ### Claude Strategy (cloud, Claude Sonnet + web search)
 - **Structural Change Scanner** — identifies irreversible market shifts not yet priced by consensus; adds candidates directly to watchlist
 - **Consensus Gap Analysis** — measures the gap between your investment thesis and market consensus per position
-- All verdicts from all agents feed back into the Rebalance context automatically
+- All verdicts from all agents feed back into the portfolio context automatically
 
 ### System
-- **Skills System** — reusable prompt templates for every agent; AI-assisted generation in Settings
+- **Skills Management** — dedicated page (System → Skills) with CRUD for reusable prompt templates; AI-assisted generation
+- **Skills Integration** — optional user-selectable skills for WatchlistChecker, PortfolioStory, and other agents
 - **Per-agent Model Selection** — choose Ollama and Claude models individually at runtime
 - **Scheduled Tasks** — run cloud agents automatically on a schedule (daily / weekly / monthly)
 - **Cost & Token Tracking** — per-agent/skill/model token counts and USD costs; split by manual vs. scheduled runs; daily trend chart; non-destructive per-row reset
