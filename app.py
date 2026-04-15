@@ -117,7 +117,7 @@ pg = st.navigation({
         st.Page("pages/news_chat.py",       title=t("nav.news_chat"),        icon=":material/newspaper:"),
         st.Page("pages/search_chat.py",     title=t("nav.search_chat"),      icon=":material/manage_search:"),
         st.Page("pages/storychecker.py",    title=t("nav.storychecker"),     icon=":material/fact_check:"),
-        st.Page("pages/fundamental.py",     title=t("nav.fundamental"),      icon=":material/calculate:"),
+        st.Page("pages/fundamental_analyzer.py", title="Fundamental Analyzer", icon=":material/calculate:"),
     ],
     t("nav.group_claude_strategy"): [
         st.Page("pages/structural_scan.py", title=t("nav.structural_scan"),  icon=":material/radar:"),

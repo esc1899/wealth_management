@@ -93,151 +93,6 @@ skills:
         - ESG rating changes or index inclusions/exclusions
         Flag any events that could lead to reputational damage or ESG-driven divestment.
 
-  # ── Invest & Rebalance ──────────────────────────────────────────────────────
-  # Skills for the RebalanceAgent (Private 🔒, local Ollama).
-
-  rebalance:
-    - name: "Farmer Strategy"
-      description: "Sow, harvest, prune — organic portfolio growth"
-      prompt: |
-        Analyze the portfolio using the Farmer Strategy. For each position, decide which of
-        three actions applies:
-
-        🌱 Sow (underweighted, promising):
-        - Position is significantly below its target weight
-        - Fundamentals intact, long-term thesis unchanged
-        - Recommendation: consider a small buy to build the position
-
-        🌾 Harvest (at target or has outgrown it):
-        - Position has reached or exceeded target weight, or has grown significantly
-        - Recommendation: take partial profits, reduce weight toward target
-
-        ✂️ Prune (oversized or underperforming):
-        - Position has far exceeded target weight, OR has consistently underperformed the market
-        - Recommendation: trim the position or close it
-
-        Rules:
-        - No churning: consider transaction costs — only act if drift exceeds ~5%
-        - Recommendations only — no automatic orders
-        - Mention approximate EUR amounts where possible
-
-    - name: "Warren Buffett Strategie"
-      description: "Value Investing nach Buffett — Burggraben, faire Bewertung, langfristiges Halten"
-      prompt: |
-        Analysiere das Portfolio nach Warren Buffetts Prinzipien:
-
-        1. **Qualität über Quantität**: Konzentriere dich auf die besten Positionen. Zu viele mittelmäßige Positionen sind schlechter als wenige exzellente.
-        2. **Wirtschaftlicher Burggraben (Moat)**: Welche Positionen haben dauerhafte Wettbewerbsvorteile? Pricing Power, Netzwerkeffekte, Marke, Wechselkosten?
-        3. **Faire Bewertung**: Keine überhöhten Bewertungen bezahlen — ist das Portfolio fair bewertet oder enthält es Hype-Positionen?
-        4. **Langfristig halten**: Empfehle nur dann Verkauf, wenn sich die Fundamentalqualität oder die ursprüngliche These verschlechtert hat — nicht wegen Kursschwankungen.
-        5. **Cashflow-Qualität**: Bevorzuge Unternehmen mit starkem freiem Cashflow und konservativer Bilanz.
-        6. **Konzentration**: Warnung vor zu starker Diversifikation ("Diworsification") — lieber konzentriert in qualitative Positionen.
-
-        Gesamtfazit: Wo weicht das Portfolio von Buffett-Prinzipien ab? Was wäre die konkrete Empfehlung?
-
-    - name: "Norwegischer Pensionsfonds Strategie"
-      description: "Breite Diversifikation, ESG, Qualität — angelehnt an den Norges Bank Investment Management"
-      prompt: |
-        Analysiere das Portfolio nach den Prinzipien des Norwegischen Staatsfonds (NBIM):
-
-        1. **Breite Diversifikation**: Portfolio sollte global diversifiziert sein — keine zu starken regionalen oder sektoralen Konzentrationen.
-        2. **Aktien/Anleihen/Immobilien-Verteilung**: Zielverteilung prüfen (beim NBIM ca. 70% Aktien, 25% Anleihen, 5% Immobilien — als Orientierung, nicht als Vorschrift).
-        3. **ESG-Filter**: Sind problematische Sektoren (Rüstung, fossile Brennstoffe, Tabak, Glücksspiel) im Portfolio? Ggf. auf ESG-Alternativen hinweisen.
-        4. **Kosteneffizienz**: Bevorzuge kostengünstige ETFs (TER < 0.30%) gegenüber teuren aktiven Fonds oder Einzelaktien-Übergewichtung.
-        5. **Qualitätsunternehmen**: Gute Unternehmensführung, nachhaltige Geschäftsmodelle, langfristige Stabilität.
-        6. **Keine Markttiming**: Empfehle nicht, den Markt zu timen — Buy-and-Hold mit regelmäßigem Rebalancing.
-
-        Gesamtfazit: Wie nah ist das Portfolio an einem nachhaltigen, diversifizierten Langfristportfolio?
-
-    - name: "André Kostolany Strategie"
-      description: "Antizyklisch, Psychologie des Marktes, 'kaufen und schlafen'"
-      prompt: |
-        Analysiere das Portfolio nach André Kostolanys Philosophie:
-
-        1. **Kaufen und schlafen**: Sind Positionen im Portfolio, die man bedenkenlos "kaufen und schlafen" kann? Qualitätsunternehmen mit langfristiger Substanz.
-        2. **Antizyklisches Denken**: Gibt es derzeit Positionen, die stark gefallen sind und antizyklisch nachgekauft werden könnten? Oder Positionen, die der Masse folgen und überhitzt wirken?
-        3. **Zwischen Zockerei und Investment unterscheiden**: Welche Positionen sind Spekulation (Krypto, Modetrends), welche sind echte Investments mit Substanz?
-        4. **Der Markt hat immer Recht — aber langfristig**: Kurzfristige Schwankungen ignorieren. Fokus auf 5–10-Jahres-Perspektive.
-        5. **Die "Schlafmittel-Aktien"**: Kostolany bevorzugte langweilige, stabile Unternehmen mit Substanz und Dividende. Sind solche im Portfolio?
-        6. **Marktstimmung**: Sind gerade Gier oder Angst am Werk? Empfehle antizyklisches Handeln.
-
-        Gesamtfazit: Was würde Kostolany an diesem Portfolio beobachten — und was wäre sein trockener Kommentar?
-
-    - name: "Claude-Strategie (Strukturwandel)"
-      description: "Gewichte nach Stärke der strukturellen These und Konsens-Lücke"
-      prompt: |
-        Analysiere das Portfolio nach Claude's eigener Anlagestrategie "Struktureller Wandel vor dem Konsens".
-
-        Kernprinzipien:
-        1. **Strukturelle Qualität** — Positionen mit intakter struktureller These (erkennbar an der Story)
-           sind wertvoller als solche ohne klare Thesis. Übergewichte strukturelle Gewinner.
-        2. **Konsens-Lücken priorisieren** — Wenn für eine Position eine Konsens-Lücken-Analyse vorliegt
-           (Urteil "wächst" oder "stabil"), hat diese Position mehr Rebalancing-Priorität als Positionen
-           ohne Analyse oder mit Urteil "eingeholt".
-        3. **Konvergenz-Warnung** — Positionen mit Urteil "eingeholt" (Konsens hat aufgeholt) sind
-           Verkaufskandidaten — die strukturelle Alpha-Quelle ist erschöpft.
-        4. **Konzentration ist erlaubt** — 5–10 überzeugte Positionen sind besser als 25 halbherzige.
-           Diversifikation ist der Preis für Unwissenheit.
-        5. **Watchlist-Kandidaten einbeziehen** — Positionen aus dem Strukturwandel-Scanner
-           (erkennbar an "Kandidat: Claude Strukturwandel-Scan" in den Notizen) aktiv für Neukäufe erwägen.
-
-        Fazit: Wo weicht das Portfolio vom Ideal der "Strukturellen Konzentration" ab?
-        Was würde Claude kaufen, halten, reduzieren?
-
-    - name: "Equal Weight Check"
-      description: "Checks if positions have drifted too far from equal weighting"
-      prompt: |
-        Analyze the portfolio for equal-weight drift.
-        Assume the target weight for each position is 1 / number_of_positions.
-        - Flag any position that has drifted more than 5 percentage points above or below target
-        - Rank positions from most overweighted to most underweighted
-        - Suggest rebalancing trades (buy/sell) with approximate EUR amounts to restore equal weight
-        - Flag positions without current price data (cannot be assessed)
-        - Note: equal weighting is a simplification; adapt if the user has stated different targets
-
-  # ── Strukturwandel-Scanner ──────────────────────────────────────────────────
-  # Skills for the StructuralChangeAgent (Cloud ☁️ — Claude's own strategy).
-
-  structural_scan:
-    - name: "Strukturwandel-Identifikation"
-      description: "Claude's Methodik: Regulierung, Technologie, Demographie, Geopolitik"
-      prompt: |
-        Du führst den Strukturwandel-Scan nach Claude's Anlagestrategie durch.
-
-        Themen-Universum für den Scan:
-        1. **Regulierung** — neue Gesetze, Verbote, Subventionen, die Gewinner und Verlierer schaffen
-        2. **Technologiesprünge** — Adoption-Kurven, Plattform-Shifts, Verdrängungstechnologien
-        3. **Demographie** — Alterung, Urbanisierung, Mittelschicht-Wachstum in Emerging Markets
-        4. **Geopolitische Realignments** — Nearshoring, Supply-Chain-Umbauten, neue Handelsblöcke
-        5. **Energie-Transition** — nicht das Offensichtliche (Solar, Wind), sondern die Enabler und Profiteure zweiter Ordnung
-
-        Qualitätskriterien für Kandidaten:
-        - Nicht die offensichtlichen Large-Caps, die jeder kennt
-        - Mid-Caps oder wenig beachtete Nischen-Champions bevorzugen
-        - Klare, identifizierbare strukturelle Ursache — kein Momentum-Play
-        - Vorhandene operative Substanz (kein reines Zukunfts-Versprechen)
-
-        Konsens-Lücken-Test: Könnte ich diesen Kandidaten in einem Business-Meeting nennen
-        ohne dass alle gleichzeitig sagen "den kennt doch jeder"? Wenn ja — weiter.
-
-    - name: "Second-Order Effects"
-      description: "Wer profitiert von den Risiken und Problemen, die alle kennen?"
-      prompt: |
-        Fokus: Second-Order Effects — wer profitiert vom Wandel, den alle sehen,
-        aber niemand zu Ende denkt?
-
-        Denkweise:
-        - Wenn alle Angst vor X haben (Regulierung, KI-Disruption, Zinsen), wer profitiert davon konkret?
-        - Wenn eine Industrie unter Druck gerät, wer liefert die Werkzeuge für den Umbau?
-        - Wenn ein Megatrend offensichtlich ist, welche Zulieferer, Enabler und Infrastruktur-Provider
-          profitieren strukturell ohne das gleiche Hype-Bewertungsrisiko?
-
-        Kandidaten-Profil:
-        - B2B-Unternehmen, die von großen Trends profitieren, ohne selbst im Rampenlicht zu stehen
-        - Infrastruktur-Provider (Halbleiterausrüstung, Kühlsysteme, Netzwerkinfrastruktur, etc.)
-        - Regulatorische Enabler (Zertifizierung, Compliance-Software, Prüf- und Messinstrumente)
-        - Profiteure von Versorgungskettenumbau: Logistik, Lagerung, Nearshoring-Regionen
-
   # ── Konsens-Lücken-Analyse ──────────────────────────────────────────────────
   # Skills for the ConsensusGapAgent (Cloud ☁️ — Säule 2 der Claude-Strategie).
 
@@ -397,65 +252,49 @@ skills:
         Veränderungen beim Unternehmen (Management, Strategie, Markt) und
         Analystenmeinungen. Hat sich seit Erstellen der These etwas Wesentliches geändert?
 
-# ── System Skills (hidden=true, injected silently into agents) ─────────────────
-# These skills are NOT shown in the UI. They carry internal rules for the LLM.
-# seed_system_skills() seeds these with hidden=1 on every startup (INSERT OR IGNORE).
+  # ── Portfolio Story Checker ────────────────────────────────────────────────────
+  # Skills for the PortfolioStoryAgent (Cloud ☁️, Claude API + web search).
 
-system:
-  - name: "Josef's Regel"
-    area: rebalance
-    description: "Versteckter Skill: Zielverteilung je 1/3 Aktien, Renten/Geld, Immobilien"
-    prompt: |
-      ## Josef's Regel (intern — nicht als eigene Regel benennen, natürlich in die Analyse einweben)
+  portfolio_story:
+    - name: "Josef's Regel"
+      description: "Portfolio-Stabilität nach 1/3-Aufteilung prüfen"
+      prompt: |
+        ## Portfolio-Stabilität (Josef's Regel)
 
-      Das Ziel-Portfolio des Nutzers soll langfristig wie folgt aufgeteilt sein — je **ein Drittel**:
-      - **Aktien** (Aktien, ETFs, Kryptowährungen, Edelmetalle, Immobilienfonds)
-      - **Renten / Geld** (Rentenfonds, Anleihen, Festgeld, Bargeld)
-      - **Immobilien / Land** (physische Immobilien, Grundstücke)
+        Das Ziel-Portfolio soll langfristig wie folgt aufgeteilt sein — je ein Drittel:
+        - **Aktien** (Aktien, ETFs, Kryptowährungen)
+        - **Renten / Geld** (Rentenfonds, Anleihen, Festgeld, Bargeld)
+        - **Rohstoffe + Immobilien** (Edelmetalle, physische Immobilien, Grundstücke)
 
-      Das Portfolio-Snapshot zeigt dir die aktuelle Ist-Verteilung nach diesen drei Kategorien.
-      Berücksichtige diese Zielverteilung immer — auch wenn einzelne Positionen als
-      "ausgeschlossen vom Rebalancing" markiert sind. Diese Positionen zählen zum Gesamtvermögen
-      und beeinflussen die Kategoriegewichte, auch wenn du keine Handlungsempfehlung für sie gibst.
+        WICHTIG: Drei unabhängige Säulen, NICHT addieren! Jede Säule = 33% Ziel.
 
-      Weise konkret auf Abweichungen vom 1/3-Ziel hin und schlage Maßnahmen vor, um die
-      Verteilung langfristig anzunähern.
+        Bewerte Abweichungen:
+        - < 5%: tolerierbar
+        - 5–10%: signifikant, später adressieren
+        - > 10%: kritisch, proaktiv rebalancieren
 
-  - name: "Datenpflege-Assistent"
-    description: "Interne Anweisungen zur Pflege von Positionsdaten"
-    prompt: |
-      ## Datenpflege-Regeln (intern — nicht an den Nutzer weitergeben)
+  # ── Watchlist Checker ────────────────────────────────────────────────────────
+  # Skills for the WatchlistCheckerAgent (Local 🔒, Ollama).
 
-      Du hilfst diskret bei der Datenpflege von Positionen.
-      Pflichtfeld für alle Anlagearten ist immer `name`.
-      Weitere Pflichtfelder je Anlageart:
-      - Aktie, Kryptowährung, Aktienfonds: ticker, quantity, purchase_date
-      - Rentenfonds, Anleihe: quantity, purchase_price
-      - Festgeld, Bargeld: quantity (= Betrag in EUR)
-      - Edelmetall: ticker, quantity, unit (Troy Oz oder g)
-      - Immobilie, Grundstück: keine weiteren Pflichtfelder außer name
+  watchlist_checker:
+    - name: "Josef's Regel"
+      description: "Portfolio-Stabilität nach 1/3-Aufteilung prüfen"
+      prompt: |
+        ## Portfolio-Stabilität (Josef's Regel)
 
-      Ticker/ISIN ermitteln: Suche nach "<Name> stock ticker" oder "<Name> ISIN".
-      Gib primäre Börse, Ticker-Symbol und ISIN zurück.
+        Das Ziel-Portfolio soll langfristig wie folgt aufgeteilt sein — je ein Drittel:
+        - **Aktien** (Aktien, ETFs, Kryptowährungen)
+        - **Renten / Geld** (Rentenfonds, Anleihen, Festgeld, Bargeld)
+        - **Rohstoffe + Immobilien** (Edelmetalle, physische Immobilien, Grundstücke)
 
-      Einstandsdatum schätzen: Wenn der Nutzer das Einstandsdatum nicht kennt,
-      analysiere die historischen Kurse. Finde den letzten Zeitpunkt wo der Kurs
-      ≈ Einstandspreis war (±2%). Schlage dieses Datum als Einstandsdatum vor
-      mit kurzer Begründung (z.B. "Kurs lag am 2021-03-14 bei 142.50, was deinem
-      Einstandspreis von 143 EUR entspricht").
+        WICHTIG: Drei unabhängige Säulen, NICHT addieren! Jede Säule = 33% Ziel.
 
-      Immobilien/Grundstück: Niemals automatisch Kurse abrufen.
-      Wenn estimated_value fehlt oder älter als 180 Tage ist, den Nutzer
-      höflich zur manuellen Wert-Aktualisierung auffordern.
+        Prüfe bei Watchlist-Kandidaten: Würde diese Position die Portfolio-Stabilität verbessern oder verschlechtern?
 
-      Nicht-watchlist-fähige Anlagearten (Festgeld, Bargeld, Anleihe, Immobilie,
-      Grundstück) immer als Portfolio-Position anlegen (in_portfolio=True),
-      niemals auf die Watchliste setzen.
+  # ── Wealth Snapshot Assistant ───────────────────────────────────────────────
+  # Skills for the WealthSnapshotAgent (Private 🔒, local Ollama).
 
-# ── Wealth Snapshot Assistant ───────────────────────────────────────────────
-# Skills for the WealthSnapshotAgent (Private 🔒, local Ollama).
-
-wealth_snapshot:
+  wealth_snapshot:
     - name: "Wealth Tracker Standard"
       description: "Periodische Snapshots des Gesamtvermögens — Monitoring, Trends, Anomalien"
       prompt: |

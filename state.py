@@ -12,13 +12,11 @@ from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET
 from agents.consensus_gap_agent import ConsensusGapAgent
 from agents.fundamental_agent import FundamentalAgent
 from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
-from agents.investment_compass_agent import InvestmentCompassAgent
 from agents.market_data_agent import MarketDataAgent
 from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
 from agents.news_agent import NewsAgent
 from agents.portfolio_agent import PortfolioAgent
 from agents.portfolio_story_agent import PortfolioStoryAgent
-from agents.rebalance_agent import RebalanceAgent
 from agents.research_agent import ResearchAgent
 from agents.search_agent import SearchAgent
 from agents.storychecker_agent import StorycheckerAgent
@@ -41,7 +39,6 @@ from core.storage.base import build_encryption_service, get_connection, init_db,
 from core.storage.market_data import MarketDataRepository
 from core.storage.positions import PositionsRepository
 from core.storage.news import NewsRepository
-from core.storage.rebalance import RebalanceRepository
 from core.storage.research import ResearchRepository
 from core.storage.scheduled_jobs import ScheduledJobsRepository
 from core.storage.search import SearchRepository
@@ -158,11 +155,6 @@ def get_research_repo() -> ResearchRepository:
 @st.cache_resource
 def get_news_repo() -> NewsRepository:
     return NewsRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_rebalance_repo() -> RebalanceRepository:
-    return RebalanceRepository(get_db_connection())
 
 
 @st.cache_resource
@@ -288,19 +280,6 @@ def get_storychecker_agent() -> StorycheckerAgent:
 
 
 @st.cache_resource
-def get_rebalance_agent() -> RebalanceAgent:
-    model = _get_agent_model("rebalance", "ollama", _DEFAULT_OLLAMA_MODEL)
-    llm = _make_ollama_provider(model, "rebalance_chat")
-    return RebalanceAgent(
-        positions_repo=get_positions_repo(),
-        market_repo=get_market_repo(),
-        analyses_repo=get_analyses_repo(),
-        llm=llm,
-        skills_repo=get_skills_repo(),
-    )
-
-
-@st.cache_resource
 def get_scheduled_jobs_repo() -> ScheduledJobsRepository:
     return ScheduledJobsRepository(get_db_connection())
 
@@ -409,20 +388,6 @@ def get_watchlist_checker_agent() -> WatchlistCheckerAgent:
         positions_repo=get_positions_repo(),
         analyses_repo=get_analyses_repo(),
         llm=llm,
-    )
-
-
-@st.cache_resource
-def get_investment_compass_agent() -> InvestmentCompassAgent:
-    model = _get_agent_model("investment_compass", "ollama", _DEFAULT_OLLAMA_MODEL)
-    llm = _make_ollama_provider(model, "investment_compass")
-    return InvestmentCompassAgent(
-        positions_repo=get_positions_repo(),
-        market_repo=get_market_repo(),
-        analyses_repo=get_analyses_repo(),
-        portfolio_story_repo=get_portfolio_story_repo(),
-        llm=llm,
-        skills_repo=get_skills_repo(),
     )
 
 

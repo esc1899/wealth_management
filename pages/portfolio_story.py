@@ -214,7 +214,7 @@ else:
                 valuations = get_market_agent().get_portfolio_valuation()
 
                 if portfolio:
-                    from agents.rebalance_agent import JOSEF_CATEGORY
+                    from core.portfolio_stability import JOSEF_CATEGORY
 
                     # Tradeable positions (börsengehandelt = haben ticker)
                     snapshot_lines = ["**Portfolio Snapshot (Börsengehandelte Positionen)**\n"]
@@ -264,7 +264,7 @@ else:
                 dividend_yield = (total_dividend / total_value * 100) if total_value > 0 else 0
 
                 from agents.portfolio_story_agent import PortfolioMetrics
-                from agents.rebalance_agent import compute_josef_allocation
+                from core.portfolio_stability import compute_josef_allocation
 
                 # Compute real Josef-Regel allocation from actual portfolio valuations
                 josef = compute_josef_allocation(valuations)

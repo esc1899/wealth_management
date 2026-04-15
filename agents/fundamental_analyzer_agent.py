@@ -206,13 +206,23 @@ class FundamentalAnalyzerAgent:
     # ------------------------------------------------------------------
 
     def _run_llm(self, session: AnalyzerSession) -> str:
-        """Execute LLM call with web search tool."""
+        """Execute LLM call — inject system message into session messages."""
+        from core.llm.base import Message, Role
+
         self._llm.skill_context = "fundamental_analyzer"
+
+        # Build message list with system prompt injected
+        messages = [Message(role=Role.SYSTEM, content=BASE_SYSTEM_PROMPT)]
+
+        # Add existing session messages
+        for msg in session.messages:
+            role = Role.USER if msg["role"] == "user" else Role.ASSISTANT
+            messages.append(Message(role=role, content=msg["content"]))
+
+        # Call chat (non-tool version for now — web search via prompt instruction)
         response = self._llm.chat(
-            messages=session.to_messages_api(),
-            system=BASE_SYSTEM_PROMPT,
-            tools=[WEB_SEARCH_TOOL],
-            max_tool_calls=MAX_TOOL_ITERATIONS,
+            messages=messages,
+            max_tokens=4096,
         )
         return response
 

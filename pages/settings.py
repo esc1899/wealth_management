@@ -291,11 +291,9 @@ def _claude_sel(agent_key: str, label: str) -> str:
     return st.selectbox(label, options=_CLAUDE_MODELS, index=idx, key=f"_model_claude_{agent_key}")
 
 st.markdown(f"**{t('settings.ollama_agents_header')}** 🔒")
-col_o1, col_o2 = st.columns(2)
+col_o1 = st.columns(1)[0]
 with col_o1:
     sel_portfolio = _ollama_sel("portfolio", t("settings.agent_portfolio_chat"))
-with col_o2:
-    sel_rebalance = _ollama_sel("rebalance", t("settings.agent_rebalance"))
 
 st.markdown(f"**{t('settings.claude_agents_header')}** ☁️")
 col_c1, col_c2, col_c3 = st.columns(3)
@@ -317,7 +315,6 @@ with col_s3:
 
 if st.button(t("settings.save_models_button"), key="_save_models_btn", use_container_width=False):
     app_config.set("model_ollama_portfolio", sel_portfolio)
-    app_config.set("model_ollama_rebalance", sel_rebalance)
     app_config.set("model_claude_news", sel_news)
     app_config.set("model_claude_search", sel_search)
     app_config.set("model_claude_storychecker", sel_storychecker)
