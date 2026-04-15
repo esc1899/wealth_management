@@ -555,7 +555,8 @@ Full Analysis:
             )
 
             st.success("✅ Watchlist-Prüfung durchgeführt!")
-            st.session_state["_watchlist_check_result"] = result
+            # Store the saved analysis from DB (has summary + fit_counts fields)
+            st.session_state["_watchlist_check_result"] = saved_analysis
             st.session_state["_watchlist_check_analysis_id"] = saved_analysis.id
 
         except Exception as e:

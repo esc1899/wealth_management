@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(pytest tests/ -x -q)",
-      "Bash(python3 -c ':*)"
+      "Bash(python3 -c ':*)",
+      "Bash(rm -rf ~/.streamlit/*.json)",
+      "Bash(rm -rf /tmp/.streamlit*)"
     ]
   }
 }
