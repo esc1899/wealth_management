@@ -458,14 +458,17 @@ if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
         # Build complete context (analog to Portfolio Story)
         portfolio = positions_repo.get_portfolio()
         market_agent = get_market_agent()
-        valuations = market_agent.get_portfolio_valuation() if market_agent else {}
+
+        # Get valuations as dict (position_id -> PortfolioValuation)
+        valuations_list = market_agent.get_portfolio_valuation() if market_agent else []
+        valuations = {v.position_id: v for v in valuations_list} if valuations_list else {}
 
         # Portfolio snapshot with values + Josef-Regel categories
         portfolio_snapshot = "## Portfolio\n"
         if portfolio:
             for p in portfolio:
-                val = valuations.get(p.id, {})
-                val_eur = val.get("value_eur", 0)
+                val = valuations.get(p.id)
+                val_eur = val.value_eur if val else 0
                 portfolio_snapshot += f"- {p.name} ({p.ticker}, {p.asset_class}): {val_eur:.0f}€\n"
         else:
             portfolio_snapshot += "(Leer)\n"
