@@ -52,6 +52,11 @@ class PortfolioStoryAgent:
         self._market = market_repo
         self._skills_repo = skills_repo
 
+    @property
+    def model(self) -> str:
+        """Return the LLM model name."""
+        return self._llm.model
+
     async def generate_story_draft(
         self,
         positions_summary: str,
@@ -134,7 +139,8 @@ class PortfolioStoryAgent:
             f"Rohstoffe + Immo: {metrics.josef_rohstoffe_pct:.0f}%"
         )
 
-        system_prompt = f"""Du bist ein kritischer Portfolio-Analyst der bewertet ob ein Portfolio mit den Zielen des Investors aligned ist.
+        # Build BASE system prompt (without specific stability rule — that comes from skills)
+        base_prompt = f"""Du bist ein kritischer Portfolio-Analyst der bewertet ob ein Portfolio mit den Zielen des Investors aligned ist.
 
 Portfolio-These (Narrativ):
 {story.story}
@@ -160,36 +166,11 @@ Antworte IMMER in diesem exakten Format (drei Sektionen mit je eigenem Urteil):
 
 ### Einschätzung im Kontext der Ziele
 
-## Josef's Regel — Krisenschutz-Prinzip
-Die angestrebte Verteilung (je ca. 1/3) ist BEWUSST konstruiert für Krisensicherheit.
-**WICHTIG: Drei unabhängige Säulen, NICHT addieren!**
-
-- **Säule 1 — Aktien: 1/3** (Wachstum + Schutz bei Inflation und wirtschaftlichem Boom)
-- **Säule 2 — Renten/Geld: 1/3** (Sicherer Hafen bei Deflation, Rezession und Aktiencrash)
-- **Säule 3 — Rohstoffe + Immobilien: 1/3 ZUSAMMEN**
-  (Edelmetalle + Infrastrukturfonds + physische Immobilien zählen ZUSAMMEN als eine Säule.
-  NICHT addieren: Rohstoffe 33% + Immobilien 33% = falsch! Es ist zusammen 1/3.)
-  Zweck: Inflationsschutz + Sachwerterhalt (unabhängig von Märkten)
-
-**Das Kernprinzip:** In JEDER Wirtschaftslage wächst oder stabilisiert sich mindestens eine Säule.
-Eine Verteilung **nahe bei 1/3 pro Säule = bewusst krisensicher**. Dies ist die Stärke des Konzepts.
-Abweichungen von ±5–10 Prozentpunkten pro Säule = erhöhtes Szenario-Risiko.
-
 ## Stabilität
 **Stabilitäts-Urteil:** 🟢 Stabil | 🟡 Achtung | 🔴 Instabil
 > {{EIN-SATZ-FAZIT}}
 
-Beurteile die Stabilität anhand der aktuellen Gewichtung (drei unabhängige Säulen):
-- **Säule-Bewertung (je 1/3-Ziel)**:
-  - Säule 1 Aktien: {metrics.josef_aktien_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_aktien_pct - 33:.0f}pp)
-  - Säule 2 Renten/Geld: {metrics.josef_renten_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_renten_pct - 33:.0f}pp)
-  - Säule 3 Rohstoffe + Immo: {metrics.josef_rohstoffe_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_rohstoffe_pct - 33:.0f}pp)
-- **Szenario-Anfälligkeit pro Säule**: Welche Wirtschaftsszenarien sind durch Über/Untergewicht einer Säule riskanther?
-  - Übergewicht Aktien = Aktiencrash-Risiko | Untergewicht = Inflations-Exposur
-  - Übergewicht Renten/Geld = Deflations-Exposur, aber weniger Wachstum | Untergewicht = Rezessions-Risiko
-  - Übergewicht Rohstoffe/Immo = Liquiditäts-Einschränkung | Untergewicht = Inflations-Risiko
-- **Passung zu Zielen**: Passt die Säulen-Gewichtung zum Zeithorizont ({story.target_year or 'offen'}) und Priorität ({story.priority})?
-- **Liquiditätsbedarf**: Sind Renten/Geld ({metrics.josef_renten_pct:.0f}%) + jährliche Dividenden ({metrics.total_annual_dividend_eur:.0f}€) ausreichend? ({story.liquidity_need or 'keiner angegeben'})
+Beurteile die Stabilität mit den Kriterien unten (Fokus-Bereich je nach ausgewählter Stabilitäts-Regel).
 
 ### Fazit zur Stabilität
 
@@ -203,9 +184,26 @@ Gewichtung nach Josef's Regel: {josef_summary}
 Dividenden-Snapshot:
 {dividend_snapshot}{inflation_context}"""
 
-        # Optionally append skill prompt if provided
+        # Build final system prompt: base + stability rule (from skill or default Josef's Regel)
+        system_prompt = base_prompt
         if selected_skill and selected_skill.prompt:
-            system_prompt += f"\n\n## Fokus-Bereich ({selected_skill.name}):\n{selected_skill.prompt}"
+            system_prompt += f"\n\n## Stabilitäts-Fokus: {selected_skill.name}\n{selected_skill.prompt}"
+        else:
+            # Default: if no skill selected, use compact Josef's Regel guidance
+            default_stability = f"""## Stabilitäts-Fokus: Josef's Regel (Standard)
+
+Das Portfolio soll langfristig wie folgt aufgeteilt sein — je ein Drittel:
+- **Säule 1 — Aktien: 1/3** (Wachstum, Inflationsschutz)
+- **Säule 2 — Renten/Geld: 1/3** (Rezessions-Schutz)
+- **Säule 3 — Rohstoffe+Immobilien: 1/3** (Sachwert-Schutz)
+
+Aktuelle Verteilung:
+- Aktien: {metrics.josef_aktien_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_aktien_pct - 33:.0f}pp)
+- Renten/Geld: {metrics.josef_renten_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_renten_pct - 33:.0f}pp)
+- Rohstoffe + Immo: {metrics.josef_rohstoffe_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_rohstoffe_pct - 33:.0f}pp)
+
+Bewerte: Abweichungen > 10% pro Säule = kritisch und adressierungsbedürftig."""
+            system_prompt += f"\n\n{default_stability}"
 
         user_message = "Bitte analysiere mein Portfolio gegen die angegebene These und Ziele."
 

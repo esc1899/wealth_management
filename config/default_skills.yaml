@@ -256,40 +256,91 @@ skills:
   # Skills for the PortfolioStoryAgent (Cloud ☁️, Claude API + web search).
 
   portfolio_story:
-    - name: "Josef's Regel"
-      description: "Portfolio-Stabilität nach 1/3-Aufteilung prüfen"
+    - name: "Josef's Regel (3-Säulen-Stabilität)"
+      description: "Portfolio-Stabilität nach 1/3-Aufteilung: Aktien/Renten/Rohstoffe"
       prompt: |
-        ## Portfolio-Stabilität (Josef's Regel)
+        ## Portfolio-Stabilität: Josef's Regel (3-Säulen-Modell)
 
         Das Ziel-Portfolio soll langfristig wie folgt aufgeteilt sein — je ein Drittel:
-        - **Aktien** (Aktien, ETFs, Kryptowährungen)
-        - **Renten / Geld** (Rentenfonds, Anleihen, Festgeld, Bargeld)
-        - **Rohstoffe + Immobilien** (Edelmetalle, physische Immobilien, Grundstücke)
+        - **Säule 1 — Aktien: 1/3** (Aktien, ETFs, Kryptowährungen)
+        - **Säule 2 — Renten/Geld: 1/3** (Rentenfonds, Anleihen, Festgeld, Bargeld)
+        - **Säule 3 — Rohstoffe+Immobilien: 1/3 ZUSAMMEN** (Edelmetalle, physische Immobilien, Grundstücke)
 
-        WICHTIG: Drei unabhängige Säulen, NICHT addieren! Jede Säule = 33% Ziel.
+        WICHTIG: Drei unabhängige Säulen, NICHT addieren! In jeder Wirtschaftslage wächst oder stabilisiert sich mindestens eine Säule.
 
-        Bewerte Abweichungen:
+        Bewerte Abweichungen pro Säule:
         - < 5%: tolerierbar
         - 5–10%: signifikant, später adressieren
         - > 10%: kritisch, proaktiv rebalancieren
+
+    - name: "Sektor-Limits (Konzentrations-Schutz)"
+      description: "Sektor-Diversifikation: Kein Sektor >25%, max 3 Dominanten"
+      prompt: |
+        ## Portfolio-Stabilität: Sektor-Diversifikation
+
+        Beachte die Sektorgewichtung als Stabilitätsfaktor:
+        - **Kein Sektor > 25%** — zu hohe Branchenspezialisierung ist riskant
+        - **Maximal 3 dominante Sektoren** — Konzentration auf Technologie, Finanzen, Industrie erlaubt, aber nicht mehr
+        - **Mindestens 5 verschiedene Sektoren vertreten** — Breite Risikostreuung
+
+        Sektoren zu verfolgen: Technologie, Finanzen, Industrie, Konsum, Energie, Utilities, Gesundheit, Rohstoffe, Immobilien.
+
+        Bewerte:
+        - Ist das Portfolio überkonzentriert in einen Sektor (>40% Top-Sektor)?
+        - Fehlen ganze Sektoren komplett?
+        - Sind natürliche Hedges vorhanden (z.B. Utilities als Deflations-Schutz neben Tech)?
+
+    - name: "Geographische Streuung (Regional-Diversifikation)"
+      description: "Global diversifiziert: ~1/3 EU, ~1/3 USA, ~1/3 Schwellenländer"
+      prompt: |
+        ## Portfolio-Stabilität: Geographische Diversifikation
+
+        Beachte die Regionalgewichtung als Stabilitätsfaktor:
+        - **~1/3 Europäische Märkte** (Deutschland, EU, UK, Schweiz)
+        - **~1/3 USA + Nord-Amerika** (USA, Kanada)
+        - **~1/3 Emerging Markets + Rest** (Asien, Lateinamerika, Australien, Japan)
+
+        Diese Verteilung schützt vor währungs- und regionsspezifischen Risiken:
+        - Europa: Sichere Märkte, stabiler, niedriges Wachstum
+        - USA: Tech-Innovation, aber höhere Volatilität
+        - Emerging Markets: Wachstum, aber Währungsrisiken
+
+        Bewerte:
+        - Ist das Portfolio zu USA-lastig (z.B. >60% USD-denominiert)?
+        - Fehlt Europa oder Emerging-Market-Exposure komplett?
+        - Wie ist die Währungsdiversifikation (EUR, USD, CHF)?
 
   # ── Watchlist Checker ────────────────────────────────────────────────────────
   # Skills for the WatchlistCheckerAgent (Local 🔒, Ollama).
 
   watchlist_checker:
-    - name: "Josef's Regel"
-      description: "Portfolio-Stabilität nach 1/3-Aufteilung prüfen"
+    - name: "Josef's Regel (3-Säulen-Stabilität)"
+      description: "Watchlist-Fit nach Josef's Regel: Füllt die Portfolio-Lücke?"
       prompt: |
-        ## Portfolio-Stabilität (Josef's Regel)
+        ## Watchlist-Fit: Josef's Regel (3-Säulen-Modell)
 
         Das Ziel-Portfolio soll langfristig wie folgt aufgeteilt sein — je ein Drittel:
-        - **Aktien** (Aktien, ETFs, Kryptowährungen)
-        - **Renten / Geld** (Rentenfonds, Anleihen, Festgeld, Bargeld)
-        - **Rohstoffe + Immobilien** (Edelmetalle, physische Immobilien, Grundstücke)
+        - **Säule 1 — Aktien: 1/3** (Aktien, ETFs, Kryptowährungen)
+        - **Säule 2 — Renten/Geld: 1/3** (Rentenfonds, Anleihen, Festgeld, Bargeld)
+        - **Säule 3 — Rohstoffe+Immobilien: 1/3 ZUSAMMEN** (Edelmetalle, physische Immobilien, Grundstücke)
 
-        WICHTIG: Drei unabhängige Säulen, NICHT addieren! Jede Säule = 33% Ziel.
+        Für jeden Watchlist-Kandidaten prüfen:
+        - Welche Säule ist untergewichtet?
+        - Würde diese Position die Untergewichte schließen?
+        - Hilft es oder macht es die Übergewichte noch schlimmer?
 
-        Prüfe bei Watchlist-Kandidaten: Würde diese Position die Portfolio-Stabilität verbessern oder verschlechtern?
+    - name: "Sektor-Limits (Konzentrations-Schutz)"
+      description: "Watchlist-Fit nach Sektordiversifikation"
+      prompt: |
+        ## Watchlist-Fit: Sektor-Diversifikation
+
+        Portfolio-Stabilitätsziel: Kein Sektor > 25%, mindestens 5 Sektoren vertreten.
+
+        Für jeden Watchlist-Kandidaten prüfen:
+        - In welchem Sektor liegt die Position?
+        - Würde sie einen bereits übergewichtigen Sektor weiter verstärken?
+        - Füllt sie eine Sektorlücke sinnvoll?
+        - Ist das Gesamtportfolio anschließend breiter oder enger aufgestellt?
 
 # ── System Skills (hidden=true, injected silently into agents) ─────────────────
 # These skills are NOT shown in the UI. They carry internal rules for the LLM.
