@@ -12,7 +12,7 @@ from config import config
 from core.health import Severity, check_ollama_connectivity, run_static_checks
 from core.i18n import SUPPORTED_LANGUAGES, current_language, set_language, t
 from core.storage.models import ScheduledJob
-from state import get_agent_scheduler, get_app_config_repo, get_scheduled_jobs_repo, get_skills_repo
+from state import get_agent_scheduler, get_app_config_repo, get_scheduled_jobs_repo
 
 st.set_page_config(page_title="Einstellungen", page_icon="⚙️", layout="wide")
 st.title(t("settings.title"))
@@ -308,7 +308,6 @@ st.divider()
 # ------------------------------------------------------------------
 
 _sched_repo = get_scheduled_jobs_repo()
-_all_skills_repo = get_skills_repo()
 _SCHEDULABLE_AGENTS = {
     "news": t("settings.agent_news"),
     "structural_scan": t("nav.structural_scan"),
@@ -371,27 +370,13 @@ _FREQ_OPTIONS = ["daily", "weekly", "monthly"]
 _FREQ_LABELS = [t(f"settings.freq_{f}") for f in _FREQ_OPTIONS]
 _WEEKDAY_OPTIONS = list(range(7))
 
-# Agent selector outside the form so changing it triggers a rerun and updates skills
-_jf_agent_label = st.selectbox(
-    t("settings.job_agent_label"),
-    options=list(_SCHEDULABLE_AGENTS.keys()),
-    format_func=lambda k: _SCHEDULABLE_AGENTS[k],
-    key="_jf_agent",
-)
-_jf_agent_skills = _all_skills_repo.get_by_area(_jf_agent_label)
-_jf_needs_skill = _jf_agent_label != "storychecker"
-
 with st.form("add_job_form"):
-    if _jf_needs_skill:
-        _jf_skill = st.selectbox(
-            t("settings.job_skill_label"),
-            options=_jf_agent_skills,
-            format_func=lambda s: s.name,
-            key="_jf_skill",
-        )
-    else:
-        _jf_skill = None
-        st.caption(t("settings.storychecker_skill_note"))
+    _jf_agent_label = st.selectbox(
+        t("settings.job_agent_label"),
+        options=list(_SCHEDULABLE_AGENTS.keys()),
+        format_func=lambda k: _SCHEDULABLE_AGENTS[k],
+        key="_jf_agent",
+    )
     _jf_freq_label = st.selectbox(
         t("settings.job_frequency_label"),
         options=_FREQ_LABELS,
@@ -429,21 +414,18 @@ with st.form("add_job_form"):
     _jf_submitted = st.form_submit_button(t("settings.save_button"), use_container_width=True)
 
 if _jf_submitted:
-    if _jf_needs_skill and not _jf_agent_skills:
-        st.error(t("settings.no_agent_skills"))
-    else:
-        _new_job = ScheduledJob(
-            agent_name=_jf_agent_label,
-            skill_name=_jf_skill.name if _jf_skill else "",
-            skill_prompt=_jf_skill.prompt if _jf_skill else "",
-            frequency=_jf_freq,
-            run_hour=int(_jf_hour),
-            run_minute=int(_jf_minute),
-            run_weekday=int(_jf_weekday) if _jf_weekday is not None else None,
-            run_day=int(_jf_day) if _jf_day is not None else None,
-            model=_jf_model or None,
-        )
-        _sched_repo.add(_new_job)
-        get_agent_scheduler().reload_jobs()
-        st.success(t("settings.job_saved"))
-        st.rerun()
+    _new_job = ScheduledJob(
+        agent_name=_jf_agent_label,
+        skill_name="",
+        skill_prompt="",
+        frequency=_jf_freq,
+        run_hour=int(_jf_hour),
+        run_minute=int(_jf_minute),
+        run_weekday=int(_jf_weekday) if _jf_weekday is not None else None,
+        run_day=int(_jf_day) if _jf_day is not None else None,
+        model=_jf_model or None,
+    )
+    _sched_repo.add(_new_job)
+    get_agent_scheduler().reload_jobs()
+    st.success(t("settings.job_saved"))
+    st.rerun()
