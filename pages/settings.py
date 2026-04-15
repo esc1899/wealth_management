@@ -12,7 +12,7 @@ from config import config
 from core.health import Severity, check_ollama_connectivity, run_static_checks
 from core.i18n import SUPPORTED_LANGUAGES, current_language, set_language, t
 from core.storage.models import ScheduledJob
-from state import get_agent_scheduler, get_app_config_repo, get_scheduled_jobs_repo
+from state import get_agent_scheduler, get_app_config_repo, get_scheduled_jobs_repo, get_skills_repo
 
 st.set_page_config(page_title="Einstellungen", page_icon="⚙️", layout="wide")
 st.title(t("settings.title"))
