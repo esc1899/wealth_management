@@ -301,6 +301,17 @@ def init_db(conn: sqlite3.Connection) -> None:
             created_at  TEXT NOT NULL
         )""",
         "CREATE INDEX IF NOT EXISTS idx_portfolio_story_position_fits_position ON portfolio_story_position_fits(position_id)",
+        """CREATE TABLE IF NOT EXISTS watchlist_checker_analyses (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            summary             TEXT,
+            full_text           TEXT,
+            fit_counts          TEXT,
+            position_fits_json  TEXT,
+            skill_name          TEXT,
+            model               TEXT,
+            created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_watchlist_checker_analyses_created ON watchlist_checker_analyses(created_at)",
         """CREATE TABLE IF NOT EXISTS agent_runs (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
             agent_name       TEXT NOT NULL,

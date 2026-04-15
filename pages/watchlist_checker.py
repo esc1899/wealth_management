@@ -8,6 +8,7 @@ Cleanroom Neuimplementierung (2026-04-14):
 """
 
 import asyncio
+import json
 import logging
 import threading
 import time
@@ -26,6 +27,8 @@ from state import (
     get_analyses_repo,
     get_storychecker_repo,
     get_skills_repo,
+    get_watchlist_checker_repo,
+    get_market_agent,
 )
 from core.services.portfolio_comment_service import get_style_by_id
 from config import config
@@ -452,27 +455,33 @@ else:
 
 if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
     with st.spinner("Watchlist wird geprüft..."):
-        # Build context
+        # Build complete context (analog to Portfolio Story)
         portfolio = positions_repo.get_portfolio()
-        market_repo = None  # Would need to import, using placeholder
+        market_agent = get_market_agent()
+        valuations = market_agent.get_portfolio_valuation() if market_agent else {}
 
-        # Portfolio snapshot (simplified)
+        # Portfolio snapshot with values + Josef-Regel categories
         portfolio_snapshot = "## Portfolio\n"
         if portfolio:
-            for p in portfolio[:5]:  # Show first 5
-                portfolio_snapshot += f"- {p.name} ({p.ticker})\n"
-            if len(portfolio) > 5:
-                portfolio_snapshot += f"...\n"
+            for p in portfolio:
+                val = valuations.get(p.id, {})
+                val_eur = val.get("value_eur", 0)
+                portfolio_snapshot += f"- {p.name} ({p.ticker}, {p.asset_class}): {val_eur:.0f}€\n"
         else:
             portfolio_snapshot += "(Leer)\n"
 
-        # Story analysis context
+        # Complete story analysis context with full_text
         story_analysis_text = None
         story_analysis = portfolio_story_repo.get_latest_analysis()
         if story_analysis:
-            story_analysis_text = f"""Story: {story_analysis.verdict}
-Performance: {story_analysis.perf_verdict}
-Stabilität: {story_analysis.stability_verdict}
+            story_analysis_text = f"""## Portfolio Story Context
+Story: {story_analysis.verdict}
+Summary: {story_analysis.summary}
+Performance: {story_analysis.perf_verdict} - {story_analysis.perf_summary}
+Stabilität: {story_analysis.stability_verdict} - {story_analysis.stability_summary}
+
+Full Analysis:
+{story_analysis.full_text}
 """
 
         # Run check
@@ -486,16 +495,47 @@ Stabilität: {story_analysis.stability_verdict}
                 )
             )
 
+            # Calculate fit counts from result
+            fit_counts = {
+                "sehr_passend": sum(1 for f in result.position_fits if f.verdict == "sehr_passend"),
+                "passend": sum(1 for f in result.position_fits if f.verdict == "passend"),
+                "neutral": sum(1 for f in result.position_fits if f.verdict == "neutral"),
+                "nicht_passend": sum(1 for f in result.position_fits if f.verdict == "nicht_passend"),
+            }
+
+            # Serialize position fits
+            position_fits_json = json.dumps([{
+                "position_id": fit.position_id,
+                "verdict": fit.verdict,
+                "summary": fit.summary,
+                "fit_role": fit.fit_role,
+            } for fit in result.position_fits])
+
+            # Save to DB
+            from core.storage.models import WatchlistCheckerAnalysis
+            analysis = WatchlistCheckerAnalysis(
+                summary=result.summary,
+                full_text=result.full_text,
+                fit_counts=json.dumps(fit_counts),
+                position_fits_json=position_fits_json,
+                skill_name=selected_skill.name if selected_skill else "",
+                model=agent.model,
+                created_at=datetime.now(),
+            )
+            wc_repo = get_watchlist_checker_repo()
+            saved_analysis = wc_repo.save_analysis(analysis)
+
             # Log to agent_runs
             agent_runs_repo.log_run(
                 agent_name="watchlist_checker",
                 model=agent.model,
-                output_summary=f"Checked {len(watchlist)} positions",
-                context_summary=f"Portfolio ({len(portfolio)} pos), Story ({bool(story_analysis)})",
+                output_summary=f"Checked {len(watchlist)} positions: {fit_counts['sehr_passend']} sehr passend, {fit_counts['passend']} passend",
+                context_summary=f"Portfolio ({len(portfolio)} pos), Story ({bool(story_analysis)}), Skill ({selected_skill.name if selected_skill else 'Standard'})",
             )
 
             st.success("✅ Watchlist-Prüfung durchgeführt!")
             st.session_state["_watchlist_check_result"] = result
+            st.session_state["_watchlist_check_analysis_id"] = saved_analysis.id
 
         except Exception as e:
             st.error(f"❌ Fehler: {e}")
@@ -503,20 +543,64 @@ Stabilität: {story_analysis.stability_verdict}
             st.text(traceback.format_exc())
 
 # ─────────────────────────────────────────────────────────────────────
-# Section 2: Display Results
+# Section 2: Display Results (persistent from DB)
 # ─────────────────────────────────────────────────────────────────────
 
-# If session_state is empty but a result exists in agent_runs, show hint
+wc_repo = get_watchlist_checker_repo()
+
+# Try to load from session_state first, else from DB
 if not st.session_state.get("_watchlist_check_result"):
-    latest_run = agent_runs_repo.get_latest_run("watchlist_checker")
-    if latest_run and latest_run.get("created_at"):
-        st.info(f"📌 Letzter Check: {latest_run['created_at']} — Seite neu laden um Ergebnis zu sehen")
+    latest_analysis = wc_repo.get_latest_analysis()
+    if latest_analysis:
+        # Reconstruct result from DB (for display purposes)
+        st.session_state["_watchlist_check_result"] = latest_analysis
+    else:
+        latest_analysis = None
+else:
+    latest_analysis = st.session_state.get("_watchlist_check_result")
 
 if st.session_state.get("_watchlist_check_result"):
     st.divider()
     st.subheader("2️⃣ Ergebnisse")
 
     result = st.session_state["_watchlist_check_result"]
+
+    # Display summary + fit counts prominently
+    if hasattr(result, 'summary') and result.summary:
+        with st.container(border=True):
+            st.markdown(f"**Fazit:** {result.summary}")
+
+    # Parse fit_counts if stored in DB (JSON string)
+    if hasattr(result, 'fit_counts'):
+        try:
+            if isinstance(result.fit_counts, str):
+                fit_counts = json.loads(result.fit_counts)
+            else:
+                fit_counts = result.fit_counts or {}
+        except:
+            fit_counts = {
+                "sehr_passend": sum(1 for f in result.position_fits if f.verdict == "sehr_passend"),
+                "passend": sum(1 for f in result.position_fits if f.verdict == "passend"),
+                "neutral": sum(1 for f in result.position_fits if f.verdict == "neutral"),
+                "nicht_passend": sum(1 for f in result.position_fits if f.verdict == "nicht_passend"),
+            }
+    else:
+        fit_counts = {
+            "sehr_passend": sum(1 for f in result.position_fits if f.verdict == "sehr_passend"),
+            "passend": sum(1 for f in result.position_fits if f.verdict == "passend"),
+            "neutral": sum(1 for f in result.position_fits if f.verdict == "neutral"),
+            "nicht_passend": sum(1 for f in result.position_fits if f.verdict == "nicht_passend"),
+        }
+
+    st.markdown(
+        f"🟢 Sehr passend: {fit_counts.get('sehr_passend', 0)} | "
+        f"🟡 Passend: {fit_counts.get('passend', 0)} | "
+        f"⚪ Neutral: {fit_counts.get('neutral', 0)} | "
+        f"🔴 Nicht passend: {fit_counts.get('nicht_passend', 0)}"
+    )
+
+    st.divider()
+    st.markdown("**Position-Details**")
 
     # Bulk-fetch analyses for all watchlist positions (used in expanders below)
     _all_fit_ids = [fit.position_id for fit in result.position_fits if fit.position_id]
@@ -579,7 +663,9 @@ if st.session_state.get("_watchlist_check_result"):
 
     if st.button(f"{_comment_style['emoji']} KI-Kommentar", key="_watchlist_comment_btn"):
         with st.spinner("..."):
-            _ctx = f"Watchlist-Check Ergebnis:\n{result.full_text[:500]}"
+            # Use full_text (not truncated)
+            full_text = result.full_text if hasattr(result, 'full_text') else ""
+            _ctx = f"Watchlist-Check Ergebnis:\n{full_text}"
             st.session_state["_watchlist_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
 
     if st.session_state.get("_watchlist_comment"):
@@ -587,45 +673,22 @@ if st.session_state.get("_watchlist_check_result"):
             st.caption(f"{_comment_style['emoji']} **{_comment_style['name']}**")
             st.markdown(st.session_state["_watchlist_comment"])
 
-    # --- Details --
+    # --- Details (Metadata + Full Analysis) --
 
-    with st.expander("📊 Kontext-Details"):
+    st.divider()
+    with st.expander("📋 Vollständige Analyse & Metadaten"):
+        st.caption("**Vollständige LLM-Analyse**")
+        st.text(result.full_text if hasattr(result, 'full_text') else "")
+
+        st.divider()
         st.caption("**Agent Metadata**")
         latest_run = agent_runs_repo.get_latest_run("watchlist_checker")
         if latest_run:
-            st.json({
-                "agent": latest_run["agent_name"],
-                "model": latest_run["model"],
-                "timestamp": latest_run["created_at"],
-                "context": latest_run["context_summary"],
-            })
-
-        st.divider()
-        st.caption("**Portfolio Story Context**")
-        story_analysis = portfolio_story_repo.get_latest_analysis()
-        if story_analysis:
-            st.markdown(f"**Story Verdict:** {story_analysis.verdict}")
-            st.caption(f"Performance: {story_analysis.perf_verdict}")
-            st.caption(f"Stabilität: {story_analysis.stability_verdict}")
-        else:
-            st.caption("(Noch keine Portfolio-Story erstellt)")
-
-        st.divider()
-        st.caption("**Watchlist-Positionen: Zusammenfassung**")
-        st.caption(f"Gesamt: {len(watchlist)} Positionen analysiert")
-        fit_counts = {
-            "sehr_passend": sum(1 for f in result.position_fits if f.verdict == "sehr_passend"),
-            "passend": sum(1 for f in result.position_fits if f.verdict == "passend"),
-            "neutral": sum(1 for f in result.position_fits if f.verdict == "neutral"),
-            "nicht_passend": sum(1 for f in result.position_fits if f.verdict == "nicht_passend"),
-        }
-        st.markdown(
-            f"🟢 Sehr passend: {fit_counts['sehr_passend']} | "
-            f"🟡 Passend: {fit_counts['passend']} | "
-            f"⚪ Neutral: {fit_counts['neutral']} | "
-            f"🔴 Nicht passend: {fit_counts['nicht_passend']}"
-        )
-
-        st.divider()
-        st.caption("**Vollständige LLM-Analyse**")
-        st.text(result.full_text)
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Agent", latest_run["agent_name"])
+            with col2:
+                st.metric("Model", latest_run["model"])
+            with col3:
+                st.metric("Timestamp", latest_run["created_at"][:10])  # Just date
+            st.caption(f"Context: {latest_run['context_summary']}")

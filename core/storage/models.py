@@ -545,6 +545,22 @@ class PortfolioStoryPositionFit(BaseModel):
     created_at: datetime
 
 
+class WatchlistCheckerAnalysis(BaseModel):
+    """
+    Persisted result of a watchlist check run.
+    Contains summary, full LLM response, fit verdicts for all positions, and counts.
+    """
+
+    id: Optional[int] = None
+    summary: Optional[str] = None              # Ein-Satz-Fazit
+    full_text: Optional[str] = None            # Vollständige LLM-Antwort (Markdown)
+    fit_counts: Optional[dict] = None          # {"sehr_passend": 2, "passend": 3, ...}
+    position_fits_json: Optional[str] = None   # JSON: [{position_id, verdict, summary, fit_role}]
+    skill_name: Optional[str] = None           # z.B. "Josef's Regel"
+    model: Optional[str] = None                # z.B. "qwen3:8b"
+    created_at: datetime
+
+
 # Constants for position fit roles
 FIT_ROLES = [
     "Wachstumsmotor",

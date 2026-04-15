@@ -30,6 +30,7 @@ from core.storage.storychecker import StorycheckerRepository
 from core.storage.structural_scans import StructuralScansRepository
 from core.storage.wealth_snapshots import WealthSnapshotRepository
 from core.storage.dividend_snapshots import DividendSnapshotRepository
+from core.storage.watchlist_checker_repo import WatchlistCheckerRepository
 from core.asset_class_config import get_asset_class_registry, AssetClassRegistry
 from core.llm.claude import ClaudeProvider
 from core.llm.local import OllamaProvider
@@ -342,6 +343,11 @@ def get_agent_scheduler() -> AgentSchedulerService:
 @st.cache_resource
 def get_dividend_snapshot_repo() -> DividendSnapshotRepository:
     return DividendSnapshotRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_watchlist_checker_repo() -> WatchlistCheckerRepository:
+    return WatchlistCheckerRepository(get_db_connection())
 
 
 @st.cache_resource
