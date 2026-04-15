@@ -99,6 +99,16 @@ class PositionAnalysesRepository:
 
     @staticmethod
     def _row_to_model(row: sqlite3.Row) -> PositionAnalysis:
+        session_id = row["session_id"]
+        # Convert session_id from string to int (or None if empty/null)
+        if session_id:
+            try:
+                session_id = int(session_id)
+            except (ValueError, TypeError):
+                session_id = None
+        else:
+            session_id = None
+
         return PositionAnalysis(
             id=row["id"],
             position_id=row["position_id"],
@@ -106,6 +116,6 @@ class PositionAnalysesRepository:
             skill_name=row["skill_name"],
             verdict=row["verdict"],
             summary=row["summary"],
-            session_id=row["session_id"],
+            session_id=session_id,
             created_at=datetime.fromisoformat(row["created_at"]),
         )
