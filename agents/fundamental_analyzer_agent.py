@@ -229,14 +229,14 @@ class FundamentalAnalyzerAgent:
         )
         return response
 
-    def _resolve_skill(self, position: Position) -> Tuple[Optional[str], Optional[str]]:
-        """Resolve skill context if available."""
+    def _resolve_skill(self, position: Position) -> Tuple[str, Optional[str]]:
+        """Resolve skill context if available. Returns (skill_name, skill_prompt) where skill_name is never None."""
         if not self._skills_repo or not position.story_skill:
-            return None, None
+            return "Standard", None
         skill = self._skills_repo.get_by_name(position.story_skill)
         if skill:
             return skill.name, skill.prompt
-        return None, None
+        return "Standard", None
 
     def get_messages(self, session_id: str) -> List[Dict[str, str]]:
         """Get all messages in a session."""
