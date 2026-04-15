@@ -7,6 +7,7 @@ Output: per-position fit verdict + summary, full analysis text.
 """
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Optional
 
@@ -240,10 +241,16 @@ def _parse_watchlist_results(
 
             # Parse new position
             header = line_stripped.replace("##", "").strip()
-            # Extract ticker from "NAME (TICKER)" format
+            # Extract ticker from "NAME (TICKER)" or "NAME (TICKER) (ASSET_CLASS)" format
+            # Test all bracketed candidates (first match wins)
             if "(" in header and ")" in header:
-                ticker = header[header.rfind("(") + 1 : header.rfind(")")].strip()
-                pos = pos_lookup.get(ticker.upper())
+                candidates = re.findall(r'\(([^)]+)\)', header)
+                pos = None
+                for candidate in candidates:
+                    pos = pos_lookup.get(candidate.upper())
+                    if pos:
+                        break
+
                 if pos:
                     current_pos_id = pos.id
                     verdict = None

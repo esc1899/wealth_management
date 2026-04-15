@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pytest tests/ -x -q)"
+      "Bash(pytest tests/ -x -q)",
+      "Bash(python3 -c ':*)"
     ]
   }
 }

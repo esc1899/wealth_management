@@ -516,11 +516,19 @@ Full Analysis:
             # Save to DB
             from core.storage.models import WatchlistCheckerAnalysis
 
-            # Extract summary from first line of full_text (if available)
+            # Extract summary from "## Zusammenfassung" section (not the first line, which is a header)
             summary = None
             if result.full_text:
-                first_line = result.full_text.split('\n')[0].strip()
-                summary = first_line[:200] if first_line else None
+                zusammenfassung_idx = result.full_text.find("## Zusammenfassung")
+                if zusammenfassung_idx != -1:
+                    # Get text after the "## Zusammenfassung" header
+                    after = result.full_text[zusammenfassung_idx:].split('\n', 1)
+                    if len(after) > 1:
+                        body = after[1].strip()
+                        # First non-empty line is the summary
+                        first_line = next((l.strip() for l in body.split('\n') if l.strip()), None)
+                        summary = first_line[:200] if first_line else None
+                # If no Zusammenfassung section, leave summary empty (better than showing wrong header)
 
             analysis = WatchlistCheckerAnalysis(
                 summary=summary,
