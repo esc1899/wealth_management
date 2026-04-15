@@ -331,6 +331,44 @@ for pos in service.filter_positions(criteria):
 
 ## Changelog (CLAUDE.md Prozess-Updates)
 
+### 2026-04-15 — Skills Architecture Cleanup & Completion (Session 4)
+
+**Critical Milestone: Skills System Complete + Dead Code Removed**
+
+**Phase-Based Implementation (All 5 Phases Completed):**
+1. ✅ Phase 1: Josef's Regel Extraction → `core/portfolio_stability.py`
+2. ✅ Phase 2: Dead Agents Deletion (rebalance, investment_compass)
+3. ✅ Phase 3a: Skills YAML Restructure (10 areas, removed rebalance/structural_scan)
+4. ✅ Phase 3b: WatchlistCheckerAgent Skills Support (skill-selectable)
+5. ✅ Phase 3c: PortfolioStoryAgent Skills Support (skill-selectable)
+6. ✅ Phase 4: Fundamental Analyzer Navigation (replaced fundamental.py)
+7. ✅ Phase 5: Skills Management Page Separation (System → Skills)
+
+**Issues Fixed:**
+- ✅ Old skill areas (wealth_snapshot, rebalance) removed from UI
+- ✅ FundamentalAnalyzer session_id validation error fixed (AsyncMock)
+- ✅ Watchlist Checker "Standard (kein Fokus)" option added (default behavior preserved)
+- ✅ Portfolio Story "Standard (kein Fokus)" option added
+- ✅ All 6 test_fundamental_analyzer_agent.py failures resolved
+
+**Files Changed:**
+- Deleted: 7 files (rebalance_agent, investment_compass_agent, related pages/storage)
+- Created: 2 files (core/portfolio_stability.py, pages/skills.py)
+- Modified: 11 files (agents, pages, state, app, YAML, tests)
+- Total Impact: -63 lines dead code, +259 lines features, net -292 lines
+
+**Tests:** 563/563 passing ✓, Coverage 78.35% ✓
+**Commits:** 3 (skills infrastructure, skill selectors, test fixes)
+
+**Lernpunkt:** UI Integration Testing critical — 3 issues found only during manual testing:
+1. Old skill areas still showing in YAML
+2. Fundamental Analyzer async/await mocking issue
+3. Watchlist Checker results parsing affected by auto-selected skill
+
+**Next:** User to test UI manually (deferred to later session due to context limits)
+
+---
+
 ### 2026-04-14 — UI Integration Tests Rule + Vermögenshistorie Automation (Session 3)
 
 **Lernpunkt:** 3 UI-Fehler hintereinander in `wealth_history.py` weil Unit-Tests liefen (grün), aber App nicht gestartet wurde

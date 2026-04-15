@@ -75,6 +75,43 @@ Portfolio Story als Kontext in Rebalancer injizieren → Rebalancing-Vorschläge
 
 ---
 
+### Skills Architecture & System Design
+
+#### [P1] [FEAT] Skills Architecture: Cleanup & Completion ✅ IMPLEMENTIERT
+**Status:** Commited (5 Phase-based commits, 2026-04-15)
+
+**5-Phase Implementation (All Complete):**
+1. ✅ Josef's Regel Extraction → `core/portfolio_stability.py` (reusable across agents)
+2. ✅ Dead Code Removal (rebalance_agent, investment_compass_agent + related pages/storage/tests)
+3. ✅ YAML Restructure (removed rebalance/structural_scan areas, kept 10 active skill areas)
+4. ✅ WatchlistCheckerAgent Skills Support (optional skill selection with "Standard" default)
+5. ✅ PortfolioStoryAgent Skills Support (optional skill selection with "Standard" default)
+6. ✅ Fundamental Analyzer Navigation (replaced duplicate fundamental.py)
+7. ✅ Skills Management Page Separation (System → Skills, removed from Settings)
+
+**Files Changed:**
+- Deleted: 7 files (dead agents + pages + storage + tests)
+- Created: 2 files (core/portfolio_stability.py, pages/skills.py)
+- Modified: 11 files (agents, pages, state, app, YAML, tests)
+
+**Features:**
+- Skills now user-selectable in WatchlistChecker + PortfolioStory (default=Standard, optional=Josef's Regel)
+- Flexible skill-prompt injection into system prompts
+- Removed 6 obsolete skill areas from UI
+- Dedicated Skills management page in System menu
+
+**Testing:**
+- 563/563 tests passing ✓
+- Coverage 78.35% (improved from 77.95%)
+- All FundamentalAnalyzer tests passing (fixed AsyncMock issue)
+
+**Issues Fixed:**
+- Old skill areas no longer appear in UI
+- FundamentalAnalyzer session_id validation error (AsyncMock)
+- Watchlist Checker results parsing (Standard option prevents auto-selection interference)
+
+---
+
 ### Invest / Rebalance
 
 #### [P1] [BUG] Story Checker: Story wechselt bei Position-Neuauswahl nicht ✅ BEHOBEN

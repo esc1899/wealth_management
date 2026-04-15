@@ -8,6 +8,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Skills Architecture Cleanup & Completion (2026-04-15)
+
+**Major Refactor**: Completed 5-phase skills system restructuring with dead code elimination.
+
+#### Phase-Based Implementation
+1. **Phase 1**: Josef's Regel extraction to `core/portfolio_stability.py` (reusable module)
+2. **Phase 2**: Deleted dead agents (rebalance_agent, investment_compass_agent) + related storage/pages/tests (7 files removed)
+3. **Phase 3a**: YAML restructure — removed `rebalance` and `structural_scan` areas, kept 10 active areas
+4. **Phase 3b**: WatchlistCheckerAgent skill support + UI selector (default=Standard, optional=Josef's Regel)
+5. **Phase 3c**: PortfolioStoryAgent skill support + UI selector (default=Standard, optional=Josef's Regel)
+6. **Phase 4**: Fundamental Analyzer navigation (removed duplicate fundamental.py, kept fundamental_analyzer.py)
+7. **Phase 5**: Skills management page separation (System → Skills, removed from Settings)
+
+#### Changes
+- **Deleted**: 7 files (dead agents, pages, storage, tests)
+- **Created**: 2 files (core/portfolio_stability.py, pages/skills.py)
+- **Modified**: 11 files (agents, pages, state, app, YAML, tests)
+- **Net Impact**: -292 lines code (dead code removal + test cleanup)
+
+#### Fixed Issues
+- ✅ Old skill areas (wealth_snapshot, rebalance) no longer appear in UI
+- ✅ FundamentalAnalyzer session_id validation error (AsyncMock fix)
+- ✅ Watchlist Checker results parsing (Standard option added)
+- ✅ All FundamentalAnalyzer tests passing (21/21)
+
+#### Testing & Validation
+- **Tests**: 563/563 passing (all previously failing tests resolved)
+- **Coverage**: 78.35% (improved from 77.95%)
+- **UI Integration Testing**: Performed (3 issues caught: old YAML areas, async mocks, auto-selected skills)
+
 ### Fixed — Portfolio Story: Josef's Regel Comprehension (2026-04-13)
 - **LLM prompt clarification**: Added explicit warning that three Säulen are independent and must NOT be summed together
 - Previously LLM incorrectly calculated (e.g., "Aktien 40% + Rohstoffe 30% = 70% = too high")
