@@ -210,13 +210,17 @@ else:
         portfolio_story_skills = skills_repo.get_by_area("portfolio_story")
         skill_options = {s.name: s for s in portfolio_story_skills if not s.hidden}
 
-        if skill_options:
+        # Add "Standard (kein Fokus)" option to allow using base system prompt without skill override
+        all_options = ["Standard (kein Fokus)"] + list(skill_options.keys())
+
+        if all_options:
             selected_skill_name = st.selectbox(
                 "Fokus-Bereich",
-                options=list(skill_options.keys()),
+                options=all_options,
+                index=0,  # Default to Standard
                 key="portfolio_story_skill",
             )
-            selected_skill = skill_options.get(selected_skill_name)
+            selected_skill = skill_options.get(selected_skill_name) if selected_skill_name != "Standard (kein Fokus)" else None
         else:
             selected_skill = None
 
