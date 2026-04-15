@@ -658,6 +658,7 @@ if st.session_state.get("_watchlist_check_result"):
     _all_fit_ids = [fit.position_id for fit in position_fits if fit.position_id]
     _bulk_story = analyses_repo.get_latest_bulk(_all_fit_ids, "storychecker") if _all_fit_ids else {}
     _bulk_fund = analyses_repo.get_latest_bulk(_all_fit_ids, "fundamental") if _all_fit_ids else {}
+    _bulk_consensus = analyses_repo.get_latest_bulk(_all_fit_ids, "consensus_gap") if _all_fit_ids else {}
 
     # Display position fits
     for fit in position_fits:
@@ -675,9 +676,9 @@ if st.session_state.get("_watchlist_check_result"):
                 with col2:
                     st.metric("Fit", fit.verdict.replace("_", " ").title())
 
-                # Position details (Story, Fundamental Analysis)
+                # Position details (Story, Fundamental Analysis, Consensus Gap)
                 with st.expander("📋 Position-Details"):
-                    detail_cols = st.columns(2)
+                    detail_cols = st.columns(3)
 
                     # Story Analysis (pre-fetched in bulk above)
                     with detail_cols[0]:
@@ -701,6 +702,19 @@ if st.session_state.get("_watchlist_check_result"):
                             st.markdown(f"{verdict_icon} {verdict or 'unbekannt'}")
                             if latest_fund.summary:
                                 st.caption(latest_fund.summary)
+                        else:
+                            st.caption("⚪ Noch nicht analysiert")
+
+                    # Consensus Gap (pre-fetched in bulk above)
+                    with detail_cols[2]:
+                        st.caption("**Konsens-Lücke**")
+                        latest_consensus = _bulk_consensus.get(pos.id) if pos.id in _bulk_consensus else None
+                        if latest_consensus and latest_consensus.verdict:
+                            verdict = latest_consensus.verdict
+                            verdict_icon = "🟢" if verdict == "gap_closing" else "🟡" if verdict == "stable" else "🔴" if verdict == "gap_widening" else "⚪"
+                            st.markdown(f"{verdict_icon} {verdict or 'unbekannt'}")
+                            if latest_consensus.summary:
+                                st.caption(latest_consensus.summary)
                         else:
                             st.caption("⚪ Noch nicht analysiert")
 
