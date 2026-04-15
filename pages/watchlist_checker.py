@@ -511,15 +511,21 @@ Full Analysis:
                 "position_id": fit.position_id,
                 "verdict": fit.verdict,
                 "summary": fit.summary,
-                "fit_role": fit.fit_role,
             } for fit in result.position_fits])
 
             # Save to DB
             from core.storage.models import WatchlistCheckerAnalysis
+
+            # Extract summary from first line of full_text (if available)
+            summary = None
+            if result.full_text:
+                first_line = result.full_text.split('\n')[0].strip()
+                summary = first_line[:200] if first_line else None
+
             analysis = WatchlistCheckerAnalysis(
-                summary=result.summary,
+                summary=summary,
                 full_text=result.full_text,
-                fit_counts=json.dumps(fit_counts),
+                fit_counts=fit_counts,  # Already a dict
                 position_fits_json=position_fits_json,
                 skill_name=selected_skill.name if selected_skill else "",
                 model=agent.model,
