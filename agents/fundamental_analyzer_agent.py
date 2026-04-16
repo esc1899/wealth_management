@@ -205,25 +205,24 @@ class FundamentalAnalyzerAgent:
     # ------------------------------------------------------------------
 
     def _run_llm(self, session: AnalyzerSession) -> str:
-        """Execute LLM call — inject system message into session messages."""
+        """Execute LLM call — use standard system= kwarg convention."""
         import asyncio
         from core.llm.base import Message, Role
 
         self._llm.skill_context = "fundamental_analyzer"
 
-        # Build message list with system prompt injected
-        messages = [Message(role=Role.SYSTEM, content=BASE_SYSTEM_PROMPT)]
-
-        # Add existing session messages
+        # Build message list (user/assistant only, system separate)
+        messages = []
         for msg in session.messages:
             role = Role.USER if msg["role"] == "user" else Role.ASSISTANT
             messages.append(Message(role=role, content=msg["content"]))
 
-        # Call async chat method
+        # Call async chat method with system= kwarg
         loop = asyncio.get_event_loop()
         response = loop.run_until_complete(
             self._llm.chat(
                 messages=messages,
+                system=BASE_SYSTEM_PROMPT,
                 max_tokens=4096,
             )
         )
