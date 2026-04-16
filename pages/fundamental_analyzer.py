@@ -12,6 +12,7 @@ import time
 import streamlit as st
 
 from core.i18n import t
+from core.ui.verdicts import cloud_notice
 from state import get_analyses_repo, get_positions_repo, get_fundamental_analyzer_agent
 
 st.set_page_config(page_title="Fundamental Analyzer", page_icon="📊", layout="wide")
@@ -20,7 +21,7 @@ st.caption("Tiefgehende Fundamentalwert-Analyse einzelner Positionen")
 
 agent = get_fundamental_analyzer_agent()
 analyses_repo = get_analyses_repo()
-st.info(f"☁️ Cloud-Agent (Claude {agent.model})", icon="ℹ️")
+cloud_notice(agent.model)
 
 with st.expander("ℹ️ Wie nutze ich das?", expanded=False):
     st.markdown("""

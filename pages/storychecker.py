@@ -13,6 +13,7 @@ import time
 import streamlit as st
 
 from core.i18n import t
+from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon, cloud_notice
 from state import get_analyses_repo, get_positions_repo, get_storychecker_agent
 
 st.set_page_config(page_title="Story Checker", page_icon="🔍", layout="wide")
@@ -21,7 +22,10 @@ st.caption(t("storychecker.subtitle"))
 
 agent = get_storychecker_agent()
 analyses_repo = get_analyses_repo()
-st.info(t("storychecker.cloud_notice").format(model=agent.model), icon="ℹ️")
+cloud_notice(agent.model)
+
+# Use shared verdict config
+_VERDICT_CONFIG = VERDICT_CONFIGS["storychecker"]
 
 with st.expander(t("storychecker.what_is_this"), expanded=False):
     st.markdown(t("storychecker.explanation"))
@@ -180,10 +184,9 @@ with col_left:
         # Verdict history for selected position
         past_analyses = analyses_repo.get_for_position(selected_position.id, limit=5)
         if past_analyses:
-            _VERDICT_ICON = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴", "unknown": "⚪"}
             with st.expander(t("storychecker.verdict_history"), expanded=False):
                 for a in past_analyses:
-                    icon = _VERDICT_ICON.get(a.verdict or "unknown", "⚪")
+                    icon = verdict_icon(a.verdict or "unknown", _VERDICT_CONFIG)
                     date_str = a.created_at.strftime("%d.%m.%Y")
                     skill_label = f" · {a.skill_name}" if a.skill_name else ""
                     st.markdown(f"{icon} **{date_str}**{skill_label}")
@@ -214,9 +217,8 @@ with col_left:
     if not sessions:
         st.info(t("storychecker.no_checks"))
     else:
-        _VERDICT_ICON = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴"}
         for s in sessions:
-            icon = _VERDICT_ICON.get(s.verdict or "", "⚪")
+            icon = verdict_icon(s.verdict or "", _VERDICT_CONFIG)
             date_str = s.created_at.strftime("%d.%m. %H:%M")
             skill_part = f" · {s.skill_name}" if s.skill_name else ""
             btn_label = f"{icon} **{s.position_name}**  \n{date_str}{skill_part}"

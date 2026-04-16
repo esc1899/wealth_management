@@ -13,6 +13,7 @@ import streamlit as st
 from core.currency import symbol
 from core.i18n import t
 from core.storage.models import PortfolioStory
+from core.ui.verdicts import cloud_notice
 from state import (
     get_analyses_repo,
     get_app_config_repo,
@@ -79,6 +80,7 @@ positions_repo = get_positions_repo()
 market_repo = get_market_repo()
 analyses_repo = get_analyses_repo()
 agent = get_portfolio_story_agent()
+cloud_notice(agent.model)
 
 current_story = repo.get_current()
 latest_analysis = repo.get_latest_analysis()

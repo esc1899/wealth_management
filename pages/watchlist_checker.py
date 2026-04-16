@@ -15,6 +15,8 @@ import time
 import streamlit as st
 from datetime import datetime
 
+from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon
+
 st.set_page_config(page_title="Watchlist Checker", layout="wide")
 
 from state import (
@@ -644,11 +646,12 @@ if st.session_state.get("_watchlist_check_result"):
             "nicht_passend": sum(1 for f in position_fits if f.verdict == "nicht_passend"),
         }
 
+    _wc_config = VERDICT_CONFIGS["watchlist_checker"]
     st.markdown(
-        f"🟢 Sehr passend: {fit_counts.get('sehr_passend', 0)} | "
-        f"🟡 Passend: {fit_counts.get('passend', 0)} | "
-        f"⚪ Neutral: {fit_counts.get('neutral', 0)} | "
-        f"🔴 Nicht passend: {fit_counts.get('nicht_passend', 0)}"
+        f"{verdict_icon('sehr_passend', _wc_config)} Sehr passend: {fit_counts.get('sehr_passend', 0)} | "
+        f"{verdict_icon('passend', _wc_config)} Passend: {fit_counts.get('passend', 0)} | "
+        f"{verdict_icon('neutral', _wc_config)} Neutral: {fit_counts.get('neutral', 0)} | "
+        f"{verdict_icon('nicht_passend', _wc_config)} Nicht passend: {fit_counts.get('nicht_passend', 0)}"
     )
 
     st.divider()
@@ -669,7 +672,8 @@ if st.session_state.get("_watchlist_check_result"):
 
                 with col1:
                     # Verdict emoji
-                    verdict_emoji = "🟢" if fit.verdict == "sehr_passend" else "🟡" if fit.verdict == "passend" else "⚪" if fit.verdict == "neutral" else "🔴"
+                    _wc_config = VERDICT_CONFIGS["watchlist_checker"]
+                    verdict_emoji = verdict_icon(fit.verdict, _wc_config)
                     st.markdown(f"**{verdict_emoji} {pos.name}** ({pos.ticker})")
                     st.caption(fit.summary)
 
@@ -685,8 +689,9 @@ if st.session_state.get("_watchlist_check_result"):
                         st.caption("**Story Checker**")
                         latest_story = _bulk_story.get(pos.id) if pos.id in _bulk_story else None
                         if latest_story and latest_story.verdict:
-                            verdict_icon = "🟢" if latest_story.verdict == "intact" else "🟡" if latest_story.verdict == "gemischt" else "🔴"
-                            st.markdown(f"{verdict_icon} {latest_story.verdict}")
+                            _sc_config = VERDICT_CONFIGS["storychecker"]
+                            _icon = verdict_icon(latest_story.verdict, _sc_config)
+                            st.markdown(f"{_icon} {latest_story.verdict}")
                             if latest_story.summary:
                                 st.caption(latest_story.summary)
                         else:
@@ -698,8 +703,9 @@ if st.session_state.get("_watchlist_check_result"):
                         latest_fund = _bulk_fund.get(pos.id) if pos.id in _bulk_fund else None
                         if latest_fund and latest_fund.verdict:
                             verdict = latest_fund.verdict
-                            verdict_icon = "🟢" if verdict == "unterbewertet" else "🟡" if verdict == "fair" else "🔴" if verdict == "überbewertet" else "⚪"
-                            st.markdown(f"{verdict_icon} {verdict or 'unbekannt'}")
+                            _fa_config = VERDICT_CONFIGS["fundamental_analyzer"]
+                            _icon = verdict_icon(verdict, _fa_config)
+                            st.markdown(f"{_icon} {verdict or 'unbekannt'}")
                             if latest_fund.summary:
                                 st.caption(latest_fund.summary)
                         else:
@@ -711,8 +717,9 @@ if st.session_state.get("_watchlist_check_result"):
                         latest_consensus = _bulk_consensus.get(pos.id) if pos.id in _bulk_consensus else None
                         if latest_consensus and latest_consensus.verdict:
                             verdict = latest_consensus.verdict
-                            verdict_icon = "🟢" if verdict == "gap_closing" else "🟡" if verdict == "stable" else "🔴" if verdict == "gap_widening" else "⚪"
-                            st.markdown(f"{verdict_icon} {verdict or 'unbekannt'}")
+                            _cg_config = VERDICT_CONFIGS["consensus_gap"]
+                            _icon = verdict_icon(verdict, _cg_config)
+                            st.markdown(f"{_icon} {verdict or 'unbekannt'}")
                             if latest_consensus.summary:
                                 st.caption(latest_consensus.summary)
                         else:
