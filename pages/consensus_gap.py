@@ -32,6 +32,7 @@ _agent = get_consensus_gap_agent()
 cloud_notice(_agent.model)
 
 _positions_repo = get_positions_repo()
+_analyses_repo = get_analyses_repo()
 _skills = get_skills_repo().get_by_area("consensus_gap")
 
 # ------------------------------------------------------------------
@@ -137,8 +138,7 @@ if _JOB["done"]:
         )
     _JOB["done"] = False
     # Reload verdicts from DB
-    from state import get_analyses_repo
-    _current_verdicts = get_analyses_repo().get_latest_bulk(_all_ids, agent="consensus_gap")
+    _current_verdicts = _analyses_repo.get_latest_bulk(_all_ids, agent="consensus_gap")
 
 if _JOB["last_error"] and not _JOB["running"]:
     st.error(f"❌ Letzter Lauf fehlgeschlagen: {_JOB['last_error']}")

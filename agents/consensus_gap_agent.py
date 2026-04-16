@@ -100,6 +100,11 @@ class ConsensusGapAgent:
         self._llm = llm
         self._analyses_repo = analyses_repo
 
+    @property
+    def model(self) -> str:
+        """Return the LLM model name."""
+        return self._llm.model
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
