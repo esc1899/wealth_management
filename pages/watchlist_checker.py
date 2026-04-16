@@ -619,10 +619,7 @@ if st.session_state.get("_watchlist_check_result"):
     result = st.session_state["_watchlist_check_result"]
     result, position_fits = _normalize_result(result)
 
-    # Display summary + fit counts prominently
-    if hasattr(result, 'summary') and result.summary:
-        with st.container(border=True):
-            st.markdown(f"**Fazit:** {result.summary}")
+    # Summary shown via AI comment below (not redundant with verdict counts)
 
     # Parse fit_counts if stored in DB (JSON string)
     if hasattr(result, 'fit_counts'):
@@ -725,21 +722,20 @@ if st.session_state.get("_watchlist_check_result"):
                         else:
                             st.caption("⚪ Noch nicht analysiert")
 
-    # --- KI-Kommentar --
-
-    st.divider()
-    st.subheader("3️⃣ KI-Kommentar")
+    # --- KI-Kommentar (Auto-generated) --
 
     _comment_style_id = get_app_config_repo().get("comment_style") or "humorvoll"
     _comment_style = get_style_by_id(_comment_style_id)
     comment_service = get_portfolio_comment_service()
 
-    if st.button(f"{_comment_style['emoji']} KI-Kommentar", key="_watchlist_comment_btn"):
-        with st.spinner("..."):
-            # Use full_text (not truncated)
-            full_text = result.full_text if hasattr(result, 'full_text') else ""
-            _ctx = f"Watchlist-Check Ergebnis:\n{full_text}"
-            st.session_state["_watchlist_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
+    # Auto-generate comment with current context
+    with st.spinner(f"{_comment_style['emoji']} Generiere Kommentar..."):
+        full_text = result.full_text if hasattr(result, 'full_text') else ""
+        _ctx = f"Watchlist-Check Ergebnis:\n{full_text}"
+        st.session_state["_watchlist_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
+
+    st.divider()
+    st.subheader("3️⃣ KI-Kommentar")
 
     if st.session_state.get("_watchlist_comment"):
         with st.container(border=True):
