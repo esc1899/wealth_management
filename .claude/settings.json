@@ -4,7 +4,13 @@
       "Bash(pytest tests/ -x -q)",
       "Bash(python3 -c ':*)",
       "Bash(rm -rf ~/.streamlit/*.json)",
-      "Bash(rm -rf /tmp/.streamlit*)"
+      "Bash(rm -rf /tmp/.streamlit*)",
+      "Bash(grep -n \"_VERDICT_CONFIG\\\\|verdict_badge\\\\|_verdict_badge\" /Users/erik/Projects/wealth_management/pages/*.py)",
+      "Bash(python -m pytest tests/unit/test_consensus_gap_verdict_parser.py::test_multiple_verdicts_in_batch -v)",
+      "Bash(python -m pytest tests/unit/test_consensus_gap_verdict_parser.py -x)",
+      "Bash(python -m pytest tests/unit/test_consensus_gap_verdict_parser.py::test_mixed_valid_and_invalid -v)",
+      "Bash(python -m pytest tests/unit/test_consensus_gap_verdict_parser.py::test_mixed_valid_and_invalid -xvs)",
+      "Bash(git status *)"
     ]
   }
 }

@@ -14,10 +14,12 @@ from core.llm.claude import ClaudeResponse, ClaudeToolCall
 from core.storage.models import Position
 
 
-def make_agent():
-    """Create agent with mocked LLM."""
+def make_agent(analyses_repo=None):
+    """Create agent with mocked LLM and analyses_repo."""
     llm = MagicMock()
-    return ConsensusGapAgent(llm=llm)
+    if analyses_repo is None:
+        analyses_repo = MagicMock()
+    return ConsensusGapAgent(llm=llm, analyses_repo=analyses_repo)
 
 
 def make_test_position(pos_id: int, name: str, story: str = "Test thesis") -> Position:
@@ -43,7 +45,8 @@ def make_test_position(pos_id: int, name: str, story: str = "Test thesis") -> Po
 @pytest.mark.asyncio
 async def test_single_verdict_extraction():
     """Agent extracts a single position verdict from tool call."""
-    agent = make_agent()
+    analyses_repo = MagicMock()
+    agent = make_agent(analyses_repo=analyses_repo)
 
     tool_call = ClaudeToolCall(
         id="call_1",
@@ -64,14 +67,11 @@ async def test_single_verdict_extraction():
         )
     )
 
-    analyses_repo = MagicMock()
-
     positions = [make_test_position(42, "Apple")]
     results = await agent.analyze_portfolio(
         positions=positions,
         skill_name="test_skill",
         skill_prompt="Test prompt",
-        analyses_repo=analyses_repo,
     )
 
     assert len(results) == 1
@@ -90,7 +90,8 @@ async def test_single_verdict_extraction():
 @pytest.mark.asyncio
 async def test_multiple_verdicts_in_batch():
     """Agent extracts multiple verdicts from a single batch."""
-    agent = make_agent()
+    analyses_repo = MagicMock()
+    agent = make_agent(analyses_repo=analyses_repo)
 
     tool_calls = [
         ClaudeToolCall(
@@ -123,7 +124,6 @@ async def test_multiple_verdicts_in_batch():
         )
     )
 
-    analyses_repo = MagicMock()
     positions = [
         make_test_position(1, "Apple"),
         make_test_position(2, "Microsoft"),
@@ -133,7 +133,6 @@ async def test_multiple_verdicts_in_batch():
         positions=positions,
         skill_name="test",
         skill_prompt="prompt",
-        analyses_repo=analyses_repo,
     )
 
     assert len(results) == 2
@@ -144,7 +143,8 @@ async def test_multiple_verdicts_in_batch():
 @pytest.mark.asyncio
 async def test_no_verdicts_logged():
     """When no tool calls are returned, warning is logged."""
-    agent = make_agent()
+    analyses_repo = MagicMock()
+    agent = make_agent(analyses_repo=analyses_repo)
 
     agent._llm.chat_with_tools = AsyncMock(
         return_value=ClaudeResponse(
@@ -161,7 +161,6 @@ async def test_no_verdicts_logged():
         positions=positions,
         skill_name="test",
         skill_prompt="prompt",
-        analyses_repo=analyses_repo,
     )
 
     assert len(results) == 0
@@ -171,7 +170,8 @@ async def test_no_verdicts_logged():
 @pytest.mark.asyncio
 async def test_invalid_verdict_filtered():
     """Tool calls with invalid verdicts are filtered out."""
-    agent = make_agent()
+    analyses_repo = MagicMock()
+    agent = make_agent(analyses_repo=analyses_repo)
 
     tool_call = ClaudeToolCall(
         id="call_1",
@@ -199,7 +199,6 @@ async def test_invalid_verdict_filtered():
         positions=positions,
         skill_name="test",
         skill_prompt="prompt",
-        analyses_repo=analyses_repo,
     )
 
     assert len(results) == 0
@@ -209,7 +208,8 @@ async def test_invalid_verdict_filtered():
 @pytest.mark.asyncio
 async def test_mixed_valid_and_invalid():
     """Valid and invalid verdicts are separated."""
-    agent = make_agent()
+    analyses_repo = MagicMock()
+    agent = make_agent(analyses_repo=analyses_repo)
 
     tool_calls = [
         ClaudeToolCall(
@@ -242,7 +242,6 @@ async def test_mixed_valid_and_invalid():
         )
     )
 
-    analyses_repo = MagicMock()
     positions = [
         make_test_position(1, "A"),
         make_test_position(2, "B"),
@@ -252,7 +251,6 @@ async def test_mixed_valid_and_invalid():
         positions=positions,
         skill_name="test",
         skill_prompt="prompt",
-        analyses_repo=analyses_repo,
     )
 
     assert len(results) == 1
@@ -264,7 +262,8 @@ async def test_mixed_valid_and_invalid():
 @pytest.mark.asyncio
 async def test_all_valid_verdicts_accepted():
     """All four valid verdicts are accepted."""
-    agent = make_agent()
+    analyses_repo = MagicMock()
+    agent = make_agent(analyses_repo=analyses_repo)
 
     verdicts = ["wächst", "stabil", "schließt", "eingeholt"]
     for i, verdict in enumerate(verdicts, 1):
@@ -287,14 +286,12 @@ async def test_all_valid_verdicts_accepted():
             )
         )
 
-        analyses_repo = MagicMock()
         positions = [make_test_position(i, f"Stock{i}")]
 
         results = await agent.analyze_portfolio(
             positions=positions,
             skill_name="test",
             skill_prompt="prompt",
-            analyses_repo=analyses_repo,
         )
 
         assert len(results) == 1
@@ -304,9 +301,8 @@ async def test_all_valid_verdicts_accepted():
 @pytest.mark.asyncio
 async def test_positions_without_story_skipped():
     """Positions without a story are not analyzed."""
-    agent = make_agent()
-
     analyses_repo = MagicMock()
+    agent = make_agent(analyses_repo=analyses_repo)
 
     # Position without story
     pos_no_story = Position(
@@ -330,7 +326,6 @@ async def test_positions_without_story_skipped():
         positions=[pos_no_story],
         skill_name="test",
         skill_prompt="prompt",
-        analyses_repo=analyses_repo,
     )
 
     assert len(results) == 0
@@ -340,7 +335,8 @@ async def test_positions_without_story_skipped():
 @pytest.mark.asyncio
 async def test_non_tool_calls_ignored():
     """Tool calls for other tools are ignored (e.g., web_search)."""
-    agent = make_agent()
+    analyses_repo = MagicMock()
+    agent = make_agent(analyses_repo=analyses_repo)
 
     # Only the submit_consensus_verdict call matters
     tool_calls = [
@@ -369,14 +365,12 @@ async def test_non_tool_calls_ignored():
         )
     )
 
-    analyses_repo = MagicMock()
     positions = [make_test_position(1, "Apple")]
 
     results = await agent.analyze_portfolio(
         positions=positions,
         skill_name="test",
         skill_prompt="prompt",
-        analyses_repo=analyses_repo,
     )
 
     # Only the verdict tool call is processed

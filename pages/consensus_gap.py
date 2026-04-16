@@ -12,6 +12,7 @@ import time
 import streamlit as st
 
 from core.i18n import t
+from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge, render_verdict_legend, cloud_notice
 from state import (
     get_analyses_repo,
     get_consensus_gap_agent,
@@ -28,8 +29,9 @@ st.title(f"🎯 {t('consensus_gap.title')}")
 st.caption(t("consensus_gap.subtitle"))
 
 _agent = get_consensus_gap_agent()
+cloud_notice(_agent.model)
+
 _positions_repo = get_positions_repo()
-_analyses_repo = get_analyses_repo()
 _skills = get_skills_repo().get_by_area("consensus_gap")
 
 # ------------------------------------------------------------------
@@ -42,7 +44,7 @@ if "_cgap_job" not in st.session_state:
 _JOB = st.session_state["_cgap_job"]
 
 
-def _run_background(agent, positions, skill_name, skill_prompt, analyses_repo, job: dict):
+def _run_background(agent, positions, skill_name, skill_prompt, job: dict):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -51,7 +53,6 @@ def _run_background(agent, positions, skill_name, skill_prompt, analyses_repo, j
                 positions=positions,
                 skill_name=skill_name,
                 skill_prompt=skill_prompt,
-                analyses_repo=analyses_repo,
             )
         )
         job.update({"running": False, "done": True, "count": len(results), "error": None})
@@ -61,21 +62,8 @@ def _run_background(agent, positions, skill_name, skill_prompt, analyses_repo, j
         loop.close()
 
 
-# ------------------------------------------------------------------
-# Verdict display helpers
-# ------------------------------------------------------------------
-
-_VERDICT_CONFIG = {
-    "wächst":    ("🟢", t("consensus_gap.verdict_waechst")),
-    "stabil":    ("🟡", t("consensus_gap.verdict_stabil")),
-    "schließt":  ("🟠", t("consensus_gap.verdict_schliesst")),
-    "eingeholt": ("🔴", t("consensus_gap.verdict_eingeholt")),
-}
-
-
-def _verdict_badge(verdict: str) -> str:
-    icon, label = _VERDICT_CONFIG.get(verdict, ("⚪", verdict))
-    return f"{icon} {label}"
+# Use shared verdict config
+_VERDICT_CONFIG = VERDICT_CONFIGS["consensus_gap"]
 
 
 # ------------------------------------------------------------------
@@ -126,7 +114,7 @@ else:
             _JOB["last_error"] = None
             t_bg = threading.Thread(
                 target=_run_background,
-                args=(_agent, _eligible, _sel_skill.name, _sel_skill.prompt, _analyses_repo, _JOB),
+                args=(_agent, _eligible, _sel_skill.name, _sel_skill.prompt, _JOB),
                 daemon=True,
             )
             t_bg.start()
@@ -148,7 +136,9 @@ if _JOB["done"]:
             icon=":material/check_circle:",
         )
     _JOB["done"] = False
-    _current_verdicts = _analyses_repo.get_latest_bulk(_all_ids, agent="consensus_gap")
+    # Reload verdicts from DB
+    from state import get_analyses_repo
+    _current_verdicts = get_analyses_repo().get_latest_bulk(_all_ids, agent="consensus_gap")
 
 if _JOB["last_error"] and not _JOB["running"]:
     st.error(f"❌ Letzter Lauf fehlgeschlagen: {_JOB['last_error']}")
@@ -175,7 +165,7 @@ for _pos in _eligible_sorted:
             st.caption(f"{_pos.asset_class}" + (f" · {_pos.anlageart}" if _pos.anlageart else ""))
         with _hc2:
             if _verdict:
-                st.markdown(_verdict_badge(_verdict))
+                st.markdown(verdict_badge(_verdict, _VERDICT_CONFIG))
                 if _analysis and _analysis.created_at:
                     st.caption(_analysis.created_at.strftime("%d.%m.%Y"))
             else:
@@ -188,12 +178,18 @@ for _pos in _eligible_sorted:
             with st.expander(t("consensus_gap.show_story")):
                 st.markdown(_pos.story)
 
+        # Details footer with metadata
+        if _analysis:
+            with st.expander("Details"):
+                st.caption(f"Agent: consensus_gap")
+                st.caption(f"Model: {_agent.model}")
+                if _analysis.created_at:
+                    st.caption(f"Analysiert: {_analysis.created_at.strftime('%d.%m.%Y %H:%M')}")
+
 st.divider()
 
 # ------------------------------------------------------------------
 # Legend
 # ------------------------------------------------------------------
 
-with st.expander(t("consensus_gap.legend_header")):
-    for verdict, (icon, label) in _VERDICT_CONFIG.items():
-        st.markdown(f"**{icon} {label}** — {t(f'consensus_gap.legend_{verdict}')}")
+render_verdict_legend(_VERDICT_CONFIG)

@@ -95,8 +95,10 @@ class ConsensusGapAgent:
     def __init__(
         self,
         llm: ClaudeProvider,
+        analyses_repo: PositionAnalysesRepository,
     ):
         self._llm = llm
+        self._analyses_repo = analyses_repo
 
     # ------------------------------------------------------------------
     # Public API
@@ -107,7 +109,6 @@ class ConsensusGapAgent:
         positions: List[Position],
         skill_name: str,
         skill_prompt: str,
-        analyses_repo: PositionAnalysesRepository,
     ) -> List[Tuple[int, str, str]]:
         """
         Analyse all positions with stories. Returns list of (position_id, verdict, summary).
@@ -169,7 +170,7 @@ class ConsensusGapAgent:
                 continue
             if verdict not in VALID_VERDICTS:
                 continue
-            analyses_repo.save(
+            self._analyses_repo.save(
                 position_id=pos_id,
                 agent=AGENT_NAME,
                 skill_name=skill_name,

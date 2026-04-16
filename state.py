@@ -325,7 +325,10 @@ def get_fundamental_analyzer_agent() -> FundamentalAnalyzerAgent:
 def get_consensus_gap_agent(claude_model: str = "") -> ConsensusGapAgent:
     model = _get_agent_model("consensus_gap", "claude", CLAUDE_SONNET)
     llm = _make_claude_provider(model, "consensus_gap")
-    return ConsensusGapAgent(llm=llm)
+    return ConsensusGapAgent(
+        llm=llm,
+        analyses_repo=get_analyses_repo(),
+    )
 
 
 @st.cache_resource
