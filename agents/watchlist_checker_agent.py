@@ -103,11 +103,15 @@ class WatchlistCheckerAgent:
         analyses_repo: PositionAnalysesRepository,
         llm: OllamaProvider,
         skills_repo: Optional[SkillsRepository] = None,
+        wc_repo=None,
+        agent_runs_repo=None,
     ) -> None:
         self._positions = positions_repo
         self._analyses = analyses_repo
         self._llm = llm
         self._skills_repo = skills_repo
+        self._wc_repo = wc_repo
+        self._agent_runs_repo = agent_runs_repo
 
     @property
     def model(self) -> str:
@@ -194,6 +198,62 @@ class WatchlistCheckerAgent:
                 skill_name=skill_name,
                 verdict=fit.verdict,
                 summary=fit.summary,
+            )
+
+        # Persist analysis if repos are available
+        if self._wc_repo and self._agent_runs_repo:
+            import json
+            from datetime import datetime
+            from core.storage.models import WatchlistCheckerAnalysis
+
+            # Calculate fit counts from result
+            fit_counts = {
+                "sehr_passend": sum(1 for f in fits if f.verdict == "sehr_passend"),
+                "passend": sum(1 for f in fits if f.verdict == "passend"),
+                "neutral": sum(1 for f in fits if f.verdict == "neutral"),
+                "nicht_passend": sum(1 for f in fits if f.verdict == "nicht_passend"),
+            }
+
+            # Serialize position fits
+            position_fits_json = json.dumps([{
+                "position_id": fit.position_id,
+                "verdict": fit.verdict,
+                "summary": fit.summary,
+            } for fit in fits])
+
+            # Extract summary from "## Zusammenfassung" section if present
+            summary = None
+            if full_text:
+                zusammenfassung_idx = full_text.find("## Zusammenfassung")
+                if zusammenfassung_idx != -1:
+                    after = full_text[zusammenfassung_idx:].split('\n', 1)
+                    if len(after) > 1:
+                        body = after[1].strip()
+                        first_line = next((l.strip() for l in body.split('\n') if l.strip()), None)
+                        summary = first_line[:200] if first_line else None
+
+            # Fallback: create summary from fit counts if not found
+            if not summary:
+                summary = f"Geprüft: {fit_counts['sehr_passend']} sehr passend, {fit_counts['passend']} passend, {fit_counts['neutral']} neutral, {fit_counts['nicht_passend']} nicht passend"
+
+            # Build and save analysis
+            analysis = WatchlistCheckerAnalysis(
+                summary=summary,
+                full_text=full_text,
+                fit_counts=fit_counts,
+                position_fits_json=position_fits_json,
+                skill_name=selected_skill.name if selected_skill else "",
+                model=self.model,
+                created_at=datetime.now(),
+            )
+            self._wc_repo.save_analysis(analysis)
+
+            # Log to agent_runs
+            self._agent_runs_repo.log_run(
+                agent_name="watchlist_checker",
+                model=self.model,
+                output_summary=f"Checked {len(watchlist_positions)} positions: {fit_counts['sehr_passend']} sehr passend, {fit_counts['passend']} passend",
+                context_summary=f"Skill: {selected_skill.name if selected_skill else 'Standard'}",
             )
 
         return WatchlistCheckResult(

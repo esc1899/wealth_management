@@ -15,15 +15,14 @@ from core.i18n import t
 from core.storage.models import PortfolioStory
 from core.ui.verdicts import cloud_notice
 from state import (
-    get_analyses_repo,
+    get_analysis_service,
     get_app_config_repo,
-    get_agent_runs_repo,
     get_market_agent,
     get_market_repo,
     get_portfolio_comment_service,
+    get_portfolio_service,
     get_portfolio_story_agent,
     get_portfolio_story_repo,
-    get_positions_repo,
     get_skills_repo,
 )
 
@@ -76,9 +75,9 @@ st.caption("Dein langfristiges Anlage-Narrativ und Alignment-Check")
 # ──────────────────────────────────────────────────────────────────────
 
 repo = get_portfolio_story_repo()
-positions_repo = get_positions_repo()
+_portfolio_service = get_portfolio_service()
+_analysis_service = get_analysis_service()
 market_repo = get_market_repo()
-analyses_repo = get_analyses_repo()
 agent = get_portfolio_story_agent()
 cloud_notice(agent.model)
 
@@ -155,7 +154,7 @@ if not current_story:
     st.warning("⚠️ Bitte definiere zuerst deine Portfolio Story oben.")
 else:
     # Pre-check: Load portfolio once for pre-check before button
-    _portfolio_for_precheck = positions_repo.get_portfolio()
+    _portfolio_for_precheck = _portfolio_service.get_portfolio_positions()
 
     if _portfolio_for_precheck:
         # Per-agent eligible IDs — mirrors each dedicated page's filter logic
@@ -175,7 +174,7 @@ else:
             ("consensus_gap", "Konsens-Lücken", "pages/consensus_gap.py"),
         ]:
             ids = _eligible_ids_per_agent[agent_name]
-            b = analyses_repo.get_latest_bulk(ids, agent_name)
+            b = _analysis_service.get_verdicts(ids, agent_name)
             n = sum(1 for pid in ids if pid not in b)
 
             # Get timestamp of latest analysis
@@ -236,8 +235,8 @@ else:
         if st.button("🔄 Story-Check durchführen", use_container_width=True):
             with st.spinner("Analysiere Portfolio gegen Story…"):
                 # Build portfolio snapshot
-                portfolio = positions_repo.get_portfolio()
-                watchlist = positions_repo.get_watchlist()
+                portfolio = _portfolio_service.get_portfolio_positions()
+                watchlist = _portfolio_service.get_watchlist_positions()
 
                 # Get valuations (includes all positions: tradeable + non-tradeable)
                 valuations = get_market_agent().get_portfolio_valuation()
@@ -314,9 +313,9 @@ else:
                 pos_ids = [p.id for p in portfolio if p.id]
                 verdicts_by_position = {}
                 if pos_ids:
-                    vs = analyses_repo.get_latest_bulk(pos_ids, "storychecker")
-                    vf = analyses_repo.get_latest_bulk(pos_ids, "fundamental")
-                    vc = analyses_repo.get_latest_bulk(pos_ids, "consensus_gap")
+                    vs = _analysis_service.get_verdicts(pos_ids, "storychecker")
+                    vf = _analysis_service.get_verdicts(pos_ids, "fundamental")
+                    vc = _analysis_service.get_verdicts(pos_ids, "consensus_gap")
                     for pos_id in pos_ids:
                         verdicts_by_position[pos_id] = {
                             "storychecker": vs.get(pos_id),
@@ -344,20 +343,6 @@ else:
                     return analysis, position_fits
 
                 analysis, position_fits = asyncio.run(run_checks())
-
-                # Save analysis and position fits
-                saved_analysis = repo.save_analysis(analysis)
-                if position_fits:
-                    repo.save_position_fits(position_fits)
-
-                # Log to agent_runs
-                agent_runs_repo = get_agent_runs_repo()
-                agent_runs_repo.log_run(
-                    agent_name="portfolio_story",
-                    model=agent.model,
-                    output_summary=f"Story: {analysis.verdict}, Performance: {analysis.perf_verdict}, Stability: {analysis.stability_verdict}",
-                    context_summary=f"Portfolio ({len(portfolio)} positions), Story (target_year: {current_story.target_year})",
-                )
 
                 st.success("✅ Story-Check durchgeführt!")
                 st.rerun()
@@ -478,15 +463,15 @@ def _verdict_icon_short(verdict: str) -> str:
 
 st.subheader("3️⃣ Einzelne Investitionen — Passung zur Portfolio Story")
 
-portfolio = positions_repo.get_portfolio()
+portfolio = _portfolio_service.get_portfolio_positions()
 if not portfolio:
     st.info("ℹ️ Portfolio ist leer.")
 else:
     # Get all verdicts and position fits
     pos_ids = [p.id for p in portfolio if p.id]
-    verdicts_story = analyses_repo.get_latest_bulk(pos_ids, "storychecker")
-    verdicts_fundamental = analyses_repo.get_latest_bulk(pos_ids, "fundamental")
-    verdicts_consensus = analyses_repo.get_latest_bulk(pos_ids, "consensus_gap")
+    verdicts_story = _analysis_service.get_verdicts(pos_ids, "storychecker")
+    verdicts_fundamental = _analysis_service.get_verdicts(pos_ids, "fundamental")
+    verdicts_consensus = _analysis_service.get_verdicts(pos_ids, "consensus_gap")
     position_fits = repo.get_latest_position_fits(pos_ids)
 
     # Filter: only show positions with at least one verdict or position fit

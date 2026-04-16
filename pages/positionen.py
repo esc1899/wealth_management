@@ -20,7 +20,7 @@ from core.asset_class_config import get_asset_class_registry
 from core.figi import RELEVANT_EXCH, openfigi_lookup, to_yahoo_ticker
 from core.i18n import t
 from core.storage.models import Position
-from state import get_analyses_repo, get_app_config_repo, get_market_agent, get_market_repo, get_position_story_service, get_positions_repo, get_skills_repo
+from state import get_analysis_service, get_app_config_repo, get_market_agent, get_market_repo, get_position_story_service, get_positions_repo, get_skills_repo
 
 st.set_page_config(page_title="Positionen", page_icon="📋", layout="wide")
 st.title(f"📋 {t('positionen.title')}")
@@ -32,7 +32,7 @@ if st.session_state.pop("_pos_just_saved", None):
 registry = get_asset_class_registry()
 repo = get_positions_repo()
 app_config = get_app_config_repo()
-analyses_repo = get_analyses_repo()
+_analysis_service = get_analysis_service()
 
 def _fmtnum(value: float, decimals: int = 2) -> str:
     """Format a number in German locale style (1.234,56)."""
@@ -798,7 +798,7 @@ def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
 
     positions = sorted(positions, key=lambda p: p.name.lower())
 
-    verdicts = analyses_repo.get_latest_bulk(
+    verdicts = _analysis_service.get_verdicts(
         [p.id for p in positions if p.id], "storychecker"
     )
 

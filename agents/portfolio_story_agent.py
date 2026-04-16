@@ -46,11 +46,15 @@ class PortfolioStoryAgent:
         positions_repo: PositionsRepository,
         market_repo: MarketDataRepository,
         skills_repo: Optional[SkillsRepository] = None,
+        portfolio_story_repo=None,
+        agent_runs_repo=None,
     ):
         self._llm = llm
         self._positions = positions_repo
         self._market = market_repo
         self._skills_repo = skills_repo
+        self._story_repo = portfolio_story_repo
+        self._agent_runs_repo = agent_runs_repo
 
     @property
     def model(self) -> str:
@@ -211,6 +215,11 @@ Bewerte: Abweichungen > 10% pro Säule = kritisch und adressierungsbedürftig.""
 
         # Parse structured output
         analysis = self._parse_analysis(reply, full_text=reply)
+
+        # Persist analysis if repo is available
+        if self._story_repo:
+            self._story_repo.save_analysis(analysis)
+
         return analysis
 
     async def analyze_positions(
@@ -283,6 +292,28 @@ Positionen zur Bewertung:
 
         # Parse position fits from reply
         fits = self._parse_position_fits(reply, positions)
+
+        # Persist position fits if repo is available
+        if self._story_repo and fits:
+            self._story_repo.save_position_fits(fits)
+
+        # Log the run if repo is available
+        if self._agent_runs_repo:
+            # Build a summary from the fits if available
+            fit_counts = {}
+            for fit in fits:
+                role = fit.role if hasattr(fit, 'role') else 'unknown'
+                fit_counts[role] = fit_counts.get(role, 0) + 1
+
+            fit_summary = ", ".join(f"{role}: {count}" for role, count in fit_counts.items()) if fit_counts else "No fits"
+
+            self._agent_runs_repo.log_run(
+                agent_name="portfolio_story",
+                model=self.model,
+                output_summary=f"Position fits: {fit_summary}",
+                context_summary=f"Analyzed {len(positions)} positions",
+            )
+
         return fits
 
     @staticmethod

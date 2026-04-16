@@ -20,13 +20,13 @@ from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon
 st.set_page_config(page_title="Watchlist Checker", layout="wide")
 
 from state import (
-    get_positions_repo,
+    get_analysis_service,
+    get_portfolio_service,
     get_watchlist_checker_agent,
     get_portfolio_story_repo,
     get_agent_runs_repo,
     get_portfolio_comment_service,
     get_app_config_repo,
-    get_analyses_repo,
     get_storychecker_repo,
     get_skills_repo,
     get_watchlist_checker_repo,
@@ -296,13 +296,13 @@ st.caption("Welche Watchlist-Positionen würden gut ins Portfolio passen?")
 
 st.subheader("1️⃣ Watchlist prüfen")
 
-positions_repo = get_positions_repo()
+_portfolio_service = get_portfolio_service()
+_analysis_service = get_analysis_service()
 portfolio_story_repo = get_portfolio_story_repo()
-analyses_repo = get_analyses_repo()
 agent = get_watchlist_checker_agent()
 agent_runs_repo = get_agent_runs_repo()
 
-watchlist = positions_repo.get_watchlist()
+watchlist = _portfolio_service.get_watchlist_positions()
 
 # Initialize background job state for two separate jobs
 _JOB_DEFAULTS = {"running": False, "done": False, "count": 0, "errors": 0, "error": None, "agents": [], "logs": []}
@@ -336,11 +336,6 @@ for _job, _label in [(_WC_JOB, "Story+Konsens"), (_WC_FUND_JOB, "Fundamental")]:
                 st.text("\n".join(_job.get("logs", [])))
 
         if st.button("Dismiss", key=f"dismiss_{_label}"):
-            # Clear repo caches so next render gets fresh data from DB
-            try:
-                get_analyses_repo.clear()
-            except Exception:
-                pass
             _job.update(dict(_JOB_DEFAULTS))
             st.rerun()
         st.divider()
@@ -362,7 +357,7 @@ if not _WC_JOB["running"] and not _WC_FUND_JOB["running"]:
         ("fundamental", "Fundamental Analyzer", "pages/fundamental.py"),
         ("consensus_gap", "Konsens-Lücken", "pages/consensus_gap.py"),
     ]:
-        bulk = analyses_repo.get_latest_bulk(watchlist_ids, agent_name)
+        bulk = _analysis_service.get_verdicts(watchlist_ids, agent_name)
         n_missing = sum(1 for pid in watchlist_ids if pid not in bulk)
 
         # Get timestamp of latest analysis across all watchlist positions
@@ -458,7 +453,7 @@ else:
 if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
     with st.spinner("Watchlist wird geprüft..."):
         # Build complete context (analog to Portfolio Story)
-        portfolio = positions_repo.get_portfolio()
+        portfolio = _portfolio_service.get_portfolio_positions()
         market_agent = get_market_agent()
 
         # Get valuations as dict (ticker -> PortfolioValuation)
@@ -498,62 +493,6 @@ Full Analysis:
                     story_analysis_text=story_analysis_text,
                     selected_skill=selected_skill,
                 )
-            )
-
-            # Calculate fit counts from result
-            fit_counts = {
-                "sehr_passend": sum(1 for f in result.position_fits if f.verdict == "sehr_passend"),
-                "passend": sum(1 for f in result.position_fits if f.verdict == "passend"),
-                "neutral": sum(1 for f in result.position_fits if f.verdict == "neutral"),
-                "nicht_passend": sum(1 for f in result.position_fits if f.verdict == "nicht_passend"),
-            }
-
-            # Serialize position fits
-            position_fits_json = json.dumps([{
-                "position_id": fit.position_id,
-                "verdict": fit.verdict,
-                "summary": fit.summary,
-            } for fit in result.position_fits])
-
-            # Save to DB
-            from core.storage.models import WatchlistCheckerAnalysis
-
-            # Extract summary from "## Zusammenfassung" section if present
-            # Fallback: use fit_counts summary if Zusammenfassung not found
-            summary = None
-            if result.full_text:
-                zusammenfassung_idx = result.full_text.find("## Zusammenfassung")
-                if zusammenfassung_idx != -1:
-                    # Get text after the "## Zusammenfassung" header
-                    after = result.full_text[zusammenfassung_idx:].split('\n', 1)
-                    if len(after) > 1:
-                        body = after[1].strip()
-                        # First non-empty line is the summary
-                        first_line = next((l.strip() for l in body.split('\n') if l.strip()), None)
-                        summary = first_line[:200] if first_line else None
-
-            # Fallback: if no Zusammenfassung section found, create summary from fit counts
-            if not summary:
-                summary = f"Geprüft: {fit_counts['sehr_passend']} sehr passend, {fit_counts['passend']} passend, {fit_counts['neutral']} neutral, {fit_counts['nicht_passend']} nicht passend"
-
-            analysis = WatchlistCheckerAnalysis(
-                summary=summary,
-                full_text=result.full_text,
-                fit_counts=fit_counts,  # Already a dict
-                position_fits_json=position_fits_json,
-                skill_name=selected_skill.name if selected_skill else "",
-                model=agent.model,
-                created_at=datetime.now(),
-            )
-            wc_repo = get_watchlist_checker_repo()
-            saved_analysis = wc_repo.save_analysis(analysis)
-
-            # Log to agent_runs
-            agent_runs_repo.log_run(
-                agent_name="watchlist_checker",
-                model=agent.model,
-                output_summary=f"Checked {len(watchlist)} positions: {fit_counts['sehr_passend']} sehr passend, {fit_counts['passend']} passend",
-                context_summary=f"Portfolio ({len(portfolio)} pos), Story ({bool(story_analysis)}), Skill ({selected_skill.name if selected_skill else 'Standard'})",
             )
 
             st.success("✅ Watchlist-Prüfung durchgeführt!")
@@ -656,9 +595,9 @@ if st.session_state.get("_watchlist_check_result"):
 
     # Bulk-fetch analyses for all watchlist positions (used in expanders below)
     _all_fit_ids = [fit.position_id for fit in position_fits if fit.position_id]
-    _bulk_story = analyses_repo.get_latest_bulk(_all_fit_ids, "storychecker") if _all_fit_ids else {}
-    _bulk_fund = analyses_repo.get_latest_bulk(_all_fit_ids, "fundamental") if _all_fit_ids else {}
-    _bulk_consensus = analyses_repo.get_latest_bulk(_all_fit_ids, "consensus_gap") if _all_fit_ids else {}
+    _bulk_story = _analysis_service.get_verdicts(_all_fit_ids, "storychecker") if _all_fit_ids else {}
+    _bulk_fund = _analysis_service.get_verdicts(_all_fit_ids, "fundamental") if _all_fit_ids else {}
+    _bulk_consensus = _analysis_service.get_verdicts(_all_fit_ids, "consensus_gap") if _all_fit_ids else {}
 
     # Display position fits
     for fit in position_fits:

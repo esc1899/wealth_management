@@ -14,8 +14,8 @@ import streamlit as st
 
 from core.i18n import t
 from state import (
-    get_analyses_repo,
-    get_positions_repo,
+    get_analysis_service,
+    get_portfolio_service,
     get_skills_repo,
     get_storychecker_agent,
     get_storychecker_repo,
@@ -34,6 +34,8 @@ st.caption(t("structural_scan.subtitle"))
 _agent = get_structural_change_agent()
 _repo = get_structural_scans_repo()
 _skills = get_skills_repo().get_by_area("structural_scan")
+_analysis_service = get_analysis_service()
+_portfolio_service = get_portfolio_service()
 
 if not _skills:
     st.warning(t("structural_scan.no_skills"))
@@ -159,7 +161,7 @@ if _active_run_id:
 
         # ── Watchlist summary ────────────────────────────────────────
         _candidates = [
-            p for p in get_positions_repo().get_watchlist()
+            p for p in _portfolio_service.get_watchlist_positions()
             if p.notes and "Strukturwandel-Scan" in (p.notes or "")
         ]
         if _candidates:
@@ -168,7 +170,7 @@ if _active_run_id:
                 icon=":material/bookmark_added:",
             )
             _cand_ids = [c.id for c in _candidates if c.id]
-            _cand_verdicts = get_analyses_repo().get_latest_bulk(_cand_ids, "storychecker")
+            _cand_verdicts = _analysis_service.get_verdicts(_cand_ids, "storychecker")
             _SC_ICONS = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴", "unknown": "⚪"}
             with st.expander(t("structural_scan.show_candidates")):
                 for c in _candidates:

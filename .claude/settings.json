@@ -21,7 +21,10 @@
       "Bash(pytest tests/unit/test_analysis_service.py tests/unit/test_portfolio_service.py -v)",
       "Bash(pytest tests/unit/test_analysis_service.py::TestGetVerdicts::test_get_verdicts_single_agent -v)",
       "Bash(python -c \"from core.storage.models import Position; p = Position\\(id=1, name='Test', asset_class='Aktie'\\); print\\(p\\)\")",
-      "Bash(pytest tests/ -x --tb=line -q)"
+      "Bash(pytest tests/ -x --tb=line -q)",
+      "Bash(curl -s http://localhost:8501/_stcore/health)",
+      "Bash(python3 -c ' *)",
+      "Bash(find /Users/erik/Projects/wealth_management/core/storage -name \"*.py\" -exec grep -l \"WatchlistCheckerRepository\\\\|class.*Watchlist\" {} \\\\;)"
     ]
   }
 }
