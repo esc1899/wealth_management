@@ -283,20 +283,59 @@ pytest -k consensus_gap       # Specific agent
 
 ## Known Technical Debt
 
-See **BACKLOG.md § Technical Debt** for full inventory (16 items).
+See **BACKLOG.md § Technical Debt** for full inventory.
 
-**High-Priority Items Still Open:**
-- [DEBT-4] No Service Layer (direct Repo access in Pages)
-- [DEBT-7] state.py is God Module
-- [DEBT-9] asyncio.run() + nest_asyncio anti-pattern
+**DEBT Stack Completed (2026-04-16):** ✅
+- ✅ [DEBT-9] asyncio.get_event_loop() → asyncio.run() (Python 3.12+ safe)
+- ✅ [DEBT-7] state.py decomposed (437 → 60 lines + 5 modules, zero page disruption)
+- ✅ [DEBT-4] Service Layer + Agent Encapsulation (AnalysisService, PortfolioService; agents own persistence)
 
 ---
 
 ## Recent Changes (April 2026)
 
+✅ **DEBT Stack Complete** (2026-04-16)
+   - Async modernization (Python 3.12+), State decomposition, Service layer + Agent encapsulation
+
 ✅ Skills Architecture Complete (Phase 5)  
 ✅ Watchlist Checker + Consensus Gap Analysis Integration  
-✅ Fundamental Analyzer (multi-turn session-based)  
+✅ Fundamental Analyzer (multi-turn session-based)
+
+---
+
+## Service Layer (Post-DEBT-4)
+
+### Core Services
+
+**AnalysisService** (`core/services/analysis_service.py`)
+- `get_verdicts(position_ids, agent)` — Fetch verdicts for a list of positions from a specific agent
+- `get_all_verdicts(position_ids)` — Fetch all agent verdicts in one call (storychecker, consensus_gap, fundamental_analyzer)
+- `get_coverage(positions, agents)` — Count positions missing analysis per agent
+- `has_verdict(position_id, agent)` — Check if position has a verdict
+- `get_verdict(position_id, agent)` — Get single verdict
+
+**PortfolioService** (`core/services/portfolio_service.py`)
+- `get_all_positions(include_portfolio, include_watchlist, require_story, require_ticker)` — Centralized position aggregation
+- `get_portfolio_positions()` — Convenience method for portfolio only
+- `get_watchlist_positions()` — Convenience method for watchlist only
+
+### Usage Pattern
+Pages no longer call `analyses_repo.get_latest_bulk()` or `positions_repo.get_*()` directly:
+```python
+# Before DEBT-4:
+verdicts = analyses_repo.get_latest_bulk(ids, "storychecker")
+
+# After DEBT-4:
+verdicts = analysis_service.get_verdicts(ids, "storychecker")
+```
+
+### Pages Using Services
+- `pages/structural_scan.py` — AnalysisService, PortfolioService
+- `pages/positionen.py` — AnalysisService
+- `pages/watchlist_checker.py` — AnalysisService, PortfolioService
+- `pages/portfolio_story.py` — AnalysisService, PortfolioService
+- `pages/consensus_gap.py` — AnalysisService, PortfolioService
+- `pages/fundamental_analyzer.py` — PortfolioService  
 ✅ Portfolio Story subsystem (role-based fit)  
 ✅ 563+ tests passing, 78.35% coverage  
 

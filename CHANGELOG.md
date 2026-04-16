@@ -8,6 +8,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### DEBT Stack Completion (2026-04-16)
+
+**Complete architectural modernization: 3 technical debts resolved in 1 session.**
+
+#### DEBT-9: Async Anti-Pattern Cleanup
+- **Changed**: Replaced deprecated `asyncio.get_event_loop().run_until_complete()` → `asyncio.run()`
+- **Files**: 2 agents (StorycheckerAgent, FundamentalAnalyzerAgent)
+- **Impact**: Python 3.12+ compatible, modern async pattern
+
+#### DEBT-7: God Module Decomposition
+- **Changed**: state.py monolith (437 lines, 38 exports) → 5 focused modules + facade
+  - `state_db.py`: DB + encryption initialization
+  - `state_repos.py`: 17 repository factories
+  - `state_llm.py`: LLM provider creation
+  - `state_agents.py`: 15 agent factories (with logging fix)
+  - `state_services.py`: 5 service factories
+  - `state.py`: Pure re-export facade (nest_asyncio.apply() preserved)
+- **Impact**: Zero disruption to 21 pages (all still use `from state import X`)
+- **Tests**: All 573 passing, coverage maintained
+
+#### DEBT-4: Service Layer + Agent Encapsulation
+**Part A: Service Migration (4 pages)**
+- `structural_scan.py`: 1 call → AnalysisService.get_verdicts()
+- `positionen.py`: 1 call → AnalysisService.get_verdicts()
+- `watchlist_checker.py`: 6 calls → AnalysisService + PortfolioService
+- `portfolio_story.py`: 9 calls → AnalysisService + PortfolioService
+
+**Part B: Agent Encapsulation (2 agents)**
+- `WatchlistCheckerAgent`: Now owns persistence (wc_repo.save_analysis + agent_runs_repo.log_run)
+- `PortfolioStoryAgent`: Now owns persistence (portfolio_story_repo.save_* + agent_runs_repo.log_run)
+- `state_agents.py`: Updated factories to inject repos into agents
+
+**Architecture Changes:**
+- Pages are now thin UI layers (input → agent → display)
+- Services centralize repository patterns (AnalysisService, PortfolioService)
+- Agents encapsulate full lifecycle (analyze → persist → log)
+
+#### Testing & Validation
+- **Tests**: 573/573 passing, 77.55% coverage
+- **Smoketest**: All 5 updated pages load without errors
+- **Git**: 
+  - Commit 5e69c3d: DEBT-4 completion (service migration + agent encapsulation)
+  - Commit 4efc424: DEBT-9 + DEBT-7 (async cleanup + state decomposition)
+
+#### Commits
+```
+5e69c3d refactor: DEBT-4 — Complete service migration + agent encapsulation
+4efc424 refactor: DEBT-9 + DEBT-7 + DEBT-4 — async cleanup, state decomposition, service layer
+```
+
+---
+
 ### Skills Architecture Cleanup & Completion (2026-04-15)
 
 **Major Refactor**: Completed 5-phase skills system restructuring with dead code elimination.
