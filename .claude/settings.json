@@ -10,7 +10,18 @@
       "Bash(python -m pytest tests/unit/test_consensus_gap_verdict_parser.py -x)",
       "Bash(python -m pytest tests/unit/test_consensus_gap_verdict_parser.py::test_mixed_valid_and_invalid -v)",
       "Bash(python -m pytest tests/unit/test_consensus_gap_verdict_parser.py::test_mixed_valid_and_invalid -xvs)",
-      "Bash(git status *)"
+      "Bash(git status *)",
+      "Bash(python -c ' *)",
+      "Bash(git reset *)",
+      "Bash(python -m pytest tests/unit/test_fundamental_analyzer_agent.py -v)",
+      "Bash(grep -n \"from state import\\\\|import state\" /Users/erik/Projects/wealth_management/pages/*.py)",
+      "Bash(pytest tests/unit/ -k \"storychecker or fundamental_analyzer\" -v)",
+      "Bash(python -c \"from state import get_portfolio_agent, get_analyses_repo, get_position_story_service; print\\('✅ All state imports OK'\\)\")",
+      "Bash(pytest tests/ -x --tb=short)",
+      "Bash(pytest tests/unit/test_analysis_service.py tests/unit/test_portfolio_service.py -v)",
+      "Bash(pytest tests/unit/test_analysis_service.py::TestGetVerdicts::test_get_verdicts_single_agent -v)",
+      "Bash(python -c \"from core.storage.models import Position; p = Position\\(id=1, name='Test', asset_class='Aktie'\\); print\\(p\\)\")",
+      "Bash(pytest tests/ -x --tb=line -q)"
     ]
   }
 }

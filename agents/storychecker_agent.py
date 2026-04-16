@@ -268,9 +268,7 @@ Schreibe nur die These selbst, keine Einleitung oder Überschrift."""
     def _run_llm(self, session_id: int, api_messages: list[dict]) -> str:
         """Run the tool-calling loop and persist the final assistant response."""
         import asyncio
-        return asyncio.get_event_loop().run_until_complete(
-            self._run_llm_async(session_id, api_messages)
-        )
+        return asyncio.run(self._run_llm_async(session_id, api_messages))
 
     async def _run_llm_async(self, session_id: int, api_messages: list[dict]) -> str:
         messages = list(api_messages)

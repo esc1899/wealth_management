@@ -13,7 +13,7 @@ import streamlit as st
 
 from core.i18n import t
 from core.ui.verdicts import cloud_notice
-from state import get_analyses_repo, get_positions_repo, get_fundamental_analyzer_agent
+from state import get_analyses_repo, get_fundamental_analyzer_agent, get_portfolio_service
 
 st.set_page_config(page_title="Fundamental Analyzer", page_icon="📊", layout="wide")
 st.title("📊 Fundamental Analyzer")
@@ -43,8 +43,10 @@ Der Agent nutzt Web-Search um aktuelle Daten zu finden (Finanzkennzahlen, Manage
 # Load data
 # ------------------------------------------------------------------
 
-positions_repo = get_positions_repo()
-all_positions = positions_repo.get_portfolio() + positions_repo.get_watchlist()
+portfolio_service = get_portfolio_service()
+all_positions = portfolio_service.get_all_positions(
+    include_portfolio=True, include_watchlist=True
+)
 positions_with_required_fields = [p for p in all_positions if p.name]
 
 # ------------------------------------------------------------------

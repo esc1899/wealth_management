@@ -1,436 +1,102 @@
 """
-Shared Streamlit cache resources — singletons for agents and repositories.
+Streamlit cache resource facade — singletons for agents and repositories.
+
+All implementation details are in state_* modules. This file re-exports them
+for zero-disruption migration from monolithic state.py.
 """
 
 import nest_asyncio
-import streamlit as st
 
 nest_asyncio.apply()
 
-from config import config
-from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET
-from agents.consensus_gap_agent import ConsensusGapAgent
-from agents.fundamental_agent import FundamentalAgent
-from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
-from agents.market_data_agent import MarketDataAgent
-from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
-from agents.news_agent import NewsAgent
-from agents.portfolio_agent import PortfolioAgent
-from agents.portfolio_story_agent import PortfolioStoryAgent
-from agents.research_agent import ResearchAgent
-from agents.search_agent import SearchAgent
-from agents.storychecker_agent import StorycheckerAgent
-from agents.structural_change_agent import StructuralChangeAgent
-from agents.watchlist_checker_agent import WatchlistCheckerAgent
-from agents.wealth_snapshot_agent import WealthSnapshotAgent
-from core.storage.analyses import PositionAnalysesRepository
-from core.storage.agent_runs import AgentRunsRepository
-from core.storage.portfolio_story import PortfolioStoryRepository
-from core.storage.storychecker import StorycheckerRepository
-from core.storage.structural_scans import StructuralScansRepository
-from core.storage.wealth_snapshots import WealthSnapshotRepository
-from core.storage.dividend_snapshots import DividendSnapshotRepository
-from core.storage.watchlist_checker_repo import WatchlistCheckerRepository
-from core.asset_class_config import get_asset_class_registry, AssetClassRegistry
-from core.llm.claude import ClaudeProvider
-from core.llm.local import OllamaProvider
-from core.encryption import PassthroughEncryptionService
-from core.storage.app_config import AppConfigRepository
-from core.storage.base import build_encryption_service, get_connection, init_db, migrate_db
-from core.storage.market_data import MarketDataRepository
-from core.storage.positions import PositionsRepository
-from core.storage.news import NewsRepository
-from core.storage.research import ResearchRepository
-from core.storage.scheduled_jobs import ScheduledJobsRepository
-from core.storage.search import SearchRepository
-from core.storage.skills import SkillsRepository
-from core.storage.usage import UsageRepository
-from core.scheduler import AgentSchedulerService
-from core.strategy_config import get_strategy_registry
-from monitoring.langfuse_client import create_langfuse_client
-
-# Default model values (overridable via app_config)
-_DEFAULT_OLLAMA_MODEL = config.OLLAMA_MODEL
-_DEFAULT_CLAUDE_MODEL = CLAUDE_HAIKU
-
-
-@st.cache_resource
-def get_db_connection():
-    conn = get_connection(config.DB_PATH)
-    init_db(conn)
-    migrate_db(conn)
-    return conn
-
-
-@st.cache_resource
-def get_encryption_service():
-    if config.DEMO_MODE:
-        return PassthroughEncryptionService()
-    return build_encryption_service(config.ENCRYPTION_KEY, "data/salt.bin")
-
-
-@st.cache_resource
-def get_positions_repo() -> PositionsRepository:
-    return PositionsRepository(get_db_connection(), get_encryption_service())
-
-
-@st.cache_resource
-def get_market_repo() -> MarketDataRepository:
-    return MarketDataRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_app_config_repo() -> AppConfigRepository:
-    return AppConfigRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_asset_classes() -> AssetClassRegistry:
-    return get_asset_class_registry()
-
-
-@st.cache_resource
-def get_portfolio_agent() -> PortfolioAgent:
-    model = _get_agent_model("portfolio", "ollama", _DEFAULT_OLLAMA_MODEL)
-    llm = OllamaProvider(host=config.OLLAMA_HOST, model=model)
-    llm.on_usage = lambda i, o, skill=None, dur=None, pos=None: get_usage_repo().record("portfolio_chat", model, i, o, skill=skill, duration_ms=dur, position_count=pos)
-    fetcher = MarketDataFetcher(
-        rate_limiter=RateLimiter(calls_per_second=config.RATE_LIMIT_RPS)
-    )
-    return PortfolioAgent(
-        positions_repo=get_positions_repo(),
-        llm=llm,
-        skills_repo=get_skills_repo(),
-        market_fetcher=fetcher,
-        market_repo=get_market_repo(),
-    )
-
-
-def _safe_take_snapshot() -> None:
-    """Helper: take wealth and dividend snapshots after market fetch, fail silently on errors."""
-    agent = get_wealth_snapshot_agent()
-
-    # Take wealth snapshot
-    try:
-        agent.take_snapshot(is_manual=False, overwrite=False)
-    except ValueError:
-        pass  # Snapshot for today already exists — ok
-    except Exception as e:
-        logger.warning("Auto wealth snapshot failed: %s", e)
-
-    # Take dividend snapshot
-    try:
-        agent.take_dividend_snapshot(is_manual=False, overwrite=False)
-    except ValueError:
-        pass  # Snapshot for today already exists — ok
-    except Exception as e:
-        logger.warning("Auto dividend snapshot failed: %s", e)
-
-
-@st.cache_resource
-def get_market_agent() -> MarketDataAgent:
-    fetcher = MarketDataFetcher(
-        rate_limiter=RateLimiter(calls_per_second=config.RATE_LIMIT_RPS)
-    )
-    agent = MarketDataAgent(
-        positions_repo=get_positions_repo(),
-        market_repo=get_market_repo(),
-        fetcher=fetcher,
-        db_path=config.DB_PATH,
-        encryption_key=config.ENCRYPTION_KEY,
-    )
-    scheduler = agent.setup_scheduler(fetch_hour=config.MARKET_DATA_FETCH_HOUR)
-    scheduler.start()
-
-    # Register post-fetch callback for automatic wealth snapshots
-    agent.set_post_fetch_callback(lambda: _safe_take_snapshot())
-
-    return agent
-
-
-@st.cache_resource
-def get_research_repo() -> ResearchRepository:
-    return ResearchRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_news_repo() -> NewsRepository:
-    return NewsRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_search_repo() -> SearchRepository:
-    return SearchRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_usage_repo() -> UsageRepository:
-    return UsageRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_skills_repo() -> SkillsRepository:
-    repo = SkillsRepository(get_db_connection())
-    _seed_default_skills(repo)
-    return repo
-
-
-def _seed_default_skills(repo: SkillsRepository) -> None:
-    """Seed all areas from config/default_skills.yaml on first startup."""
-    import yaml
-    from pathlib import Path
-    path = Path(__file__).parent / "config" / "default_skills.yaml"
-    with open(path) as f:
-        data = yaml.safe_load(f)
-    for area, skills_list in (data.get("skills") or {}).items():
-        repo.seed_if_empty(area, skills_list or [])
-    # Seed hidden system skills (INSERT OR IGNORE — safe to run every startup)
-    system_skills = data.get("system") or []
-    repo.seed_system_skills(system_skills)
-    # Seed new visible skills that may not be in existing installations
-    # (INSERT OR IGNORE per name+area — never overwrites user edits)
-    _skills_data = data.get("skills") or {}
-    repo.seed_new_skills("structural_scan", _skills_data.get("structural_scan", []))
-    repo.seed_new_skills("consensus_gap", _skills_data.get("consensus_gap", []))
-    repo.seed_new_skills("fundamental", _skills_data.get("fundamental", []))
-    repo.seed_new_skills("portfolio_story", _skills_data.get("portfolio_story", []))
-    repo.seed_new_skills("watchlist_checker", _skills_data.get("watchlist_checker", []))
-    # Load private skills if config/private_skills.yaml exists (gitignored)
-    private_path = Path(__file__).parent / "config" / "private_skills.yaml"
-    if private_path.exists():
-        with open(private_path) as f:
-            private_data = yaml.safe_load(f) or {}
-        for area, skills_list in (private_data.get("skills") or {}).items():
-            repo.seed_new_skills(area, skills_list or [])
-
-
-def _make_claude_provider(model: str, agent_name: str) -> ClaudeProvider:
-    provider = ClaudeProvider(
-        api_key=config.ANTHROPIC_API_KEY,
-        model=model,
-    )
-    provider.on_usage = lambda i, o, skill=None, dur=None, pos=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos)
-    return provider
-
-
-def _make_ollama_provider(model: str, agent_name: str, timeout: float = 120.0) -> "OllamaProvider":
-    provider = OllamaProvider(host=config.OLLAMA_HOST, model=model, timeout=timeout)
-    provider.on_usage = lambda i, o, skill=None, dur=None, pos=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos)
-    return provider
-
-
-def _get_agent_model(agent_key: str, model_type: str, default: str) -> str:
-    """Return model for a specific agent. Falls back to global setting then env default."""
-    repo = get_app_config_repo()
-    return (
-        repo.get(f"model_{model_type}_{agent_key}")
-        or repo.get(f"model_{model_type}")
-        or default
-    )
-
-
-@st.cache_resource
-def get_research_agent() -> ResearchAgent:
-    model = _get_agent_model("research", "claude", _DEFAULT_CLAUDE_MODEL)
-    llm = _make_claude_provider(model, "research_chat")
-    return ResearchAgent(
-        positions_repo=get_positions_repo(),
-        research_repo=get_research_repo(),
-        llm=llm,
-        strategy_registry=get_strategy_registry(),
-    )
-
-
-@st.cache_resource
-def get_news_agent() -> NewsAgent:
-    model = _get_agent_model("news", "claude", _DEFAULT_CLAUDE_MODEL)
-    llm = _make_claude_provider(model, "news_digest")
-    return NewsAgent(llm=llm)
-
-
-@st.cache_resource
-def get_search_agent() -> SearchAgent:
-    model = _get_agent_model("search", "claude", CLAUDE_SONNET)
-    llm = _make_claude_provider(model, "investment_search")
-    return SearchAgent(
-        positions_repo=get_positions_repo(),
-        search_repo=get_search_repo(),
-        llm=llm,
-    )
-
-
-@st.cache_resource
-def get_storychecker_repo() -> StorycheckerRepository:
-    return StorycheckerRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_analyses_repo() -> PositionAnalysesRepository:
-    return PositionAnalysesRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_storychecker_agent() -> StorycheckerAgent:
-    model = _get_agent_model("storychecker", "claude", _DEFAULT_CLAUDE_MODEL)
-    llm = _make_claude_provider(model, "storychecker")
-    return StorycheckerAgent(
-        positions_repo=get_positions_repo(),
-        storychecker_repo=get_storychecker_repo(),
-        analyses_repo=get_analyses_repo(),
-        llm=llm,
-        skills_repo=get_skills_repo(),
-    )
-
-
-@st.cache_resource
-def get_scheduled_jobs_repo() -> ScheduledJobsRepository:
-    return ScheduledJobsRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_structural_scans_repo() -> StructuralScansRepository:
-    return StructuralScansRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_structural_change_agent(claude_model: str = "") -> StructuralChangeAgent:
-    model = _get_agent_model("structural_scan", "claude", CLAUDE_SONNET)
-    llm = _make_claude_provider(model, "structural_scan")
-    return StructuralChangeAgent(
-        positions_repo=get_positions_repo(),
-        llm=llm,
-    )
-
-
-@st.cache_resource
-def get_fundamental_agent() -> FundamentalAgent:
-    model = _get_agent_model("fundamental", "claude", CLAUDE_SONNET)
-    llm = _make_claude_provider(model, "fundamental")
-    return FundamentalAgent(llm=llm)
-
-
-@st.cache_resource
-def get_fundamental_analyzer_agent() -> FundamentalAnalyzerAgent:
-    model = _get_agent_model("fundamental_analyzer", "claude", _DEFAULT_CLAUDE_MODEL)
-    llm = _make_claude_provider(model, "fundamental_analyzer")
-    return FundamentalAnalyzerAgent(
-        positions_repo=get_positions_repo(),
-        analyses_repo=get_analyses_repo(),
-        llm=llm,
-        skills_repo=get_skills_repo(),
-    )
-
-
-@st.cache_resource
-def get_consensus_gap_agent(claude_model: str = "") -> ConsensusGapAgent:
-    model = _get_agent_model("consensus_gap", "claude", CLAUDE_SONNET)
-    llm = _make_claude_provider(model, "consensus_gap")
-    return ConsensusGapAgent(
-        llm=llm,
-        analyses_repo=get_analyses_repo(),
-    )
-
-
-@st.cache_resource
-def get_agent_scheduler() -> AgentSchedulerService:
-    service = AgentSchedulerService(
-        db_path=config.DB_PATH,
-        encryption_key=config.ENCRYPTION_KEY,
-        anthropic_api_key=config.ANTHROPIC_API_KEY,
-        default_claude_model=_DEFAULT_CLAUDE_MODEL,
-    )
-    service.start()
-    return service
-
-
-@st.cache_resource
-def get_dividend_snapshot_repo() -> DividendSnapshotRepository:
-    return DividendSnapshotRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_watchlist_checker_repo() -> WatchlistCheckerRepository:
-    return WatchlistCheckerRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_wealth_snapshot_repo() -> WealthSnapshotRepository:
-    return WealthSnapshotRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_wealth_snapshot_agent() -> WealthSnapshotAgent:
-    return WealthSnapshotAgent(
-        positions_repo=get_positions_repo(),
-        market_repo=get_market_repo(),
-        wealth_repo=get_wealth_snapshot_repo(),
-        market_data_agent=get_market_agent(),
-        dividend_repo=get_dividend_snapshot_repo(),
-    )
-
-
-@st.cache_resource
-def get_portfolio_story_repo() -> PortfolioStoryRepository:
-    return PortfolioStoryRepository(get_db_connection(), get_encryption_service())
-
-
-@st.cache_resource
-def get_portfolio_story_agent() -> PortfolioStoryAgent:
-    model = _get_agent_model("portfolio_story", "ollama", _DEFAULT_OLLAMA_MODEL)
-    # Portfolio story analysis has detailed prompt — needs longer timeout
-    llm = _make_ollama_provider(model, "portfolio_story_check", timeout=300.0)
-    return PortfolioStoryAgent(
-        llm=llm,
-        positions_repo=get_positions_repo(),
-        market_repo=get_market_repo(),
-        skills_repo=get_skills_repo(),
-    )
-
-
-@st.cache_resource
-def get_agent_runs_repo() -> AgentRunsRepository:
-    return AgentRunsRepository(get_db_connection())
-
-
-@st.cache_resource
-def get_watchlist_checker_agent() -> WatchlistCheckerAgent:
-    model = _get_agent_model("watchlist_checker", "ollama", _DEFAULT_OLLAMA_MODEL)
-    llm = _make_ollama_provider(model, "watchlist_checker", timeout=300.0)
-    return WatchlistCheckerAgent(
-        positions_repo=get_positions_repo(),
-        analyses_repo=get_analyses_repo(),
-        llm=llm,
-        skills_repo=get_skills_repo(),
-    )
-
-
-@st.cache_resource
-def get_position_story_service():
-    """Service for generating individual position investment theses."""
-    from core.services.position_story_service import PositionStoryService
-    return PositionStoryService(
-        api_key=config.ANTHROPIC_API_KEY,
-        usage_repo=get_usage_repo(),
-        model=_get_agent_model("position_story", "claude", CLAUDE_HAIKU),
-    )
-
-
-@st.cache_resource
-def get_portfolio_comment_service():
-    """Service for generating stylized financial commentary."""
-    from core.services.portfolio_comment_service import PortfolioCommentService
-    model = _get_agent_model("portfolio_comment", "ollama", _DEFAULT_OLLAMA_MODEL)
-    return PortfolioCommentService(
-        host=config.OLLAMA_HOST,
-        model=model,
-        usage_repo=get_usage_repo(),
-    )
-
-
-@st.cache_resource
-def get_langfuse_client():
-    return create_langfuse_client(
-        public_key=config.LANGFUSE_PUBLIC_KEY,
-        secret_key=config.LANGFUSE_SECRET_KEY,
-        host=config.LANGFUSE_HOST,
-    )
+# Database and encryption
+from state_db import get_db_connection, get_encryption_service
+
+# Repositories (17 total)
+from state_repos import (
+    get_positions_repo,
+    get_market_repo,
+    get_app_config_repo,
+    get_research_repo,
+    get_news_repo,
+    get_search_repo,
+    get_usage_repo,
+    get_skills_repo,
+    get_storychecker_repo,
+    get_analyses_repo,
+    get_scheduled_jobs_repo,
+    get_structural_scans_repo,
+    get_dividend_snapshot_repo,
+    get_watchlist_checker_repo,
+    get_wealth_snapshot_repo,
+    get_portfolio_story_repo,
+    get_agent_runs_repo,
+)
+
+# Agents (15 total)
+from state_agents import (
+    get_portfolio_agent,
+    get_market_agent,
+    get_research_agent,
+    get_news_agent,
+    get_search_agent,
+    get_storychecker_agent,
+    get_structural_change_agent,
+    get_fundamental_agent,
+    get_fundamental_analyzer_agent,
+    get_consensus_gap_agent,
+    get_agent_scheduler,
+    get_wealth_snapshot_agent,
+    get_portfolio_story_agent,
+    get_watchlist_checker_agent,
+)
+
+# Services
+from state_services import (
+    get_position_story_service,
+    get_portfolio_comment_service,
+    get_langfuse_client,
+    get_analysis_service,
+    get_portfolio_service,
+)
+
+__all__ = [
+    "get_db_connection",
+    "get_encryption_service",
+    "get_positions_repo",
+    "get_market_repo",
+    "get_app_config_repo",
+    "get_research_repo",
+    "get_news_repo",
+    "get_search_repo",
+    "get_usage_repo",
+    "get_skills_repo",
+    "get_storychecker_repo",
+    "get_analyses_repo",
+    "get_scheduled_jobs_repo",
+    "get_structural_scans_repo",
+    "get_dividend_snapshot_repo",
+    "get_watchlist_checker_repo",
+    "get_wealth_snapshot_repo",
+    "get_portfolio_story_repo",
+    "get_agent_runs_repo",
+    "get_portfolio_agent",
+    "get_market_agent",
+    "get_research_agent",
+    "get_news_agent",
+    "get_search_agent",
+    "get_storychecker_agent",
+    "get_structural_change_agent",
+    "get_fundamental_agent",
+    "get_fundamental_analyzer_agent",
+    "get_consensus_gap_agent",
+    "get_agent_scheduler",
+    "get_wealth_snapshot_agent",
+    "get_portfolio_story_agent",
+    "get_watchlist_checker_agent",
+    "get_position_story_service",
+    "get_portfolio_comment_service",
+    "get_langfuse_client",
+    "get_analysis_service",
+    "get_portfolio_service",
+]

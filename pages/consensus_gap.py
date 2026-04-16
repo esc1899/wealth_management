@@ -16,8 +16,9 @@ from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge, render_verdict_lege
 from state import (
     get_analyses_repo,
     get_consensus_gap_agent,
-    get_positions_repo,
     get_skills_repo,
+    get_portfolio_service,
+    get_analysis_service,
 )
 
 st.set_page_config(
@@ -31,8 +32,9 @@ st.caption(t("consensus_gap.subtitle"))
 _agent = get_consensus_gap_agent()
 cloud_notice(_agent.model)
 
-_positions_repo = get_positions_repo()
 _analyses_repo = get_analyses_repo()
+_portfolio_service = get_portfolio_service()
+_analysis_service = get_analysis_service()
 _skills = get_skills_repo().get_by_area("consensus_gap")
 
 # ------------------------------------------------------------------
@@ -71,8 +73,9 @@ _VERDICT_CONFIG = VERDICT_CONFIGS["consensus_gap"]
 # Portfolio + Watchlist positions with stories
 # ------------------------------------------------------------------
 
-_all_positions = _positions_repo.get_all()  # Include watchlist positions
-_eligible = [p for p in _all_positions if p.story]
+_eligible = _portfolio_service.get_all_positions(
+    include_portfolio=True, include_watchlist=True, require_story=True
+)
 _all_ids = [p.id for p in _eligible if p.id]
 
 if not _eligible:

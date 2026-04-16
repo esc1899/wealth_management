@@ -218,8 +218,7 @@ class FundamentalAnalyzerAgent:
             messages.append(Message(role=role, content=msg["content"]))
 
         # Call async chat method with system= kwarg
-        loop = asyncio.get_event_loop()
-        response = loop.run_until_complete(
+        response = asyncio.run(
             self._llm.chat(
                 messages=messages,
                 system=BASE_SYSTEM_PROMPT,
