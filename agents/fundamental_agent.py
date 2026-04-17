@@ -78,8 +78,13 @@ class FundamentalAgent:
     Stores verdicts in position_analyses (agent='fundamental').
     """
 
-    def __init__(self, llm: ClaudeProvider):
+    def __init__(
+        self,
+        llm: ClaudeProvider,
+        analyses_repo: PositionAnalysesRepository,
+    ):
         self._llm = llm
+        self._analyses_repo = analyses_repo
 
     # ------------------------------------------------------------------
     # Public API
@@ -90,7 +95,6 @@ class FundamentalAgent:
         positions: List[Position],
         skill_name: str,
         skill_prompt: str,
-        analyses_repo: PositionAnalysesRepository,
     ) -> List[Tuple[int, str, str]]:
         """
         Analyse all eligible positions. Returns list of (position_id, verdict, summary).
@@ -111,7 +115,7 @@ class FundamentalAgent:
 
         for pos in auto_skip:
             summary = f"Automatisch als unbekannt klassifiziert — {pos.asset_class} ist nicht klassisch bewertbar (kein DCF/P/E anwendbar)."
-            analyses_repo.save(
+            self._analyses_repo.save(
                 position_id=pos.id,
                 agent=AGENT_NAME,
                 skill_name=skill_name,
@@ -166,7 +170,7 @@ class FundamentalAgent:
             if extras:
                 rich_summary = f"{summary} ({', '.join(extras)})"
 
-            analyses_repo.save(
+            self._analyses_repo.save(
                 position_id=pos_id,
                 agent=AGENT_NAME,
                 skill_name=skill_name,

@@ -181,8 +181,12 @@ else:
             latest_ts = None
             for verdict_obj in b.values():
                 if verdict_obj and hasattr(verdict_obj, 'created_at') and verdict_obj.created_at:
-                    if latest_ts is None or verdict_obj.created_at > latest_ts:
-                        latest_ts = verdict_obj.created_at
+                    ts = verdict_obj.created_at
+                    # Normalize to naive datetime for comparison
+                    if hasattr(ts, 'replace'):
+                        ts = ts.replace(tzinfo=None) if ts.tzinfo else ts
+                    if latest_ts is None or ts > latest_ts:
+                        latest_ts = ts
 
             ts_str = f" (zuletzt: {latest_ts.strftime('%d.%m. %H:%M')})" if latest_ts else " (noch nicht gelaufen)"
 

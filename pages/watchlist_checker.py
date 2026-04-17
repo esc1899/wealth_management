@@ -177,7 +177,7 @@ def _run_storychecker_consensus_job(
             try:
                 _log_to_job(job, f"Running ConsensusGapAgent with skill '{cg_skill_name}'")
                 loop.run_until_complete(
-                    cg_agent.analyze_portfolio(watchlist_positions, cg_skill_name, cg_skill_prompt, analyses_repo)
+                    cg_agent.analyze_portfolio(watchlist_positions, cg_skill_name, cg_skill_prompt)
                 )
                 cg_count = len(watchlist_positions)
                 count += cg_count
@@ -246,7 +246,7 @@ def _run_fundamental_job(
 
         # Create agent with thread-safe repos (same as Scheduler does)
         fund_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET)
-        fund_agent = FundamentalAgent(llm=fund_llm)
+        fund_agent = FundamentalAgent(llm=fund_llm, analyses_repo=analyses_repo)
 
         job["agents"] = ["Fundamental"]
         positions = [p for p in watchlist if p.id]
@@ -262,7 +262,6 @@ def _run_fundamental_job(
                         positions=positions,
                         skill_name=fund_skill_name,
                         skill_prompt=fund_skill_prompt,
-                        analyses_repo=analyses_repo,
                     )
                 )
                 count = len(results) if results else len(positions)
@@ -496,9 +495,7 @@ Full Analysis:
             )
 
             st.success("✅ Watchlist-Prüfung durchgeführt!")
-            # Store the saved analysis from DB (has summary + fit_counts fields)
             st.session_state["_watchlist_check_result"] = result
-            st.session_state["_watchlist_check_analysis_id"] = result.id
 
         except Exception as e:
             st.error(f"❌ Fehler: {e}")

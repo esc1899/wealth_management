@@ -264,7 +264,6 @@ class AgentSchedulerService:
             positions=positions,
             skill_name=job.skill_name,
             skill_prompt=job.skill_prompt,
-            analyses_repo=analyses_repo,
         )
         logger.info("Consensus gap job %s completed", job.id)
 
@@ -304,13 +303,12 @@ class AgentSchedulerService:
         llm = self._make_scheduled_llm("fundamental", model, conn)
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
-        agent = FundamentalAgent(llm=llm)
+        agent = FundamentalAgent(llm=llm, analyses_repo=analyses_repo)
         positions = positions_repo.get_portfolio()
         await agent.analyze_portfolio(
             positions=positions,
             skill_name=job.skill_name,
             skill_prompt=job.skill_prompt,
-            analyses_repo=analyses_repo,
         )
         logger.info("Fundamental job %s completed for %d positions", job.id, len(positions))
 
