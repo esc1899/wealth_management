@@ -30,6 +30,7 @@ from core.llm.claude import ClaudeProvider, ClaudeResponse
 from core.storage.models import Position, StructuralScanRun
 from core.storage.positions import PositionsRepository
 from core.storage.structural_scans import StructuralScansRepository
+from agents.agent_language import response_language_instruction
 
 
 logger = logging.getLogger(__name__)
@@ -139,14 +140,23 @@ class StructuralChangeAgent:
         skill_prompt: str,
         user_focus: Optional[str],
         repo: StructuralScansRepository,
+        language: str = "de",
     ) -> Tuple[StructuralScanRun, str, List[Position]]:
         """
         Run a structural change scan. Saves the run + messages.
         Returns (run, report, newly_added_candidates).
+
+        Args:
+            skill_name: Name of the configured skill
+            skill_prompt: Custom skill prompt
+            user_focus: Optional user focus area
+            repo: Repository for persisting scan runs
+            language: Language code for LLM output (default: "de")
         """
         self._scan_added = []  # reset for this scan
 
         system = BASE_SYSTEM_PROMPT.format(today=date.today().isoformat())
+        system += "\n" + response_language_instruction(language)
         system += f"\n\n## Scan-Strategie (vom Nutzer konfiguriert)\n{skill_prompt}"
 
         user_msg = user_focus.strip() if user_focus and user_focus.strip() else (
@@ -175,13 +185,22 @@ class StructuralChangeAgent:
         run_id: int,
         user_message: str,
         repo: StructuralScansRepository,
+        language: str = "de",
     ) -> str:
-        """Follow-up conversation after a scan."""
+        """Follow-up conversation after a scan.
+
+        Args:
+            run_id: ID of the structural scan run
+            user_message: User's follow-up question
+            repo: Repository for persistence
+            language: Language code for LLM output (default: "de")
+        """
         run = repo.get_run(run_id)
         if run is None:
             raise ValueError(f"Scan run {run_id} not found")
 
         system = FOLLOWUP_SYSTEM_PROMPT.format(report=run.result)
+        system += "\n" + response_language_instruction(language)
         history = repo.get_messages(run_id)
 
         api_messages = [{"role": m.role, "content": m.content} for m in history]

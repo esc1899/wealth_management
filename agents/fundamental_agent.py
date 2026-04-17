@@ -25,6 +25,7 @@ from core.currency import symbol
 from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.models import Position
+from agents.agent_language import response_language_with_fixed_codes
 
 
 logger = logging.getLogger(__name__)
@@ -95,10 +96,17 @@ class FundamentalAgent:
         positions: List[Position],
         skill_name: str,
         skill_prompt: str,
+        language: str = "de",
     ) -> List[Tuple[int, str, str]]:
         """
         Analyse all eligible positions. Returns list of (position_id, verdict, summary).
         Verdicts are persisted in position_analyses.
+
+        Args:
+            positions: List of positions to analyze
+            skill_name: Name of the configured skill
+            skill_prompt: Custom skill prompt
+            language: Language code for LLM output (default: "de")
         """
         # Only positions with tickers are fundamentally analysable
         all_with_ticker = [p for p in positions if p.ticker and p.id is not None]
@@ -129,7 +137,8 @@ class FundamentalAgent:
 
         self._llm.skill_context = skill_name
         self._llm.position_count = len(eligible)  # Track how many positions in this batch
-        system = ANALYSIS_SYSTEM_PROMPT + f"\n\n## Bewertungs-Skill\n{skill_prompt}"
+        system = ANALYSIS_SYSTEM_PROMPT + "\n" + response_language_with_fixed_codes(language, ["unterbewertet", "fair", "überbewertet", "unbekannt"])
+        system += f"\n\n## Bewertungs-Skill\n{skill_prompt}"
         all_results: List[Tuple[str, str, str, str, str, str]] = []
 
         # Process one position at a time — fundamental analysis is very token-heavy

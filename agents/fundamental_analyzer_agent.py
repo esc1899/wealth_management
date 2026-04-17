@@ -18,6 +18,7 @@ from typing import List, Optional, Tuple, Dict, Any
 from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.models import Position
+from agents.agent_language import response_language_instruction
 
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ Analysiere diese Dimensionen (je nach Position relevant):
 - Was könnte sich in den nächsten 1–3 Jahren ändern?
 - Wann wird die Bewertung gerecht?
 
-Antworte auf Deutsch, präzise und konkret. Nutze Zahlen wenn möglich.
+Präzise und konkret. Nutze Zahlen wenn möglich.
 Auf Follow-up-Fragen: kurz und fokussiert antworten."""
 
 
@@ -85,11 +86,12 @@ Auf Follow-up-Fragen: kurz und fokussiert antworten."""
 class AnalyzerSession:
     """In-memory session for fundamental analyzer chat."""
 
-    def __init__(self, session_id: str, position_id: int, position_name: str, ticker: Optional[str]):
+    def __init__(self, session_id: str, position_id: int, position_name: str, ticker: Optional[str], language: str = "de"):
         self.id = session_id
         self.position_id = position_id
         self.position_name = position_name
         self.ticker = ticker
+        self.language = language
         self.messages: List[Dict[str, str]] = []
         self.verdict: Optional[str] = None
         self.summary: Optional[str] = None
@@ -135,8 +137,13 @@ class FundamentalAnalyzerAgent:
     # Session management
     # ------------------------------------------------------------------
 
-    def start_session(self, position: Position) -> AnalyzerSession:
-        """Create a new session and run the initial analysis."""
+    def start_session(self, position: Position, language: str = "de") -> AnalyzerSession:
+        """Create a new session and run the initial analysis.
+
+        Args:
+            position: The position to analyze
+            language: Language code for LLM output (default: "de")
+        """
         import uuid
         from datetime import datetime
 
@@ -146,6 +153,7 @@ class FundamentalAnalyzerAgent:
             position_id=position.id,
             position_name=position.name,
             ticker=position.ticker,
+            language=language,
         )
 
         # Build initial message
@@ -217,11 +225,14 @@ class FundamentalAnalyzerAgent:
             role = Role.USER if msg["role"] == "user" else Role.ASSISTANT
             messages.append(Message(role=role, content=msg["content"]))
 
+        # Build system prompt with language instruction
+        system = BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(session.language)
+
         # Call async chat method with system= kwarg
         response = asyncio.run(
             self._llm.chat(
                 messages=messages,
-                system=BASE_SYSTEM_PROMPT,
+                system=system,
                 max_tokens=4096,
             )
         )

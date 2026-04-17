@@ -24,7 +24,9 @@
       "Bash(pytest tests/ -x --tb=line -q)",
       "Bash(curl -s http://localhost:8501/_stcore/health)",
       "Bash(python3 -c ' *)",
-      "Bash(find /Users/erik/Projects/wealth_management/core/storage -name \"*.py\" -exec grep -l \"WatchlistCheckerRepository\\\\|class.*Watchlist\" {} \\\\;)"
+      "Bash(find /Users/erik/Projects/wealth_management/core/storage -name \"*.py\" -exec grep -l \"WatchlistCheckerRepository\\\\|class.*Watchlist\" {} \\\\;)",
+      "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py -v)",
+      "Bash(pytest tests/ -xvs --tb=short)"
     ]
   }
 }

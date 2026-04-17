@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.models import Position
+from agents.agent_language import response_language_with_fixed_codes
 
 AGENT_NAME = "consensus_gap"
 
@@ -114,10 +115,17 @@ class ConsensusGapAgent:
         positions: List[Position],
         skill_name: str,
         skill_prompt: str,
+        language: str = "de",
     ) -> List[Tuple[int, str, str]]:
         """
         Analyse all positions with stories. Returns list of (position_id, verdict, summary).
         Verdicts are also persisted in position_analyses.
+
+        Args:
+            positions: List of positions to analyze
+            skill_name: Name of the configured skill
+            skill_prompt: Custom skill prompt
+            language: Language code for LLM output (default: "de")
         """
         eligible = [p for p in positions if p.story and p.id is not None]
         if not eligible:
@@ -125,7 +133,8 @@ class ConsensusGapAgent:
 
         self._llm.skill_context = skill_name
         self._llm.position_count = len(eligible)  # Track how many positions in this batch
-        system = ANALYSIS_SYSTEM_PROMPT + f"\n\n## Strategie-Skill\n{skill_prompt}"
+        system = ANALYSIS_SYSTEM_PROMPT + "\n" + response_language_with_fixed_codes(language, ["wächst", "stabil", "schließt", "eingeholt"])
+        system += f"\n\n## Strategie-Skill\n{skill_prompt}"
         all_results: List[Tuple[str, str, str, str]] = []
 
         # Process in batches of 2 to stay within rate limits

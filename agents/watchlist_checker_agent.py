@@ -16,6 +16,7 @@ from core.llm.local import OllamaProvider
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.models import Position, Skill
 from core.storage.skills import SkillsRepository
+from agents.agent_language import response_language_instruction
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ Ampel-Regeln (genau eine wählen pro Position):
 - ⚪ **Neutral** — Passt rein, aber nicht besonders gesucht
 - 🔴 **Nicht passend** — Widerspricht Portfolio-Ausrichtung oder aktuelle Übergewichtung
 
-Sei direkt und konkret. Keine Allgemeinplätze. Antworte auf Deutsch.
+Sei direkt und konkret. Keine Allgemeinplätze.
 Keine neuen Empfehlungen — nur fit-Analyse bestehender Watchlist-Positionen."""
 
 
@@ -123,6 +124,7 @@ class WatchlistCheckerAgent:
         watchlist_positions: list[Position],
         story_analysis_text: Optional[str] = None,
         selected_skill: Optional[Skill] = None,
+        language: str = "de",
     ) -> WatchlistCheckResult:
         """Evaluate which watchlist positions fit into the current portfolio."""
         if not watchlist_positions:
@@ -176,9 +178,9 @@ class WatchlistCheckerAgent:
         context = "\n".join(context_parts)
 
         # Build system prompt with optional skill injection
-        system_prompt = BASE_SYSTEM_PROMPT
+        system_prompt = BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(language)
         if selected_skill and selected_skill.prompt:
-            system_prompt = f"{BASE_SYSTEM_PROMPT}\n\n## Fokus-Bereich ({selected_skill.name}):\n{selected_skill.prompt}"
+            system_prompt = f"{system_prompt}\n\n## Fokus-Bereich ({selected_skill.name}):\n{selected_skill.prompt}"
 
         # LLM call (combine system prompt with context, send as user message)
         messages = [

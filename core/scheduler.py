@@ -233,6 +233,7 @@ class AgentSchedulerService:
             skill_prompt=job.skill_prompt,
             user_focus=None,
             repo=scans_repo,
+            language="de",
         )
         logger.info("Structural scan job %s completed — %d new candidates", job.id, len(new_candidates))
 
@@ -246,7 +247,7 @@ class AgentSchedulerService:
                 llm=sc_llm,
                 skills_repo=SkillsRepository(conn),
             )
-            await storychecker.batch_check_all(positions=new_candidates)
+            await storychecker.batch_check_all(positions=new_candidates, language="de")
             logger.info("Story checks done for structural scan job %s", job.id)
 
     async def _run_consensus_gap_job(self, job, conn) -> None:
@@ -264,6 +265,7 @@ class AgentSchedulerService:
             positions=positions,
             skill_name=job.skill_name,
             skill_prompt=job.skill_prompt,
+            language="de",
         )
         logger.info("Consensus gap job %s completed", job.id)
 
@@ -291,7 +293,7 @@ class AgentSchedulerService:
         if not positions:
             logger.info("Storychecker job %s: no positions with story, skipping", job.id)
             return
-        await agent.batch_check_all(positions=positions)
+        await agent.batch_check_all(positions=positions, language="de")
         logger.info("Storychecker job %s completed for %d positions", job.id, len(positions))
 
     async def _run_fundamental_job(self, job, conn) -> None:
@@ -309,6 +311,7 @@ class AgentSchedulerService:
             positions=positions,
             skill_name=job.skill_name,
             skill_prompt=job.skill_prompt,
+            language="de",
         )
         logger.info("Fundamental job %s completed for %d positions", job.id, len(positions))
 

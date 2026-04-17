@@ -24,6 +24,7 @@ from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.models import Position, StorycheckerSession
 from core.storage.storychecker import StorycheckerRepository
+from agents.agent_language import response_language_instruction
 
 
 logger = logging.getLogger(__name__)
@@ -77,7 +78,7 @@ Ampel-Regeln (genau eines wählen):
 - 🟡 **Gemischt** — Teils bestätigt, teils geschwächt; Beobachtung empfohlen
 - 🔴 **Gefährdet** — Wesentliche Thesen-Aspekte sind nicht mehr gültig oder neue Risiken
 
-Sei direkt und konkret. Keine Allgemeinplätze. Antworte auf Deutsch.
+Sei direkt und konkret. Keine Allgemeinplätze.
 Bei Rückfragen im Chat: kurz und präzise antworten, kein neues Ampel-Urteil."""
 
 
@@ -114,8 +115,13 @@ class StorycheckerAgent:
     # Session management
     # ------------------------------------------------------------------
 
-    def start_session(self, position: Position) -> StorycheckerSession:
-        """Create a new session and run the initial story check."""
+    def start_session(self, position: Position, language: str = "de") -> StorycheckerSession:
+        """Create a new session and run the initial story check.
+
+        Args:
+            position: The position to check
+            language: Language code for LLM output (default: "de")
+        """
         skill_name, skill_prompt = self._resolve_skill(position)
         session = self._storychecker.create_session(
             position_id=position.id,
@@ -128,7 +134,7 @@ class StorycheckerAgent:
         self._llm.skill_context = skill_name or "storychecker"
         initial_msg = _build_initial_message(position, skill_name, skill_prompt)
         self._storychecker.add_message(session.id, "user", initial_msg)
-        response = self._run_llm(session.id, [{"role": "user", "content": initial_msg}])
+        response = self._run_llm(session.id, [{"role": "user", "content": initial_msg}], language=language)
         # Persist structured result for trend tracking
         self._analyses.save(
             position_id=position.id,
@@ -140,8 +146,13 @@ class StorycheckerAgent:
         )
         return session
 
-    async def start_session_async(self, position: Position) -> StorycheckerSession:
-        """Async version of start_session — for use in batch_check_all."""
+    async def start_session_async(self, position: Position, language: str = "de") -> StorycheckerSession:
+        """Async version of start_session — for use in batch_check_all.
+
+        Args:
+            position: The position to check
+            language: Language code for LLM output (default: "de")
+        """
         skill_name, skill_prompt = self._resolve_skill(position)
         session = self._storychecker.create_session(
             position_id=position.id,
@@ -153,7 +164,7 @@ class StorycheckerAgent:
         self._llm.skill_context = skill_name or "storychecker"
         initial_msg = _build_initial_message(position, skill_name, skill_prompt)
         self._storychecker.add_message(session.id, "user", initial_msg)
-        response = await self._run_llm_async(session.id, [{"role": "user", "content": initial_msg}])
+        response = await self._run_llm_async(session.id, [{"role": "user", "content": initial_msg}], language=language)
         self._analyses.save(
             position_id=position.id,
             agent="storychecker",
@@ -164,18 +175,22 @@ class StorycheckerAgent:
         )
         return session
 
-    async def batch_check_all(self, positions: List[Position]) -> List[Tuple[str, str | None]]:
+    async def batch_check_all(self, positions: List[Position], language: str = "de") -> List[Tuple[str, str | None]]:
         """
         Run story checks for all eligible positions sequentially.
         Each position uses its own story_skill (or none if not set).
         Returns list of (position_name, error_or_None).
+
+        Args:
+            positions: List of positions to check
+            language: Language code for LLM output (default: "de")
         """
         eligible = [p for p in positions if p.story and p.id is not None]
         self._llm.position_count = len(eligible)  # Track how many positions in this batch
         results: List[Tuple[str, str | None]] = []
         for i, pos in enumerate(eligible):
             try:
-                await self.start_session_async(pos)
+                await self.start_session_async(pos, language=language)
                 results.append((pos.name, None))
             except Exception as exc:
                 results.append((pos.name, str(exc)))
@@ -265,18 +280,19 @@ Schreibe nur die These selbst, keine Einleitung oder Überschrift."""
             return skill.name, skill.prompt
         return "", ""
 
-    def _run_llm(self, session_id: int, api_messages: list[dict]) -> str:
+    def _run_llm(self, session_id: int, api_messages: list[dict], language: str = "de") -> str:
         """Run the tool-calling loop and persist the final assistant response."""
         import asyncio
-        return asyncio.run(self._run_llm_async(session_id, api_messages))
+        return asyncio.run(self._run_llm_async(session_id, api_messages, language=language))
 
-    async def _run_llm_async(self, session_id: int, api_messages: list[dict]) -> str:
+    async def _run_llm_async(self, session_id: int, api_messages: list[dict], language: str = "de") -> str:
         messages = list(api_messages)
+        system_prompt = BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(language)
         for _ in range(MAX_TOOL_ITERATIONS):
             response = await self._llm.chat_with_tools(
                 messages=messages,
                 tools=[WEB_SEARCH_TOOL],
-                system=BASE_SYSTEM_PROMPT,
+                system=system_prompt,
                 max_tokens=4096,
             )
             # Web search is server-side — no client tool calls to handle.

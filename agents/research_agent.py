@@ -22,6 +22,7 @@ from core.storage.models import Position, ResearchSession
 from core.storage.positions import PositionsRepository
 from core.storage.research import ResearchRepository
 from core.strategy_config import StrategyConfig, StrategyRegistry
+from agents.agent_language import response_language_instruction
 
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ Vorgehen:
 
 Wichtig: Füge die Aktie zur Watchlist NUR hinzu, wenn der Nutzer dies explizit verlangt (z.B. "Füge zur Watchlist hinzu" oder "Watchlist").
 
-Antworte auf Deutsch. Sei konkret und belege deine Aussagen mit Zahlen wenn möglich."""
+Sei konkret und belege deine Aussagen mit Zahlen wenn möglich."""
 
 # ------------------------------------------------------------------
 # Tool definitions
@@ -143,18 +144,23 @@ class ResearchAgent:
             company_name=company_name,
         )
 
-    async def chat(self, session_id: int, user_message: str) -> str:
+    async def chat(self, session_id: int, user_message: str, language: str = "de") -> str:
         """
         Send a user message in an existing session and return the assistant reply.
         Handles the tool-calling loop for add_to_watchlist.
+
+        Args:
+            session_id: The research session ID
+            user_message: The user's input
+            language: Language code for LLM output (default: "de")
         """
         session = self._research.get_session(session_id)
         if session is None:
             raise ValueError(f"Session {session_id} not found")
 
-        # Build system prompt = base + strategy focus
+        # Build system prompt = base + strategy focus + language
         self._llm.skill_context = session.strategy_name
-        system = BASE_SYSTEM_PROMPT + "\n\n## Analysestrategie\n" + session.strategy_prompt
+        system = BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(language) + "\n\n## Analysestrategie\n" + session.strategy_prompt
 
         # Load history before adding new message, then append manually
         api_messages = self._build_api_messages(session_id)
