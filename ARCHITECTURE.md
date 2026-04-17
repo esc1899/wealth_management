@@ -292,7 +292,32 @@ See **BACKLOG.md § Technical Debt** for full inventory.
 
 ---
 
+## Multi-Language Support (i18n)
+
+**UI Language Selection**: Settings page allows German ↔ English switching via `core.i18n` module.
+
+**Agent Response Language** (2026-04-17):
+- Agents accept `language: str = "de"` parameter on execution methods
+- System prompts dynamically inject language instruction via `agents/agent_language.py` helpers
+- Pages capture `current_language()` in main thread before background thread spawn (session_state safety)
+
+**Verdict Code Preservation**:
+- Internal verdict labels (`unterbewertet`, `wächst`, `intact`, etc.) remain German
+- These are database identifiers, not user-visible text
+- Agents with schema-locked enums use `response_language_with_fixed_codes()` helper
+- Explicitly instructs LLM: "Write text in {language}, use EXACTLY these codes as-is"
+
+**Scope**:
+- ✅ 7 agents (StorycheckerAgent, ConsensusGapAgent, FundamentalAgent, ResearchAgent, etc.)
+- ✅ 6 pages (consensus_gap, fundamental_analyzer, structural_scan, research_chat, storychecker, watchlist_checker)
+- ⚠️ **Out of scope**: Page UI labels (agentmonitor.py, portfolio_story.py, positionen.py partially hardcoded German)
+
+---
+
 ## Recent Changes (April 2026)
+
+✅ **Agent i18n Support** (2026-04-17)
+   - Multi-language responses, verdict codes preserved, thread-safe language passing
 
 ✅ **DEBT Stack Complete** (2026-04-16)
    - Async modernization (Python 3.12+), State decomposition, Service layer + Agent encapsulation

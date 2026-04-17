@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Agent i18n Support (2026-04-17)
+
+**Multi-language agent responses while preserving internal verdict codes.**
+
+- **Added**: `agents/agent_language.py` with language instruction helpers
+- **Changed**: 7 agents now accept `language` parameter (defaults to "de" for backward compatibility)
+  - StorycheckerAgent, WatchlistCheckerAgent, ResearchAgent, StructuralChangeAgent
+  - FundamentalAgent, ConsensusGapAgent, FundamentalAnalyzerAgent
+- **Changed**: All 6 agent pages updated to pass `current_language()` to agent calls
+  - Captures language in main thread before spawning background threads (session_state safety)
+- **Design**: Verdict codes remain German (internal DB identifiers); only free-text output language-ized
+  - `response_language_instruction()` for simple responses
+  - `response_language_with_fixed_codes()` for agents with schema enums (fundamental, consensus_gap)
+- **Tests**: 578/578 passing, no test changes needed (all default to "de")
+
+---
+
 ### DEBT Stack Completion (2026-04-16)
 
 **Complete architectural modernization: 3 technical debts resolved in 1 session.**
