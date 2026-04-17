@@ -108,7 +108,7 @@ portfolio_chat:
   watchlist_header: "**Watchlist**"
   empty_portfolio: "No entries yet."
   empty_positions: "No positions yet."
-  input_placeholder: "e.g. 'Add 10 Apple shares at 150'
+  input_placeholder: "e.g. 'Add 10 Apple shares at 150'"
   thinking: "Thinking..."
   portfolio_count: "Portfolio ({count} positions)"
   watchlist_count: "Watchlist ({count} entries)"
