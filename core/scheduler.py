@@ -258,7 +258,7 @@ class AgentSchedulerService:
         llm = self._make_scheduled_llm("consensus_gap", model, conn)
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
-        agent = ConsensusGapAgent(llm=llm)
+        agent = ConsensusGapAgent(llm=llm, analyses_repo=analyses_repo)
         positions = positions_repo.get_portfolio()
         await agent.analyze_portfolio(
             positions=positions,

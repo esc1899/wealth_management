@@ -173,7 +173,7 @@ def _run_storychecker_consensus_job(
 
             cg_skill_name, cg_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "consensus_gap")
             cg_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET)
-            cg_agent = ConsensusGapAgent(llm=cg_llm)
+            cg_agent = ConsensusGapAgent(llm=cg_llm, analyses_repo=analyses_repo)
             try:
                 _log_to_job(job, f"Running ConsensusGapAgent with skill '{cg_skill_name}'")
                 loop.run_until_complete(
@@ -497,8 +497,8 @@ Full Analysis:
 
             st.success("✅ Watchlist-Prüfung durchgeführt!")
             # Store the saved analysis from DB (has summary + fit_counts fields)
-            st.session_state["_watchlist_check_result"] = saved_analysis
-            st.session_state["_watchlist_check_analysis_id"] = saved_analysis.id
+            st.session_state["_watchlist_check_result"] = result
+            st.session_state["_watchlist_check_analysis_id"] = result.id
 
         except Exception as e:
             st.error(f"❌ Fehler: {e}")
@@ -661,17 +661,24 @@ if st.session_state.get("_watchlist_check_result"):
                         else:
                             st.caption("⚪ Noch nicht analysiert")
 
-    # --- KI-Kommentar (Auto-generated) --
+    # --- KI-Kommentar (Auto-generated, cached) --
+
+    from core.services.portfolio_comment_service import get_style_by_id
+    import hashlib
 
     _comment_style_id = get_app_config_repo().get("comment_style") or "humorvoll"
     _comment_style = get_style_by_id(_comment_style_id)
     comment_service = get_portfolio_comment_service()
 
-    # Auto-generate comment with current context
-    with st.spinner(f"{_comment_style['emoji']} Generiere Kommentar..."):
-        full_text = result.full_text if hasattr(result, 'full_text') else ""
-        _ctx = f"Watchlist-Check Ergebnis:\n{full_text}"
-        st.session_state["_watchlist_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
+    # Cache by context + style hash (regenerate only if input changes)
+    full_text = result.full_text if hasattr(result, 'full_text') else ""
+    _ctx = f"Watchlist-Check Ergebnis:\n{full_text}"
+    _ctx_hash = hashlib.md5((_ctx + _comment_style_id).encode()).hexdigest()
+
+    if st.session_state.get("_watchlist_comment_hash") != _ctx_hash:
+        with st.spinner(f"{_comment_style['emoji']} Generiere Kommentar..."):
+            st.session_state["_watchlist_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
+            st.session_state["_watchlist_comment_hash"] = _ctx_hash
 
     st.divider()
     st.subheader("3️⃣ KI-Kommentar")

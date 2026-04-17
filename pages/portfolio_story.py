@@ -404,22 +404,27 @@ else:
                 if latest_analysis.stability_summary:
                     st.markdown(f"_{latest_analysis.stability_summary}_")
 
-        # --- KI-Kommentar (Auto-generated) ----------------------------------------------------------
+        # --- KI-Kommentar (Auto-generated, cached) ----------------------------------------------------------
         from core.services.portfolio_comment_service import get_style_by_id
+        import hashlib
 
         _comment_style_id = get_app_config_repo().get("comment_style") or "humorvoll"
         _comment_style = get_style_by_id(_comment_style_id)
         comment_service = get_portfolio_comment_service()
 
-        # Auto-generate comment with current context
-        with st.spinner(f"{_comment_style['emoji']} Generiere Kommentar..."):
-            _ctx = (
-                f"Story: {latest_analysis.verdict} — {latest_analysis.summary}\n"
-                f"Performance: {latest_analysis.perf_verdict} — {latest_analysis.perf_summary}\n"
-                f"Stabilität: {latest_analysis.stability_verdict} — {latest_analysis.stability_summary}\n"
-                f"Volltext:\n{latest_analysis.full_text}"
-            )
-            st.session_state["_story_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
+        # Cache by context + style hash (regenerate only if input changes)
+        _ctx = (
+            f"Story: {latest_analysis.verdict} — {latest_analysis.summary}\n"
+            f"Performance: {latest_analysis.perf_verdict} — {latest_analysis.perf_summary}\n"
+            f"Stabilität: {latest_analysis.stability_verdict} — {latest_analysis.stability_summary}\n"
+            f"Volltext:\n{latest_analysis.full_text}"
+        )
+        _ctx_hash = hashlib.md5((_ctx + _comment_style_id).encode()).hexdigest()
+
+        if st.session_state.get("_story_comment_hash") != _ctx_hash:
+            with st.spinner(f"{_comment_style['emoji']} Generiere Kommentar..."):
+                st.session_state["_story_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
+                st.session_state["_story_comment_hash"] = _ctx_hash
 
         if st.session_state.get("_story_comment"):
             with st.container(border=True):
