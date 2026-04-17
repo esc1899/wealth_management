@@ -11,7 +11,7 @@ import time
 
 import streamlit as st
 
-from core.i18n import t
+from core.i18n import t, current_language
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge, render_verdict_legend, cloud_notice
 from state import (
     get_analyses_repo,
@@ -47,7 +47,7 @@ if "_cgap_job" not in st.session_state:
 _JOB = st.session_state["_cgap_job"]
 
 
-def _run_background(agent, positions, skill_name, skill_prompt, job: dict):
+def _run_background(agent, positions, skill_name, skill_prompt, language: str, job: dict):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -56,6 +56,7 @@ def _run_background(agent, positions, skill_name, skill_prompt, job: dict):
                 positions=positions,
                 skill_name=skill_name,
                 skill_prompt=skill_prompt,
+                language=language,
             )
         )
         job.update({"running": False, "done": True, "count": len(results), "error": None})
@@ -112,13 +113,14 @@ else:
             disabled=_JOB["running"],
         ):
             _sel_skill = _skill_options[_sel_skill_name]
+            _lang = current_language()
             _JOB["running"] = True
             _JOB["done"] = False
             _JOB["error"] = None
             _JOB["last_error"] = None
             t_bg = threading.Thread(
                 target=_run_background,
-                args=(_agent, _eligible, _sel_skill.name, _sel_skill.prompt, _JOB),
+                args=(_agent, _eligible, _sel_skill.name, _sel_skill.prompt, _lang, _JOB),
                 daemon=True,
             )
             t_bg.start()

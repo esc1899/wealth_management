@@ -12,7 +12,7 @@ import time
 
 import streamlit as st
 
-from core.i18n import t
+from core.i18n import t, current_language
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon, cloud_notice
 from state import get_analyses_repo, get_positions_repo, get_storychecker_agent
 
@@ -48,11 +48,11 @@ if "_sc_batch_job" not in st.session_state:
 _BATCH = st.session_state["_sc_batch_job"]
 
 
-def _run_batch_background(ag, positions, job: dict):
+def _run_batch_background(ag, positions, language: str, job: dict):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        results = loop.run_until_complete(ag.batch_check_all(positions=positions))
+        results = loop.run_until_complete(ag.batch_check_all(positions=positions, language=language))
         errors = sum(1 for _, err in results if err)
         job.update({"running": False, "done": True, "count": len(results), "errors": errors, "error": None})
     except Exception as exc:
@@ -71,13 +71,14 @@ if positions_with_story:
             use_container_width=False,
             disabled=_BATCH["running"],
         ):
+            _lang = current_language()
             _BATCH["running"] = True
             _BATCH["done"] = False
             _BATCH["error"] = None
             _BATCH["last_error"] = None
             threading.Thread(
                 target=_run_batch_background,
-                args=(agent, positions_with_story, _BATCH),
+                args=(agent, positions_with_story, _lang, _BATCH),
                 daemon=True,
             ).start()
             st.rerun()
@@ -204,7 +205,7 @@ with col_left:
                     if current_session and current_session.position_id != selected_position.id:
                         st.session_state.pop("sc_session_id", None)
 
-                    session = agent.start_session(position=selected_position)
+                    session = agent.start_session(position=selected_position, language=current_language())
                     st.session_state["sc_session_id"] = session.id
                 except Exception as exc:
                     st.session_state["sc_start_error"] = str(exc)

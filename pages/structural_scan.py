@@ -12,7 +12,7 @@ import time
 
 import streamlit as st
 
-from core.i18n import t
+from core.i18n import t, current_language
 from state import (
     get_analysis_service,
     get_portfolio_service,
@@ -57,7 +57,7 @@ if "scan_run_id" not in st.session_state:
     st.session_state["scan_run_id"] = None
 
 
-def _run_background(agent, storychecker, skill_name, skill_prompt, user_focus, repo, job: dict):
+def _run_background(agent, storychecker, skill_name, skill_prompt, user_focus, language: str, repo, job: dict):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -67,11 +67,12 @@ def _run_background(agent, storychecker, skill_name, skill_prompt, user_focus, r
                 skill_prompt=skill_prompt,
                 user_focus=user_focus,
                 repo=repo,
+                language=language,
             )
         )
         story_count = 0
         if new_candidates:
-            loop.run_until_complete(storychecker.batch_check_all(positions=new_candidates))
+            loop.run_until_complete(storychecker.batch_check_all(positions=new_candidates, language=language))
             story_count = len(new_candidates)
         job.update({"running": False, "done": True, "run_id": run.id, "error": None, "story_check_count": story_count})
     except Exception as exc:
@@ -103,6 +104,7 @@ with st.expander(t("structural_scan.new_scan_header"), expanded=st.session_state
     )
 
     if st.button(t("structural_scan.start_button"), type="primary", key="_scan_start", disabled=_JOB["running"]):
+        _lang = current_language()
         _JOB["running"] = True
         _JOB["done"] = False
         _JOB["run_id"] = None
@@ -111,7 +113,7 @@ with st.expander(t("structural_scan.new_scan_header"), expanded=st.session_state
         _JOB["story_check_count"] = 0
         t_bg = threading.Thread(
             target=_run_background,
-            args=(_agent, get_storychecker_agent(), _sel_skill.name, _sel_skill.prompt, _user_focus or None, _repo, _JOB),
+            args=(_agent, get_storychecker_agent(), _sel_skill.name, _sel_skill.prompt, _user_focus or None, _lang, _repo, _JOB),
             daemon=True,
         )
         t_bg.start()

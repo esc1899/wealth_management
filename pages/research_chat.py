@@ -6,7 +6,7 @@ import asyncio
 
 import streamlit as st
 
-from core.i18n import t
+from core.i18n import t, current_language
 from core.strategy_config import CUSTOM_STRATEGY_NAME
 from state import get_research_agent, get_skills_repo
 
@@ -90,7 +90,7 @@ with col_sidebar:
             )
             with st.spinner(t("research_chat.thinking")):
                 try:
-                    asyncio.run(agent.chat(session.id, initial_msg))
+                    asyncio.run(agent.chat(session.id, initial_msg, language=current_language()))
                 except Exception as exc:
                     st.error(f"⚠️ {t('common.agent_error')}: {exc}")
             st.rerun()
@@ -157,7 +157,7 @@ with col_chat:
                 with st.chat_message("assistant"):
                     with st.spinner(t("research_chat.analysing")):
                         try:
-                            response = asyncio.run(agent.chat(session_id, prompt))
+                            response = asyncio.run(agent.chat(session_id, prompt, language=current_language()))
                         except Exception as exc:
                             response = f"⚠️ {t('common.agent_error')}: {exc}"
                     st.markdown(response)

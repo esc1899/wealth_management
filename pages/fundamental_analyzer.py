@@ -11,7 +11,7 @@ import time
 
 import streamlit as st
 
-from core.i18n import t
+from core.i18n import t, current_language
 from core.ui.verdicts import cloud_notice
 from state import get_analyses_repo, get_fundamental_analyzer_agent, get_portfolio_service
 
@@ -126,7 +126,7 @@ with col_left:
                     if current_session and current_session.position_id != selected_position.id:
                         st.session_state.pop("fa_session_id", None)
 
-                    session = agent.start_session(position=selected_position)
+                    session = agent.start_session(position=selected_position, language=current_language())
                     st.session_state["fa_session_id"] = session.id
                 except Exception as exc:
                     st.session_state["fa_start_error"] = str(exc)

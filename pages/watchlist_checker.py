@@ -16,6 +16,7 @@ import streamlit as st
 from datetime import datetime
 
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon
+from core.i18n import current_language
 
 st.set_page_config(page_title="Watchlist Checker", layout="wide")
 
@@ -105,6 +106,7 @@ def _resolve_skill(
 def _run_storychecker_consensus_job(
     watchlist: list,
     agents_to_run: list[str],  # ["storychecker", "consensus_gap"]
+    language: str,
     job: dict,
     db_path: str,
     enc_key: str,
@@ -152,7 +154,7 @@ def _run_storychecker_consensus_job(
             )
             try:
                 _log_to_job(job, f"Running StorycheckerAgent with skill '{sc_skill_name}'")
-                results = loop.run_until_complete(sc_agent.batch_check_all(positions=watchlist_positions))
+                results = loop.run_until_complete(sc_agent.batch_check_all(positions=watchlist_positions, language=language))
                 sc_count = sum(1 for _, err in results if err is None)
                 count += sc_count
                 _log_to_job(job, f"StorycheckerAgent: {sc_count}/{len(watchlist_positions)} analyses completed")
@@ -177,7 +179,7 @@ def _run_storychecker_consensus_job(
             try:
                 _log_to_job(job, f"Running ConsensusGapAgent with skill '{cg_skill_name}'")
                 loop.run_until_complete(
-                    cg_agent.analyze_portfolio(watchlist_positions, cg_skill_name, cg_skill_prompt)
+                    cg_agent.analyze_portfolio(watchlist_positions, cg_skill_name, cg_skill_prompt, language=language)
                 )
                 cg_count = len(watchlist_positions)
                 count += cg_count
@@ -207,6 +209,7 @@ def _run_storychecker_consensus_job(
 
 def _run_fundamental_job(
     watchlist: list,
+    language: str,
     job: dict,
     db_path: str,
     enc_key: str,
@@ -262,6 +265,7 @@ def _run_fundamental_job(
                         positions=positions,
                         skill_name=fund_skill_name,
                         skill_prompt=fund_skill_prompt,
+                        language=language,
                     )
                 )
                 count = len(results) if results else len(positions)
@@ -403,10 +407,11 @@ if not _WC_JOB["running"] and not _WC_FUND_JOB["running"]:
                 agents_to_run = [s["agent_name"] for s in _analyses_status
                                 if s["n_missing"] > 0 and s["agent_name"] in ["storychecker", "consensus_gap"]]
                 if agents_to_run:
+                    _lang = current_language()
                     _WC_JOB.update({**_JOB_DEFAULTS, "running": True, "agents": ["Story Checker", "Konsens-Lücken"]})
                     threading.Thread(
                         target=_run_storychecker_consensus_job,
-                        args=(watchlist, agents_to_run, _WC_JOB,
+                        args=(watchlist, agents_to_run, _lang, _WC_JOB,
                               config.DB_PATH, config.ENCRYPTION_KEY, config.ANTHROPIC_API_KEY),
                         daemon=True,
                     ).start()
@@ -422,10 +427,11 @@ if not _WC_JOB["running"] and not _WC_FUND_JOB["running"]:
             ):
                 # Only run if fundamental has missing analyses
                 if any(s["n_missing"] > 0 and s["agent_name"] == "fundamental" for s in _analyses_status):
+                    _lang = current_language()
                     _WC_FUND_JOB.update({**_JOB_DEFAULTS, "running": True, "agents": ["Fundamental Analyzer"]})
                     threading.Thread(
                         target=_run_fundamental_job,
-                        args=(watchlist, _WC_FUND_JOB,
+                        args=(watchlist, _lang, _WC_FUND_JOB,
                               config.DB_PATH, config.ENCRYPTION_KEY, config.ANTHROPIC_API_KEY),
                         daemon=True,
                     ).start()
@@ -491,6 +497,7 @@ Full Analysis:
                     watchlist_positions=watchlist,
                     story_analysis_text=story_analysis_text,
                     selected_skill=selected_skill,
+                    language=current_language(),
                 )
             )
 
