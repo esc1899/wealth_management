@@ -429,3 +429,50 @@ if _jf_submitted:
     get_agent_scheduler().reload_jobs()
     st.success(t("settings.job_saved"))
     st.rerun()
+
+st.divider()
+
+# ------------------------------------------------------------------
+# Section: Backup
+# ------------------------------------------------------------------
+
+import os as _os
+import subprocess as _subprocess
+
+st.subheader("💾 Backup")
+
+_BACKUP_SCRIPT = _os.path.expanduser("~/scripts/wm_backup.sh")
+_BACKUP_REPO = config.BACKUP_REPO_PATH
+_BACKUP_LOG = _os.path.expanduser("~/Library/Logs/wm_backup.log")
+
+_drive_mounted = bool(_BACKUP_REPO) and _os.path.isdir(_BACKUP_REPO)
+_script_exists = _os.path.isfile(_BACKUP_SCRIPT)
+
+if not _script_exists:
+    st.warning(f"Backup-Script nicht gefunden: `{_BACKUP_SCRIPT}`")
+elif not _BACKUP_REPO:
+    st.warning("BACKUP_REPO_PATH ist nicht in `.env` gesetzt.")
+elif _drive_mounted:
+    st.success(f"WD Passport verbunden — bereit für Backup", icon=":material/check_circle:")
+else:
+    st.info("WD Passport nicht verbunden. Laufwerk anschließen, dann Backup starten.", icon=":material/usb:")
+
+if _script_exists and _drive_mounted:
+    if st.button("▶ Jetzt sichern", type="primary", key="_backup_now_btn"):
+        with st.spinner("Backup läuft…"):
+            result = _subprocess.run(
+                ["/bin/bash", _BACKUP_SCRIPT],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+        if result.returncode == 0:
+            st.success("Backup erfolgreich abgeschlossen!", icon=":material/check_circle:")
+        else:
+            st.error("Backup fehlgeschlagen — siehe Log unten.", icon=":material/error:")
+
+if _os.path.isfile(_BACKUP_LOG):
+    with st.expander("📋 Backup-Log (letzte Einträge)"):
+        with open(_BACKUP_LOG) as _f:
+            _lines = _f.readlines()
+        st.code("".join(_lines[-30:]), language=None)

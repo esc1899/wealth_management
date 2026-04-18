@@ -63,6 +63,10 @@ class Config:
     # Currency — EUR (default), CHF, GBP, USD, JPY
     BASE_CURRENCY: str = os.getenv("BASE_CURRENCY", "EUR")
 
+    # Backup
+    BACKUP_REPO_PATH: str = os.getenv("BACKUP_REPO_PATH", "")
+    RESTIC_PASSWORD_FILE: str = os.getenv("RESTIC_PASSWORD_FILE", "")
+
     def validate(self) -> list[str]:
         """Return list of error messages for missing required config. Empty = OK."""
         errors = []
