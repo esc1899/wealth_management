@@ -809,23 +809,31 @@ if _ss("_pos_show_form"):
     st.divider()
 
 # ---------------------------------------------------------------------------
-# Delete confirmation
+# Delete confirmation dialog
 # ---------------------------------------------------------------------------
+
+@st.dialog(t("positionen.confirm_delete"))
+def _show_delete_dialog(pos_id: int):
+    pos = repo.get(pos_id)
+    if not pos:
+        st.error("Position not found.")
+        return
+
+    st.warning(f"**{pos.name}** wird gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.")
+
+    col_yes, col_no = st.columns(2)
+    if col_yes.button(t("positionen.confirm_yes"), type="primary", use_container_width=True):
+        repo.delete(pos_id)
+        _clear_form()
+        st.toast(t("positionen.deleted"), icon="🗑️")
+        st.rerun()
+    if col_no.button(t("positionen.confirm_no"), use_container_width=True):
+        _clear_form()
+        st.rerun()
 
 confirm_id = _ss("_pos_confirm_del")
 if confirm_id is not None:
-    to_del = repo.get(confirm_id)
-    if to_del:
-        with st.warning(f"{t('positionen.confirm_delete')} **{to_del.name}**"):
-            c1, c2, _ = st.columns([1, 1, 6])
-            if c1.button(t("positionen.confirm_yes"), type="primary"):
-                repo.delete(confirm_id)
-                _clear_form()
-                st.toast(t("positionen.deleted"), icon="🗑️")
-                st.rerun()
-            if c2.button(t("positionen.confirm_no")):
-                _clear_form()
-                st.rerun()
+    _show_delete_dialog(confirm_id)
 
 # ---------------------------------------------------------------------------
 # Position tables
