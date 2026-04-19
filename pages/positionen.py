@@ -901,9 +901,11 @@ def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
             st.rerun()
         if cols[9].button("✏️", key=f"{key_prefix}_edit_{pos.id}", help=t("positionen.edit_tooltip")):
             _clear_form()
+            _clear_detail()
             _set(_pos_show_form=True, _pos_edit_id=pos.id)
             st.rerun()
         if cols[10].button("🗑️", key=f"{key_prefix}_del_{pos.id}", help=t("positionen.delete_tooltip")):
+            _clear_detail()
             _set(_pos_confirm_del=pos.id)
             st.rerun()
 
