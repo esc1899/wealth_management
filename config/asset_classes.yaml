@@ -265,3 +265,45 @@ asset_classes:
       - notes
     price_source: manual
     requires_ticker: false
+
+  Altersvorsorge-Rente:
+    investment_type: Renten
+    default_unit: Stück
+    auto_fetch: false
+    watchlist_eligible: false
+    manual_valuation: true
+    anlagearten:
+      - Betriebliche Rentenversicherung
+      - Direktzusage
+      - Pensionsfonds
+    extra_fields:
+      - estimated_value
+      - valuation_date
+    visible_fields:
+      - quantity
+      - purchase_price
+      - purchase_date
+      - notes
+    price_source: manual
+    requires_ticker: false
+
+  Altersvorsorge-Festgeld:
+    investment_type: Geld
+    default_unit: Stück
+    auto_fetch: false
+    watchlist_eligible: false
+    manual_valuation: true
+    anlagearten:
+      - bAV mit Kapitaloption
+      - Pensionskasse (Auszahlung)
+      - Private Altersvorsorge
+    extra_fields:
+      - estimated_value
+      - valuation_date
+    visible_fields:
+      - quantity
+      - purchase_price
+      - purchase_date
+      - notes
+    price_source: manual
+    requires_ticker: false

@@ -59,6 +59,10 @@ investment_types:
   Geld: "Geld"
   Bargeld: "Bargeld"
 
+asset_classes:
+  Altersvorsorge-Rente: "Altersvorsorge (Rente)"
+  Altersvorsorge-Festgeld: "Altersvorsorge (Auszahlung)"
+
 dashboard:
   title: "Dashboard"
   portfolio_value: "Portfoliowert"

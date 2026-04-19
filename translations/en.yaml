@@ -58,6 +58,10 @@ investment_types:
   Geld: "Cash"
   Bargeld: "Liquid Cash"
 
+asset_classes:
+  Altersvorsorge-Rente: "Pension (Annuity)"
+  Altersvorsorge-Festgeld: "Pension (Lump Sum)"
+
 dashboard:
   title: "Dashboard"
   portfolio_value: "Portfolio Value"
