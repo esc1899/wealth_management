@@ -192,7 +192,6 @@ asset_classes:
     manual_valuation: true
     anlagearten:
       - Festgeld
-      - Tagesgeld
       - Sparkonto
     extra_fields:
       - interest_rate
@@ -209,7 +208,7 @@ asset_classes:
     requires_ticker: false
 
   Bargeld:
-    investment_type: Geld
+    investment_type: Bargeld
     default_unit: €
     auto_fetch: false
     watchlist_eligible: false
@@ -218,6 +217,7 @@ asset_classes:
       - Bargeld
       - Girokonto
       - Verrechnungskonto
+      - Tagesgeld
     extra_fields:
       - estimated_value
       - valuation_date

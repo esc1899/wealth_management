@@ -17,6 +17,7 @@ JOSEF_CATEGORY = {
     "Edelmetalle": "Rohstoffe",
     "Renten": "Renten/Geld",
     "Geld": "Renten/Geld",
+    "Bargeld": "Renten/Geld",
     "Immobilien": "Rohstoffe",  # Combined with Edelmetalle, not separate
 }
 

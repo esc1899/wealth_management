@@ -62,13 +62,25 @@
       "Bash(curl -s http://localhost:8501/pages/statistics.py)",
       "Bash(sed -i '' 's|System: Statistics / Benchmark / Skills / Monitor|System: Statistics / Skills|g' /Users/erik/Projects/wealth_management/ARCHITECTURE.md)",
       "Bash(sed -i '' 's| \\(agentmonitor.py, ||g; s|agentmonitor.py, ||g' /Users/erik/Projects/wealth_management/ARCHITECTURE.md)",
-      "Bash(sed -i '' 's|Add the CREATE TABLE to `migrate_db\\(\\)` too \\(see benchmark_runs example\\)|Add the CREATE TABLE to `migrate_db\\(\\)` too if it needs ALTER TABLE migrations later|g' /Users/erik/Projects/wealth_management/MIGRATIONS.md)"
+      "Bash(sed -i '' 's|Add the CREATE TABLE to `migrate_db\\(\\)` too \\(see benchmark_runs example\\)|Add the CREATE TABLE to `migrate_db\\(\\)` too if it needs ALTER TABLE migrations later|g' /Users/erik/Projects/wealth_management/MIGRATIONS.md)",
+      "Bash(python -m pytest tests/unit/ tests/test_wealth_snapshot*.py -q --tb=no)",
+      "Bash(python -m pytest tests/ --ignore=tests/integration/test_watchlist_checker_ui.py -q --tb=no)",
+      "Bash(git checkout *)",
+      "Bash(git restore *)",
+      "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py -v --tb=short --no-cov)",
+      "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py -v --no-cov)",
+      "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py::TestPageLoadability::test_positionen_page_loads -v --no-cov)",
+      "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py::TestPageLoadability -k storychecker --no-cov -v)",
+      "Bash(python -m pytest tests/ --no-cov -q)",
+      "Bash(python test_dividend_override.py)",
+      "Bash(python -m pytest tests/unit/test_positions.py -v --no-cov -k dividend)"
     ],
     "additionalDirectories": [
       "/Users/erik",
       "/Applications/Wealth Management.app/Contents/MacOS",
       "/Users/erik/Projects/wealth_management/monitoring",
-      "/Users/erik/Projects/wealth_management"
+      "/Users/erik/Projects/wealth_management",
+      "/Users/erik/Projects/wealth_management/htmlcov"
     ]
   }
 }

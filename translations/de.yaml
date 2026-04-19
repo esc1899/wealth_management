@@ -57,6 +57,7 @@ investment_types:
   Edelmetalle: "Edelmetalle"
   Krypto: "Krypto"
   Geld: "Geld"
+  Bargeld: "Bargeld"
 
 dashboard:
   title: "Dashboard"

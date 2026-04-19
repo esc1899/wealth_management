@@ -1,0 +1,9 @@
+# Cash rule template for portfolio stability.
+# Copy this file to cash_rule.yaml and adjust values for your portfolio.
+# cash_rule.yaml is gitignored (private configuration).
+
+bargeld_rule:
+  enabled: true
+  target_pct: 5.0     # Target: 5% of total portfolio value
+  min_eur: 10000      # Minimum liquid cash to keep
+  max_eur: 100000     # Maximum liquid cash needed (capped)

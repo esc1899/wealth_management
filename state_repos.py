@@ -138,3 +138,25 @@ def get_portfolio_story_repo() -> PortfolioStoryRepository:
 @st.cache_resource
 def get_agent_runs_repo() -> AgentRunsRepository:
     return AgentRunsRepository(get_db_connection())
+
+
+def load_cash_rule() -> dict:
+    """Load cash rule configuration from config/cash_rule.yaml or defaults."""
+    from pathlib import Path
+    import yaml
+    rule_path = Path(__file__).parent / "config" / "cash_rule.yaml"
+    if rule_path.exists():
+        with open(rule_path) as f:
+            data = yaml.safe_load(f) or {}
+            return data.get("bargeld_rule", _default_cash_rule())
+    return _default_cash_rule()
+
+
+def _default_cash_rule() -> dict:
+    """Default cash rule if no config file exists."""
+    return {
+        "enabled": True,
+        "target_pct": 5.0,
+        "min_eur": 10000,
+        "max_eur": 100000,
+    }
