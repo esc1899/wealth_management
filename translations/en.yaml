@@ -668,3 +668,12 @@ wealth_history:
   no_wealth_snapshots: "No wealth history available."
   no_dividend_snapshots: "No dividend history available."
   no_data: "No data"
+
+portfolio_story:
+  cash_rule_title: "💰 Cash Rule"
+  cash_rule_total: "Total Portfolio"
+  cash_rule_current: "Liquid Cash"
+  cash_rule_target: "Target"
+  cash_rule_success: "✅ Cash rule satisfied"
+  cash_rule_warning: "⚠️ Cash below target: {current} < {target}"
+  cash_rule_error: "🔴 Critical cash shortage: {current} < {minimum}"

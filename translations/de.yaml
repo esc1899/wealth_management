@@ -675,3 +675,12 @@ wealth_history:
   no_wealth_snapshots: "Keine Vermögenshistorie vorhanden."
   no_dividend_snapshots: "Keine Dividendenhistorie vorhanden."
   no_data: "Keine Daten"
+
+portfolio_story:
+  cash_rule_title: "💰 Bargeldregel"
+  cash_rule_total: "Gesamtportfolio"
+  cash_rule_current: "Liquides Bargeld"
+  cash_rule_target: "Zielwert"
+  cash_rule_success: "✅ Bargeldregel erfüllt"
+  cash_rule_warning: "⚠️ Bargeldbestand unter Ziel: {current} < {target}"
+  cash_rule_error: "🔴 Bargeldbestand kritisch: {current} < {minimum}"

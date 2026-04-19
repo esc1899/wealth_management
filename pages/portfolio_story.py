@@ -186,24 +186,30 @@ def _render_cash_rule_check() -> None:
         ),
     )
 
-    with st.expander("💰 Bargeldregel", expanded=False):
+    with st.expander(t("portfolio_story.cash_rule_title"), expanded=False):
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Gesamtportfolio", f"{symbol()}{total_eur:,.0f}")
+            st.metric(t("portfolio_story.cash_rule_total"), f"{symbol()}{total_eur:,.0f}")
         with col2:
-            st.metric("Liquides Bargeld", f"{symbol()}{cash_eur:,.0f}")
+            st.metric(t("portfolio_story.cash_rule_current"), f"{symbol()}{cash_eur:,.0f}")
         with col3:
-            st.metric("Zielwert", f"{symbol()}{target:,.0f}")
+            st.metric(t("portfolio_story.cash_rule_target"), f"{symbol()}{target:,.0f}")
 
         if cash_eur >= target:
-            st.success("✅ Bargeldregel erfüllt")
+            st.success(t("portfolio_story.cash_rule_success"))
         elif cash_eur >= rule.get("min_eur", 10000):
             st.warning(
-                f"⚠️ Bargeldbestand unter Ziel: {symbol()}{cash_eur:,.0f} < {symbol()}{target:,.0f}"
+                t("portfolio_story.cash_rule_warning").format(
+                    current=f"{symbol()}{cash_eur:,.0f}",
+                    target=f"{symbol()}{target:,.0f}"
+                )
             )
         else:
             st.error(
-                f"🔴 Bargeldbestand kritisch: {symbol()}{cash_eur:,.0f} < {symbol()}{rule.get('min_eur', 10000):,.0f}"
+                t("portfolio_story.cash_rule_error").format(
+                    current=f"{symbol()}{cash_eur:,.0f}",
+                    minimum=f"{symbol()}{rule.get('min_eur', 10000):,.0f}"
+                )
             )
 
 
