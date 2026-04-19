@@ -26,7 +26,42 @@
       "Bash(python3 -c ' *)",
       "Bash(find /Users/erik/Projects/wealth_management/core/storage -name \"*.py\" -exec grep -l \"WatchlistCheckerRepository\\\\|class.*Watchlist\" {} \\\\;)",
       "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py -v)",
-      "Bash(pytest tests/ -xvs --tb=short)"
+      "Bash(pytest tests/ -xvs --tb=short)",
+      "Bash(restic version *)",
+      "Bash(borg --version)",
+      "Bash(sqlite3 --version)",
+      "Bash(brew list *)",
+      "Read(//Library/LaunchDaemons/**)",
+      "Bash(diskutil list *)",
+      "Read(//Volumes/**)",
+      "Bash(pip3 --version)",
+      "Read(//usr/bin/**)",
+      "Bash(command -v gpg2)",
+      "Bash(command -v gpg)",
+      "Bash(command -v age)",
+      "Bash(command -v openssl)",
+      "Bash(openssl version *)",
+      "Bash(security --version)",
+      "Bash(hdiutil version *)",
+      "Bash(hdiutil help *)",
+      "Bash(diskutil info *)",
+      "Bash(brew --version)",
+      "Bash(/opt/homebrew/bin/brew --version)",
+      "Bash(/opt/homebrew/bin/restic version *)",
+      "Bash(chmod +x /Users/erik/scripts/wm_backup.sh)",
+      "Bash(/Users/erik/scripts/wm_backup.sh)",
+      "Bash(python -c \"import pages.settings\")",
+      "Bash(chmod +x /Users/erik/Projects/wealth_management/start.command)",
+      "Bash(chmod +x /Users/erik/scripts/wm_start.sh)",
+      "Bash(launchctl load *)",
+      "Bash(launchctl list *)",
+      "Bash(plutil -lint ~/Library/LaunchAgents/com.erik.wealth-management.plist)",
+      "Bash(bash /Users/erik/scripts/wm_start.sh)",
+      "Bash(launchctl unload *)"
+    ],
+    "additionalDirectories": [
+      "/Users/erik",
+      "/Applications/Wealth Management.app/Contents/MacOS"
     ]
   }
 }

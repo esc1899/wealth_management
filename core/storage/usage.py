@@ -300,6 +300,17 @@ class UsageRepository:
         ).fetchall()
         return [r[0] for r in rows]
 
+    def get_recent_calls(self, limit: int = 50) -> list[dict]:
+        """Last N LLM calls (newest first), regardless of reset filters."""
+        rows = self._conn.execute(
+            """SELECT created_at, agent, skill, model, source, input_tokens, output_tokens, duration_ms
+               FROM llm_usage
+               ORDER BY created_at DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
 
 # ------------------------------------------------------------------
 # Cost helper (module-level, reusable)
