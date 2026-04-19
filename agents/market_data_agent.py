@@ -272,6 +272,17 @@ class MarketDataAgent:
             else:
                 current_value = current_price * pos.quantity if current_price and pos.quantity else None
 
+            # Fallback: estimated_value from extra_data if no market price (for funds without valid tickers)
+            if current_value is None:
+                extra_for_est = pos.extra_data or {}
+                est_val = extra_for_est.get("estimated_value")
+                if est_val is not None:
+                    try:
+                        current_value = float(est_val)
+                        current_price = (current_value / pos.quantity) if pos.quantity else current_value
+                    except (ValueError, TypeError):
+                        pass
+
             if pos.unit == "g" and pos.purchase_price and pos.quantity:
                 cost_basis = pos.purchase_price * pos.quantity
             else:
