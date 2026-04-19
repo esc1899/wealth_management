@@ -24,7 +24,6 @@ from state import (
     get_portfolio_story_agent,
     get_portfolio_story_repo,
     get_skills_repo,
-    load_cash_rule,
 )
 
 logger = logging.getLogger(__name__)
@@ -151,9 +150,21 @@ with st.form("portfolio_story_form", clear_on_submit=False):
 
 def _render_cash_rule_check() -> None:
     """Display cash rule status: target vs. actual liquid cash."""
-    cash_rule = load_cash_rule()
-    if not cash_rule.get("enabled"):
-        return
+    import yaml
+
+    # Load rule parameters from "Bargeldregel" skill in portfolio_story area
+    rule = {"target_pct": 5.0, "min_eur": 10000, "max_eur": 100000}  # defaults
+    try:
+        skills = get_skills_repo().get_by_area("portfolio_story")
+        bargeld_skill = next((s for s in skills if s.name == "Bargeldregel"), None)
+        if bargeld_skill:
+            parsed = yaml.safe_load(bargeld_skill.prompt)
+            if isinstance(parsed, dict):
+                for key in ("target_pct", "min_eur", "max_eur"):
+                    if key in parsed:
+                        rule[key] = float(parsed[key])
+    except Exception:
+        pass  # malformed skill → use defaults
 
     market_agent = get_market_agent()
     valuations = market_agent.get_portfolio_valuation()
@@ -168,10 +179,10 @@ def _render_cash_rule_check() -> None:
     )
 
     target = max(
-        cash_rule.get("min_eur", 10000),
+        rule.get("min_eur", 10000),
         min(
-            cash_rule.get("max_eur", 100000),
-            total_eur * cash_rule.get("target_pct", 5.0) / 100,
+            rule.get("max_eur", 100000),
+            total_eur * rule.get("target_pct", 5.0) / 100,
         ),
     )
 
@@ -186,13 +197,13 @@ def _render_cash_rule_check() -> None:
 
         if cash_eur >= target:
             st.success("✅ Bargeldregel erfüllt")
-        elif cash_eur >= cash_rule.get("min_eur", 10000):
+        elif cash_eur >= rule.get("min_eur", 10000):
             st.warning(
                 f"⚠️ Bargeldbestand unter Ziel: {symbol()}{cash_eur:,.0f} < {symbol()}{target:,.0f}"
             )
         else:
             st.error(
-                f"🔴 Bargeldbestand kritisch: {symbol()}{cash_eur:,.0f} < {symbol()}{cash_rule.get('min_eur', 10000):,.0f}"
+                f"🔴 Bargeldbestand kritisch: {symbol()}{cash_eur:,.0f} < {symbol()}{rule.get('min_eur', 10000):,.0f}"
             )
 
 

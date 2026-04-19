@@ -310,6 +310,13 @@ skills:
         - Fehlt Europa oder Emerging-Market-Exposure komplett?
         - Wie ist die Währungsdiversifikation (EUR, USD, CHF)?
 
+    - name: "Bargeldregel"
+      description: "Liquiditätspuffer: Ziel-%, Minimum und Maximum für liquides Bargeld"
+      prompt: |
+        target_pct: 5.0
+        min_eur: 10000
+        max_eur: 100000
+
   # ── Watchlist Checker ────────────────────────────────────────────────────────
   # Skills for the WatchlistCheckerAgent (Local 🔒, Ollama).
 

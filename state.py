@@ -31,7 +31,6 @@ from state_repos import (
     get_wealth_snapshot_repo,
     get_portfolio_story_repo,
     get_agent_runs_repo,
-    load_cash_rule,
 )
 
 # Agents (15 total)
@@ -80,7 +79,6 @@ __all__ = [
     "get_wealth_snapshot_repo",
     "get_portfolio_story_repo",
     "get_agent_runs_repo",
-    "load_cash_rule",
     "get_portfolio_agent",
     "get_market_agent",
     "get_research_agent",
