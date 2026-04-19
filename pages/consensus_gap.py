@@ -79,6 +79,16 @@ _eligible = _portfolio_service.get_all_positions(
 )
 _all_ids = [p.id for p in _eligible if p.id]
 
+if st.session_state.pop("_auto_run_consensus_gap", False) and _eligible and not _JOB["running"] and _skills:
+    _default_skill = next((s for s in _skills if "Standard" in s.name), _skills[0])
+    _JOB.update({"running": True, "done": False, "error": None, "last_error": None})
+    threading.Thread(
+        target=_run_background,
+        args=(_agent, _eligible, _default_skill.name, _default_skill.prompt, current_language(), _JOB),
+        daemon=True,
+    ).start()
+    st.rerun()
+
 if not _eligible:
     st.info(t("consensus_gap.no_eligible"))
     st.stop()

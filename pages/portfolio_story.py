@@ -281,27 +281,37 @@ else:
                 )
             )
 
-            # Buttons to run missing analyses
+            # Buttons to run missing analyses (auto-start batch on target page)
+            _AUTO_RUN_FLAGS = {
+                "storychecker": "_auto_run_storychecker",
+                "consensus_gap": "_auto_run_consensus_gap",
+            }
             col_buttons_pre = st.columns(len([s for s in _pre_status if s["n_missing"] > 0]))
             for idx, s in enumerate([s for s in _pre_status if s["n_missing"] > 0]):
                 with col_buttons_pre[idx]:
                     if st.button(f"→ {s['label']}", key=f"_nav_pre_{s['agent_name']}", use_container_width=True):
+                        flag = _AUTO_RUN_FLAGS.get(s["agent_name"])
+                        if flag:
+                            st.session_state[flag] = True
                         st.switch_page(s["page"])
 
     col_check, col_history = st.columns([2, 1])
 
     with col_check:
-        # Skill selector for Portfolio Story
+        # Skill selector for Portfolio Story (exclude rule-config skills)
+        _RULE_SKILLS = {"Bargeldregel"}
         skills_repo = get_skills_repo()
         portfolio_story_skills = skills_repo.get_by_area("portfolio_story")
-        skill_options = {s.name: s for s in portfolio_story_skills if not s.hidden}
+        skill_options = {s.name: s for s in portfolio_story_skills if not s.hidden and s.name not in _RULE_SKILLS}
 
         if skill_options:
             skill_names = list(skill_options.keys())
+            _default_skill = "Josef's Regel (3-Säulen-Stabilität)"
+            _default_idx = skill_names.index(_default_skill) if _default_skill in skill_names else 0
             selected_skill_name = st.selectbox(
                 "Fokus-Bereich",
                 options=skill_names,
-                index=0,  # Default to first skill (Josef's Regel)
+                index=_default_idx,
                 key="portfolio_story_skill",
             )
             selected_skill = skill_options[selected_skill_name]

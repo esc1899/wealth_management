@@ -61,6 +61,15 @@ def _run_batch_background(ag, positions, language: str, job: dict):
         loop.close()
 
 
+if st.session_state.pop("_auto_run_storychecker", False) and positions_with_story and not _BATCH["running"]:
+    _BATCH.update({"running": True, "done": False, "error": None, "last_error": None})
+    threading.Thread(
+        target=_run_batch_background,
+        args=(agent, positions_with_story, current_language(), _BATCH),
+        daemon=True,
+    ).start()
+    st.rerun()
+
 if positions_with_story:
     with st.expander(t("storychecker.batch_header"), expanded=False):
         st.caption(t("storychecker.batch_caption").format(n=len(positions_with_story)))
