@@ -27,8 +27,7 @@ Some tables appear in **both** `init_db()` AND `migrate_db()` because they have 
 
 | Table | Reason |
 |---|---|
-| **benchmark_runs** | Added `duration_ms` column via ALTER TABLE (line 364-365) |
-| **portfolio_story_position_fits** | Migration: renamed `fit_verdict` → `fit_role` (line 379-380) |
+| **portfolio_story_position_fits** | Migration: renamed `fit_verdict` → `fit_role` |
 | **agent_runs** | Latest table; created in both for completeness |
 
 Why both? If we only checked in `migrate_db()`, fresh databases from `init_db()` would miss the ALTER TABLE changes. Instead:
@@ -54,8 +53,7 @@ This pattern is idempotent and safe for concurrent readers (WAL mode).
 ### Renames (ALTER TABLE ... RENAME COLUMN)
 
 ```python
-# benchmark_runs: no rename
-# portfolio_story_position_fits: fit_verdict → fit_role (line 379-380)
+# portfolio_story_position_fits: fit_verdict → fit_role
 if "fit_verdict" in existing_fits and "fit_role" not in existing_fits:
     conn.execute("ALTER TABLE portfolio_story_position_fits RENAME COLUMN fit_verdict TO fit_role")
 ```
@@ -96,7 +94,7 @@ if "new_column" not in existing_xxx:
 
 1. **Add to `init_db()`** in the CREATE TABLE statements
 2. **Usually NOT needed in `migrate_db()`** (unless there are future ALTER TABLE operations on that table)
-3. If the table will be modified later, add the CREATE TABLE to `migrate_db()` too (see benchmark_runs example)
+3. If the table will be modified later, add the CREATE TABLE to `migrate_db()` too (see `portfolio_story_position_fits` as example)
 
 ---
 

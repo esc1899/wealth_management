@@ -267,10 +267,10 @@ Pages use `core.currency.symbol()` and `core.currency.fmt()` for display.
 
 ## Testing Strategy
 
-- **Unit tests**: Agent logic, repository CRUD, parsing (559 total)
+- **Unit tests**: Agent logic, repository CRUD, parsing (550 total)
 - **Integration tests**: Full workflows with real SQLite (`:memory:`)
 - **No mocking of repositories**: Always use real storage for higher fidelity
-- **Coverage**: 78.35% (target: 77–80%)
+- **Coverage**: 76% (target: 75–80%)
 
 ```bash
 pytest tests/                 # All
@@ -362,8 +362,8 @@ verdicts = analysis_service.get_verdicts(ids, "storychecker")
 - `pages/consensus_gap.py` — AnalysisService, PortfolioService
 - `pages/fundamental_analyzer.py` — PortfolioService  
 ✅ Portfolio Story subsystem (role-based fit)  
-✅ 563+ tests passing, 78.35% coverage  
+✅ 550 tests passing, 76% coverage  
 
 ---
 
-*Last updated: 2026-04-16*
+*Last updated: 2026-04-19*

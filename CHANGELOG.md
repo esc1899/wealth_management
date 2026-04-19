@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Cleanup: Langfuse, Benchmark, Empfehlungs-Labels removed (2026-04-19)
+
+**Removed experimental/unused features. No functional regressions.**
+
+- **Removed Langfuse**: `monitoring/langfuse_client.py`, `monitoring/agentmonitor_helpers.py`, `pages/agentmonitor.py`, `docker-compose.yml`, `state_services.get_langfuse_client()`, config keys, health check, test files
+- **Removed Benchmark**: `pages/benchmark.py`, `benchmark_runs` table (init_db + migrate_db), `UsageRepository.record_benchmark()` + `get_benchmark_runs()` + `get_benchmark_scenarios()`, navigation entry, test functions
+- **Removed Empfehlungs-Labels**: Settings UI section (subheader + textarea + save), dropdown in Positionen/Watchlist. DB field `empfehlung` preserved; existing values kept silently.
+- **Replaced Agent Monitor**: New "Letzte Calls" tab in Statistics page using existing `UsageRepository.get_recent_calls()`. Duration color-coded (🟢 <1s / 🟡 <3s / 🔴 ≥3s).
+- **Tests**: 550 passing (down from 578; deleted test files account for the difference)
+
 ### Agent i18n Support (2026-04-17)
 
 **Multi-language agent responses while preserving internal verdict codes.**
