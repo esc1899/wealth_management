@@ -8,6 +8,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Portfolio Story Bug Fixes (2026-04-19)
+
+**Three linked bugs from user testing: SQLite path, auto-run recovery, Josef hallucination.**
+
+- **Fixed SQLite `file is not a database`**: Relative DB paths now converted to absolute anchored on project root
+  - Root cause: `.env` relative path `"data/portfolio.db"` resolved against wrong cwd when app launched from `.app` bundle
+  - Solution: `_resolve_db_path()` helper in `config.py` ensures all DB paths absolute regardless of cwd or env override
+  - Also fixed `salt.bin` path in `state_db.py`
+  - Impact: App now starts without crashes when launched from any directory
+  
+- **Fixed Auto-Run from Portfolio Checker**: Automatically resolved by above fix
+  - Storychecker batch jobs now trigger immediately when "→ Story Checker" button clicked
+  - Root cause was SQLite error on line 37, blocking flag consumption at line 64
+
+- **Fixed Josef's Regel hallucinating missing physical real estate**: Added explicit Immobilien section to portfolio snapshot
+  - LLM now sees explicit list of physical Immobilien with values (if any exist)
+  - Or explicit statement "keine im Portfolio" if none (prevents inference hallucination)
+  - Verdict accuracy improved by anchoring LLM with facts instead of omission
+
+- **Tests**: 564/564 passing, no regressions
+
 ### Position & Dividend Management Polish (2026-04-19)
 
 **Resolved dividend override display issues and improved fund valuation handling.**
