@@ -216,10 +216,12 @@ class MarketDataAgent:
 
                 # Calculate dividends: override > interest_rate for Festgeld/Anleihe
                 override_yield = extra.get("dividend_yield_override") if extra else None
-                if override_yield is not None and current_value is not None:
+                if override_yield is not None:
                     try:
                         rate_float = float(override_yield)
-                        annual_dividend_eur = current_value * rate_float / 100
+                        valuation_base = current_value if current_value is not None else cost_basis
+                        if valuation_base is not None:
+                            annual_dividend_eur = valuation_base * rate_float / 100
                         dividend_yield_pct = rate_float / 100
                         dividend_source = "override"
                     except (ValueError, TypeError):
@@ -293,10 +295,12 @@ class MarketDataAgent:
             # Calculate dividends: override > yfinance
             extra = pos.extra_data or {}
             override_yield = extra.get("dividend_yield_override")
-            if override_yield is not None and current_value is not None:
+            if override_yield is not None:
                 try:
                     rate_float = float(override_yield)
-                    annual_dividend_eur = current_value * rate_float / 100
+                    valuation_base = current_value if current_value is not None else cost_basis
+                    if valuation_base is not None:
+                        annual_dividend_eur = valuation_base * rate_float / 100
                     dividend_yield_pct = rate_float / 100
                     dividend_source = "override"
                 except (ValueError, TypeError):
