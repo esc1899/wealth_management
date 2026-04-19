@@ -74,6 +74,7 @@ def render_valuations(entries):
 
     col_retrieved = t("market_data.retrieved_at")
     col_price = t("market_data.price_col")
+    col_div = "Div.-Rendite"
 
     rows = [
         {
@@ -84,6 +85,7 @@ def render_valuations(entries):
             t("common.unit"):        v.unit,
             col_price:               v.current_price_eur,
             t("common.value"):       v.current_value_eur,
+            col_div:                 (v.dividend_yield_pct * 100) if v.dividend_yield_pct else None,
             col_retrieved:           v.fetched_at.strftime("%d.%m %H:%M") if v.fetched_at else "—",
         }
         for v in entries
@@ -94,10 +96,12 @@ def render_valuations(entries):
             t("common.quantity"): fmt_quantity,
             col_price:            lambda x: fmt_opt(x),
             t("common.value"):    lambda x: fmt_opt(x, "€ {:,.2f}"),
+            col_div:              lambda x: fmt_opt(x, "{:.2f}%"),
         }),
         use_container_width=True,
         hide_index=True,
     )
+    st.caption("ℹ️ Dividenden / Ausschüttungen werden nicht automatisch mit Kursen aktualisiert — Button auf der Positionen-Seite.")
 
 
 portfolio_vals = [v for v in valuations if v.in_portfolio]

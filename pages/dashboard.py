@@ -97,12 +97,15 @@ COL_TICKER = t("common.ticker")
 COL_NAME = t("common.name")
 COL_ASSET_CLASS = t("common.asset_class")
 
+COL_DIV_YIELD = "Div.-Rendite"
+
 fmt_rules = {
     COL_QUANTITY:       fmt_quantity,
     COL_UNIT:           "{}",
     COL_PURCHASE_PRICE: lambda x: fmt_optional(x),
     COL_CURRENT_PRICE:  lambda x: fmt_optional(x),
     COL_VALUE:          lambda x: fmt_optional(x, f"{symbol()} {{:,.2f}}"),
+    COL_DIV_YIELD:      lambda x: fmt_optional(x, "{:.2f}%"),
     COL_PNL_EUR:        lambda x: fmt_optional(x, "{:+,.2f}"),
     COL_PNL_PCT:        lambda x: fmt_optional(x, "{:+.2f}%"),
 }
@@ -126,6 +129,7 @@ for inv_type in investment_types:
             COL_PURCHASE_PRICE: v.purchase_price_eur,
             COL_CURRENT_PRICE:  v.current_price_eur,
             COL_VALUE:          v.current_value_eur,
+            COL_DIV_YIELD:      (v.dividend_yield_pct * 100) if v.dividend_yield_pct else None,
             COL_PNL_EUR:        v.pnl_eur,
             COL_PNL_PCT:        v.pnl_pct,
         }

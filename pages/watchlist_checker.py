@@ -471,7 +471,10 @@ if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
             for p in portfolio:
                 val = valuations.get(p.ticker) if p.ticker else None
                 val_eur = val.current_value_eur if val and val.current_value_eur else 0
-                portfolio_snapshot += f"- {p.name} ({p.ticker}, {p.asset_class}): {val_eur:.0f}€\n"
+                div_str = ""
+                if val and val.annual_dividend_eur and val.annual_dividend_eur > 0:
+                    div_str = f", Dividende/Ausschüttung: {val.annual_dividend_eur:.0f}€/Jahr ({(val.dividend_yield_pct or 0) * 100:.1f}%, Quelle: {val.dividend_source or 'unbekannt'})"
+                portfolio_snapshot += f"- {p.name} ({p.ticker}, {p.asset_class}): {val_eur:.0f}€{div_str}\n"
         else:
             portfolio_snapshot += "(Leer)\n"
 
