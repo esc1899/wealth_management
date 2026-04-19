@@ -82,10 +82,10 @@ def _set(**kwargs):
         st.session_state[k] = v
 
 def _clear_form():
-    """Clear all form-related keys from session state."""
-    # Form control and basic fields
+    """Clear all form-related keys from session state, including any open detail dialog."""
     for k in [
         "_pos_edit_id", "_pos_show_form", "_pos_confirm_del",
+        "_pos_detail_id",
         "_pos_ticker", "_pos_name", "_pos_figi_results",
         "_pos_isin", "_pos_wkn", "_pos_asset_class",
         "_pos_story_draft", "_pos_form_story", "_pos_form_story_owner", "_pos_figi_pick",
@@ -682,7 +682,9 @@ if _ss("_pos_show_form"):
         if form_ticker:
             div_rec = _market_repo.get_dividend(form_ticker)
             if div_rec:
-                st.info(f"ℹ️ Aktuell von yfinance: {(div_rec.yield_pct or 0) * 100:.2f}% ({div_rec.rate_eur:.4f}€/Aktie, Stand: {div_rec.fetched_at.strftime('%d.%m.%Y') if div_rec.fetched_at else '—'})")
+                rate_str = f"{div_rec.rate_eur:.4f}€/Aktie" if div_rec.rate_eur is not None else "Kurs n/a"
+                date_str = div_rec.fetched_at.strftime('%d.%m.%Y') if div_rec.fetched_at else "—"
+                st.info(f"ℹ️ Aktuell von yfinance: {(div_rec.yield_pct or 0) * 100:.2f}% ({rate_str}, Stand: {date_str})")
             existing_override = existing_extra.get("dividend_yield_override", 0.0)
             if existing_override and existing_override > 0:
                 st.info(f"⚠️ Override aktiv: {existing_override:.2f}% → yfinance-Wert wird ignoriert")
@@ -810,10 +812,12 @@ if confirm_id is not None:
             if c1.button(t("positionen.confirm_yes"), type="primary"):
                 repo.delete(confirm_id)
                 st.session_state.pop("_pos_confirm_del", None)
+                _clear_detail()
                 st.toast(t("positionen.deleted"), icon="🗑️")
                 st.rerun()
             if c2.button(t("positionen.confirm_no")):
                 st.session_state.pop("_pos_confirm_del", None)
+                _clear_detail()
                 st.rerun()
 
 # ---------------------------------------------------------------------------
@@ -959,6 +963,7 @@ else:
 col_fetch, col_info = st.columns([1, 4])
 with col_fetch:
     if st.button("🔄 Dividenden aktualisieren", use_container_width=True):
+        _clear_detail()
         with st.spinner("Fetching dividend data..."):
             errors = _market_agent.fetch_dividends_now()
             if errors:
