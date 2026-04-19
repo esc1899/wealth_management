@@ -267,7 +267,7 @@ def _show_detail(pos_id: int):
     if div_record or override_yield:
         st.markdown("#### 📊 Dividende / Ausschüttung")
         if override_yield and override_yield > 0:
-            annual = pos.quantity * (div_record.rate_eur if div_record else 0) if pos.quantity and div_record else None
+            annual = (pos.quantity * div_record.rate_eur) if (pos.quantity and div_record and div_record.rate_eur) else None
             if annual is None and pos.quantity:
                 annual = (pos.quantity * _position_current_value(pos) * override_yield / 100) if _position_current_value(pos) else None
             col_src, col_yield, col_annual = st.columns(3)
