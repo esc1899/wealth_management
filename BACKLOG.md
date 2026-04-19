@@ -21,7 +21,6 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 | ID | Priority | Description | Notes |
 |---|---|---|---|
 | DEBT-8 | P3 | Document `migrate_db()` inline — add comments explaining the dual init+migrate pattern | Low risk, cosmetic |
-| DEBT-10 | P2 | Page unit tests — smoke-test page rendering without real agents (mock at service boundary) | Unblocked since DEBT-4 complete |
 | DEBT-13 | P3 | Tighten requirements.txt version bounds | Low urgency, no known conflicts |
 
 ---
@@ -42,6 +41,7 @@ See CHANGELOG.md for full history of completed features and debt remediations.
 | DEBT-6 | 2026-04-12 | Public agent APIs — eliminated private attribute access from pages |
 | DEBT-7 | 2026-04-16 | state.py decomposed (437 → 60 lines + 5 modules) |
 | DEBT-9 | 2026-04-16 | asyncio.get_event_loop() → asyncio.run() (Python 3.12+ safe) |
+| DEBT-10 | 2026-04-19 | Page smoke tests — all 19 pages load without exceptions (Streamlit AppTest) |
 | DEBT-11 | 2026-04-12 | Coverage configuration added to pytest.ini |
 | DEBT-14 | 2026-04-12 | agentmonitor.py wired to navigation |
 | DEBT-15 | 2026-04-12 | Expired Easter egg removed |
