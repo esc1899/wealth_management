@@ -355,6 +355,22 @@ else:
                         snapshot_lines.append("\n**Nicht-börsengehandelt (in Josef-Regel enthalten):**")
                         snapshot_lines.extend(non_tradeable_lines)
 
+                    # Explicit physical Immobilien section to anchor LLM (prevent hallucination)
+                    physical_immo = [
+                        v for v in valuations
+                        if v.in_portfolio and v.asset_class in {"Immobilie", "Grundstück"}
+                    ]
+                    if physical_immo:
+                        snapshot_lines.append("\n**Direkte Immobilien (physisch, nicht fondbasiert):**")
+                        for v in physical_immo:
+                            snapshot_lines.append(
+                                f"- {v.name} [{v.asset_class}]: {symbol()}{v.current_value_eur:,.0f}"
+                            )
+                    else:
+                        snapshot_lines.append(
+                            "\n**Direkte Immobilien (physisch): keine im Portfolio**"
+                        )
+
                     portfolio_snapshot = "\n".join(snapshot_lines)
                 else:
                     portfolio_snapshot = "(Leeres Portfolio)"

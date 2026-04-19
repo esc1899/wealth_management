@@ -1,7 +1,20 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 from core.constants import CLAUDE_MODELS_DEFAULT_LIST
+
+_PROJECT_ROOT = Path(__file__).parent
+
+
+def _resolve_db_path(env_var: str, default: str) -> str:
+    """Convert relative DB paths to absolute (relative to project root)."""
+    path_str = os.getenv(env_var, default)
+    path = Path(path_str)
+    if not path.is_absolute():
+        path = _PROJECT_ROOT / path
+    return str(path)
+
 
 load_dotenv()
 # Optional profile override: ENV_PROFILE=work loads .env.work on top of .env
@@ -29,13 +42,13 @@ class Config:
 
     # Demo mode
     DEMO_MODE: bool = os.getenv("DEMO_MODE", "false").lower() == "true"
-    DEMO_DB_PATH: str = os.getenv("DEMO_DB_PATH", "data/demo.db")
 
-    # Storage — in demo mode, use the demo DB
+    # Storage — in demo mode, use the demo DB (convert relative paths to absolute)
+    DEMO_DB_PATH: str = _resolve_db_path("DEMO_DB_PATH", "data/demo.db")
     DB_PATH: str = (
-        os.getenv("DEMO_DB_PATH", "data/demo.db")
-        if os.getenv("DEMO_MODE", "false").lower() == "true"
-        else os.getenv("DB_PATH", "data/portfolio.db")
+        _resolve_db_path("DEMO_DB_PATH", "data/demo.db")
+        if DEMO_MODE
+        else _resolve_db_path("DB_PATH", "data/portfolio.db")
     )
 
     # Market data
