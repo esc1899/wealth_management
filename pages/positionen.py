@@ -88,8 +88,8 @@ def _clear_form():
         "_pos_edit_id", "_pos_show_form", "_pos_confirm_del",
         "_pos_ticker", "_pos_name", "_pos_figi_results",
         "_pos_isin", "_pos_wkn", "_pos_asset_class",
-        "_pos_story_draft", "_pos_form_story", "_pos_figi_pick",
-        "_pos_story_gen",
+        "_pos_story_draft", "_pos_form_story", "_pos_form_story_owner", "_pos_figi_pick",
+        "_pos_story_gen", "_pos_form_notified",
     ]:
         st.session_state.pop(k, None)
 
@@ -250,6 +250,31 @@ def _show_detail(pos_id: int):
 
     st.divider()
 
+    # ── Dividend / Interest display ──────────────────────────────────────────
+    div_record = _market_repo.get_dividend(pos.ticker) if pos.ticker else None
+    override_yield = extra.get("dividend_yield_override")
+
+    if div_record or override_yield:
+        st.markdown("#### 📊 Dividende / Ausschüttung")
+        if override_yield and override_yield > 0:
+            annual = pos.quantity * (div_record.rate_eur if div_record else 0) if pos.quantity and div_record else None
+            if annual is None and pos.quantity:
+                annual = (pos.quantity * _position_current_value(pos) * override_yield / 100) if _position_current_value(pos) else None
+            col_src, col_yield, col_annual = st.columns(3)
+            col_src.markdown(f"**Quelle:** Override")
+            col_yield.markdown(f"**Rendite:** {override_yield:.2f} %")
+            if annual:
+                col_annual.markdown(f"**Jährlich:** {symbol()}{annual:,.0f}")
+        elif div_record:
+            annual = pos.quantity * div_record.rate_eur if pos.quantity else None
+            col_src, col_yield, col_annual = st.columns(3)
+            col_src.markdown(f"**Quelle:** yfinance")
+            col_yield.markdown(f"**Rendite:** {(div_record.yield_pct or 0) * 100:.2f} %")
+            if annual:
+                col_annual.markdown(f"**Jährlich:** {symbol()}{annual:,.0f}")
+
+    st.divider()
+
     # ── Analysis exclusion toggle ────────────────────────────────────────────
     new_excl = st.toggle(
         t("positionen.analysis_excluded_label"),
@@ -296,6 +321,16 @@ if _ss("_pos_show_form"):
     st.subheader(
         t("positionen.form_header_edit") if editing else t("positionen.form_header_add")
     )
+
+    # Initialize form state explicitly to prevent sticky state between opens
+    if "_pos_form_story" not in st.session_state or st.session_state.get("_pos_form_story_owner") != edit_id:
+        st.session_state["_pos_form_story"] = (editing.story or "") if editing else ""
+        st.session_state["_pos_form_story_owner"] = edit_id
+
+    # Notify if form was just opened (for scroll navigation)
+    if not _ss("_pos_form_notified"):
+        st.info("✏️ Formular oben auf der Seite — scrollen Sie nach oben")
+        _set(_pos_form_notified=True)
 
     # ── Asset class selector OUTSIDE the form ────────────────────────────────
     # This must be outside so changing it triggers a rerun before the form renders.
@@ -641,6 +676,17 @@ if _ss("_pos_show_form"):
         # ── Dividend Yield Override (all asset classes) ────────────────────────
         st.markdown("---")
         st.markdown("#### 📊 Dividende / Zinssatz (manueller Override)")
+
+        # Show current yfinance value if available
+        form_ticker = editing.ticker if editing else _ss("_pos_ticker", "")
+        if form_ticker:
+            div_rec = _market_repo.get_dividend(form_ticker)
+            if div_rec:
+                st.info(f"ℹ️ Aktuell von yfinance: {(div_rec.yield_pct or 0) * 100:.2f}% ({div_rec.rate_eur:.4f}€/Aktie, Stand: {div_rec.fetched_at.strftime('%d.%m.%Y') if div_rec.fetched_at else '—'})")
+            existing_override = existing_extra.get("dividend_yield_override", 0.0)
+            if existing_override and existing_override > 0:
+                st.info(f"⚠️ Override aktiv: {existing_override:.2f}% → yfinance-Wert wird ignoriert")
+
         form_dividend_override = st.number_input(
             "Jährlicher Zinssatz / Dividendenrendite (%)",
             min_value=0.0,
@@ -776,6 +822,21 @@ if confirm_id is not None:
 
 _VERDICT_ICON = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴"}
 
+# Pre-fetch all dividend records once for efficient lookup
+_all_divs = _market_repo.get_all_dividends()
+
+def _get_dividend_yield(pos: Position) -> Optional[str]:
+    """Get dividend yield for position: override > yfinance > None"""
+    extra = pos.extra_data or {}
+    override = extra.get("dividend_yield_override")
+    if override and override > 0:
+        return f"{override:.2f} %"
+    if pos.ticker and pos.ticker in _all_divs:
+        div_rec = _all_divs[pos.ticker]
+        if div_rec.yield_pct:
+            return f"{div_rec.yield_pct * 100:.2f} %"
+    return None
+
 
 def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
     if not positions:
@@ -788,20 +849,20 @@ def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
         [p.id for p in positions if p.id], "storychecker"
     )
 
-    # Header row (10 columns: name, ticker, isin, class, qty, unit, current_value, detail, edit, del)
-    hc = st.columns([3, 1, 2, 1, 1, 1, 1.3, 0.4, 0.4, 0.4])
+    # Header row (11 columns: name, ticker, isin, class, qty, unit, current_value, div_yield, detail, edit, del)
+    hc = st.columns([3, 1, 2, 1, 1, 1, 1.3, 0.8, 0.4, 0.4, 0.4])
     for col, label in zip(hc, [
         t("positionen.col_name"), t("positionen.col_ticker"),
         t("positionen.col_isin"), t("positionen.col_asset_class"),
         t("positionen.col_quantity"), t("positionen.col_unit"),
-        "Akt. Wert", "", "", "",
+        "Akt. Wert", "Div.-Rendite", "", "", "",
     ]):
         col.markdown(f"**{label}**")
 
     st.divider()
 
     for pos in positions:
-        cols = st.columns([3, 1, 2, 1, 1, 1, 1.3, 0.4, 0.4, 0.4])
+        cols = st.columns([3, 1, 2, 1, 1, 1, 1.3, 0.8, 0.4, 0.4, 0.4])
         analysis = verdicts.get(pos.id)
         verdict_badge = _VERDICT_ICON.get(analysis.verdict, "") if analysis else ""
         cols[0].write(f"{verdict_badge} {pos.name}" if verdict_badge else pos.name)
@@ -831,14 +892,18 @@ def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
             cols[6].markdown(_val_str)
         else:
             cols[6].write("—")
-        if cols[7].button("🔍", key=f"{key_prefix}_det_{pos.id}", help=t("positionen.detail_tooltip")):
+
+        div_yield = _get_dividend_yield(pos)
+        cols[7].write(div_yield or "—")
+
+        if cols[8].button("🔍", key=f"{key_prefix}_det_{pos.id}", help=t("positionen.detail_tooltip")):
             _set(_pos_detail_id=pos.id)
             st.rerun()
-        if cols[8].button("✏️", key=f"{key_prefix}_edit_{pos.id}", help=t("positionen.edit_tooltip")):
+        if cols[9].button("✏️", key=f"{key_prefix}_edit_{pos.id}", help=t("positionen.edit_tooltip")):
             _clear_form()
             _set(_pos_show_form=True, _pos_edit_id=pos.id)
             st.rerun()
-        if cols[9].button("🗑️", key=f"{key_prefix}_del_{pos.id}", help=t("positionen.delete_tooltip")):
+        if cols[10].button("🗑️", key=f"{key_prefix}_del_{pos.id}", help=t("positionen.delete_tooltip")):
             _set(_pos_confirm_del=pos.id)
             st.rerun()
 

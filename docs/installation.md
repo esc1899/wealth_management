@@ -68,11 +68,6 @@ OLLAMA_MODEL=qwen3:8b               # default model for Portfolio Chat and Rebal
 ### Optional
 
 ```env
-# Langfuse monitoring (omit both keys to disable)
-LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_HOST=http://localhost:3000
-
 # Storage
 DB_PATH=data/portfolio.db
 
@@ -151,30 +146,6 @@ The `OLLAMA_MODEL` env var sets the startup default; the Settings UI overrides i
 ```bash
 ollama pull qwen3:8b
 ```
-
----
-
-## Langfuse Monitoring (Optional)
-
-Langfuse provides LLM call monitoring and tracing. A Docker Compose stack is included.
-
-```bash
-# Start Langfuse (PostgreSQL + ClickHouse + Redis + MinIO)
-docker compose up -d
-
-# Open the Langfuse UI
-open http://localhost:3000
-```
-
-Create a project in Langfuse, copy the API keys, and add them to `.env`:
-
-```env
-LANGFUSE_SECRET_KEY=sk-lf-...
-LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_HOST=http://localhost:3000
-```
-
-Omit both keys to disable monitoring entirely.
 
 ---
 
