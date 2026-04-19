@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Position & Dividend Management Polish (2026-04-19)
+
+**Resolved dividend override display issues and improved fund valuation handling.**
+
+- **Fixed Dividend Overrides**: Dividend override calculations now use `cost_basis` as fallback when market price unavailable (e.g., bond funds without yfinance tickers)
+  - Both auto-fetch and manual-valuation code paths updated
+  - Fixes `TypeError: unsupported operand type(s) for *: 'float' and 'NoneType'` when `div_record.rate_eur` is None
+- **Enhanced Funds Valuation**: `estimated_value` from detail dialog now used as fallback in auto-fetch code path
+  - Allows funds without valid yfinance tickers to calculate P&L and dividends
+  - Schätzwert (estimated value) input now visible for all fund classes in detail view
+- **Config**: Enabled `manual_valuation: true` for Aktienfonds, Rentenfonds, Immobilienfonds, Infrastrukturfonds
+  - Users can now set estimated position values in the detail dialog when market prices unavailable
+- **Refactored**: Moved position story update from Story Checker page to position create/edit form
+  - Story editing consolidated in dedicated position form (PositionStoryService)
+  - Story Checker page now focused on analysis verdicts only
+- **Tests**: 564/564 passing
+
 ### DEBT-10: Page Smoke Tests (2026-04-19)
 
 **Streamlit UI smoke tests for all 19 pages — catches initialization crashes.**
