@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### DEBT-10: Page Smoke Tests (2026-04-19)
+
+**Streamlit UI smoke tests for all 19 pages — catches initialization crashes.**
+
+- **Added**: `tests/integration/test_watchlist_checker_ui.py` — expanded from 5 pages to all 19
+- **Coverage Impact**: Pages import triggers new code paths; coverage 76% → 69% (expected, acceptable)
+- **Tests**: 564 total, all passing
+- **Scope**: Agent pages (9), Admin & Dashboard (7), System pages (3)
+- **Goal**: Safety layer for page refactoring — catches import errors, syntax errors, runtime crashes on startup
+
+---
+
 ### Cleanup: Langfuse, Benchmark, Empfehlungs-Labels removed (2026-04-19)
 
 **Removed experimental/unused features. No functional regressions.**
