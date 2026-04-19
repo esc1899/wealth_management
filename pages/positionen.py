@@ -99,8 +99,20 @@ def _clear_form():
     for k in keys_to_remove:
         st.session_state.pop(k, None)
 
-def _clear_detail():
-    st.session_state.pop("_pos_detail_id", None)
+def _open_detail(pos_id: int):
+    """Open detail dialog, clearing any other state."""
+    _clear_form()
+    _set(_pos_detail_id=pos_id)
+
+def _open_edit(pos_id: int | None):
+    """Open edit form, clearing any other state."""
+    _clear_form()
+    _set(_pos_show_form=True, _pos_edit_id=pos_id)
+
+def _open_delete(pos_id: int):
+    """Open delete confirmation, clearing any other state."""
+    _clear_form()
+    _set(_pos_confirm_del=pos_id)
 
 # ---------------------------------------------------------------------------
 # Detail dialog
@@ -122,9 +134,7 @@ def _show_detail(pos_id: int):
     if pos.ticker:
         c1.caption(pos.ticker)
     if c2.button(t("positionen.edit_button_detail"), use_container_width=True):
-        _clear_form()
-        _set(_pos_show_form=True, _pos_edit_id=pos_id)
-        _clear_detail()
+        _open_edit(pos_id)
         st.rerun()
         return  # Exit dialog immediately to avoid re-rendering
 
@@ -290,7 +300,7 @@ def _show_detail(pos_id: int):
 
     st.divider()
     if st.button(t("positionen.close_button"), use_container_width=True):
-        _clear_detail()
+        _clear_form()
         st.rerun()
 
 # ---------------------------------------------------------------------------
@@ -306,8 +316,7 @@ if detail_id is not None:
 # ---------------------------------------------------------------------------
 
 if st.button(t("positionen.add_button"), type="primary"):
-    _clear_form()
-    _set(_pos_show_form=True, _pos_edit_id=None)
+    _open_edit(None)
     st.rerun()
 
 # ---------------------------------------------------------------------------
@@ -811,13 +820,11 @@ if confirm_id is not None:
             c1, c2, _ = st.columns([1, 1, 6])
             if c1.button(t("positionen.confirm_yes"), type="primary"):
                 repo.delete(confirm_id)
-                st.session_state.pop("_pos_confirm_del", None)
-                _clear_detail()
+                _clear_form()
                 st.toast(t("positionen.deleted"), icon="🗑️")
                 st.rerun()
             if c2.button(t("positionen.confirm_no")):
-                st.session_state.pop("_pos_confirm_del", None)
-                _clear_detail()
+                _clear_form()
                 st.rerun()
 
 # ---------------------------------------------------------------------------
@@ -901,16 +908,13 @@ def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
         cols[7].write(div_yield or "—")
 
         if cols[8].button("🔍", key=f"{key_prefix}_det_{pos.id}", help=t("positionen.detail_tooltip")):
-            _set(_pos_detail_id=pos.id)
+            _open_detail(pos.id)
             st.rerun()
         if cols[9].button("✏️", key=f"{key_prefix}_edit_{pos.id}", help=t("positionen.edit_tooltip")):
-            _clear_form()
-            _clear_detail()
-            _set(_pos_show_form=True, _pos_edit_id=pos.id)
+            _open_edit(pos.id)
             st.rerun()
         if cols[10].button("🗑️", key=f"{key_prefix}_del_{pos.id}", help=t("positionen.delete_tooltip")):
-            _clear_detail()
-            _set(_pos_confirm_del=pos.id)
+            _open_delete(pos.id)
             st.rerun()
 
 
@@ -963,7 +967,7 @@ else:
 col_fetch, col_info = st.columns([1, 4])
 with col_fetch:
     if st.button("🔄 Dividenden aktualisieren", use_container_width=True):
-        _clear_detail()
+        _clear_form()
         with st.spinner("Fetching dividend data..."):
             errors = _market_agent.fetch_dividends_now()
             if errors:
