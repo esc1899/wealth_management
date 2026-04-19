@@ -38,17 +38,6 @@ def get_portfolio_comment_service():
 
 
 @st.cache_resource
-def get_langfuse_client():
-    """Monitoring client for Langfuse integration."""
-    from monitoring.langfuse_client import create_langfuse_client
-    return create_langfuse_client(
-        public_key=config.LANGFUSE_PUBLIC_KEY,
-        secret_key=config.LANGFUSE_SECRET_KEY,
-        host=config.LANGFUSE_HOST,
-    )
-
-
-@st.cache_resource
 def get_analysis_service():
     """Service for centralized verdict analysis access."""
     from core.services.analysis_service import AnalysisService

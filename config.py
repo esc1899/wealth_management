@@ -17,11 +17,6 @@ class Config:
     # Tavily Search (optional — replaces Anthropic's built-in web_search when set)
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
 
-    # Langfuse (optional monitoring — omit keys to disable)
-    LANGFUSE_SECRET_KEY: str = os.getenv("LANGFUSE_SECRET_KEY", "")
-    LANGFUSE_PUBLIC_KEY: str = os.getenv("LANGFUSE_PUBLIC_KEY", "")
-    LANGFUSE_HOST: str = os.getenv("LANGFUSE_HOST", "http://localhost:3000")
-
     # Ollama
     OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
     OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.2")

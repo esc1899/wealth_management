@@ -247,33 +247,6 @@ if st.button(t("settings.cost_alert_save"), key="_save_alert_btn"):
 st.divider()
 
 # ------------------------------------------------------------------
-# Section: Empfehlung labels
-# ------------------------------------------------------------------
-
-st.subheader(t("settings.empfehlung_labels_header"))
-
-_DEFAULT_EMPFEHLUNG = ["Kaufen", "Halten", "Verkaufen", "Beobachten"]
-_current_labels: list[str] = app_config.get_json("empfehlung_labels", _DEFAULT_EMPFEHLUNG)
-
-labels_text = st.text_area(
-    t("settings.empfehlung_labels_label"),
-    value="\n".join(_current_labels),
-    height=130,
-    help=t("settings.empfehlung_labels_help"),
-    key="_settings_empf_labels",
-)
-
-if st.button(t("settings.save_labels_button"), key="_save_labels_btn"):
-    parsed = [l.strip() for l in labels_text.splitlines() if l.strip()]
-    if not parsed:
-        st.error(t("settings.labels_empty_error"))
-    else:
-        app_config.set_json("empfehlung_labels", parsed)
-        st.success(t("settings.labels_saved"))
-
-st.divider()
-
-# ------------------------------------------------------------------
 # Section: KI-Kommentarstil
 # ------------------------------------------------------------------
 

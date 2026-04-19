@@ -55,8 +55,7 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Cost & Token Tracking** — per-agent/skill/model token counts and USD costs; split by manual vs. scheduled runs; daily trend chart; non-destructive per-row reset
 - **Cost Alerts** — configurable daily and monthly USD spending limits; warnings in sidebar and Statistics page
 - **Monthly Cost Forecast** — projects scheduled-job costs forward based on actual average tokens per call
-- **Performance Benchmarks** — run agents against fixed scenarios; compare runs over time; duration and token delta tracked per benchmark
-- **Recommendation & Story** — configurable recommendation labels and investment thesis per position
+- **Recommendation & Story** — investment thesis per position
 - **Demo Mode** — pre-seeded database with 20 realistic positions + sample analyses for testing
 - **Bilingual UI** — German / English, switchable per session
 - **System Status** — health checks for Ollama connectivity, privacy mode, and demo mode
@@ -83,9 +82,6 @@ Portfolio data (quantities, prices, notes, investment thesis) is encrypted at re
 ### Skills as reusable prompts
 The Skills system lets you save and edit prompt templates for each agent. Learn that a well-written system prompt dramatically changes LLM output quality, and that externalising prompts from code makes them easier to iterate on.
 
-### Monitoring with Langfuse
-Optionally connect Langfuse to trace every LLM call — full prompt, response, latency, and token counts.
-
 ### Agent design trade-offs
 The app has ten agents with different characteristics: stateful vs. stateless, local vs. cloud, one-shot vs. conversational, agentic loop vs. single call. Comparing Portfolio Chat, Rebalance, Research Chat, News Digest, the Story Checker, and the Claude Strategy agents shows the practical trade-offs: privacy, cost, speed, and capability.
 
@@ -94,9 +90,6 @@ The Structural Change Scanner runs an agentic loop: Claude decides when to call 
 
 ### Tracking costs and controlling spending
 The Statistics page gives an indication of what each agent call costs in USD, broken down by agent, skill, and model. Configurable daily and monthly alert thresholds warn you before spending gets out of hand. The monthly forecast extrapolates from actual average token usage of your scheduled jobs — so you see the projected bill before it arrives. Learn what makes one agent 10× more expensive than another (hint: agentic loops with web search vs. a single-shot call), and how to use this to choose the right model for each task.
-
-### Benchmarking prompt and model changes
-The Benchmark page lets you run an agent against a fixed scenario and compare the results over time. Change the system prompt or switch from Sonnet to Haiku, run the benchmark, and see the token delta and duration side by side. This is the feedback loop for prompt engineering: measurable, repeatable, not just a feeling.
 
 ---
 
@@ -138,8 +131,6 @@ Copy `.env.example` to `.env` and fill in your values.
 | `OLLAMA_HOST` | Optional | Default: `http://localhost:11434` |
 | `OLLAMA_MODEL` | Optional | Default model for Portfolio Chat and Rebalance (overridable in Settings UI) |
 | `TAVILY_API_KEY` | Optional | Tavily search — replaces Anthropic's built-in web_search when set. Free tier: 1000 searches/month |
-| `LANGFUSE_SECRET_KEY` | Optional | Langfuse monitoring (omit to disable) |
-| `LANGFUSE_PUBLIC_KEY` | Optional | Langfuse monitoring (omit to disable) |
 | `DEMO_MODE` | Optional | Set to `true` to use the demo database |
 | `DB_PATH` | Optional | Default: `data/portfolio.db` |
 | `MARKET_DATA_FETCH_HOUR` | Optional | Hour (0–23) for automatic price refresh, default `18` |

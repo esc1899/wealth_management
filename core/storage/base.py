@@ -194,20 +194,6 @@ def init_db(conn: sqlite3.Connection) -> None:
             skill    TEXT,
             reset_at TEXT NOT NULL DEFAULT (datetime('now'))
         )""",
-        """CREATE TABLE IF NOT EXISTS benchmark_runs (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            scenario_name TEXT NOT NULL,
-            agent         TEXT NOT NULL,
-            model         TEXT NOT NULL,
-            skill_name    TEXT NOT NULL,
-            input_tokens  INTEGER NOT NULL,
-            output_tokens INTEGER NOT NULL,
-            cost_eur      REAL NOT NULL DEFAULT 0,
-            duration_ms   INTEGER,
-            run_at        TEXT NOT NULL DEFAULT (datetime('now')),
-            label         TEXT
-        )""",
-        "CREATE INDEX IF NOT EXISTS idx_benchmark_runs_scenario ON benchmark_runs(scenario_name)",
         """CREATE TABLE IF NOT EXISTS app_config (
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -371,26 +357,6 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     if "position_count" not in existing_usage:
         conn.execute("ALTER TABLE llm_usage ADD COLUMN position_count INTEGER")
 
-    # NOTE: benchmark_runs and portfolio_story_position_fits are defined here (not just in init_db)
-    # because they have ALTER TABLE migrations that must run when present.
-    # Other tables (usage_resets, dividend_data) are defined only in init_db.
-    conn.execute("""CREATE TABLE IF NOT EXISTS benchmark_runs (
-        id            INTEGER PRIMARY KEY AUTOINCREMENT,
-        scenario_name TEXT NOT NULL,
-        agent         TEXT NOT NULL,
-        model         TEXT NOT NULL,
-        skill_name    TEXT NOT NULL,
-        input_tokens  INTEGER NOT NULL,
-        output_tokens INTEGER NOT NULL,
-        cost_eur      REAL NOT NULL DEFAULT 0,
-        duration_ms   INTEGER,
-        run_at        TEXT NOT NULL DEFAULT (datetime('now')),
-        label         TEXT
-    )""")
-    existing_bm = {row[1] for row in conn.execute("PRAGMA table_info(benchmark_runs)")}
-    if "duration_ms" not in existing_bm:
-        conn.execute("ALTER TABLE benchmark_runs ADD COLUMN duration_ms INTEGER")
-
     # Create portfolio_story_position_fits table if it doesn't exist
     conn.execute("""CREATE TABLE IF NOT EXISTS portfolio_story_position_fits (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -405,8 +371,6 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     existing_fits = {row[1] for row in conn.execute("PRAGMA table_info(portfolio_story_position_fits)")}
     if "fit_verdict" in existing_fits and "fit_role" not in existing_fits:
         conn.execute("ALTER TABLE portfolio_story_position_fits RENAME COLUMN fit_verdict TO fit_role")
-
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_benchmark_runs_scenario ON benchmark_runs(scenario_name)")
 
     # Create agent_runs table if it doesn't exist
     conn.execute("""CREATE TABLE IF NOT EXISTS agent_runs (

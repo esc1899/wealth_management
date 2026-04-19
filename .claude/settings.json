@@ -57,11 +57,18 @@
       "Bash(launchctl list *)",
       "Bash(plutil -lint ~/Library/LaunchAgents/com.erik.wealth-management.plist)",
       "Bash(bash /Users/erik/scripts/wm_start.sh)",
-      "Bash(launchctl unload *)"
+      "Bash(launchctl unload *)",
+      "Bash(pytest tests/unit/test_cost_tracking.py -v -k \"usage\")",
+      "Bash(curl -s http://localhost:8501/pages/statistics.py)",
+      "Bash(sed -i '' 's|System: Statistics / Benchmark / Skills / Monitor|System: Statistics / Skills|g' /Users/erik/Projects/wealth_management/ARCHITECTURE.md)",
+      "Bash(sed -i '' 's| \\(agentmonitor.py, ||g; s|agentmonitor.py, ||g' /Users/erik/Projects/wealth_management/ARCHITECTURE.md)",
+      "Bash(sed -i '' 's|Add the CREATE TABLE to `migrate_db\\(\\)` too \\(see benchmark_runs example\\)|Add the CREATE TABLE to `migrate_db\\(\\)` too if it needs ALTER TABLE migrations later|g' /Users/erik/Projects/wealth_management/MIGRATIONS.md)"
     ],
     "additionalDirectories": [
       "/Users/erik",
-      "/Applications/Wealth Management.app/Contents/MacOS"
+      "/Applications/Wealth Management.app/Contents/MacOS",
+      "/Users/erik/Projects/wealth_management/monitoring",
+      "/Users/erik/Projects/wealth_management"
     ]
   }
 }

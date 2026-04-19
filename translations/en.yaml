@@ -48,7 +48,6 @@ nav:
   wealth_history: "Wealth History"
   group_system: "System ⚙️"
   statistics: "Statistics"
-  benchmark: "Benchmark"
 
 investment_types:
   Wertpapiere: "Securities"
@@ -325,12 +324,6 @@ settings:
   cost_alert_saved: "Cost limits saved."
   cost_alert_disabled: "0 = no limit"
   ollama_unavailable: "Ollama not reachable — using default model."
-  empfehlung_labels_header: "Recommendation Labels"
-  empfehlung_labels_label: "Labels (one label per line)"
-  empfehlung_labels_help: "These labels are available in the recommendation dropdown."
-  save_labels_button: "Save Labels"
-  labels_saved: "Labels saved."
-  labels_empty_error: "Please enter at least one label."
   scheduling_header: "Scheduled Tasks"
   scheduling_caption: "Run cloud agents automatically at configured times."
   no_scheduled_jobs: "No scheduled tasks yet. Add one below."
@@ -583,9 +576,6 @@ health:
     ollama_remote:
       title: "Local agents are not private"
       description: "OLLAMA_HOST points to a remote server ({detail}). Portfolio data leaves your local system."
-    langfuse_cloud:
-      title: "Langfuse sending data externally"
-      description: "Traces are sent to {detail}. Prompts may contain portfolio data."
     demo_mode:
       title: "Demo mode active"
       description: "Data is stored in the demo database and will be lost on reset. Set DEMO_MODE=false and restart for production use."
@@ -657,36 +647,6 @@ consensus_gap:
   legend_stabil: "No major consensus shift. Thesis intact — hold."
   legend_schließt: "Market catching up. Alpha decreasing — prepare exit."
   legend_eingeholt: "Thesis fully priced in. Reassess position."
-
-benchmark:
-  title: "Benchmark"
-  subtitle: "Performance tests after prompt or model changes"
-  caption: "Run the same agent call repeatedly and compare costs over time."
-  run_header: "Run Benchmark"
-  agent_label: "Agent"
-  skill_label: "Skill"
-  label_label: "Label (optional, e.g. 'before prompt change')"
-  label_placeholder: "e.g. baseline"
-  run_button: "Start Benchmark"
-  running: "Benchmark running…"
-  success: "Benchmark complete — {tokens} tokens, ${cost:.4f}"
-  error: "Error: {error}"
-  history_header: "History"
-  no_history: "No benchmark runs yet."
-  col_scenario: "Scenario"
-  col_label: "Label"
-  col_model: "Model"
-  col_skill: "Skill"
-  col_input: "Input Tokens"
-  col_output: "Output Tokens"
-  col_cost: "Cost ($)"
-  col_run_at: "Timestamp"
-  news_tickers_label: "Tickers (comma-separated)"
-  news_tickers_default: "AAPL,MSFT,NVDA"
-  no_skill: "No skill found for this agent."
-  scenario_news: "News Digest"
-  scenario_structural: "Structural Change Scanner"
-  prices_missing: "No model prices configured — costs shown as $0."
 
 wealth_history:
   wealth_section: "Wealth Development"

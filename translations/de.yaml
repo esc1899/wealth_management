@@ -48,7 +48,7 @@ nav:
   wealth_history: "Vermögenshistorie"
   group_system: "System ⚙️"
   statistics: "Statistiken"
-  benchmark: "Benchmark"
+
 
 investment_types:
   Wertpapiere: "Wertpapiere"
@@ -325,12 +325,6 @@ settings:
   cost_alert_save: "Limits speichern"
   cost_alert_saved: "Kosten-Limits gespeichert."
   cost_alert_disabled: "0 = kein Limit"
-  empfehlung_labels_header: "Empfehlungs-Labels"
-  empfehlung_labels_label: "Labels (ein Label pro Zeile)"
-  empfehlung_labels_help: "Diese Labels stehen in der Empfehlungs-Dropdown zur Auswahl."
-  save_labels_button: "Labels speichern"
-  labels_saved: "Labels gespeichert."
-  labels_empty_error: "Bitte mindestens ein Label eingeben."
   scheduling_header: "Geplante Aufgaben"
   scheduling_caption: "Cloud-Agenten automatisch zu festgelegten Zeiten ausführen."
   no_scheduled_jobs: "Noch keine geplanten Aufgaben. Unten eine neue hinzufügen."
@@ -588,9 +582,6 @@ health:
     ollama_remote:
       title: "Lokale Agents nicht privat"
       description: "OLLAMA_HOST zeigt auf einen Remote-Server ({detail}). Portfolio-Daten verlassen dein lokales System."
-    langfuse_cloud:
-      title: "Langfuse sendet Daten extern"
-      description: "Traces werden an {detail} gesendet. Prompts können Portfolio-Daten enthalten."
     demo_mode:
       title: "Demo-Modus aktiv"
       description: "Daten werden in der Demo-Datenbank gespeichert und gehen beim Reset verloren. Für echte Daten DEMO_MODE=false setzen und neu starten."
@@ -663,36 +654,6 @@ consensus_gap:
   legend_schließt: "Der Markt holt auf. Alpha nimmt ab — Ausstieg vorbereiten."
   legend_eingeholt: "These vollständig eingepreist. Position neu bewerten."
 
-
-benchmark:
-  title: "Benchmark"
-  subtitle: "Performance-Tests nach Prompt- oder Modell-Änderungen"
-  caption: "Führe denselben Agent-Call wiederholt aus und vergleiche Kosten über die Zeit."
-  run_header: "Benchmark ausführen"
-  agent_label: "Agent"
-  skill_label: "Skill"
-  label_label: "Label (optional, z.B. 'vor Prompt-Änderung')"
-  label_placeholder: "z.B. baseline"
-  run_button: "Benchmark starten"
-  running: "Benchmark läuft…"
-  success: "Benchmark abgeschlossen — {tokens} Tokens, ${cost:.4f}"
-  error: "Fehler: {error}"
-  history_header: "Verlauf"
-  no_history: "Noch keine Benchmark-Runs."
-  col_scenario: "Szenario"
-  col_label: "Label"
-  col_model: "Modell"
-  col_skill: "Skill"
-  col_input: "Input-Tokens"
-  col_output: "Output-Tokens"
-  col_cost: "Kosten ($)"
-  col_run_at: "Zeitpunkt"
-  news_tickers_label: "Ticker (kommagetrennt)"
-  news_tickers_default: "AAPL,MSFT,NVDA"
-  no_skill: "Kein Skill für diesen Agenten gefunden."
-  scenario_news: "News Digest"
-  scenario_structural: "Strukturwandel-Scanner"
-  prices_missing: "Keine Modellpreise konfiguriert — Kosten werden als $0 angezeigt."
 
 wealth_history:
   wealth_section: "Vermögensentwicklung"

@@ -10,7 +10,7 @@ graph TD
         PG3["Storychecker / Watchlist Checker"]
         PG4["Consensus Gap / Fundamental Analyzer"]
         PG5["Research Chat / News / Search"]
-        PG6["System: Statistics / Benchmark / Skills / Monitor"]
+        PG6["System: Statistics / Skills"]
     end
 
     state["state.py — DI Factory<br/>@st.cache_resource Singletons"]
@@ -310,7 +310,7 @@ See **BACKLOG.md § Technical Debt** for full inventory.
 **Scope**:
 - ✅ 7 agents (StorycheckerAgent, ConsensusGapAgent, FundamentalAgent, ResearchAgent, etc.)
 - ✅ 6 pages (consensus_gap, fundamental_analyzer, structural_scan, research_chat, storychecker, watchlist_checker)
-- ⚠️ **Out of scope**: Page UI labels (agentmonitor.py, portfolio_story.py, positionen.py partially hardcoded German)
+- ⚠️ **Out of scope**: Page UI labelsportfolio_story.py, positionen.py partially hardcoded German)
 
 ---
 

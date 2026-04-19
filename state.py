@@ -55,7 +55,6 @@ from state_agents import (
 from state_services import (
     get_position_story_service,
     get_portfolio_comment_service,
-    get_langfuse_client,
     get_analysis_service,
     get_portfolio_service,
 )
@@ -96,7 +95,6 @@ __all__ = [
     "get_watchlist_checker_agent",
     "get_position_story_service",
     "get_portfolio_comment_service",
-    "get_langfuse_client",
     "get_analysis_service",
     "get_portfolio_service",
 ]

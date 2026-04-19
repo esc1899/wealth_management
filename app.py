@@ -125,7 +125,6 @@ pg = st.navigation({
     ],
     t("nav.group_system"): [
         st.Page("pages/statistics.py",      title=t("nav.statistics"),       icon=":material/bar_chart:"),
-        st.Page("pages/benchmark.py",       title=t("nav.benchmark"),        icon=":material/speed:"),
         st.Page("pages/skills.py",          title="Skills",                  icon=":material/psychology:"),
         st.Page("pages/settings.py",        title=t("nav.settings"),         icon=":material/settings:"),
     ],

@@ -70,9 +70,6 @@ def _position_current_value(pos: Position) -> Optional[float]:
     return None
 
 
-_DEFAULT_EMPFEHLUNG_LABELS = ["Kaufen", "Halten", "Verkaufen", "Beobachten"]
-_empfehlung_labels: list[str] = app_config.get_json("empfehlung_labels", _DEFAULT_EMPFEHLUNG_LABELS)
-
 # ---------------------------------------------------------------------------
 # Session state helpers
 # ---------------------------------------------------------------------------
@@ -432,8 +429,7 @@ if _ss("_pos_show_form"):
                 st.empty()
 
         # Unit (only if multiple options or "unit" in visible_fields)
-        col_c, col_d = st.columns(2)
-        with col_c:
+        with st.container():
             unit_options = cfg.unit_options if cfg.unit_options else [cfg.default_unit]
             if len(unit_options) > 1:
                 unit_default_idx = (
@@ -450,17 +446,7 @@ if _ss("_pos_show_form"):
                 form_unit = unit_options[0]
                 st.caption(f"{t('positionen.col_unit')}: {form_unit}")
 
-        # Empfehlung dropdown
-        with col_d:
-            empf_opts = [""] + _empfehlung_labels
-            empf_default = editing.empfehlung if editing and editing.empfehlung in empf_opts else ""
-            empf_idx = empf_opts.index(empf_default)
-            form_empfehlung = st.selectbox(
-                t("positionen.empfehlung"),
-                options=empf_opts,
-                index=empf_idx,
-                format_func=lambda x: x if x else "—",
-            )
+        form_empfehlung = editing.empfehlung if editing else None
 
         # Anlageart (sub-type dropdown — only if asset class has anlagearten defined)
         _anlagearten = cfg.anlagearten

@@ -237,35 +237,6 @@ def test_monthly_estimate_disabled_job_skipped(usage_repo):
 
 
 # ---------------------------------------------------------------------------
-# UsageRepository.benchmark_runs
-# ---------------------------------------------------------------------------
-
-def test_record_benchmark(usage_repo):
-    usage_repo.record_benchmark(
-        scenario_name="structural_scan/Standard",
-        agent="structural_scan",
-        model="claude-sonnet-4-6",
-        skill_name="Standard",
-        input_tokens=100,
-        output_tokens=200,
-        cost_eur=0.003,
-        label="baseline",
-    )
-    runs = usage_repo.get_benchmark_runs()
-    assert len(runs) == 1
-    assert runs[0]["scenario_name"] == "structural_scan/Standard"
-    assert runs[0]["label"] == "baseline"
-
-
-def test_get_benchmark_scenarios(usage_repo):
-    usage_repo.record_benchmark("sc1/A", "sc1", "model", "A", 10, 20, 0.001)
-    usage_repo.record_benchmark("sc1/A", "sc1", "model", "A", 10, 20, 0.001)
-    usage_repo.record_benchmark("sc2/B", "sc2", "model", "B", 10, 20, 0.001)
-    scenarios = usage_repo.get_benchmark_scenarios()
-    assert set(scenarios) == {"sc1/A", "sc2/B"}
-
-
-# ---------------------------------------------------------------------------
 # AppConfigRepository: model prices
 # ---------------------------------------------------------------------------
 

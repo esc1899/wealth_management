@@ -247,59 +247,6 @@ class UsageRepository:
             })
         return result
 
-    # ------------------------------------------------------------------
-    # Benchmark runs
-    # ------------------------------------------------------------------
-
-    def record_benchmark(
-        self,
-        scenario_name: str,
-        agent: str,
-        model: str,
-        skill_name: str,
-        input_tokens: int,
-        output_tokens: int,
-        cost_eur: float,
-        label: Optional[str] = None,
-        duration_ms: Optional[int] = None,
-    ) -> None:
-        self._conn.execute(
-            "INSERT INTO benchmark_runs"
-            " (scenario_name, agent, model, skill_name, input_tokens, output_tokens, cost_eur, duration_ms, run_at, label)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                scenario_name,
-                agent,
-                model,
-                skill_name,
-                input_tokens,
-                output_tokens,
-                cost_eur,
-                duration_ms,
-                datetime.utcnow().isoformat(),
-                label,
-            ),
-        )
-        self._conn.commit()
-
-    def get_benchmark_runs(self, scenario_name: Optional[str] = None) -> list[dict]:
-        if scenario_name:
-            rows = self._conn.execute(
-                "SELECT * FROM benchmark_runs WHERE scenario_name = ? ORDER BY run_at DESC",
-                (scenario_name,),
-            ).fetchall()
-        else:
-            rows = self._conn.execute(
-                "SELECT * FROM benchmark_runs ORDER BY run_at DESC"
-            ).fetchall()
-        return [dict(r) for r in rows]
-
-    def get_benchmark_scenarios(self) -> list[str]:
-        rows = self._conn.execute(
-            "SELECT DISTINCT scenario_name FROM benchmark_runs ORDER BY scenario_name"
-        ).fetchall()
-        return [r[0] for r in rows]
-
     def get_recent_calls(self, limit: int = 50) -> list[dict]:
         """Last N LLM calls (newest first), regardless of reset filters."""
         rows = self._conn.execute(
