@@ -40,10 +40,8 @@ if _limits.get("daily", 0) > 0 or _limits.get("monthly", 0) > 0:
             )
 
 # ------------------------------------------------------------------
-# Tab structure
+# Source filter (applies to both tabs)
 # ------------------------------------------------------------------
-
-tab_summary, tab_recent = st.tabs(["Übersicht", "Letzte Calls"])
 
 _SOURCE_OPTIONS = {"all": "Alle", "manual": "Manuell", "scheduled": "Geplant (Auto)"}
 _sel_source = st.radio(
@@ -54,6 +52,12 @@ _sel_source = st.radio(
     horizontal=True,
     label_visibility="collapsed",
 )
+
+# ------------------------------------------------------------------
+# Tab structure
+# ------------------------------------------------------------------
+
+tab_summary, tab_recent = st.tabs(["Übersicht", "Letzte Calls"])
 
 # ------------------------------------------------------------------
 # Tab 1: Today vs. all-time totals
