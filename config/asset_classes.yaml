@@ -38,6 +38,7 @@ asset_classes:
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
+    manual_valuation: true
     anlagearten:
       - ETF
       - Aktiv gemanagter Fonds
@@ -58,6 +59,7 @@ asset_classes:
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
+    manual_valuation: true
     anlagearten:
       - ETF
       - Aktiv gemanagter Fonds
@@ -78,6 +80,7 @@ asset_classes:
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
+    manual_valuation: true
     anlagearten:
       - ETF
       - REIT
@@ -99,6 +102,7 @@ asset_classes:
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
+    manual_valuation: true
     anlagearten:
       - ETF
       - Infrastructure Fund
