@@ -153,13 +153,24 @@ col_pie1, col_pie2 = st.columns(2)
 
 with col_pie1:
     st.subheader(t("analysis.weight_by_type"))
-    alloc_type = {}
-    for v in valuations:
-        if v.current_value_eur:
-            alloc_type[v.investment_type] = alloc_type.get(v.investment_type, 0) + v.current_value_eur
-    if alloc_type:
-        fig = px.pie(names=list(alloc_type.keys()), values=list(alloc_type.values()), hole=0.3)
-        fig.update_layout(margin=dict(t=0, b=0))
+    rows = [
+        {
+            "anlageklasse": t(f"investment_types.{v.investment_type}"),
+            "anlageform": v.asset_class,
+            "wert": v.current_value_eur
+        }
+        for v in valuations
+        if v.current_value_eur
+    ]
+    if rows:
+        df = pd.DataFrame(rows).groupby(["anlageklasse", "anlageform"])["wert"].sum().reset_index()
+        fig = px.sunburst(
+            df,
+            path=["anlageklasse", "anlageform"],
+            values="wert",
+            color="anlageklasse"
+        )
+        fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info(t("analysis.no_weight_data"))

@@ -150,7 +150,7 @@ analysis:
   allocation: "Allocation"
   portfolio_empty: "Portfolio is empty."
   no_price_data: "No price data yet. Please refresh on the Market Data page."
-  weight_by_type: "Allocation by Investment Type"
+  weight_by_type: "Allocation by Asset Class"
   weight_by_position: "Allocation by Position"
   no_weight_data: "No price data for allocation."
   refreshing: "Refresh"

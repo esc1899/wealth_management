@@ -73,7 +73,10 @@
       "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py::TestPageLoadability -k storychecker --no-cov -v)",
       "Bash(python -m pytest tests/ --no-cov -q)",
       "Bash(python test_dividend_override.py)",
-      "Bash(python -m pytest tests/unit/test_positions.py -v --no-cov -k dividend)"
+      "Bash(python -m pytest tests/unit/test_positions.py -v --no-cov -k dividend)",
+      "Bash(pytest tests/ --no-cov -q)",
+      "Bash(kill 1912)",
+      "Bash(kill -9 1912)"
     ],
     "additionalDirectories": [
       "/Users/erik",

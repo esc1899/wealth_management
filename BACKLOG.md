@@ -16,6 +16,13 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 
 ## Planned
 
+### Features
+
+| ID | Priority | Type | Description | Status | Session |
+|---|---|---|---|---|---|
+| FEAT-17 | P2 | [IMPR] Terminology & Chart | Rename "Investment-Typ" → "Anlageklasse" (UI only); add Sunburst chart (Anlageklasse innen, Anlageform außen) | ✅ DONE | 2026-04-20 |
+| FEAT-18 | P2 | [IMPR] Portfolio-Checker Refactor | Split monolithic PortfolioStoryAgent into modular, optional checks (CashRule, Stability, Story) — parallel to Position-Checkers pattern | 🔄 DESIGN | TBD |
+
 ### Technical Debt
 
 | ID | Priority | Description | Notes |
