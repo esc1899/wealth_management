@@ -341,6 +341,9 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     if "anlageart" not in existing_pos:
         conn.execute("ALTER TABLE positions ADD COLUMN anlageart TEXT")
 
+    # Migrate Edelmetalle → Rohstoffe (2026-04-20)
+    conn.execute("UPDATE positions SET investment_type='Rohstoffe' WHERE investment_type='Edelmetalle'")
+
     existing_skills = {row[1] for row in conn.execute("PRAGMA table_info(skills)")}
     if "hidden" not in existing_skills:
         conn.execute(

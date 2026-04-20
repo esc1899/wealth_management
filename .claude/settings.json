@@ -77,7 +77,12 @@
       "Bash(pytest tests/ --no-cov -q)",
       "Bash(kill 1912)",
       "Bash(kill -9 1912)",
-      "Bash(python -m pytest tests/unit/test_asset_class_config.py::TestLoadRealConfig::test_edelmetall_investment_type -xvs)"
+      "Bash(python -m pytest tests/unit/test_asset_class_config.py::TestLoadRealConfig::test_edelmetall_investment_type -xvs)",
+      "Bash(sqlite3 /Users/erik/Projects/wealth_management/wealth_data.db \"SELECT DISTINCT investment_type FROM positions ORDER BY investment_type;\")",
+      "Bash(sqlite3 /Users/erik/Projects/wealth_management/data/wealth_management.db \"SELECT DISTINCT investment_type FROM positions ORDER BY investment_type;\")",
+      "Bash(sqlite3 /Users/erik/Projects/wealth_management/wealth_data.db \".tables\")",
+      "Bash(sqlite3 /Users/erik/Projects/wealth_management/data/demo.db \"SELECT DISTINCT investment_type FROM positions ORDER BY investment_type;\")",
+      "Bash(sqlite3 /Users/erik/Projects/wealth_management/data/demo.db \"UPDATE positions SET investment_type='Rohstoffe' WHERE investment_type='Edelmetalle';\")"
     ],
     "additionalDirectories": [
       "/Users/erik",
