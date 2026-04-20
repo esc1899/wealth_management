@@ -259,76 +259,27 @@ def _render_stability_check() -> None:
     if st.button("🔄 Stabilitäts-Check durchführen", use_container_width=True, key="btn_stability"):
         with st.spinner("Analysiere Stabilität…"):
             valuations = get_market_agent().get_portfolio_valuation()
-            portfolio = _portfolio_service.get_portfolio_positions()
 
-            from core.portfolio_stability import JOSEF_CATEGORY, compute_josef_allocation
+            from core.portfolio_stability import compute_josef_allocation
             from agents.portfolio_story_agent import PortfolioMetrics
 
-            valuation_map = {v.name: v for v in valuations}
-
-            # Build portfolio snapshot — include EUR values for ALL positions so LLM doesn't recompute percentages
-            snapshot_lines = ["**Portfolio Snapshot**\n"]
-            for p in portfolio:
-                if p.ticker:
-                    ticker_str = f" ({p.ticker})"
-                    v = valuation_map.get(p.name)
-                    josef_cat = JOSEF_CATEGORY.get(p.investment_type, "?")
-                    val_str = f" → {josef_cat} ({symbol()}{v.current_value_eur:,.0f})" if v and v.current_value_eur else f" → {josef_cat}"
-                    snapshot_lines.append(f"- {p.name}{ticker_str} [{p.asset_class}]{val_str}")
-
-            # Non-tradeable positions (use portfolio list — v.symbol always truthy due to name[:10] fallback)
-            non_tradeable = [p for p in portfolio if not p.ticker]
-            non_tradeable_lines = []
-            for p in non_tradeable:
-                v = valuation_map.get(p.name)
-                if v and v.current_value_eur:
-                    josef_cat = JOSEF_CATEGORY.get(p.investment_type, "?")
-                    non_tradeable_lines.append(
-                        f"- {p.name} [{p.asset_class}] → {josef_cat} ({symbol()}{v.current_value_eur:,.0f})"
-                    )
-
-            if non_tradeable_lines:
-                snapshot_lines.append("\n**Nicht-börsengehandelt:**")
-                snapshot_lines.extend(non_tradeable_lines)
-
-            # Physical Immobilien
-            physical_immo = [v for v in valuations if v.in_portfolio and v.asset_class in {"Immobilie", "Grundstück"}]
-            if physical_immo:
-                snapshot_lines.append("\n**Direkte Immobilien:**")
-                for v in physical_immo:
-                    snapshot_lines.append(f"- {v.name}: {symbol()}{v.current_value_eur:,.0f}")
-            else:
-                snapshot_lines.append("\n**Direkte Immobilien: keine**")
-
-            portfolio_snapshot = "\n".join(snapshot_lines)
-
-            # Compute metrics
-            total_value = sum(v.current_value_eur or 0 for v in valuations)
-            total_cost = sum(v.cost_basis_eur or 0 for v in valuations)
-            total_pnl = total_value - total_cost
-            total_pnl_pct = (total_pnl / total_cost * 100) if total_cost > 0 else 0
-            total_dividend = sum(v.annual_dividend_eur or 0 for v in valuations)
-            dividend_yield = (total_dividend / total_value * 100) if total_value > 0 else 0
-
             josef = compute_josef_allocation(valuations)
-
             metrics = PortfolioMetrics(
-                total_value_eur=total_value,
-                total_pnl_eur=total_pnl,
-                total_pnl_pct=total_pnl_pct,
-                total_annual_dividend_eur=total_dividend,
-                portfolio_dividend_yield_pct=dividend_yield,
+                total_value_eur=sum(v.current_value_eur or 0 for v in valuations),
+                total_pnl_eur=0,
+                total_pnl_pct=0,
+                total_annual_dividend_eur=0,
+                portfolio_dividend_yield_pct=0,
                 josef_aktien_pct=josef["Aktien"],
                 josef_renten_pct=josef["Renten/Geld"],
                 josef_rohstoffe_pct=josef["Rohstoffe"],
-                positions_count=len(portfolio),
+                positions_count=len(valuations),
             )
 
             # Run stability check
             async def run_stability_check():
                 return await agent.analyze_stability(
                     metrics=metrics,
-                    portfolio_snapshot=portfolio_snapshot,
                     skill_prompt=selected_skill.prompt,
                 )
 
@@ -647,39 +598,20 @@ if current_story:
                     ):
                         if _include_prechecks:
                             with st.spinner("Führe Portfolio-Checks durch…"):
-                                from core.portfolio_stability import JOSEF_CATEGORY, compute_josef_allocation
+                                from core.portfolio_stability import compute_josef_allocation
                                 from agents.portfolio_story_agent import PortfolioMetrics
                                 _vals = get_market_agent().get_portfolio_valuation()
-                                _port = _portfolio_service.get_portfolio_positions()
-                                _vmap = {v.name: v for v in _vals}
-                                _snap = ["**Portfolio Snapshot**\n"]
-                                for _p in _port:
-                                    if _p.ticker:
-                                        _snap.append(f"- {_p.name} ({_p.ticker}) [{_p.asset_class}]")
-                                _nt = [_p for _p in _port if not _p.ticker]
-                                _nt_lines = []
-                                for _p in _nt:
-                                    _v = _vmap.get(_p.name)
-                                    if _v and _v.current_value_eur:
-                                        _jcat = JOSEF_CATEGORY.get(_p.investment_type, "?")
-                                        _nt_lines.append(f"- {_p.name} [{_p.asset_class}] → {_jcat} ({symbol()}{_v.current_value_eur:,.0f})")
-                                if _nt_lines:
-                                    _snap.append("\n**Nicht-börsengehandelt:**")
-                                    _snap.extend(_nt_lines)
-                                _snap_str = "\n".join(_snap)
-                                _tv = sum(v.current_value_eur or 0 for v in _vals)
-                                _tc = sum(v.cost_basis_eur or 0 for v in _vals)
                                 _josef = compute_josef_allocation(_vals)
                                 _metrics = PortfolioMetrics(
-                                    total_value_eur=_tv,
-                                    total_pnl_eur=_tv - _tc,
-                                    total_pnl_pct=((_tv - _tc) / _tc * 100) if _tc > 0 else 0,
-                                    total_annual_dividend_eur=sum(v.annual_dividend_eur or 0 for v in _vals),
-                                    portfolio_dividend_yield_pct=(sum(v.annual_dividend_eur or 0 for v in _vals) / _tv * 100) if _tv > 0 else 0,
+                                    total_value_eur=sum(v.current_value_eur or 0 for v in _vals),
+                                    total_pnl_eur=0,
+                                    total_pnl_pct=0,
+                                    total_annual_dividend_eur=0,
+                                    portfolio_dividend_yield_pct=0,
                                     josef_aktien_pct=_josef["Aktien"],
                                     josef_renten_pct=_josef["Renten/Geld"],
                                     josef_rohstoffe_pct=_josef["Rohstoffe"],
-                                    positions_count=len(_port),
+                                    positions_count=len(_vals),
                                 )
                                 _stab_skills = get_skills_repo().get_by_area("portfolio_stability")
                                 if _stab_skills:
@@ -689,7 +621,6 @@ if current_story:
                                     async def _run_stab():
                                         return await agent.analyze_stability(
                                             metrics=_metrics,
-                                            portfolio_snapshot=_snap_str,
                                             skill_prompt=_stab_skill.prompt,
                                         )
                                     st.session_state["_stability_result"] = asyncio.run(_run_stab())

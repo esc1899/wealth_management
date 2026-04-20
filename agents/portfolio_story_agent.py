@@ -133,12 +133,11 @@ class PortfolioStoryAgent:
     async def analyze_stability(
         self,
         metrics: PortfolioMetrics,
-        portfolio_snapshot: str,
         skill_prompt: Optional[str] = None,
     ) -> StabilityResult:
         """
         Analyze portfolio stability (Josef's Regel or custom skill).
-        FEAT-18: Separate modular check from Story/Performance.
+        Only the 3 pre-computed allocation percentages are passed — no position snapshot needed.
         """
         self._llm.skill_context = "portfolio_stability_check"
 
@@ -150,12 +149,9 @@ class PortfolioStoryAgent:
 
         system_prompt = f"""Du bist ein kritischer Portfolio-Analyst der Portfolio-Stabilität bewertet.
 
-Portfolio-Daten:
-{portfolio_snapshot}
+Aktuelle Gewichtung: {josef_summary}
 
-Gewichtung nach Josef's Regel (bereits berechnet — NICHT neu berechnen): {josef_summary}
-
-Analysiere die Stabilität des Portfolios gegen die Kriterien unten. Verwende die oben angegebenen Josef-Prozentwerte direkt.
+Beurteile die Stabilität anhand der Kriterien unten.
 Antworte IMMER in diesem exakten Format:
 
 ## Stabilität
