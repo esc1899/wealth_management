@@ -605,54 +605,58 @@ if current_story:
     st.subheader("3️⃣ Positions-Checks")
 
     _portfolio_for_checks = _portfolio_service.get_portfolio_positions()
+
+    # Build agent eligibility regardless of portfolio size (show metrics even if 0/0)
+    _eligible_ids_per_agent = {
+        "storychecker": [p.id for p in _portfolio_for_checks
+                         if p.id and p.story and not p.analysis_excluded],
+        "fundamental":  [p.id for p in _portfolio_for_checks
+                         if p.id and p.ticker and not p.analysis_excluded],
+        "consensus_gap":[p.id for p in _portfolio_for_checks
+                         if p.id and p.story and not p.analysis_excluded],
+    }
+
+    _agent_configs = [
+        ("storychecker", "Story Checker", "pages/storychecker.py"),
+        ("fundamental", "Fundamental Analyzer", "pages/fundamental_analyzer.py"),
+        ("consensus_gap", "Konsens-Lücken", "pages/consensus_gap.py"),
+    ]
+
+    _pre_status = []
+    for agent_name, agent_label, page_path in _agent_configs:
+        ids = _eligible_ids_per_agent[agent_name]
+        b = _analysis_service.get_verdicts(ids, agent_name)
+        n = sum(1 for pid in ids if pid not in b)
+        latest_ts = None
+        for verdict_obj in b.values():
+            if verdict_obj and hasattr(verdict_obj, 'created_at') and verdict_obj.created_at:
+                ts = verdict_obj.created_at
+                if hasattr(ts, 'replace'):
+                    ts = ts.replace(tzinfo=None) if ts.tzinfo else ts
+                if latest_ts is None or ts > latest_ts:
+                    latest_ts = ts
+        ts_str = latest_ts.strftime("%d.%m. %H:%M") if latest_ts else "—"
+        _pre_status.append({
+            "label": agent_label,
+            "page": page_path,
+            "n_missing": n,
+            "total": len(ids),
+            "ts_str": ts_str,
+            "agent_name": agent_name,
+        })
+
+    # Metrics row: pending counts per agent (always show, even if 0/0)
+    _metric_cols = st.columns(len(_pre_status))
+    for idx, s in enumerate(_pre_status):
+        with _metric_cols[idx]:
+            st.metric(
+                s["label"],
+                f"{s['n_missing']}/{s['total']} ausstehend",
+                help=f"Zuletzt: {s['ts_str']}",
+            )
+
+    # Navigation buttons (only if portfolio has positions)
     if _portfolio_for_checks:
-        _eligible_ids_per_agent = {
-            "storychecker": [p.id for p in _portfolio_for_checks
-                             if p.id and p.story and not p.analysis_excluded],
-            "fundamental":  [p.id for p in _portfolio_for_checks
-                             if p.id and p.ticker and not p.analysis_excluded],
-            "consensus_gap":[p.id for p in _portfolio_for_checks
-                             if p.id and p.story and not p.analysis_excluded],
-        }
-        _agent_configs = [
-            ("storychecker", "Story Checker", "pages/storychecker.py"),
-            ("fundamental", "Fundamental Analyzer", "pages/fundamental_analyzer.py"),
-            ("consensus_gap", "Konsens-Lücken", "pages/consensus_gap.py"),
-        ]
-        _pre_status = []
-        for agent_name, agent_label, page_path in _agent_configs:
-            ids = _eligible_ids_per_agent[agent_name]
-            b = _analysis_service.get_verdicts(ids, agent_name)
-            n = sum(1 for pid in ids if pid not in b)
-            latest_ts = None
-            for verdict_obj in b.values():
-                if verdict_obj and hasattr(verdict_obj, 'created_at') and verdict_obj.created_at:
-                    ts = verdict_obj.created_at
-                    if hasattr(ts, 'replace'):
-                        ts = ts.replace(tzinfo=None) if ts.tzinfo else ts
-                    if latest_ts is None or ts > latest_ts:
-                        latest_ts = ts
-            ts_str = latest_ts.strftime("%d.%m. %H:%M") if latest_ts else "—"
-            _pre_status.append({
-                "label": agent_label,
-                "page": page_path,
-                "n_missing": n,
-                "total": len(ids),
-                "ts_str": ts_str,
-                "agent_name": agent_name,
-            })
-
-        # Metrics row: pending counts per agent
-        _metric_cols = st.columns(len(_pre_status))
-        for idx, s in enumerate(_pre_status):
-            with _metric_cols[idx]:
-                st.metric(
-                    s["label"],
-                    f"{s['n_missing']}/{s['total']} ausstehend",
-                    help=f"Zuletzt: {s['ts_str']}",
-                )
-
-        # Navigation buttons
         _btn_cols = st.columns(len(_pre_status))
         for idx, s in enumerate(_pre_status):
             with _btn_cols[idx]:
