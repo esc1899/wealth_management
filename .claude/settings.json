@@ -89,7 +89,8 @@
       "Bash(python -m pytest tests/ -q --no-header)",
       "Bash(python -m pytest tests/ -q --no-header -x)",
       "Bash(python -m pytest tests/unit/test_portfolio_story.py -xvs)",
-      "Bash(python -m py_compile /Users/erik/Projects/wealth_management/pages/portfolio_story.py)"
+      "Bash(python -m py_compile /Users/erik/Projects/wealth_management/pages/portfolio_story.py)",
+      "Bash(python -m py_compile pages/portfolio_story.py pages/storychecker.py pages/consensus_gap.py)"
     ],
     "additionalDirectories": [
       "/Users/erik",
