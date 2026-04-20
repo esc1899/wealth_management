@@ -488,6 +488,18 @@ if current_story:
 
 st.divider()
 
+# Optional: Run pre-checks before position-checker navigation (shown before results)
+if current_story:
+    st.caption("**Optional für Position-Checks:**")
+    _ps_run_prechecks = st.checkbox(
+        "☑ Portfolio-Checks (Stabilität + Story) vor Positions-Check ausführen",
+        key="_ps_run_prechecks_config",
+        value=False,
+        help="Falls noch nicht durchgeführt: Stabilitäts-Check und Story-Check ausführen, bevor zu Position-Checks navigiert wird"
+    )
+
+st.divider()
+
 # ──────────────────────────────────────────────────────────────────────
 # Results Zone: Display check results
 # ──────────────────────────────────────────────────────────────────────
@@ -647,14 +659,6 @@ if current_story:
                     help=f"Zuletzt: {s['ts_str']}",
                 )
 
-        # Optional: Run missing portfolio checks before navigating to position checkers
-        _run_prechecks = st.checkbox(
-            "☑ Portfolio-Checks (Stabilität + Story) vor Positions-Check ausführen",
-            key="_ps_run_prechecks",
-            value=False,
-            help="Falls noch nicht durchgeführt: Stabilitäts-Check und Story-Check ausführen, bevor zu Position-Checks navigiert wird"
-        )
-
         # Navigation buttons
         _btn_cols = st.columns(len(_pre_status))
         for idx, s in enumerate(_pre_status):
@@ -671,7 +675,7 @@ if current_story:
                     use_container_width=True,
                     disabled=not _has_pending,
                 ):
-                    if _run_prechecks:
+                    if st.session_state.get("_ps_run_prechecks_config"):
                         _run_missing_portfolio_checks()
                     st.switch_page(s["page"])
 
