@@ -243,8 +243,6 @@ def _render_stability_check() -> None:
     if _prev_vals:
         from core.portfolio_stability import JOSEF_CATEGORY, compute_josef_allocation as _cja
         _j = _cja(_prev_vals)
-        _j_total = sum(v.current_value_eur or 0 for v in _prev_vals if JOSEF_CATEGORY.get(v.investment_type))
-        _unclassified = [v for v in _prev_vals if not JOSEF_CATEGORY.get(v.investment_type) and v.current_value_eur]
         c1, c2, c3 = st.columns(3)
         _j_eur = {
             k: sum(v.current_value_eur or 0 for v in _prev_vals
@@ -257,25 +255,6 @@ def _render_stability_check() -> None:
                   help=f"{symbol()}{_j_eur['Renten/Geld']:,.0f} | Abw. {_j['Renten/Geld']-33:+.0f}pp")
         c3.metric(f"Rohstoffe+Immo (Ziel 33%)", f"{_j['Rohstoffe']:.0f}%",
                   help=f"{symbol()}{_j_eur['Rohstoffe']:,.0f} | Abw. {_j['Rohstoffe']-33:+.0f}pp")
-        with st.expander("🔍 Josef-Details", expanded=False):
-            import pandas as pd
-            _rows = [
-                {
-                    "Position": v.name,
-                    "Anlageklasse": v.asset_class,
-                    "investment_type": v.investment_type,
-                    "Josef-Säule": JOSEF_CATEGORY.get(v.investment_type, "⚠️ NICHT KLASSIFIZIERT"),
-                    f"Wert ({symbol()})": f"{v.current_value_eur:,.0f}" if v.current_value_eur else "—",
-                }
-                for v in _prev_vals if v.current_value_eur and v.current_value_eur > 0
-            ]
-            if _rows:
-                st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
-            if _unclassified:
-                st.warning(
-                    f"⚠️ {len(_unclassified)} Position(en) nicht klassifiziert — fehlen in Josef-Berechnung:\n"
-                    + "\n".join(f"- {v.name} (investment_type: `{v.investment_type}`)" for v in _unclassified)
-                )
 
     if st.button("🔄 Stabilitäts-Check durchführen", use_container_width=True, key="btn_stability"):
         with st.spinner("Analysiere Stabilität…"):
