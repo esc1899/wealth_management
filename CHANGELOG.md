@@ -8,6 +8,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Portfolio Story UX Refactor (2026-04-20, Part 2)
+
+**Unified interface for Bargeldregel, Stabilitäts-Check, Story-Check with symmetric design.**
+
+- **New UX Structure**
+  - Section 2: Collapsed-by-default "Details & Einstellungen" expander
+    - Skill selectors for Bargeldregel, Stabilitäts-Check, Story-Check
+    - Josef-Vorschau-Metriken (Aktien/Renten/Rohstoffe %) visible when expanded
+  - Main CTA: Always-visible row of 2 checkboxes + "🔄 Story-Check durchführen" button
+    - `☑ 💰 Bargeldregel` (default True)
+    - `☑ 🏛️ Stabilitäts-Check` (default True)
+  - Results Zone: Unified display of all check results (Bargeldregel badge, Stabilitäts-Urteil, Story/Performance Urteile)
+  - Section 3: Simplified nav buttons (no pre-checks checkbox/logic)
+
+- **Symmetric Treatment of Checks**
+  - Bargeldregel and Stabilitäts-Check now equal: both skill-based, both optional, both runnable via main button
+  - Bargeldregel: upgraded from hard-coded YAML to skill-based (like Stability)
+  - All 3 checks run on single button click in sequence: Bargeldregel → Stabilitäts-Check → Story-Check
+
+- **Use Cases**
+  - UC1 (Simple): Default load → click button → all 3 checks run
+  - UC2 (Manual): Open Section 2 → adjust Skills/preview → click button → custom settings apply
+
+- **Code Changes**
+  - Removed 3 standalone renderer functions: `_render_cash_rule_check()`, `_render_stability_check()`, `_render_story_check()`
+  - Consolidated logic into main button handler (~366 lines removed, net consolidation)
+  - Bargeldregel logic now inline (YAML skill params → deterministic check)
+  - All results stored in `session_state` with unified display
+
+- **Tests**: 565/565 passing (no breakage from UX refactor)
+
 ### FEAT-18: Portfolio-Checker Modularisierung (2026-04-20)
 
 **Split monolithic PortfolioStoryAgent.analyze() into modular, independently toggleable checks.**
