@@ -87,7 +87,9 @@
       "Bash(python -m pytest tests/ -k \"smoke\" -q)",
       "Bash(python -m pytest tests/ -k \"page\" -q)",
       "Bash(python -m pytest tests/ -q --no-header)",
-      "Bash(python -m pytest tests/ -q --no-header -x)"
+      "Bash(python -m pytest tests/ -q --no-header -x)",
+      "Bash(python -m pytest tests/unit/test_portfolio_story.py -xvs)",
+      "Bash(python -m py_compile /Users/erik/Projects/wealth_management/pages/portfolio_story.py)"
     ],
     "additionalDirectories": [
       "/Users/erik",

@@ -145,169 +145,172 @@ with st.form("portfolio_story_form", clear_on_submit=False):
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Cash Rule Pre-Check (deterministic, always runs before KI analysis)
-# ──────────────────────────────────────────────────────────────────────
-
-def _render_cash_rule_check() -> None:
-    """Display cash rule status: target vs. actual liquid cash. FEAT-18: Moved to portfolio_cash_rule area."""
-    import yaml
-
-    # Load rule parameters from "Bargeldregel" skill (FEAT-18: now in portfolio_cash_rule area)
-    rule = {"target_pct": 5.0, "min_eur": 10000, "max_eur": 100000}  # defaults
-    try:
-        skills = get_skills_repo().get_by_area("portfolio_cash_rule")
-        bargeld_skill = next((s for s in skills if s.name == "Bargeldregel"), None)
-        if bargeld_skill:
-            parsed = yaml.safe_load(bargeld_skill.prompt)
-            if isinstance(parsed, dict):
-                for key in ("target_pct", "min_eur", "max_eur"):
-                    if key in parsed:
-                        rule[key] = float(parsed[key])
-    except Exception:
-        pass  # malformed skill → use defaults
-
-    market_agent = get_market_agent()
-    valuations = market_agent.get_portfolio_valuation()
-
-    total_eur = sum(v.current_value_eur for v in valuations if v.current_value_eur)
-    if total_eur is None or total_eur <= 0:
-        return
-
-    cash_eur = sum(
-        v.current_value_eur for v in valuations
-        if v.investment_type == "Bargeld" and v.current_value_eur
-    )
-
-    target = max(
-        rule.get("min_eur", 10000),
-        min(
-            rule.get("max_eur", 100000),
-            total_eur * rule.get("target_pct", 5.0) / 100,
-        ),
-    )
-
-    st.caption(f"💰 {t('portfolio_story.cash_rule_title')}")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric(t("portfolio_story.cash_rule_total"), f"{symbol()}{total_eur:,.0f}")
-    with col2:
-        st.metric(t("portfolio_story.cash_rule_current"), f"{symbol()}{cash_eur:,.0f}")
-    with col3:
-        st.metric(t("portfolio_story.cash_rule_target"), f"{symbol()}{target:,.0f}")
-
-    if cash_eur >= target:
-        st.success(t("portfolio_story.cash_rule_success"))
-    elif cash_eur >= rule.get("min_eur", 10000):
-        st.warning(
-            t("portfolio_story.cash_rule_warning").format(
-                current=f"{symbol()}{cash_eur:,.0f}",
-                target=f"{symbol()}{target:,.0f}"
-            )
-        )
-    else:
-        st.error(
-            t("portfolio_story.cash_rule_error").format(
-                current=f"{symbol()}{cash_eur:,.0f}",
-                minimum=f"{symbol()}{rule.get('min_eur', 10000):,.0f}"
-            )
-        )
-
-
-# ──────────────────────────────────────────────────────────────────────
 # Renderer Functions for Modular Checks (FEAT-18)
 # ──────────────────────────────────────────────────────────────────────
 
-def _render_stability_check() -> None:
-    """Render stability check selector and analysis. FEAT-18: Modular check."""
-    skills_repo = get_skills_repo()
-    stability_skills = skills_repo.get_by_area("portfolio_stability")
 
-    if not stability_skills:
-        st.info(
-            "ℹ️ **Stabilitäts-Check nicht konfiguriert**\n\n"
-            "Füge einen Skill unter Bereich `portfolio_stability` hinzu, um diesen Check zu aktivieren.\n\n"
-            "_Skills: Josef's Regel, Sektor-Limits, Geographische Streuung_"
-        )
-        return
 
-    # Skill selection reads from session_state (set by ⚙️ Einstellungen expander below)
-    skill_options = {s.name: s for s in stability_skills if not s.hidden}
-    skill_names = list(skill_options.keys())
-    _default_skill = "Josef's Regel (3-Säulen-Stabilität)"
-    _default_name = _default_skill if _default_skill in skill_names else (skill_names[0] if skill_names else None)
-    _sel_name = st.session_state.get("stability_check_skill", _default_name)
-    selected_skill = skill_options.get(_sel_name) or (list(skill_options.values())[0] if skill_options else None)
+# ──────────────────────────────────────────────────────────────────────
+# Section 2: Settings & Configuration (collapsed by default)
+# ──────────────────────────────────────────────────────────────────────
 
-    # Josef-Vorschau: show current allocation before running the LLM check
-    _prev_vals = get_market_agent().get_portfolio_valuation()
-    if _prev_vals:
-        from core.portfolio_stability import JOSEF_CATEGORY, compute_josef_allocation as _cja
-        _j = _cja(_prev_vals)
-        c1, c2, c3 = st.columns(3)
-        _j_eur = {
-            k: sum(v.current_value_eur or 0 for v in _prev_vals
-                   if JOSEF_CATEGORY.get(v.investment_type) == k and v.current_value_eur)
-            for k in ("Aktien", "Renten/Geld", "Rohstoffe")
-        }
-        c1.metric(f"Aktien (Ziel 33%)", f"{_j['Aktien']:.0f}%",
-                  help=f"{symbol()}{_j_eur['Aktien']:,.0f} | Abw. {_j['Aktien']-33:+.0f}pp")
-        c2.metric(f"Renten/Geld (Ziel 33%)", f"{_j['Renten/Geld']:.0f}%",
-                  help=f"{symbol()}{_j_eur['Renten/Geld']:,.0f} | Abw. {_j['Renten/Geld']-33:+.0f}pp")
-        c3.metric(f"Rohstoffe+Immo (Ziel 33%)", f"{_j['Rohstoffe']:.0f}%",
-                  help=f"{symbol()}{_j_eur['Rohstoffe']:,.0f} | Abw. {_j['Rohstoffe']-33:+.0f}pp")
-
-    if st.button("🔄 Stabilitäts-Check durchführen", use_container_width=True, key="btn_stability"):
-        with st.spinner("Analysiere Stabilität…"):
-            valuations = get_market_agent().get_portfolio_valuation()
-
-            from core.portfolio_stability import compute_josef_allocation
-            from agents.portfolio_story_agent import PortfolioMetrics
-
-            josef = compute_josef_allocation(valuations)
-            metrics = PortfolioMetrics(
-                total_value_eur=sum(v.current_value_eur or 0 for v in valuations),
-                total_pnl_eur=0,
-                total_pnl_pct=0,
-                total_annual_dividend_eur=0,
-                portfolio_dividend_yield_pct=0,
-                josef_aktien_pct=josef["Aktien"],
-                josef_renten_pct=josef["Renten/Geld"],
-                josef_rohstoffe_pct=josef["Rohstoffe"],
-                positions_count=len(valuations),
+if current_story:
+    with st.expander("2️⃣ Details & Einstellungen", expanded=False):
+        # ⚙️ Bargeldregel Settings
+        _cash_skills = get_skills_repo().get_by_area("portfolio_cash_rule")
+        if _cash_skills:
+            _cash_opts = [s.name for s in _cash_skills if not s.hidden]
+            _cash_default = "Bargeldregel"
+            _cash_idx = _cash_opts.index(_cash_default) if _cash_default in _cash_opts else 0
+            st.selectbox(
+                "💰 Bargeldregel-Einstellung",
+                options=_cash_opts,
+                index=_cash_idx,
+                key="cash_rule_skill",
             )
 
-            # Run stability check
-            async def run_stability_check():
-                return await agent.analyze_stability(
-                    metrics=metrics,
-                    skill_prompt=selected_skill.prompt,
+        st.divider()
+
+        # ⚙️ Stabilitäts-Check Settings + Preview
+        _stability_skills = get_skills_repo().get_by_area("portfolio_stability")
+        if _stability_skills:
+            _stab_opts = [s.name for s in _stability_skills if not s.hidden]
+            _stab_default = "Josef's Regel (3-Säulen-Stabilität)"
+            _stab_idx = _stab_opts.index(_stab_default) if _stab_default in _stab_opts else 0
+            st.selectbox(
+                "🏛️ Stabilitäts-Check-Fokus",
+                options=_stab_opts,
+                index=_stab_idx,
+                key="stability_check_skill",
+            )
+
+            # Josef-Vorschau Metriken
+            _prev_vals = get_market_agent().get_portfolio_valuation()
+            if _prev_vals:
+                from core.portfolio_stability import JOSEF_CATEGORY, compute_josef_allocation as _cja
+                _j = _cja(_prev_vals)
+                c1, c2, c3 = st.columns(3)
+                _j_eur = {
+                    k: sum(v.current_value_eur or 0 for v in _prev_vals
+                           if JOSEF_CATEGORY.get(v.investment_type) == k and v.current_value_eur)
+                    for k in ("Aktien", "Renten/Geld", "Rohstoffe")
+                }
+                c1.metric(f"Aktien (Ziel 33%)", f"{_j['Aktien']:.0f}%",
+                          help=f"{symbol()}{_j_eur['Aktien']:,.0f} | Abw. {_j['Aktien']-33:+.0f}pp")
+                c2.metric(f"Renten/Geld (Ziel 33%)", f"{_j['Renten/Geld']:.0f}%",
+                          help=f"{symbol()}{_j_eur['Renten/Geld']:,.0f} | Abw. {_j['Renten/Geld']-33:+.0f}pp")
+                c3.metric(f"Rohstoffe+Immo (Ziel 33%)", f"{_j['Rohstoffe']:.0f}%",
+                          help=f"{symbol()}{_j_eur['Rohstoffe']:,.0f} | Abw. {_j['Rohstoffe']-33:+.0f}pp")
+
+        st.divider()
+
+        # ⚙️ Story-Check Settings
+        _story_skills = get_skills_repo().get_by_area("portfolio_story")
+        if _story_skills:
+            _story_opts = [s.name for s in _story_skills if not s.hidden]
+            _NO_FOCUS = " — (kein spezifischer Fokus)"
+            st.selectbox(
+                "📖 Story-Check-Fokus (optional)",
+                options=[_NO_FOCUS] + _story_opts,
+                index=0,
+                key="story_check_skill",
+            )
+
+st.divider()
+
+# ──────────────────────────────────────────────────────────────────────
+# Main CTA: Run Checks
+# ──────────────────────────────────────────────────────────────────────
+
+if current_story:
+    # Checkboxes: which checks to run
+    col_cb1, col_cb2, col_cb3 = st.columns(3)
+    with col_cb1:
+        _run_cash = st.checkbox("💰 Bargeldregel", key="_run_cash", value=True)
+    with col_cb2:
+        _run_stability = st.checkbox("🏛️ Stabilitäts-Check", key="_run_stability", value=True)
+    with col_cb3:
+        pass  # Future use
+
+    # Main button
+    if st.button("🔄 Story-Check durchführen", use_container_width=True, key="btn_story_main"):
+        with st.spinner("Analysiere Portfolio…"):
+            # Run Bargeldregel (deterministic)
+            if _run_cash:
+                import yaml
+                rule = {"target_pct": 5.0, "min_eur": 10000, "max_eur": 100000}
+                try:
+                    cash_skills = get_skills_repo().get_by_area("portfolio_cash_rule")
+                    sel_skill_name = st.session_state.get("cash_rule_skill", "Bargeldregel")
+                    sel_skill = next((s for s in cash_skills if s.name == sel_skill_name), None)
+                    if sel_skill:
+                        parsed = yaml.safe_load(sel_skill.prompt)
+                        if isinstance(parsed, dict):
+                            for key in ("target_pct", "min_eur", "max_eur"):
+                                if key in parsed:
+                                    rule[key] = float(parsed[key])
+                except Exception:
+                    pass
+
+                market_agent = get_market_agent()
+                valuations = market_agent.get_portfolio_valuation()
+                total_eur = sum(v.current_value_eur for v in valuations if v.current_value_eur)
+                if total_eur and total_eur > 0:
+                    cash_eur = sum(
+                        v.current_value_eur for v in valuations
+                        if v.investment_type == "Bargeld" and v.current_value_eur
+                    )
+                    target = max(
+                        rule.get("min_eur", 10000),
+                        min(
+                            rule.get("max_eur", 100000),
+                            total_eur * rule.get("target_pct", 5.0) / 100,
+                        ),
+                    )
+                    if cash_eur >= target:
+                        status = "ok"
+                    elif cash_eur >= rule.get("min_eur", 10000):
+                        status = "warning"
+                    else:
+                        status = "error"
+                    st.session_state["_cash_result"] = {
+                        "status": status,
+                        "cash_eur": cash_eur,
+                        "target_eur": target,
+                        "total_eur": total_eur,
+                    }
+
+            # Run Stabilitäts-Check
+            if _run_stability:
+                valuations = get_market_agent().get_portfolio_valuation()
+                from core.portfolio_stability import compute_josef_allocation
+                from agents.portfolio_story_agent import PortfolioMetrics
+
+                josef = compute_josef_allocation(valuations)
+                metrics = PortfolioMetrics(
+                    total_value_eur=sum(v.current_value_eur or 0 for v in valuations),
+                    total_pnl_eur=0,
+                    total_pnl_pct=0,
+                    total_annual_dividend_eur=0,
+                    portfolio_dividend_yield_pct=0,
+                    josef_aktien_pct=josef["Aktien"],
+                    josef_renten_pct=josef["Renten/Geld"],
+                    josef_rohstoffe_pct=josef["Rohstoffe"],
+                    positions_count=len(valuations),
                 )
 
-            stability_result = asyncio.run(run_stability_check())
+                stab_skills = get_skills_repo().get_by_area("portfolio_stability")
+                sel_skill_name = st.session_state.get("stability_check_skill", "Josef's Regel (3-Säulen-Stabilität)")
+                sel_skill = next((s for s in stab_skills if s.name == sel_skill_name), None)
+                if sel_skill:
+                    async def run_stability_check():
+                        return await agent.analyze_stability(
+                            metrics=metrics,
+                            skill_prompt=sel_skill.prompt,
+                        )
+                    st.session_state["_stability_result"] = asyncio.run(run_stability_check())
 
-            # Store in session state for display
-            st.session_state["_stability_result"] = stability_result
-            st.success("✅ Stabilitäts-Check durchgeführt!")
-            st.rerun()
-
-
-def _render_story_check() -> None:
-    """Render story & performance check. FEAT-18: Modular check."""
-    if not current_story:
-        st.info("ℹ️ **Portfolio Story erforderlich**\n\nDefiniere deine Portfolio Story im Abschnitt 1.")
-        return
-
-    skills_repo = get_skills_repo()
-    story_skills = skills_repo.get_by_area("portfolio_story")
-
-    # Skill selection reads from session_state (set by ⚙️ Einstellungen expander below)
-    skill_options = {s.name: s for s in story_skills if not s.hidden} if story_skills else {}
-    _NO_FOCUS = " — (kein spezifischer Fokus)"
-    _sel_story = st.session_state.get("story_check_skill", _NO_FOCUS)
-    selected_skill = skill_options.get(_sel_story) if skill_options else None
-
-    if st.button("🔄 Story-Check durchführen", use_container_width=True, key="btn_story"):
-        with st.spinner("Analysiere Story & Performance…"):
+            # Run Story & Performance Check (always)
             valuations = get_market_agent().get_portfolio_valuation()
             portfolio = _portfolio_service.get_portfolio_positions()
 
@@ -315,7 +318,7 @@ def _render_story_check() -> None:
 
             valuation_map_s = {v.name: v for v in valuations}
 
-            # Build portfolio snapshot — include EUR values for ALL positions
+            # Build portfolio snapshot
             snapshot_lines = ["**Portfolio Snapshot**\n"]
             for p in portfolio:
                 if p.ticker:
@@ -324,7 +327,7 @@ def _render_story_check() -> None:
                     val_str = f" ({symbol()}{v.current_value_eur:,.0f})" if v and v.current_value_eur else ""
                     snapshot_lines.append(f"- {p.name}{ticker_str} [{p.asset_class}]{val_str}")
 
-            # Non-tradeable positions (use portfolio list — v.symbol always truthy due to name[:10] fallback)
+            # Non-tradeable positions
             non_tradeable_s = [p for p in portfolio if not p.ticker]
             non_tradeable_lines = []
             for p in non_tradeable_s:
@@ -359,157 +362,131 @@ def _render_story_check() -> None:
             dividend_snapshot = "\n".join(dividend_lines) or "(Keine Dividenden)"
 
             # Run story & performance check
+            story_skills = get_skills_repo().get_by_area("portfolio_story")
+            sel_story_name = st.session_state.get("story_check_skill", " — (kein spezifischer Fokus)")
+            selected_skill = None
+            if story_skills:
+                selected_skill = next((s for s in story_skills if s.name == sel_story_name), None)
+
             async def run_story_check():
                 return await agent.analyze_story_and_performance(
-                    story=current_story,
+                    story=current_story.story,
                     portfolio_snapshot=portfolio_snapshot,
                     dividend_snapshot=dividend_snapshot,
                     skill_prompt=selected_skill.prompt if selected_skill else None,
                     inflation_rate=None,
                 )
 
-            story_result = asyncio.run(run_story_check())
-            st.session_state["_story_result"] = story_result
-            st.success("✅ Story-Check durchgeführt!")
-            st.rerun()
+            st.session_state["_story_result"] = asyncio.run(run_story_check())
 
+        st.success("✅ Checks durchgeführt!")
+        st.rerun()
+
+st.divider()
 
 # ──────────────────────────────────────────────────────────────────────
-# Section 2: Checks — collapsible expander with modular checks
+# Results Zone: Display check results
 # ──────────────────────────────────────────────────────────────────────
 
-with st.expander("2️⃣ Checks — Ausrichtung & Performance & Stabilität", expanded=True):
-    if not current_story:
-        st.warning("⚠️ Bitte definiere zuerst deine Portfolio Story oben.")
-    else:
-        # 💰 Bargeldregel — always show at top of checks section
-        _render_cash_rule_check()
+if current_story:
+    # Bargeldregel result
+    if st.session_state.get("_cash_result"):
+        cr = st.session_state["_cash_result"]
+        status_icon = {"ok": "✅", "warning": "⚠️", "error": "❌"}[cr["status"]]
+        status_text = {"ok": "erfüllt", "warning": "warnung", "error": "fehler"}[cr["status"]]
+        st.markdown(f"**{status_icon} Bargeldregel:** {status_text.title()}")
+        st.caption(f"💰 {symbol()}{cr['cash_eur']:,.0f} (Ziel: {symbol()}{cr['target_eur']:,.0f})")
 
-        st.divider()
+    # Stabilitäts-Check result
+    if st.session_state.get("_stability_result"):
+        sr = st.session_state["_stability_result"]
+        with st.container(border=True):
+            st.markdown(f"**🏛️ Stabilitäts-Urteil:** {_verdict_icon(sr.verdict)} {sr.verdict.title()}")
+            if sr.summary:
+                st.markdown(f"_{sr.summary}_")
+            with st.expander("Details"):
+                st.text(sr.full_text)
 
-        # Stabilitäts-Check
-        st.caption("**Stabilitäts-Check:**")
-        _render_stability_check()
+    # Story & Performance results
+    if st.session_state.get("_story_result"):
+        sr = st.session_state["_story_result"]
+        with st.container(border=True):
+            st.markdown(f"**📖 Story-Urteil:** {_verdict_icon(sr.verdict)} {sr.verdict.title()}")
+            if sr.summary:
+                st.markdown(f"_{sr.summary}_")
 
-        if st.session_state.get("_stability_result"):
+        with st.container(border=True):
+            st.markdown(f"**📊 Performance-Urteil:** {_verdict_icon(sr.perf_verdict)} {sr.perf_verdict.title()}")
+            if sr.perf_summary:
+                st.markdown(f"_{sr.perf_summary}_")
+
+    st.divider()
+
+    # Aktuellste gespeicherte Analyse (legacy data from analyze())
+    if latest_analysis:
+        st.markdown(f"### Aktuellste Analyse — {latest_analysis.created_at.strftime('%d.%m.%Y %H:%M')}")
+
+        if latest_analysis.verdict:
             with st.container(border=True):
-                sr = st.session_state["_stability_result"]
-                st.markdown(f"**Stabilitäts-Urteil:** {_verdict_icon(sr.verdict)} {sr.verdict.title()}")
-                if sr.summary:
-                    st.markdown(f"_{sr.summary}_")
-                with st.expander("Details"):
-                    st.text(sr.full_text)
-
-        st.divider()
-
-        # Story & Performance Check
-        st.caption("**Story & Performance Check:**")
-        _render_story_check()
-
-        if st.session_state.get("_story_result"):
-            with st.container(border=True):
-                sr = st.session_state["_story_result"]
-                st.markdown(f"**Story-Urteil:** {_verdict_icon(sr.verdict)} {sr.verdict.title()}")
-                if sr.summary:
-                    st.markdown(f"_{sr.summary}_")
-
-            with st.container(border=True):
-                sr = st.session_state["_story_result"]
-                st.markdown(f"**Performance-Urteil:** {_verdict_icon(sr.perf_verdict)} {sr.perf_verdict.title()}")
-                if sr.perf_summary:
-                    st.markdown(f"_{sr.perf_summary}_")
-
-        # ⚙️ Einstellungen — skill selectors (collapsed by default)
-        _stability_skills_for_settings = get_skills_repo().get_by_area("portfolio_stability")
-        _story_skills_for_settings = get_skills_repo().get_by_area("portfolio_story")
-        if _stability_skills_for_settings or _story_skills_for_settings:
-            with st.expander("⚙️ Einstellungen", expanded=False):
-                if _stability_skills_for_settings:
-                    _stab_opts = [s.name for s in _stability_skills_for_settings if not s.hidden]
-                    _stab_default = "Josef's Regel (3-Säulen-Stabilität)"
-                    _stab_idx = _stab_opts.index(_stab_default) if _stab_default in _stab_opts else 0
-                    st.selectbox(
-                        "Stabilitäts-Fokus",
-                        options=_stab_opts,
-                        index=_stab_idx,
-                        key="stability_check_skill",
-                    )
-                if _story_skills_for_settings:
-                    _story_opts = [s.name for s in _story_skills_for_settings if not s.hidden]
-                    _NO_FOCUS = " — (kein spezifischer Fokus)"
-                    st.selectbox(
-                        "Story-Fokus (optional)",
-                        options=[_NO_FOCUS] + _story_opts,
-                        index=0,
-                        key="story_check_skill",
-                    )
-
-        # Aktuellste gespeicherte Analyse (legacy data from analyze())
-        if latest_analysis:
-            st.divider()
-            st.markdown(f"### Aktuellste Analyse — {latest_analysis.created_at.strftime('%d.%m.%Y %H:%M')}")
-
-            if latest_analysis.verdict:
-                with st.container(border=True):
-                    col1, col2 = st.columns([4, 1])
-                    with col1:
-                        st.markdown(
-                            f"**Story-Urteil:** {_verdict_icon(latest_analysis.verdict)} {latest_analysis.verdict.title()}"
-                        )
-                        if latest_analysis.summary:
-                            st.markdown(f"_{latest_analysis.summary}_")
-                    with col2:
-                        if st.button("▼ Details", key="story_details"):
-                            st.session_state["_expand_story"] = not st.session_state.get("_expand_story", False)
-
-                    if st.session_state.get("_expand_story"):
-                        st.markdown("---")
-                        st.caption("Aus der vollständigen Analyse:")
-                        st.text(latest_analysis.full_text or "(kein Text)")
-
-            if latest_analysis.perf_verdict:
-                with st.container(border=True):
+                col1, col2 = st.columns([4, 1])
+                with col1:
                     st.markdown(
-                        f"**Performance-Urteil:** {_verdict_icon(latest_analysis.perf_verdict)} {latest_analysis.perf_verdict.title()}"
+                        f"**Story-Urteil:** {_verdict_icon(latest_analysis.verdict)} {latest_analysis.verdict.title()}"
                     )
-                    if latest_analysis.perf_summary:
-                        st.markdown(f"_{latest_analysis.perf_summary}_")
+                    if latest_analysis.summary:
+                        st.markdown(f"_{latest_analysis.summary}_")
+                with col2:
+                    if st.button("▼ Details", key="story_details"):
+                        st.session_state["_expand_story"] = not st.session_state.get("_expand_story", False)
 
-            if latest_analysis.stability_verdict:
-                with st.container(border=True):
-                    st.markdown(
-                        f"**Stabilitäts-Urteil:** {_verdict_icon(latest_analysis.stability_verdict)} {latest_analysis.stability_verdict.title()}"
-                    )
-                    if latest_analysis.stability_summary:
-                        st.markdown(f"_{latest_analysis.stability_summary}_")
+                if st.session_state.get("_expand_story"):
+                    st.markdown("---")
+                    st.caption("Aus der vollständigen Analyse:")
+                    st.text(latest_analysis.full_text or "(kein Text)")
 
-            from core.services.portfolio_comment_service import get_style_by_id
-            import hashlib
+        if latest_analysis.perf_verdict:
+            with st.container(border=True):
+                st.markdown(
+                    f"**Performance-Urteil:** {_verdict_icon(latest_analysis.perf_verdict)} {latest_analysis.perf_verdict.title()}"
+                )
+                if latest_analysis.perf_summary:
+                    st.markdown(f"_{latest_analysis.perf_summary}_")
 
-            _comment_style_id = get_app_config_repo().get("comment_style") or "humorvoll"
-            _comment_style = get_style_by_id(_comment_style_id)
-            comment_service = get_portfolio_comment_service()
+        if latest_analysis.stability_verdict:
+            with st.container(border=True):
+                st.markdown(
+                    f"**Stabilitäts-Urteil:** {_verdict_icon(latest_analysis.stability_verdict)} {latest_analysis.stability_verdict.title()}"
+                )
+                if latest_analysis.stability_summary:
+                    st.markdown(f"_{latest_analysis.stability_summary}_")
 
-            _ctx = (
-                f"Story: {latest_analysis.verdict} — {latest_analysis.summary}\n"
-                f"Performance: {latest_analysis.perf_verdict} — {latest_analysis.perf_summary}\n"
-                f"Stabilität: {latest_analysis.stability_verdict} — {latest_analysis.stability_summary}\n"
-                f"Volltext:\n{latest_analysis.full_text}"
-            )
-            _ctx_hash = hashlib.md5((_ctx + _comment_style_id).encode()).hexdigest()
+        from core.services.portfolio_comment_service import get_style_by_id
+        import hashlib
 
-            if st.session_state.get("_story_comment_hash") != _ctx_hash:
-                with st.spinner(f"{_comment_style['emoji']} Generiere Kommentar..."):
-                    st.session_state["_story_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
-                    st.session_state["_story_comment_hash"] = _ctx_hash
+        _comment_style_id = get_app_config_repo().get("comment_style") or "humorvoll"
+        _comment_style = get_style_by_id(_comment_style_id)
+        comment_service = get_portfolio_comment_service()
 
-            if st.session_state.get("_story_comment"):
-                with st.container(border=True):
-                    st.caption(f"{_comment_style['emoji']} **{_comment_style['name']}**")
-                    st.markdown(st.session_state["_story_comment"])
-                    if st.button("🔄 Nochmal", key="_story_comment_retry"):
-                        del st.session_state["_story_comment"]
-                        st.rerun()
+        _ctx = (
+            f"Story: {latest_analysis.verdict} — {latest_analysis.summary}\n"
+            f"Performance: {latest_analysis.perf_verdict} — {latest_analysis.perf_summary}\n"
+            f"Stabilität: {latest_analysis.stability_verdict} — {latest_analysis.stability_summary}\n"
+            f"Volltext:\n{latest_analysis.full_text}"
+        )
+        _ctx_hash = hashlib.md5((_ctx + _comment_style_id).encode()).hexdigest()
+
+        if st.session_state.get("_story_comment_hash") != _ctx_hash:
+            with st.spinner(f"{_comment_style['emoji']} Generiere Kommentar..."):
+                st.session_state["_story_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
+                st.session_state["_story_comment_hash"] = _ctx_hash
+
+        if st.session_state.get("_story_comment"):
+            with st.container(border=True):
+                st.caption(f"{_comment_style['emoji']} **{_comment_style['name']}**")
+                st.markdown(st.session_state["_story_comment"])
+                if st.button("🔄 Nochmal", key="_story_comment_retry"):
+                    del st.session_state["_story_comment"]
+                    st.rerun()
 
 # ──────────────────────────────────────────────────────────────────────
 # Section 3: Positions-Checks (pending status + navigation)
@@ -566,17 +543,7 @@ if current_story:
                     help=f"Zuletzt: {s['ts_str']}",
                 )
 
-        _include_prechecks = st.checkbox(
-            "☑ Portfolio-Checks (Stabilität + Story) vor Positions-Check ausführen",
-            key="_ps_include_prechecks",
-            value=False,
-        )
-
-        _AUTO_RUN_FLAGS = {
-            "storychecker": "_auto_run_storychecker",
-            "consensus_gap": "_auto_run_consensus_gap",
-        }
-
+        # Navigation buttons (no pre-checks logic)
         _btn_cols = st.columns(len(_pre_status))
         for idx, s in enumerate(_pre_status):
             with _btn_cols[idx]:
@@ -586,48 +553,13 @@ if current_story:
                     if _has_pending
                     else f"✅ {s['label']}: alle geprüft"
                 )
-                if s["agent_name"] == "fundamental":
-                    if st.button(f"→ {s['label']}", key=f"_nav_{s['agent_name']}", use_container_width=True):
-                        st.switch_page(s["page"])
-                else:
-                    if st.button(
-                        _btn_label,
-                        key=f"_nav_{s['agent_name']}",
-                        use_container_width=True,
-                        disabled=not _has_pending,
-                    ):
-                        if _include_prechecks:
-                            with st.spinner("Führe Portfolio-Checks durch…"):
-                                from core.portfolio_stability import compute_josef_allocation
-                                from agents.portfolio_story_agent import PortfolioMetrics
-                                _vals = get_market_agent().get_portfolio_valuation()
-                                _josef = compute_josef_allocation(_vals)
-                                _metrics = PortfolioMetrics(
-                                    total_value_eur=sum(v.current_value_eur or 0 for v in _vals),
-                                    total_pnl_eur=0,
-                                    total_pnl_pct=0,
-                                    total_annual_dividend_eur=0,
-                                    portfolio_dividend_yield_pct=0,
-                                    josef_aktien_pct=_josef["Aktien"],
-                                    josef_renten_pct=_josef["Renten/Geld"],
-                                    josef_rohstoffe_pct=_josef["Rohstoffe"],
-                                    positions_count=len(_vals),
-                                )
-                                _stab_skills = get_skills_repo().get_by_area("portfolio_stability")
-                                if _stab_skills:
-                                    _stab_opts = {s.name: s for s in _stab_skills if not s.hidden}
-                                    _stab_sel = st.session_state.get("stability_check_skill", "Josef's Regel (3-Säulen-Stabilität)")
-                                    _stab_skill = _stab_opts.get(_stab_sel) or list(_stab_opts.values())[0]
-                                    async def _run_stab():
-                                        return await agent.analyze_stability(
-                                            metrics=_metrics,
-                                            skill_prompt=_stab_skill.prompt,
-                                        )
-                                    st.session_state["_stability_result"] = asyncio.run(_run_stab())
-                        flag = _AUTO_RUN_FLAGS.get(s["agent_name"])
-                        if flag:
-                            st.session_state[flag] = True
-                        st.switch_page(s["page"])
+                if st.button(
+                    _btn_label,
+                    key=f"_nav_{s['agent_name']}",
+                    use_container_width=True,
+                    disabled=not _has_pending,
+                ):
+                    st.switch_page(s["page"])
 
 st.divider()
 
