@@ -141,17 +141,23 @@ class PortfolioStoryAgent:
         """
         self._llm.skill_context = "portfolio_stability_check"
 
+        ziel = 33.33
+        def _dev(pct: float) -> str:
+            d = pct - ziel
+            return f"{d:+.0f}pp"
+
         josef_summary = (
-            f"Aktien: {metrics.josef_aktien_pct:.0f}% | "
-            f"Renten/Geld: {metrics.josef_renten_pct:.0f}% | "
-            f"Rohstoffe + Immo: {metrics.josef_rohstoffe_pct:.0f}%"
+            f"Aktien: {metrics.josef_aktien_pct:.0f}% (Abw. {_dev(metrics.josef_aktien_pct)}) | "
+            f"Renten/Geld: {metrics.josef_renten_pct:.0f}% (Abw. {_dev(metrics.josef_renten_pct)}) | "
+            f"Rohstoffe+Immo: {metrics.josef_rohstoffe_pct:.0f}% (Abw. {_dev(metrics.josef_rohstoffe_pct)})"
         )
 
         system_prompt = f"""Du bist ein kritischer Portfolio-Analyst der Portfolio-Stabilität bewertet.
 
-Aktuelle Gewichtung: {josef_summary}
+Zielgewichtung: je 33% pro Säule.
+Aktuelle Gewichtung (Abweichungen bereits berechnet): {josef_summary}
 
-Beurteile die Stabilität anhand der Kriterien unten.
+Beurteile die Stabilität anhand der Kriterien unten. Verwende die angegebenen Abweichungswerte direkt.
 Antworte IMMER in diesem exakten Format:
 
 ## Stabilität
