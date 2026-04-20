@@ -494,6 +494,34 @@ if current_story:
 st.divider()
 
 # ──────────────────────────────────────────────────────────────────────
+# Positions-Check Status (immer sichtbar, vor den Ergebnissen)
+# ──────────────────────────────────────────────────────────────────────
+
+if current_story:
+    _portfolio_peek = _portfolio_service.get_portfolio_positions()
+    _peek_ids = {
+        "storychecker": [p.id for p in _portfolio_peek if p.id and p.story and not p.analysis_excluded],
+        "fundamental":  [p.id for p in _portfolio_peek if p.id and p.ticker and not p.analysis_excluded],
+        "consensus_gap":[p.id for p in _portfolio_peek if p.id and p.story and not p.analysis_excluded],
+    }
+    _peek_labels = {"storychecker": "Story Checker", "fundamental": "Fundamental Analyzer", "consensus_gap": "Konsens-Lücken"}
+    pc1, pc2, pc3 = st.columns(3)
+    for col, agent_key in zip([pc1, pc2, pc3], ["storychecker", "fundamental", "consensus_gap"]):
+        ids = _peek_ids[agent_key]
+        b = _analysis_service.get_verdicts(ids, agent_key)
+        n = sum(1 for pid in ids if pid not in b)
+        latest_ts = None
+        for vo in b.values():
+            if vo and hasattr(vo, 'created_at') and vo.created_at:
+                ts = vo.created_at.replace(tzinfo=None) if vo.created_at.tzinfo else vo.created_at
+                if latest_ts is None or ts > latest_ts:
+                    latest_ts = ts
+        col.metric(_peek_labels[agent_key], f"{n}/{len(ids)} ausstehend",
+                   help=f"Zuletzt: {latest_ts.strftime('%d.%m. %H:%M') if latest_ts else '—'}")
+
+st.divider()
+
+# ──────────────────────────────────────────────────────────────────────
 # Results Zone: Display check results
 # ──────────────────────────────────────────────────────────────────────
 
@@ -644,16 +672,6 @@ if current_story:
             "ts_str": ts_str,
             "agent_name": agent_name,
         })
-
-    # Metrics row: pending counts per agent (always show, even if 0/0)
-    _metric_cols = st.columns(len(_pre_status))
-    for idx, s in enumerate(_pre_status):
-        with _metric_cols[idx]:
-            st.metric(
-                s["label"],
-                f"{s['n_missing']}/{s['total']} ausstehend",
-                help=f"Zuletzt: {s['ts_str']}",
-            )
 
     # Navigation buttons (only if portfolio has positions)
     if _portfolio_for_checks:
