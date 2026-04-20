@@ -82,7 +82,12 @@
       "Bash(sqlite3 /Users/erik/Projects/wealth_management/data/wealth_management.db \"SELECT DISTINCT investment_type FROM positions ORDER BY investment_type;\")",
       "Bash(sqlite3 /Users/erik/Projects/wealth_management/wealth_data.db \".tables\")",
       "Bash(sqlite3 /Users/erik/Projects/wealth_management/data/demo.db \"SELECT DISTINCT investment_type FROM positions ORDER BY investment_type;\")",
-      "Bash(sqlite3 /Users/erik/Projects/wealth_management/data/demo.db \"UPDATE positions SET investment_type='Rohstoffe' WHERE investment_type='Edelmetalle';\")"
+      "Bash(sqlite3 /Users/erik/Projects/wealth_management/data/demo.db \"UPDATE positions SET investment_type='Rohstoffe' WHERE investment_type='Edelmetalle';\")",
+      "Bash(python -m pytest tests/smoke/ -q)",
+      "Bash(python -m pytest tests/ -k \"smoke\" -q)",
+      "Bash(python -m pytest tests/ -k \"page\" -q)",
+      "Bash(python -m pytest tests/ -q --no-header)",
+      "Bash(python -m pytest tests/ -q --no-header -x)"
     ],
     "additionalDirectories": [
       "/Users/erik",

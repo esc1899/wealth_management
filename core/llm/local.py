@@ -33,11 +33,12 @@ class OllamaProvider(LLMProvider):
     No data leaves the machine.
     """
 
-    def __init__(self, host: str, model: str, timeout: float = 120.0, think: bool = False):
+    def __init__(self, host: str, model: str, timeout: float = 120.0, think: bool = False, num_ctx: int = 8192):
         self._host = host.rstrip("/")
         self._model = model
         self._timeout = timeout
         self._think = think  # qwen3 thinking mode — disable for faster tool calling
+        self._num_ctx = num_ctx
 
     async def chat(
         self,
@@ -67,6 +68,7 @@ class OllamaProvider(LLMProvider):
             "options": {
                 "num_predict": max_tokens,
                 "temperature": temperature,
+                "num_ctx": self._num_ctx,
             },
         }
         if tools:

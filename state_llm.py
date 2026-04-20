@@ -20,7 +20,7 @@ def _make_claude_provider(model: str, agent_name: str) -> ClaudeProvider:
 
 def _make_ollama_provider(model: str, agent_name: str, timeout: float = 120.0) -> OllamaProvider:
     """Create and wire up an Ollama provider with usage tracking."""
-    provider = OllamaProvider(host=config.OLLAMA_HOST, model=model, timeout=timeout)
+    provider = OllamaProvider(host=config.OLLAMA_HOST, model=model, timeout=timeout, num_ctx=config.OLLAMA_NUM_CTX)
     provider.on_usage = lambda i, o, skill=None, dur=None, pos=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos)
     return provider
 

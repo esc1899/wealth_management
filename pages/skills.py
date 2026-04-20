@@ -146,7 +146,7 @@ if st.button(t("settings.generate_button"), key="gen_btn"):
     else:
         with st.spinner(t("settings.generating")):
             try:
-                llm = OllamaProvider(host=config.OLLAMA_HOST, model=config.OLLAMA_MODEL)
+                llm = OllamaProvider(host=config.OLLAMA_HOST, model=config.OLLAMA_MODEL, num_ctx=config.OLLAMA_NUM_CTX)
                 user_msg = (
                     f"Erstelle einen Investment-Analyse-Prompt für folgenden Anwendungsfall: "
                     f"{gen_description.strip()}. Bereich: {gen_area}. "
