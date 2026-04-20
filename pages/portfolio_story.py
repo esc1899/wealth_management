@@ -238,6 +238,37 @@ def _render_stability_check() -> None:
     _sel_name = st.session_state.get("stability_check_skill", _default_name)
     selected_skill = skill_options.get(_sel_name) or (list(skill_options.values())[0] if skill_options else None)
 
+    # Josef-Vorschau: show current allocation before running the LLM check
+    _prev_vals = get_market_agent().get_portfolio_valuation()
+    if _prev_vals:
+        from core.portfolio_stability import JOSEF_CATEGORY, compute_josef_allocation as _cja
+        _j = _cja(_prev_vals)
+        _j_total = sum(v.current_value_eur or 0 for v in _prev_vals if JOSEF_CATEGORY.get(v.investment_type))
+        _unclassified = [v for v in _prev_vals if not JOSEF_CATEGORY.get(v.investment_type) and v.current_value_eur]
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Aktien (Ziel 33%)", f"{_j['Aktien']:.0f}%", delta=f"{_j['Aktien']-33:.0f}pp")
+        c2.metric("Renten/Geld (Ziel 33%)", f"{_j['Renten/Geld']:.0f}%", delta=f"{_j['Renten/Geld']-33:.0f}pp")
+        c3.metric("Rohstoffe+Immo (Ziel 33%)", f"{_j['Rohstoffe']:.0f}%", delta=f"{_j['Rohstoffe']-33:.0f}pp")
+        with st.expander("🔍 Josef-Details", expanded=False):
+            import pandas as pd
+            _rows = [
+                {
+                    "Position": v.name,
+                    "Anlageklasse": v.asset_class,
+                    "investment_type": v.investment_type,
+                    "Josef-Säule": JOSEF_CATEGORY.get(v.investment_type, "⚠️ NICHT KLASSIFIZIERT"),
+                    f"Wert ({symbol()})": f"{v.current_value_eur:,.0f}" if v.current_value_eur else "—",
+                }
+                for v in _prev_vals if v.current_value_eur and v.current_value_eur > 0
+            ]
+            if _rows:
+                st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
+            if _unclassified:
+                st.warning(
+                    f"⚠️ {len(_unclassified)} Position(en) nicht klassifiziert — fehlen in Josef-Berechnung:\n"
+                    + "\n".join(f"- {v.name} (investment_type: `{v.investment_type}`)" for v in _unclassified)
+                )
+
     if st.button("🔄 Stabilitäts-Check durchführen", use_container_width=True, key="btn_stability"):
         with st.spinner("Analysiere Stabilität…"):
             valuations = get_market_agent().get_portfolio_valuation()
