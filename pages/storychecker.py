@@ -36,6 +36,12 @@ with st.expander(t("storychecker.what_is_this"), expanded=False):
 
 positions_with_story = [p for p in get_positions_repo().get_all() if p.story]
 
+# Filter to positions without an existing verdict (pending only)
+_sc_existing = analyses_repo.get_latest_bulk(
+    [p.id for p in positions_with_story if p.id], agent="storychecker"
+)
+pending_positions = [p for p in positions_with_story if p.id not in _sc_existing]
+
 # ------------------------------------------------------------------
 # Batch check — background job
 # ------------------------------------------------------------------
@@ -61,24 +67,24 @@ def _run_batch_background(ag, positions, language: str, job: dict):
         loop.close()
 
 
-if st.session_state.pop("_auto_run_storychecker", False) and positions_with_story and not _BATCH["running"]:
+if st.session_state.pop("_auto_run_storychecker", False) and pending_positions and not _BATCH["running"]:
     _BATCH.update({"running": True, "done": False, "error": None, "last_error": None})
     threading.Thread(
         target=_run_batch_background,
-        args=(agent, positions_with_story, current_language(), _BATCH),
+        args=(agent, pending_positions, current_language(), _BATCH),
         daemon=True,
     ).start()
     st.rerun()
 
 if positions_with_story:
     with st.expander(t("storychecker.batch_header"), expanded=False):
-        st.caption(t("storychecker.batch_caption").format(n=len(positions_with_story)))
+        st.caption(t("storychecker.batch_caption").format(n=len(pending_positions)))
         if st.button(
             t("storychecker.batch_button"),
             type="primary",
             key="_sc_batch_run",
             use_container_width=False,
-            disabled=_BATCH["running"],
+            disabled=_BATCH["running"] or not pending_positions,
         ):
             _lang = current_language()
             _BATCH["running"] = True
@@ -87,7 +93,7 @@ if positions_with_story:
             _BATCH["last_error"] = None
             threading.Thread(
                 target=_run_batch_background,
-                args=(agent, positions_with_story, _lang, _BATCH),
+                args=(agent, pending_positions, _lang, _BATCH),
                 daemon=True,
             ).start()
             st.rerun()

@@ -153,3 +153,32 @@ class TestJosefAllocationComputation:
         assert abs(result["Aktien"] - 50.0) < 1.0
         assert abs(result["Renten/Geld"] - 0.0) < 0.1
         assert abs(result["Rohstoffe"] - 50.0) < 1.0
+
+    def test_josef_krypto_counted_as_aktien(self):
+        """Krypto positions must contribute to the Aktien pillar, not be excluded."""
+        valuations = [
+            MockValuation("Krypto", 2000.0),       # Krypto → Aktien
+            MockValuation("Renten", 4000.0),        # Renten/Geld
+            MockValuation("Rohstoffe", 4000.0),     # Rohstoffe
+        ]
+        result = compute_josef_allocation(valuations)
+
+        assert abs(result["Aktien"] - 20.0) < 1.0, "Krypto must be counted in Aktien pillar"
+        assert abs(result["Renten/Geld"] - 40.0) < 1.0
+        assert abs(result["Rohstoffe"] - 40.0) < 1.0
+        assert abs(sum(result.values()) - 100.0) < 0.1
+
+    def test_josef_allocation_all_investment_types(self):
+        """All 7 investment_types must map to a Josef pillar (no exclusions)."""
+        all_types = [
+            ("Wertpapiere", "Aktien"),
+            ("Krypto", "Aktien"),
+            ("Rohstoffe", "Rohstoffe"),
+            ("Immobilien", "Rohstoffe"),
+            ("Renten", "Renten/Geld"),
+            ("Geld", "Renten/Geld"),
+            ("Bargeld", "Renten/Geld"),
+        ]
+        for inv_type, expected_category in all_types:
+            assert JOSEF_CATEGORY.get(inv_type) == expected_category, \
+                f"{inv_type} should map to {expected_category}"

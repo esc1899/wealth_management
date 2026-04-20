@@ -14,6 +14,7 @@ NON_TRADEABLE_CLASSES = {"Festgeld", "Bargeld", "Immobilie", "Grundstück"}
 # Note: "Immobilien" and "Rohstoffe" investment types combine into "Rohstoffe" category
 JOSEF_CATEGORY = {
     "Wertpapiere": "Aktien",
+    "Krypto": "Aktien",  # Growth asset, same pillar as equities
     "Rohstoffe": "Rohstoffe",
     "Renten": "Renten/Geld",
     "Geld": "Renten/Geld",
