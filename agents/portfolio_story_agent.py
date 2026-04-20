@@ -166,22 +166,6 @@ Antworte IMMER in diesem exakten Format:
 
         if skill_prompt:
             system_prompt += f"\n\n## Stabilitäts-Fokus\n{skill_prompt}"
-        else:
-            # Default: compact Josef's Regel guidance
-            default_stability = f"""## Stabilitäts-Fokus: Josef's Regel (Standard)
-
-Das Portfolio soll langfristig wie folgt aufgeteilt sein — je ein Drittel:
-- **Säule 1 — Aktien: 1/3** (Wachstum, Inflationsschutz)
-- **Säule 2 — Renten/Geld: 1/3** (Rezessions-Schutz)
-- **Säule 3 — Rohstoffe+Immobilien: 1/3** (Sachwert-Schutz)
-
-Aktuelle Verteilung:
-- Aktien: {metrics.josef_aktien_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_aktien_pct - 33:.0f}pp)
-- Renten/Geld: {metrics.josef_renten_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_renten_pct - 33:.0f}pp)
-- Rohstoffe + Immo: {metrics.josef_rohstoffe_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_rohstoffe_pct - 33:.0f}pp)
-
-Bewerte: Abweichungen > 10% pro Säule = kritisch und adressierungsbedürftig."""
-            system_prompt += f"\n\n{default_stability}"
 
         user_message = "Bitte analysiere die Stabilität meines Portfolios."
 
@@ -349,26 +333,10 @@ Gewichtung nach Josef's Regel: {josef_summary}
 Dividenden-Snapshot:
 {dividend_snapshot}{inflation_context}"""
 
-        # Build final system prompt: base + stability rule (from skill or default Josef's Regel)
+        # Build final system prompt: base + stability rule from skill only
         system_prompt = base_prompt
         if selected_skill and selected_skill.prompt:
             system_prompt += f"\n\n## Stabilitäts-Fokus: {selected_skill.name}\n{selected_skill.prompt}"
-        else:
-            # Default: if no skill selected, use compact Josef's Regel guidance
-            default_stability = f"""## Stabilitäts-Fokus: Josef's Regel (Standard)
-
-Das Portfolio soll langfristig wie folgt aufgeteilt sein — je ein Drittel:
-- **Säule 1 — Aktien: 1/3** (Wachstum, Inflationsschutz)
-- **Säule 2 — Renten/Geld: 1/3** (Rezessions-Schutz)
-- **Säule 3 — Rohstoffe+Immobilien: 1/3** (Sachwert-Schutz)
-
-Aktuelle Verteilung:
-- Aktien: {metrics.josef_aktien_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_aktien_pct - 33:.0f}pp)
-- Renten/Geld: {metrics.josef_renten_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_renten_pct - 33:.0f}pp)
-- Rohstoffe + Immo: {metrics.josef_rohstoffe_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_rohstoffe_pct - 33:.0f}pp)
-
-Bewerte: Abweichungen > 10% pro Säule = kritisch und adressierungsbedürftig."""
-            system_prompt += f"\n\n{default_stability}"
 
         user_message = "Bitte analysiere mein Portfolio gegen die angegebene These und Ziele."
 
