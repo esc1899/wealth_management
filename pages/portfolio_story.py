@@ -246,9 +246,17 @@ def _render_stability_check() -> None:
         _j_total = sum(v.current_value_eur or 0 for v in _prev_vals if JOSEF_CATEGORY.get(v.investment_type))
         _unclassified = [v for v in _prev_vals if not JOSEF_CATEGORY.get(v.investment_type) and v.current_value_eur]
         c1, c2, c3 = st.columns(3)
-        c1.metric("Aktien (Ziel 33%)", f"{_j['Aktien']:.0f}%", delta=f"{_j['Aktien']-33:.0f}pp")
-        c2.metric("Renten/Geld (Ziel 33%)", f"{_j['Renten/Geld']:.0f}%", delta=f"{_j['Renten/Geld']-33:.0f}pp")
-        c3.metric("Rohstoffe+Immo (Ziel 33%)", f"{_j['Rohstoffe']:.0f}%", delta=f"{_j['Rohstoffe']-33:.0f}pp")
+        _j_eur = {
+            k: sum(v.current_value_eur or 0 for v in _prev_vals
+                   if JOSEF_CATEGORY.get(v.investment_type) == k and v.current_value_eur)
+            for k in ("Aktien", "Renten/Geld", "Rohstoffe")
+        }
+        c1.metric(f"Aktien (Ziel 33%)", f"{_j['Aktien']:.0f}%",
+                  help=f"{symbol()}{_j_eur['Aktien']:,.0f} | Abw. {_j['Aktien']-33:+.0f}pp")
+        c2.metric(f"Renten/Geld (Ziel 33%)", f"{_j['Renten/Geld']:.0f}%",
+                  help=f"{symbol()}{_j_eur['Renten/Geld']:,.0f} | Abw. {_j['Renten/Geld']-33:+.0f}pp")
+        c3.metric(f"Rohstoffe+Immo (Ziel 33%)", f"{_j['Rohstoffe']:.0f}%",
+                  help=f"{symbol()}{_j_eur['Rohstoffe']:,.0f} | Abw. {_j['Rohstoffe']-33:+.0f}pp")
         with st.expander("🔍 Josef-Details", expanded=False):
             import pandas as pd
             _rows = [
