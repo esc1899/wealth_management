@@ -145,6 +145,110 @@ with st.form("portfolio_story_form", clear_on_submit=False):
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Helper: Run missing portfolio checks before position-level navigation
+# ──────────────────────────────────────────────────────────────────────
+
+def _run_missing_portfolio_checks() -> None:
+    """Execute Stability + Story checks if not yet run. Used before position-checker navigation."""
+    with st.spinner("Führe fehlende Portfolio-Checks durch…"):
+        # Run Stabilitäts-Check if not yet run
+        if not st.session_state.get("_stability_result"):
+            valuations = get_market_agent().get_portfolio_valuation()
+            from core.portfolio_stability import compute_josef_allocation
+            from agents.portfolio_story_agent import PortfolioMetrics
+
+            josef = compute_josef_allocation(valuations)
+            metrics = PortfolioMetrics(
+                total_value_eur=sum(v.current_value_eur or 0 for v in valuations),
+                total_pnl_eur=0,
+                total_pnl_pct=0,
+                total_annual_dividend_eur=0,
+                portfolio_dividend_yield_pct=0,
+                josef_aktien_pct=josef["Aktien"],
+                josef_renten_pct=josef["Renten/Geld"],
+                josef_rohstoffe_pct=josef["Rohstoffe"],
+                positions_count=len(valuations),
+            )
+
+            stab_skills = get_skills_repo().get_by_area("portfolio_stability")
+            sel_skill_name = st.session_state.get("stability_check_skill", "Josef's Regel (3-Säulen-Stabilität)")
+            sel_skill = next((s for s in stab_skills if s.name == sel_skill_name), None)
+            if sel_skill:
+                async def run_stability_check():
+                    return await agent.analyze_stability(
+                        metrics=metrics,
+                        skill_prompt=sel_skill.prompt,
+                    )
+                st.session_state["_stability_result"] = asyncio.run(run_stability_check())
+
+        # Run Story-Check if not yet run
+        if not st.session_state.get("_story_result"):
+            valuations = get_market_agent().get_portfolio_valuation()
+            portfolio = _portfolio_service.get_portfolio_positions()
+
+            from core.portfolio_stability import JOSEF_CATEGORY
+
+            valuation_map_s = {v.name: v for v in valuations}
+
+            snapshot_lines = ["**Portfolio Snapshot**\n"]
+            for p in portfolio:
+                if p.ticker:
+                    ticker_str = f" ({p.ticker})"
+                    v = valuation_map_s.get(p.name)
+                    val_str = f" ({symbol()}{v.current_value_eur:,.0f})" if v and v.current_value_eur else ""
+                    snapshot_lines.append(f"- {p.name}{ticker_str} [{p.asset_class}]{val_str}")
+
+            non_tradeable_s = [p for p in portfolio if not p.ticker]
+            non_tradeable_lines = []
+            for p in non_tradeable_s:
+                v = valuation_map_s.get(p.name)
+                if v and v.current_value_eur:
+                    josef_cat = JOSEF_CATEGORY.get(p.investment_type, "?")
+                    non_tradeable_lines.append(
+                        f"- {p.name} [{p.asset_class}] → {josef_cat} ({symbol()}{v.current_value_eur:,.0f})"
+                    )
+
+            if non_tradeable_lines:
+                snapshot_lines.append("\n**Nicht-börsengehandelt (in Josef-Regel enthalten):**")
+                snapshot_lines.extend(non_tradeable_lines)
+
+            physical_immo = [v for v in valuations if v.in_portfolio and v.asset_class in {"Immobilie", "Grundstück"}]
+            if physical_immo:
+                snapshot_lines.append("\n**Direkte Immobilien (physisch, nicht fondbasiert):**")
+                for v in physical_immo:
+                    snapshot_lines.append(f"- {v.name} [{v.asset_class}]: {symbol()}{v.current_value_eur:,.0f}")
+            else:
+                snapshot_lines.append("\n**Direkte Immobilien (physisch): keine im Portfolio**")
+
+            portfolio_snapshot = "\n".join(snapshot_lines)
+
+            dividend_lines = []
+            for v in valuations:
+                if v.annual_dividend_eur and v.annual_dividend_eur > 0:
+                    dividend_lines.append(
+                        f"- {v.name}: {symbol()}{v.annual_dividend_eur:.0f}/Jahr ({v.dividend_yield_pct*100:.1f}%)"
+                    )
+            dividend_snapshot = "\n".join(dividend_lines) or "(Keine Dividenden)"
+
+            story_skills = get_skills_repo().get_by_area("portfolio_story")
+            sel_story_name = st.session_state.get("story_check_skill", " — (kein spezifischer Fokus)")
+            selected_skill = None
+            if story_skills:
+                selected_skill = next((s for s in story_skills if s.name == sel_story_name), None)
+
+            async def run_story_check():
+                return await agent.analyze_story_and_performance(
+                    story=current_story.story,
+                    portfolio_snapshot=portfolio_snapshot,
+                    dividend_snapshot=dividend_snapshot,
+                    skill_prompt=selected_skill.prompt if selected_skill else None,
+                    inflation_rate=None,
+                )
+
+            st.session_state["_story_result"] = asyncio.run(run_story_check())
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Renderer Functions for Modular Checks (FEAT-18)
 # ──────────────────────────────────────────────────────────────────────
 
@@ -543,7 +647,15 @@ if current_story:
                     help=f"Zuletzt: {s['ts_str']}",
                 )
 
-        # Navigation buttons (no pre-checks logic)
+        # Optional: Run missing portfolio checks before navigating to position checkers
+        _run_prechecks = st.checkbox(
+            "☑ Portfolio-Checks (Stabilität + Story) vor Positions-Check ausführen",
+            key="_ps_run_prechecks",
+            value=False,
+            help="Falls noch nicht durchgeführt: Stabilitäts-Check und Story-Check ausführen, bevor zu Position-Checks navigiert wird"
+        )
+
+        # Navigation buttons
         _btn_cols = st.columns(len(_pre_status))
         for idx, s in enumerate(_pre_status):
             with _btn_cols[idx]:
@@ -559,6 +671,8 @@ if current_story:
                     use_container_width=True,
                     disabled=not _has_pending,
                 ):
+                    if _run_prechecks:
+                        _run_missing_portfolio_checks()
                     st.switch_page(s["page"])
 
 st.divider()
