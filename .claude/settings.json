@@ -76,7 +76,8 @@
       "Bash(python -m pytest tests/unit/test_positions.py -v --no-cov -k dividend)",
       "Bash(pytest tests/ --no-cov -q)",
       "Bash(kill 1912)",
-      "Bash(kill -9 1912)"
+      "Bash(kill -9 1912)",
+      "Bash(python -m pytest tests/unit/test_asset_class_config.py::TestLoadRealConfig::test_edelmetall_investment_type -xvs)"
     ],
     "additionalDirectories": [
       "/Users/erik",

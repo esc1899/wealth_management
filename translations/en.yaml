@@ -53,7 +53,7 @@ investment_types:
   Wertpapiere: "Securities"
   Renten: "Bonds"
   Immobilien: "Real Estate"
-  Edelmetalle: "Precious Metals"
+  Rohstoffe: "Commodities"
   Krypto: "Crypto"
   Geld: "Cash"
   Bargeld: "Liquid Cash"

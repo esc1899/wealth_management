@@ -11,14 +11,14 @@ NON_TRADEABLE_CLASSES = {"Festgeld", "Bargeld", "Immobilie", "Grundstück"}
 
 # Josef's Regel: target 1/3 per category (Rohstoffe + Immobilien together = 1/3).
 # Maps investment_type → Josef category
-# Note: "Immobilien" investment_type maps to "Rohstoffe" category so they combine
+# Note: "Immobilien" and "Rohstoffe" investment types combine into "Rohstoffe" category
 JOSEF_CATEGORY = {
     "Wertpapiere": "Aktien",
-    "Edelmetalle": "Rohstoffe",
+    "Rohstoffe": "Rohstoffe",
     "Renten": "Renten/Geld",
     "Geld": "Renten/Geld",
     "Bargeld": "Renten/Geld",
-    "Immobilien": "Rohstoffe",  # Combined with Edelmetalle, not separate
+    "Immobilien": "Rohstoffe",  # Combined with Rohstoffe, not separate
 }
 
 # Legacy name for backwards compatibility

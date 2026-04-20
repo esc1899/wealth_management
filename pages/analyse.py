@@ -147,40 +147,27 @@ if selected:
 st.divider()
 
 # ------------------------------------------------------------------
-# Portfolio allocation — only investment types that are present
+# Portfolio allocation — Sunburst with positions outer ring
 # ------------------------------------------------------------------
-col_pie1, col_pie2 = st.columns(2)
-
-with col_pie1:
-    st.subheader(t("analysis.weight_by_type"))
-    rows = [
-        {
-            "anlageklasse": t(f"investment_types.{v.investment_type}"),
-            "anlageform": v.asset_class,
-            "wert": v.current_value_eur
-        }
-        for v in valuations
-        if v.current_value_eur
-    ]
-    if rows:
-        df = pd.DataFrame(rows).groupby(["anlageklasse", "anlageform"])["wert"].sum().reset_index()
-        fig = px.sunburst(
-            df,
-            path=["anlageklasse", "anlageform"],
-            values="wert",
-            color="anlageklasse"
-        )
-        fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info(t("analysis.no_weight_data"))
-
-with col_pie2:
-    st.subheader(t("analysis.weight_by_position"))
-    alloc_pos = {v.symbol: v.current_value_eur for v in valuations if v.current_value_eur}
-    if alloc_pos:
-        fig2 = px.pie(names=list(alloc_pos.keys()), values=list(alloc_pos.values()), hole=0.3)
-        fig2.update_layout(margin=dict(t=0, b=0))
-        st.plotly_chart(fig2, use_container_width=True)
-    else:
-        st.info(t("analysis.no_weight_data"))
+st.subheader(t("analysis.weight_by_position"))
+rows = [
+    {
+        "anlageklasse": t(f"investment_types.{v.investment_type}"),
+        "position": v.symbol,
+        "wert": v.current_value_eur
+    }
+    for v in valuations
+    if v.current_value_eur
+]
+if rows:
+    df = pd.DataFrame(rows).groupby(["anlageklasse", "position"])["wert"].sum().reset_index()
+    fig = px.sunburst(
+        df,
+        path=["anlageklasse", "position"],
+        values="wert",
+        color="anlageklasse"
+    )
+    fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.info(t("analysis.no_weight_data"))

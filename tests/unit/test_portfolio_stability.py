@@ -21,7 +21,7 @@ class TestJosefCategorization:
     def test_josef_category_mapping_is_correct(self):
         """Verify that JOSEF_CATEGORY maps investment types to correct categories."""
         assert JOSEF_CATEGORY["Wertpapiere"] == "Aktien"
-        assert JOSEF_CATEGORY["Edelmetalle"] == "Rohstoffe"
+        assert JOSEF_CATEGORY["Rohstoffe"] == "Rohstoffe"
         assert JOSEF_CATEGORY["Renten"] == "Renten/Geld"
         assert JOSEF_CATEGORY["Geld"] == "Renten/Geld"
         assert JOSEF_CATEGORY["Immobilien"] == "Rohstoffe", \
@@ -82,7 +82,7 @@ class TestJosefAllocationComputation:
         valuations = [
             MockValuation("Wertpapiere", 1000.0),  # Aktien
             MockValuation("Renten", 1000.0),       # Renten/Geld
-            MockValuation("Edelmetalle", 1000.0),  # Rohstoffe
+            MockValuation("Rohstoffe", 1000.0),    # Rohstoffe
         ]
         result = compute_josef_allocation(valuations)
 
@@ -91,19 +91,19 @@ class TestJosefAllocationComputation:
         assert abs(result["Rohstoffe"] - 33.33) < 1.0
         assert abs(sum(result.values()) - 100.0) < 0.1
 
-    def test_rohstoffe_combines_edelmetalle_and_immobilien(self):
-        """Test that Edelmetalle and Immobilien both map to Rohstoffe."""
+    def test_rohstoffe_combines_rohstoffe_and_immobilien(self):
+        """Test that Rohstoffe and Immobilien both map to Rohstoffe."""
         valuations = [
             MockValuation("Wertpapiere", 3000.0),  # Aktien: 37.5%
             MockValuation("Geld", 2000.0),         # Renten/Geld: 25%
-            MockValuation("Edelmetalle", 1500.0),  # Rohstoffe (combined): 37.5%
+            MockValuation("Rohstoffe", 1500.0),    # Rohstoffe (combined): 37.5%
             MockValuation("Immobilien", 1500.0),   # Also Rohstoffe
         ]
         result = compute_josef_allocation(valuations)
 
         assert abs(result["Aktien"] - 37.5) < 1.0
         assert abs(result["Renten/Geld"] - 25.0) < 1.0
-        assert abs(result["Rohstoffe"] - 37.5) < 1.0  # Combined Edelmetalle + Immobilien
+        assert abs(result["Rohstoffe"] - 37.5) < 1.0  # Combined Rohstoffe + Immobilien
 
     def test_empty_portfolio(self):
         """Test with no valuations."""
@@ -132,7 +132,7 @@ class TestJosefAllocationComputation:
         valuations = [
             MockValuation("Wertpapiere", 7000.0),   # Aktien: 70%
             MockValuation("Renten", 1500.0),        # Renten/Geld: 15%
-            MockValuation("Edelmetalle", 1500.0),   # Rohstoffe: 15%
+            MockValuation("Rohstoffe", 1500.0),     # Rohstoffe: 15%
         ]
         result = compute_josef_allocation(valuations)
 
@@ -146,7 +146,7 @@ class TestJosefAllocationComputation:
         valuations = [
             MockValuation("Wertpapiere", 1000.0),
             MockValuation("Renten", None),          # Should be skipped
-            MockValuation("Edelmetalle", 1000.0),
+            MockValuation("Rohstoffe", 1000.0),
         ]
         result = compute_josef_allocation(valuations)
 

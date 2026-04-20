@@ -32,7 +32,7 @@ class TestLoadRealConfig:
         assert self.registry.get("Aktie").investment_type == "Wertpapiere"
 
     def test_edelmetall_investment_type(self):
-        assert self.registry.get("Edelmetall").investment_type == "Edelmetalle"
+        assert self.registry.get("Edelmetall").investment_type == "Rohstoffe"
 
     def test_immobilienfonds_investment_type(self):
         assert self.registry.get("Immobilienfonds").investment_type == "Immobilien"
@@ -45,7 +45,7 @@ class TestLoadRealConfig:
         types = self.registry.investment_types()
         assert "Wertpapiere" in types
         assert "Immobilien" in types
-        assert "Edelmetalle" in types
+        assert "Rohstoffe" in types
 
     def test_classes_for_wertpapiere(self):
         classes = self.registry.classes_for_type("Wertpapiere")

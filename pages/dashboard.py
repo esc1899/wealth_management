@@ -145,24 +145,49 @@ if has_prices:
     st.divider()
     st.subheader(t("dashboard.portfolio_weight"))
 
-    col_pie1, col_pie2 = st.columns(2)
+    col_sunburst1, col_sunburst2 = st.columns(2)
 
-    with col_pie1:
-        st.caption(t("dashboard.by_type"))
-        alloc_type = {}
-        for v in valuations:
-            if v.current_value_eur:
-                alloc_type[v.investment_type] = alloc_type.get(v.investment_type, 0) + v.current_value_eur
-        if alloc_type:
-            fig = px.pie(names=list(alloc_type.keys()), values=list(alloc_type.values()), hole=0.4)
+    with col_sunburst1:
+        st.caption(t("analysis.weight_by_type"))
+        rows = [
+            {
+                "anlageklasse": t(f"investment_types.{v.investment_type}"),
+                "anlageform": v.asset_class,
+                "wert": v.current_value_eur
+            }
+            for v in valuations
+            if v.current_value_eur
+        ]
+        if rows:
+            df = pd.DataFrame(rows).groupby(["anlageklasse", "anlageform"])["wert"].sum().reset_index()
+            fig = px.sunburst(
+                df,
+                path=["anlageklasse", "anlageform"],
+                values="wert",
+                color="anlageklasse"
+            )
             fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
             st.plotly_chart(fig, use_container_width=True)
 
-    with col_pie2:
-        st.caption(t("dashboard.by_position"))
-        alloc_pos = {v.symbol: v.current_value_eur for v in valuations if v.current_value_eur}
-        if alloc_pos:
-            fig2 = px.pie(names=list(alloc_pos.keys()), values=list(alloc_pos.values()), hole=0.4)
+    with col_sunburst2:
+        st.caption(t("analysis.weight_by_position"))
+        rows = [
+            {
+                "anlageklasse": t(f"investment_types.{v.investment_type}"),
+                "position": v.symbol,
+                "wert": v.current_value_eur
+            }
+            for v in valuations
+            if v.current_value_eur
+        ]
+        if rows:
+            df = pd.DataFrame(rows).groupby(["anlageklasse", "position"])["wert"].sum().reset_index()
+            fig2 = px.sunburst(
+                df,
+                path=["anlageklasse", "position"],
+                values="wert",
+                color="anlageklasse"
+            )
             fig2.update_layout(margin=dict(t=0, b=0, l=0, r=0))
             st.plotly_chart(fig2, use_container_width=True)
 
