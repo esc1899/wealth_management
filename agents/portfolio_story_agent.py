@@ -33,6 +33,24 @@ class PortfolioMetrics:
     positions_count: int
 
 
+@dataclass
+class StabilityResult:
+    """Result from a stability-only analysis (FEAT-18)."""
+    verdict: str
+    summary: str
+    full_text: str
+
+
+@dataclass
+class StoryAndPerfResult:
+    """Result from story + performance analysis (FEAT-18)."""
+    verdict: str
+    summary: str
+    perf_verdict: str
+    perf_summary: str
+    full_text: str
+
+
 class PortfolioStoryAgent:
     """
     Analyzes portfolio story alignment and performance.
@@ -111,6 +129,149 @@ class PortfolioStoryAgent:
         )
 
         return await self._llm.complete(prompt, max_tokens=500)
+
+    async def analyze_stability(
+        self,
+        metrics: PortfolioMetrics,
+        portfolio_snapshot: str,
+        skill_prompt: Optional[str] = None,
+    ) -> StabilityResult:
+        """
+        Analyze portfolio stability (Josef's Regel or custom skill).
+        FEAT-18: Separate modular check from Story/Performance.
+        """
+        self._llm.skill_context = "portfolio_stability_check"
+
+        josef_summary = (
+            f"Aktien: {metrics.josef_aktien_pct:.0f}% | "
+            f"Renten/Geld: {metrics.josef_renten_pct:.0f}% | "
+            f"Rohstoffe + Immo: {metrics.josef_rohstoffe_pct:.0f}%"
+        )
+
+        system_prompt = f"""Du bist ein kritischer Portfolio-Analyst der Portfolio-Stabilität bewertet.
+
+Portfolio-Daten:
+{portfolio_snapshot}
+
+Gewichtung nach Josef's Regel: {josef_summary}
+
+Analysiere die Stabilität des Portfolios gegen die Kriterien unten.
+Antworte IMMER in diesem exakten Format:
+
+## Stabilität
+**Stabilitäts-Urteil:** 🟢 Stabil | 🟡 Achtung | 🔴 Instabil
+> {{EIN-SATZ-FAZIT}}
+
+### Fazit zur Stabilität"""
+
+        if skill_prompt:
+            system_prompt += f"\n\n## Stabilitäts-Fokus\n{skill_prompt}"
+        else:
+            # Default: compact Josef's Regel guidance
+            default_stability = f"""## Stabilitäts-Fokus: Josef's Regel (Standard)
+
+Das Portfolio soll langfristig wie folgt aufgeteilt sein — je ein Drittel:
+- **Säule 1 — Aktien: 1/3** (Wachstum, Inflationsschutz)
+- **Säule 2 — Renten/Geld: 1/3** (Rezessions-Schutz)
+- **Säule 3 — Rohstoffe+Immobilien: 1/3** (Sachwert-Schutz)
+
+Aktuelle Verteilung:
+- Aktien: {metrics.josef_aktien_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_aktien_pct - 33:.0f}pp)
+- Renten/Geld: {metrics.josef_renten_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_renten_pct - 33:.0f}pp)
+- Rohstoffe + Immo: {metrics.josef_rohstoffe_pct:.0f}% (Ziel: 33%, Abweichung: {metrics.josef_rohstoffe_pct - 33:.0f}pp)
+
+Bewerte: Abweichungen > 10% pro Säule = kritisch und adressierungsbedürftig."""
+            system_prompt += f"\n\n{default_stability}"
+
+        user_message = "Bitte analysiere die Stabilität meines Portfolios."
+
+        reply = await self._llm.complete(system_prompt + "\n\n" + user_message, max_tokens=1024)
+
+        # Parse stability section only
+        stability_verdict = _extract_verdict_from_section(reply, "Stabilität")
+        stability_summary = _extract_summary(reply, "Stabilität")
+
+        return StabilityResult(
+            verdict=stability_verdict or "unknown",
+            summary=stability_summary or "Einschätzung ausstehend",
+            full_text=reply,
+        )
+
+    async def analyze_story_and_performance(
+        self,
+        story: PortfolioStory,
+        portfolio_snapshot: str,
+        dividend_snapshot: str,
+        skill_prompt: Optional[str] = None,
+        inflation_rate: Optional[float] = None,
+    ) -> StoryAndPerfResult:
+        """
+        Analyze portfolio story alignment and performance.
+        FEAT-18: Separate modular check from Stability.
+        """
+        self._llm.skill_context = "portfolio_story_check"
+
+        inflation_context = ""
+        if inflation_rate is not None:
+            inflation_context = (
+                f"\n\nAktuelle Inflation (HICP): {inflation_rate:.2f}% "
+                f"(Referenzwert für Bewertung geldbasierter Anlagen)"
+            )
+
+        base_prompt = f"""Du bist ein kritischer Portfolio-Analyst der bewertet ob ein Portfolio mit den Zielen des Investors aligned ist.
+
+Portfolio-These (Narrativ):
+{story.story}
+
+Ziele:
+- Ziel-Jahr: {story.target_year or 'offen'}
+- Liquiditätsbedarf: {story.liquidity_need or 'keine angegeben'}
+- Priorität: {story.priority}
+
+Analysiere anhand der Portfolio-Daten unten ob die These noch hält.
+Antworte IMMER in diesem exakten Format (zwei Sektionen mit je eigenem Urteil):
+
+## Portfolio Story-Check
+**Story-Urteil:** 🟢 Intakt | 🟡 Gemischt | 🔴 Gefährdet
+> {{EIN-SATZ-FAZIT}}
+
+### Was bestätigt die Portfolio-These
+### Was stellt sie in Frage
+
+## Performance & Dividenden
+**Performance-Urteil:** 🟢 On Track | 🟡 Achtung | 🔴 Kritisch
+> {{EIN-SATZ-FAZIT}}
+
+### Einschätzung im Kontext der Ziele
+
+---
+
+Portfolio-Daten:
+{portfolio_snapshot}
+
+Dividenden-Snapshot:
+{dividend_snapshot}{inflation_context}"""
+
+        system_prompt = base_prompt
+        if skill_prompt:
+            system_prompt += f"\n\n## Story-Fokus\n{skill_prompt}"
+
+        user_message = "Bitte analysiere mein Portfolio gegen die angegebene These und Ziele."
+
+        reply = await self._llm.complete(system_prompt + "\n\n" + user_message, max_tokens=1024)
+
+        story_verdict = _extract_verdict_from_section(reply, "Portfolio Story-Check")
+        story_summary = _extract_summary(reply, "Portfolio Story-Check")
+        perf_verdict = _extract_verdict_from_section(reply, "Performance & Dividenden")
+        perf_summary = _extract_summary(reply, "Performance & Dividenden")
+
+        return StoryAndPerfResult(
+            verdict=story_verdict or "unknown",
+            summary=story_summary or "Analyse ausstehend",
+            perf_verdict=perf_verdict or "unknown",
+            perf_summary=perf_summary or "Bewertung ausstehend",
+            full_text=reply,
+        )
 
     async def analyze(
         self,

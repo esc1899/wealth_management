@@ -252,10 +252,11 @@ skills:
         Veränderungen beim Unternehmen (Management, Strategie, Markt) und
         Analystenmeinungen. Hat sich seit Erstellen der These etwas Wesentliches geändert?
 
-  # ── Portfolio Story Checker ────────────────────────────────────────────────────
-  # Skills for the PortfolioStoryAgent (Cloud ☁️, Claude API + web search).
+  # ── Portfolio Stability Checks ─────────────────────────────────────────────────
+  # Skills for the PortfolioStoryAgent stability analysis (Cloud ☁️, Claude API + web search).
+  # FEAT-18: Split from portfolio_story area for modular checks.
 
-  portfolio_story:
+  portfolio_stability:
     - name: "Josef's Regel (3-Säulen-Stabilität)"
       description: "Portfolio-Stabilität nach 1/3-Aufteilung: Aktien/Renten/Rohstoffe"
       prompt: |
@@ -310,12 +311,23 @@ skills:
         - Fehlt Europa oder Emerging-Market-Exposure komplett?
         - Wie ist die Währungsdiversifikation (EUR, USD, CHF)?
 
+  # ── Portfolio Cash Rule (Bargeldregel) ──────────────────────────────────────────
+  # Deterministic check for cash liquidity buffer. FEAT-18: Moved from portfolio_story.
+
+  portfolio_cash_rule:
     - name: "Bargeldregel"
       description: "Liquiditätspuffer: Ziel-%, Minimum und Maximum für liquides Bargeld"
       prompt: |
         target_pct: 5.0
         min_eur: 10000
         max_eur: 100000
+
+  # ── Portfolio Story Checker ────────────────────────────────────────────────────────
+  # Skills for the PortfolioStoryAgent story & performance analysis.
+  # FEAT-18: Reserved for Story-specific skills (e.g., DividendenCheck in future).
+  # Currently empty — will be populated in future releases.
+
+  portfolio_story: []
 
   # ── Watchlist Checker ────────────────────────────────────────────────────────
   # Skills for the WatchlistCheckerAgent (Local 🔒, Ollama).

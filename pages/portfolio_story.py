@@ -149,13 +149,13 @@ with st.form("portfolio_story_form", clear_on_submit=False):
 # ──────────────────────────────────────────────────────────────────────
 
 def _render_cash_rule_check() -> None:
-    """Display cash rule status: target vs. actual liquid cash."""
+    """Display cash rule status: target vs. actual liquid cash. FEAT-18: Moved to portfolio_cash_rule area."""
     import yaml
 
-    # Load rule parameters from "Bargeldregel" skill in portfolio_story area
+    # Load rule parameters from "Bargeldregel" skill (FEAT-18: now in portfolio_cash_rule area)
     rule = {"target_pct": 5.0, "min_eur": 10000, "max_eur": 100000}  # defaults
     try:
-        skills = get_skills_repo().get_by_area("portfolio_story")
+        skills = get_skills_repo().get_by_area("portfolio_cash_rule")
         bargeld_skill = next((s for s in skills if s.name == "Bargeldregel"), None)
         if bargeld_skill:
             parsed = yaml.safe_load(bargeld_skill.prompt)
@@ -217,10 +217,202 @@ _render_cash_rule_check()
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Section 2: Story Check + Performance Check
+# Renderer Functions for Modular Checks (FEAT-18)
 # ──────────────────────────────────────────────────────────────────────
 
-st.subheader("2️⃣ Checks — Ausrichtung & Performance")
+def _render_stability_check() -> None:
+    """Render stability check selector and analysis. FEAT-18: Modular check."""
+    skills_repo = get_skills_repo()
+    stability_skills = skills_repo.get_by_area("portfolio_stability")
+
+    if not stability_skills:
+        st.info(
+            "ℹ️ **Stabilitäts-Check nicht konfiguriert**\n\n"
+            "Füge einen Skill unter Bereich `portfolio_stability` hinzu, um diesen Check zu aktivieren.\n\n"
+            "_Skills: Josef's Regel, Sektor-Limits, Geographische Streuung_"
+        )
+        return
+
+    # Skill selector
+    skill_options = {s.name: s for s in stability_skills if not s.hidden}
+    skill_names = list(skill_options.keys())
+    _default_skill = "Josef's Regel (3-Säulen-Stabilität)"
+    _default_idx = skill_names.index(_default_skill) if _default_skill in skill_names else 0
+    selected_skill_name = st.selectbox(
+        "Stabilitäts-Fokus",
+        options=skill_names,
+        index=_default_idx,
+        key="stability_check_skill",
+    )
+    selected_skill = skill_options[selected_skill_name]
+
+    if st.button("🔄 Stabilitäts-Check durchführen", use_container_width=True, key="btn_stability"):
+        with st.spinner("Analysiere Stabilität…"):
+            valuations = get_market_agent().get_portfolio_valuation()
+            portfolio = _portfolio_service.get_portfolio_positions()
+
+            # Build portfolio snapshot (same as in story check)
+            snapshot_lines = ["**Portfolio Snapshot**\n"]
+            for p in portfolio:
+                if p.ticker:
+                    ticker_str = f" ({p.ticker})"
+                    snapshot_lines.append(f"- {p.name}{ticker_str} [{p.asset_class}]")
+
+            from core.portfolio_stability import JOSEF_CATEGORY, compute_josef_allocation
+            from agents.portfolio_story_agent import PortfolioMetrics
+
+            # Non-tradeable positions
+            non_tradeable_lines = []
+            for v in valuations:
+                if v.in_portfolio and not v.symbol:
+                    josef_cat = JOSEF_CATEGORY.get(v.investment_type, "?")
+                    non_tradeable_lines.append(
+                        f"- {v.name} [{v.asset_class}] → {josef_cat} ({symbol()}{v.current_value_eur:,.0f})"
+                    )
+
+            if non_tradeable_lines:
+                snapshot_lines.append("\n**Nicht-börsengehandelt:**")
+                snapshot_lines.extend(non_tradeable_lines)
+
+            # Physical Immobilien
+            physical_immo = [v for v in valuations if v.in_portfolio and v.asset_class in {"Immobilie", "Grundstück"}]
+            if physical_immo:
+                snapshot_lines.append("\n**Direkte Immobilien:**")
+                for v in physical_immo:
+                    snapshot_lines.append(f"- {v.name}: {symbol()}{v.current_value_eur:,.0f}")
+            else:
+                snapshot_lines.append("\n**Direkte Immobilien: keine**")
+
+            portfolio_snapshot = "\n".join(snapshot_lines)
+
+            # Compute metrics
+            total_value = sum(v.current_value_eur or 0 for v in valuations)
+            total_cost = sum(v.cost_basis_eur or 0 for v in valuations)
+            total_pnl = total_value - total_cost
+            total_pnl_pct = (total_pnl / total_cost * 100) if total_cost > 0 else 0
+            total_dividend = sum(v.annual_dividend_eur or 0 for v in valuations)
+            dividend_yield = (total_dividend / total_value * 100) if total_value > 0 else 0
+
+            josef = compute_josef_allocation(valuations)
+
+            metrics = PortfolioMetrics(
+                total_value_eur=total_value,
+                total_pnl_eur=total_pnl,
+                total_pnl_pct=total_pnl_pct,
+                total_annual_dividend_eur=total_dividend,
+                portfolio_dividend_yield_pct=dividend_yield,
+                josef_aktien_pct=josef["Aktien"],
+                josef_renten_pct=josef["Renten/Geld"],
+                josef_rohstoffe_pct=josef["Rohstoffe"],
+                positions_count=len(portfolio),
+            )
+
+            # Run stability check
+            async def run_stability_check():
+                return await agent.analyze_stability(
+                    metrics=metrics,
+                    portfolio_snapshot=portfolio_snapshot,
+                    skill_prompt=selected_skill.prompt,
+                )
+
+            stability_result = asyncio.run(run_stability_check())
+
+            # Store in session state for display
+            st.session_state["_stability_result"] = stability_result
+            st.success("✅ Stabilitäts-Check durchgeführt!")
+            st.rerun()
+
+
+def _render_story_check() -> None:
+    """Render story & performance check. FEAT-18: Modular check."""
+    if not current_story:
+        st.info("ℹ️ **Portfolio Story erforderlich**\n\nDefiniere deine Portfolio Story im Abschnitt 1.")
+        return
+
+    skills_repo = get_skills_repo()
+    story_skills = skills_repo.get_by_area("portfolio_story")
+
+    # Optional skill selector (can be empty)
+    skill_options = {s.name: s for s in story_skills if not s.hidden} if story_skills else {}
+
+    if skill_options:
+        skill_names = list(skill_options.keys())
+        selected_skill_name = st.selectbox(
+            "Story-Fokus (optional)",
+            options=[" — (kein spezifischer Fokus)"] + skill_names,
+            index=0,
+            key="story_check_skill",
+        )
+        selected_skill = skill_options.get(selected_skill_name) if selected_skill_name != " — (kein spezifischer Fokus)" else None
+    else:
+        selected_skill = None
+
+    if st.button("🔄 Story-Check durchführen", use_container_width=True, key="btn_story"):
+        with st.spinner("Analysiere Story & Performance…"):
+            valuations = get_market_agent().get_portfolio_valuation()
+            portfolio = _portfolio_service.get_portfolio_positions()
+
+            # Build portfolio snapshot
+            snapshot_lines = ["**Portfolio Snapshot (Börsengehandelte Positionen)**\n"]
+            for p in portfolio:
+                if p.ticker:
+                    ticker_str = f" ({p.ticker})"
+                    snapshot_lines.append(f"- {p.name}{ticker_str} [{p.asset_class}]")
+
+            from core.portfolio_stability import JOSEF_CATEGORY
+
+            non_tradeable_lines = []
+            for v in valuations:
+                if v.in_portfolio and not v.symbol:
+                    josef_cat = JOSEF_CATEGORY.get(v.investment_type, "?")
+                    non_tradeable_lines.append(
+                        f"- {v.name} [{v.asset_class}] → {josef_cat} ({symbol()}{v.current_value_eur:,.0f})"
+                    )
+
+            if non_tradeable_lines:
+                snapshot_lines.append("\n**Nicht-börsengehandelt (in Josef-Regel enthalten):**")
+                snapshot_lines.extend(non_tradeable_lines)
+
+            physical_immo = [v for v in valuations if v.in_portfolio and v.asset_class in {"Immobilie", "Grundstück"}]
+            if physical_immo:
+                snapshot_lines.append("\n**Direkte Immobilien (physisch, nicht fondbasiert):**")
+                for v in physical_immo:
+                    snapshot_lines.append(f"- {v.name} [{v.asset_class}]: {symbol()}{v.current_value_eur:,.0f}")
+            else:
+                snapshot_lines.append("\n**Direkte Immobilien (physisch): keine im Portfolio**")
+
+            portfolio_snapshot = "\n".join(snapshot_lines)
+
+            # Build dividend snapshot
+            dividend_lines = []
+            for v in valuations:
+                if v.annual_dividend_eur and v.annual_dividend_eur > 0:
+                    dividend_lines.append(
+                        f"- {v.name}: {symbol()}{v.annual_dividend_eur:.0f}/Jahr ({v.dividend_yield_pct*100:.1f}%)"
+                    )
+            dividend_snapshot = "\n".join(dividend_lines) or "(Keine Dividenden)"
+
+            # Run story & performance check
+            async def run_story_check():
+                return await agent.analyze_story_and_performance(
+                    story=current_story,
+                    portfolio_snapshot=portfolio_snapshot,
+                    dividend_snapshot=dividend_snapshot,
+                    skill_prompt=selected_skill.prompt if selected_skill else None,
+                    inflation_rate=None,
+                )
+
+            story_result = asyncio.run(run_story_check())
+            st.session_state["_story_result"] = story_result
+            st.success("✅ Story-Check durchgeführt!")
+            st.rerun()
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Section 2: Portfolio Analysis (using modular checks)
+# ──────────────────────────────────────────────────────────────────────
+
+st.subheader("2️⃣ Checks — Ausrichtung & Performance & Stabilität")
 
 if not current_story:
     st.warning("⚠️ Bitte definiere zuerst deine Portfolio Story oben.")
@@ -295,170 +487,35 @@ else:
                             st.session_state[flag] = True
                         st.switch_page(s["page"])
 
-    col_check, col_history = st.columns([2, 1])
+    # Modular checks (FEAT-18): Stability, Story, Position Fits
+    st.caption("**Stabilitäts-Check:**")
+    _render_stability_check()
 
-    with col_check:
-        # Skill selector for Portfolio Story (exclude rule-config skills)
-        _RULE_SKILLS = {"Bargeldregel"}
-        skills_repo = get_skills_repo()
-        portfolio_story_skills = skills_repo.get_by_area("portfolio_story")
-        skill_options = {s.name: s for s in portfolio_story_skills if not s.hidden and s.name not in _RULE_SKILLS}
+    st.caption("**Story & Performance Check:**")
+    _render_story_check()
 
-        if skill_options:
-            skill_names = list(skill_options.keys())
-            _default_skill = "Josef's Regel (3-Säulen-Stabilität)"
-            _default_idx = skill_names.index(_default_skill) if _default_skill in skill_names else 0
-            selected_skill_name = st.selectbox(
-                "Fokus-Bereich",
-                options=skill_names,
-                index=_default_idx,
-                key="portfolio_story_skill",
-            )
-            selected_skill = skill_options[selected_skill_name]
-        else:
-            selected_skill = None
+    # Display results from session state if available
+    if st.session_state.get("_stability_result"):
+        with st.container(border=True):
+            sr = st.session_state["_stability_result"]
+            st.markdown(f"**Stabilitäts-Urteil:** {_verdict_icon(sr.verdict)} {sr.verdict.title()}")
+            if sr.summary:
+                st.markdown(f"_{sr.summary}_")
+            with st.expander("Details"):
+                st.text(sr.full_text)
 
-        if st.button("🔄 Story-Check durchführen", use_container_width=True):
-            with st.spinner("Analysiere Portfolio gegen Story…"):
-                # Build portfolio snapshot
-                portfolio = _portfolio_service.get_portfolio_positions()
-                watchlist = _portfolio_service.get_watchlist_positions()
+    if st.session_state.get("_story_result"):
+        with st.container(border=True):
+            sr = st.session_state["_story_result"]
+            st.markdown(f"**Story-Urteil:** {_verdict_icon(sr.verdict)} {sr.verdict.title()}")
+            if sr.summary:
+                st.markdown(f"_{sr.summary}_")
 
-                # Get valuations (includes all positions: tradeable + non-tradeable)
-                valuations = get_market_agent().get_portfolio_valuation()
-
-                if portfolio:
-                    from core.portfolio_stability import JOSEF_CATEGORY
-
-                    # Tradeable positions (börsengehandelt = haben ticker)
-                    snapshot_lines = ["**Portfolio Snapshot (Börsengehandelte Positionen)**\n"]
-                    tradeable_names = {p.name for p in portfolio if p.ticker}
-
-                    for p in portfolio:
-                        if p.ticker:  # Only show tradeable in main section
-                            ticker_str = f" ({p.ticker})"
-                            snapshot_lines.append(
-                                f"- {p.name}{ticker_str} [{p.asset_class}]"
-                            )
-
-                    # Non-tradeable positions (keine ticker = Immobilien, Festgeld, etc.)
-                    # Diese zählen in der Josef-Regel mit, müssen aber erklärt werden
-                    non_tradeable_lines = []
-                    for v in valuations:
-                        if v.in_portfolio and not v.symbol:  # in_portfolio aber kein symbol = non-tradeable
-                            josef_cat = JOSEF_CATEGORY.get(v.investment_type, "?")
-                            non_tradeable_lines.append(
-                                f"- {v.name} [{v.asset_class}] → {josef_cat} ({symbol()}{v.current_value_eur:,.0f})"
-                            )
-
-                    if non_tradeable_lines:
-                        snapshot_lines.append("\n**Nicht-börsengehandelt (in Josef-Regel enthalten):**")
-                        snapshot_lines.extend(non_tradeable_lines)
-
-                    # Explicit physical Immobilien section to anchor LLM (prevent hallucination)
-                    physical_immo = [
-                        v for v in valuations
-                        if v.in_portfolio and v.asset_class in {"Immobilie", "Grundstück"}
-                    ]
-                    if physical_immo:
-                        snapshot_lines.append("\n**Direkte Immobilien (physisch, nicht fondbasiert):**")
-                        for v in physical_immo:
-                            snapshot_lines.append(
-                                f"- {v.name} [{v.asset_class}]: {symbol()}{v.current_value_eur:,.0f}"
-                            )
-                    else:
-                        snapshot_lines.append(
-                            "\n**Direkte Immobilien (physisch): keine im Portfolio**"
-                        )
-
-                    portfolio_snapshot = "\n".join(snapshot_lines)
-                else:
-                    portfolio_snapshot = "(Leeres Portfolio)"
-
-                # Build dividend snapshot
-                dividend_lines = []
-                for v in valuations:
-                    if v.annual_dividend_eur and v.annual_dividend_eur > 0:
-                        dividend_lines.append(
-                            f"- {v.name}: {symbol()}{v.annual_dividend_eur:.0f}/Jahr "
-                            f"({v.dividend_yield_pct*100:.1f}%)"
-                        )
-                dividend_snapshot = "\n".join(dividend_lines) or "(Keine Dividenden)"
-
-                # Compute metrics (simplified)
-                total_value = sum(v.current_value_eur or 0 for v in valuations)
-                total_cost = sum(v.cost_basis_eur or 0 for v in valuations)
-                total_pnl = total_value - total_cost
-                total_pnl_pct = (total_pnl / total_cost * 100) if total_cost > 0 else 0
-                total_dividend = sum(v.annual_dividend_eur or 0 for v in valuations)
-                dividend_yield = (total_dividend / total_value * 100) if total_value > 0 else 0
-
-                from agents.portfolio_story_agent import PortfolioMetrics
-                from core.portfolio_stability import compute_josef_allocation
-
-                # Compute real Josef-Regel allocation from actual portfolio valuations
-                josef = compute_josef_allocation(valuations)
-
-                metrics = PortfolioMetrics(
-                    total_value_eur=total_value,
-                    total_pnl_eur=total_pnl,
-                    total_pnl_pct=total_pnl_pct,
-                    total_annual_dividend_eur=total_dividend,
-                    portfolio_dividend_yield_pct=dividend_yield,
-                    josef_aktien_pct=josef["Aktien"],
-                    josef_renten_pct=josef["Renten/Geld"],
-                    josef_rohstoffe_pct=josef["Rohstoffe"],
-                    positions_count=len(portfolio),
-                )
-
-                # Build verdicts dict for position analysis
-                pos_ids = [p.id for p in portfolio if p.id]
-                verdicts_by_position = {}
-                if pos_ids:
-                    vs = _analysis_service.get_verdicts(pos_ids, "storychecker")
-                    vf = _analysis_service.get_verdicts(pos_ids, "fundamental")
-                    vc = _analysis_service.get_verdicts(pos_ids, "consensus_gap")
-                    for pos_id in pos_ids:
-                        verdicts_by_position[pos_id] = {
-                            "storychecker": vs.get(pos_id),
-                            "fundamental": vf.get(pos_id),
-                            "consensus_gap": vc.get(pos_id),
-                        }
-
-                # Run analysis (portfolio-level + position-level in parallel)
-                async def run_checks():
-                    analysis, position_fits = await asyncio.gather(
-                        agent.analyze(
-                            story=current_story,
-                            portfolio_snapshot=portfolio_snapshot,
-                            metrics=metrics,
-                            dividend_snapshot=dividend_snapshot,
-                            inflation_rate=None,  # TODO: fetch from Tavily
-                            selected_skill=selected_skill,
-                        ),
-                        agent.analyze_positions(
-                            story=current_story,
-                            positions=portfolio,
-                            verdicts=verdicts_by_position,
-                        )
-                    )
-                    return analysis, position_fits
-
-                analysis, position_fits = asyncio.run(run_checks())
-
-                st.success("✅ Story-Check durchgeführt!")
-                st.rerun()
-
-    with col_history:
-        st.caption("Analysen-Verlauf")
-        history = repo.get_analysis_history(limit=3)
-        if not history:
-            st.caption("_(noch keine Analysen)_")
-        else:
-            for h in history:
-                date_str = h.created_at.strftime("%d.%m.%Y %H:%M")
-                verdict_icon = _verdict_icon(h.verdict)
-                st.caption(f"{verdict_icon} {date_str}")
+        with st.container(border=True):
+            sr = st.session_state["_story_result"]
+            st.markdown(f"**Performance-Urteil:** {_verdict_icon(sr.perf_verdict)} {sr.perf_verdict.title()}")
+            if sr.perf_summary:
+                st.markdown(f"_{sr.perf_summary}_")
 
     if latest_analysis:
         st.divider()

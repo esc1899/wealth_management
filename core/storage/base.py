@@ -344,6 +344,19 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     # Migrate Edelmetalle → Rohstoffe (2026-04-20)
     conn.execute("UPDATE positions SET investment_type='Rohstoffe' WHERE investment_type='Edelmetalle'")
 
+    # FEAT-18: Split portfolio_story area into 3 separate areas (2026-04-20)
+    conn.execute(
+        "UPDATE skills SET area='portfolio_cash_rule' "
+        "WHERE name='Bargeldregel' AND area='portfolio_story'"
+    )
+    conn.execute(
+        "UPDATE skills SET area='portfolio_stability' "
+        "WHERE name IN ('Josef''s Regel (3-Säulen-Stabilität)', "
+        "'Sektor-Limits (Konzentrations-Schutz)', "
+        "'Geographische Streuung (Regional-Diversifikation)') "
+        "AND area='portfolio_story'"
+    )
+
     existing_skills = {row[1] for row in conn.execute("PRAGMA table_info(skills)")}
     if "hidden" not in existing_skills:
         conn.execute(
