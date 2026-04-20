@@ -238,7 +238,7 @@ def _run_missing_portfolio_checks() -> None:
 
             async def run_story_check():
                 return await agent.analyze_story_and_performance(
-                    story=current_story.story,
+                    story=current_story,
                     portfolio_snapshot=portfolio_snapshot,
                     dividend_snapshot=dividend_snapshot,
                     skill_prompt=selected_skill.prompt if selected_skill else None,
@@ -334,7 +334,12 @@ if current_story:
     with col_cb2:
         _run_stability = st.checkbox("🏛️ Stabilitäts-Check", key="_run_stability", value=True)
     with col_cb3:
-        pass  # Future use
+        _ps_run_prechecks = st.checkbox(
+            "📋 Portfolio-Checks vor Position-Check",
+            key="_ps_run_prechecks",
+            value=False,
+            help="Stabilitäts-Check + Story-Check vor Navigation zu Positions-Checkern ausführen"
+        )
 
     # Main button
     if st.button("🔄 Story-Check durchführen", use_container_width=True, key="btn_story_main"):
@@ -474,7 +479,7 @@ if current_story:
 
             async def run_story_check():
                 return await agent.analyze_story_and_performance(
-                    story=current_story.story,
+                    story=current_story,
                     portfolio_snapshot=portfolio_snapshot,
                     dividend_snapshot=dividend_snapshot,
                     skill_prompt=selected_skill.prompt if selected_skill else None,
@@ -485,18 +490,6 @@ if current_story:
 
         st.success("✅ Checks durchgeführt!")
         st.rerun()
-
-st.divider()
-
-# Optional: Run pre-checks before position-checker navigation (shown before results)
-if current_story:
-    st.caption("**Optional für Position-Checks:**")
-    _ps_run_prechecks = st.checkbox(
-        "☑ Portfolio-Checks (Stabilität + Story) vor Positions-Check ausführen",
-        key="_ps_run_prechecks_config",
-        value=False,
-        help="Falls noch nicht durchgeführt: Stabilitäts-Check und Story-Check ausführen, bevor zu Position-Checks navigiert wird"
-    )
 
 st.divider()
 
@@ -675,7 +668,7 @@ if current_story:
                     use_container_width=True,
                     disabled=not _has_pending,
                 ):
-                    if st.session_state.get("_ps_run_prechecks_config"):
+                    if st.session_state.get("_ps_run_prechecks"):
                         _run_missing_portfolio_checks()
                     st.switch_page(s["page"])
 
