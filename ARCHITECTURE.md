@@ -86,7 +86,7 @@ sequenceDiagram
 | Agent | Provider | Model | Session Type | Primary Method | Scope |
 |-------|----------|-------|--------------|--------|-------|
 | **PortfolioAgent** | Ollama | Local | Stateless | `chat()` + tools | Portfolio CRUD |
-| **PortfolioStoryAgent** | Ollama | Local | Stateless | `analyze()` | Story-fit for portfolio |
+| **PortfolioStoryAgent** | Ollama | Local | Stateless | `analyze()` / `analyze_stability()` / `analyze_story_and_performance()` | Modular portfolio checks (FEAT-18) |
 | **WatchlistCheckerAgent** | Ollama | Local | Stateless | `check_watchlist()` | Watchlist fit into portfolio |
 | **MarketDataAgent** | — | — | Stateless | APScheduler | Price fetch + history |
 | **ResearchAgent** | Claude | Haiku | DB-persisted | `start_session()` + `chat()` | Research per position |

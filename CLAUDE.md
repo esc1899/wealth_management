@@ -22,6 +22,16 @@ Damit zukünftige Sessions alles finden:
 - Bei nicht-trivialen Aufgaben: Plan Mode nutzen (`/plan`)
 - Verwandte Fehler zusammen beheben — keine Einzelfix-Iterationen
 
+## Architektur-Guards (FEAT-18)
+
+**Modular Checks Pattern**: Portfolio-level und Position-level Checks folgen dem gleichen Muster:
+- Jeder Check hat eine eigene **Skill-Area** (z.B. `portfolio_stability`, `portfolio_cash_rule`)
+- Kein Skill in Area → Check wird übersprungen mit Info-Meldung (kein Fehler)
+- **Page Renderer**: Separate Funktionen für jeden Check (`_render_*_check()`)
+- **Agent Methoden**: Unabhängige Analyse-Methoden per Check (z.B. `analyze_stability()`, `analyze_story_and_performance()`)
+
+Dies erlaubt Usern, Checks selektiv zu aktivieren/deaktivieren durch Skills im `/skills` Admin-Interface.
+
 ## Plan Mode – Systems Thinking
 Motto: **try to improve the whole**
 - **Teilsysteme**: Wie wirkt sich die Änderung auf einzelne Module/Komponenten aus?

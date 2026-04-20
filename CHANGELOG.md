@@ -8,6 +8,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### FEAT-18: Portfolio-Checker Modularisierung (2026-04-20)
+
+**Split monolithic PortfolioStoryAgent.analyze() into modular, independently toggleable checks.**
+
+- **Agent Refactor**: Split `analyze()` into two independent methods
+  - `analyze_stability()` — LLM check for portfolio stability (Josef's Regel, Sektor-Limits, Geo-Streuung)
+  - `analyze_story_and_performance()` — LLM check for story alignment + performance
+  - `analyze()` remains as wrapper for backward compatibility
+  
+- **Skill Area Split**: Reorganized portfolio checks into three independent areas
+  - `portfolio_cash_rule` — Bargeldregel (deterministic pre-check, optional if skill missing)
+  - `portfolio_stability` — Josef's Regel, Sektor-Limits, Geo-Streuung (optional if no skill)
+  - `portfolio_story` — Reserved for future Story-specific skills (e.g., DividendenCheck)
+  - **Migration**: Existing user DBs auto-migrated on startup; existing skills moved to new areas
+
+- **Page Refactor**: Section 2 (Portfolio Analysis) now modular with separate renderers
+  - `_render_cash_rule_check()` — Updated to use `portfolio_cash_rule` area
+  - `_render_stability_check()` — NEW: Skill selector + LLM button for stability analysis
+  - `_render_story_check()` — NEW: Skill selector + LLM button for story/performance analysis
+  - Each check shows info message if required skill not configured (graceful degradation)
+  - Checks are independent: users can selectively enable/disable based on skills configured
+  
+- **Pattern**: Follows modular pattern established by position-level checkers (StorycheckerAgent, FundamentalAgent, ConsensusGapAgent)
+  - Each check has its own skill area, allowing selective toggling
+  - No skill → info message, not error; user can add skill via `/skills` page
+
+- **DB Migration**: Automatic on first run
+  - `UPDATE skills SET area='portfolio_cash_rule' WHERE name='Bargeldregel'`
+  - `UPDATE skills SET area='portfolio_stability' WHERE name IN ('Josef's Regel...', 'Sektor-Limits...', 'Geographische Streuung...')`
+  - Idempotent: existing migrations are skipped
+
+- **Tests**: 564/564 passing; smoke tests for portfolio_story page verified
+
 ### Portfolio Story Bug Fixes (2026-04-19)
 
 **Three linked bugs from user testing: SQLite path, auto-run recovery, Josef hallucination.**
