@@ -282,18 +282,22 @@ def _render_stability_check() -> None:
             valuations = get_market_agent().get_portfolio_valuation()
             portfolio = _portfolio_service.get_portfolio_positions()
 
-            # Build portfolio snapshot (same as in story check)
+            from core.portfolio_stability import JOSEF_CATEGORY, compute_josef_allocation
+            from agents.portfolio_story_agent import PortfolioMetrics
+
+            valuation_map = {v.name: v for v in valuations}
+
+            # Build portfolio snapshot — include EUR values for ALL positions so LLM doesn't recompute percentages
             snapshot_lines = ["**Portfolio Snapshot**\n"]
             for p in portfolio:
                 if p.ticker:
                     ticker_str = f" ({p.ticker})"
-                    snapshot_lines.append(f"- {p.name}{ticker_str} [{p.asset_class}]")
-
-            from core.portfolio_stability import JOSEF_CATEGORY, compute_josef_allocation
-            from agents.portfolio_story_agent import PortfolioMetrics
+                    v = valuation_map.get(p.name)
+                    josef_cat = JOSEF_CATEGORY.get(p.investment_type, "?")
+                    val_str = f" → {josef_cat} ({symbol()}{v.current_value_eur:,.0f})" if v and v.current_value_eur else f" → {josef_cat}"
+                    snapshot_lines.append(f"- {p.name}{ticker_str} [{p.asset_class}]{val_str}")
 
             # Non-tradeable positions (use portfolio list — v.symbol always truthy due to name[:10] fallback)
-            valuation_map = {v.name: v for v in valuations}
             non_tradeable = [p for p in portfolio if not p.ticker]
             non_tradeable_lines = []
             for p in non_tradeable:
@@ -377,17 +381,20 @@ def _render_story_check() -> None:
             valuations = get_market_agent().get_portfolio_valuation()
             portfolio = _portfolio_service.get_portfolio_positions()
 
-            # Build portfolio snapshot
-            snapshot_lines = ["**Portfolio Snapshot (Börsengehandelte Positionen)**\n"]
+            from core.portfolio_stability import JOSEF_CATEGORY
+
+            valuation_map_s = {v.name: v for v in valuations}
+
+            # Build portfolio snapshot — include EUR values for ALL positions
+            snapshot_lines = ["**Portfolio Snapshot**\n"]
             for p in portfolio:
                 if p.ticker:
                     ticker_str = f" ({p.ticker})"
-                    snapshot_lines.append(f"- {p.name}{ticker_str} [{p.asset_class}]")
-
-            from core.portfolio_stability import JOSEF_CATEGORY
+                    v = valuation_map_s.get(p.name)
+                    val_str = f" ({symbol()}{v.current_value_eur:,.0f})" if v and v.current_value_eur else ""
+                    snapshot_lines.append(f"- {p.name}{ticker_str} [{p.asset_class}]{val_str}")
 
             # Non-tradeable positions (use portfolio list — v.symbol always truthy due to name[:10] fallback)
-            valuation_map_s = {v.name: v for v in valuations}
             non_tradeable_s = [p for p in portfolio if not p.ticker]
             non_tradeable_lines = []
             for p in non_tradeable_s:

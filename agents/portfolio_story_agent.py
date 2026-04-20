@@ -153,9 +153,9 @@ class PortfolioStoryAgent:
 Portfolio-Daten:
 {portfolio_snapshot}
 
-Gewichtung nach Josef's Regel: {josef_summary}
+Gewichtung nach Josef's Regel (bereits berechnet — NICHT neu berechnen): {josef_summary}
 
-Analysiere die Stabilität des Portfolios gegen die Kriterien unten.
+Analysiere die Stabilität des Portfolios gegen die Kriterien unten. Verwende die oben angegebenen Josef-Prozentwerte direkt.
 Antworte IMMER in diesem exakten Format:
 
 ## Stabilität
@@ -328,7 +328,7 @@ Beurteile die Stabilität mit den Kriterien unten (Fokus-Bereich je nach ausgew�
 Portfolio-Daten:
 {portfolio_snapshot}
 
-Gewichtung nach Josef's Regel: {josef_summary}
+Gewichtung nach Josef's Regel (bereits berechnet — NICHT neu berechnen): {josef_summary}
 
 Dividenden-Snapshot:
 {dividend_snapshot}{inflation_context}"""
