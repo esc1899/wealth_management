@@ -15,7 +15,7 @@ from agents.market_data_agent import MarketDataAgent
 from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
 from agents.news_agent import NewsAgent
 from agents.portfolio_agent import PortfolioAgent
-from agents.portfolio_story_agent import PortfolioStoryAgent
+from agents.portfolio_story_agent_v2 import PortfolioStoryAgentV2
 from agents.research_agent import ResearchAgent
 from agents.search_agent import SearchAgent
 from agents.storychecker_agent import StorycheckerAgent
@@ -216,11 +216,11 @@ def get_wealth_snapshot_agent() -> WealthSnapshotAgent:
 
 
 @st.cache_resource
-def get_portfolio_story_agent() -> PortfolioStoryAgent:
+def get_portfolio_story_agent() -> PortfolioStoryAgentV2:
     model = _get_agent_model("portfolio_story", "ollama", _DEFAULT_OLLAMA_MODEL)
     # Portfolio story analysis has detailed prompt — needs longer timeout
     llm = _make_ollama_provider(model, "portfolio_story_check", timeout=300.0)
-    return PortfolioStoryAgent(
+    return PortfolioStoryAgentV2(
         llm=llm,
         positions_repo=get_positions_repo(),
         market_repo=get_market_repo(),
