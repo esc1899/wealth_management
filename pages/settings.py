@@ -124,6 +124,14 @@ with col_o2:
 with col_o3:
     sel_watchlist_checker = _ollama_sel("watchlist_checker", "Watchlist Checker")
 
+col_o4, col_o5, col_o6 = st.columns(3)
+with col_o4:
+    sel_portfolio_comment = _ollama_sel("portfolio_comment", "💬 KI-Kommentare")
+with col_o5:
+    pass
+with col_o6:
+    pass
+
 st.markdown(f"**{t('settings.claude_agents_header')}** ☁️")
 col_c1, col_c2, col_c3 = st.columns(3)
 with col_c1:
@@ -146,6 +154,7 @@ if st.button(t("settings.save_models_button"), key="_save_models_btn", use_conta
     app_config.set("model_ollama_portfolio", sel_portfolio)
     app_config.set("model_ollama_portfolio_story", sel_portfolio_story)
     app_config.set("model_ollama_watchlist_checker", sel_watchlist_checker)
+    app_config.set("model_ollama_portfolio_comment", sel_portfolio_comment)
     app_config.set("model_claude_news", sel_news)
     app_config.set("model_claude_search", sel_search)
     app_config.set("model_claude_storychecker", sel_storychecker)
