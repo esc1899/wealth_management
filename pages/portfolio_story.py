@@ -175,69 +175,82 @@ st.subheader("2️⃣ Ausstehende Positions-Story-Checks")
 
 # Get portfolio positions to count pending story checks
 portfolio = _portfolio_service.get_portfolio_positions()
+n_positions_with_ticker = 0
+n_missing_story = 0
+
 if portfolio:
-    portfolio_ids = [p.id for p in portfolio]
+    # Only count positions with ticker (those that can have story checks)
+    positions_with_ticker = [p for p in portfolio if p.ticker]
+    n_positions_with_ticker = len(positions_with_ticker)
 
-    # Count missing story checker verdicts
-    story_verdicts = _analysis_service.get_verdicts(portfolio_ids, "storychecker")
-    n_missing_story = sum(1 for pid in portfolio_ids if pid not in story_verdicts)
+    if positions_with_ticker:
+        portfolio_ids = [p.id for p in positions_with_ticker]
 
-    # Get latest timestamp
-    latest_ts = None
-    for verdict_obj in story_verdicts.values():
-        if verdict_obj and hasattr(verdict_obj, 'created_at') and verdict_obj.created_at:
-            if latest_ts is None or verdict_obj.created_at > latest_ts:
-                latest_ts = verdict_obj.created_at
+        # Count missing story checker verdicts
+        story_verdicts = _analysis_service.get_verdicts(portfolio_ids, "storychecker")
+        n_missing_story = sum(1 for pid in portfolio_ids if pid not in story_verdicts)
 
-    ts_str = f" (zuletzt: {latest_ts.strftime('%d.%m. %H:%M')})" if latest_ts else " (noch nicht gelaufen)"
+        # Get latest timestamp
+        latest_ts = None
+        for verdict_obj in story_verdicts.values():
+            if verdict_obj and hasattr(verdict_obj, 'created_at') and verdict_obj.created_at:
+                if latest_ts is None or verdict_obj.created_at > latest_ts:
+                    latest_ts = verdict_obj.created_at
 
-    if n_missing_story > 0:
-        st.info(
-            f"💡 **Story Checker**: {n_missing_story}/{len(portfolio_ids)} Positionen ausstehend{ts_str}"
-        )
+        ts_str = f" (zuletzt: {latest_ts.strftime('%d.%m. %H:%M')})" if latest_ts else " (noch nicht gelaufen)"
 
-# Checkbox + Skill Selector for pre-checks
-col1, col2 = st.columns([1, 2])
-with col1:
-    run_position_checks = st.checkbox(
-        "☑ Ausstehende Positions-Storychecks vor Analyse ausführen",
-        value=False,
-        key="_ps_run_prechecks",
-    )
+        if n_missing_story > 0:
+            st.info(
+                f"💡 **Story Checker**: {n_missing_story}/{n_positions_with_ticker} Positionen ausstehend{ts_str}"
+            )
 
-with col2:
-    skills_repo = get_skills_repo()
-    story_skills = skills_repo.get_by_area("portfolio_story")
-    skill_options = {s.name: s for s in story_skills if not s.hidden}
-
-    if skill_options:
-        skill_names = list(skill_options.keys())
-        selected_skill_name = st.selectbox(
-            "Story Checker Fokus-Bereich",
-            options=skill_names,
-            index=0,
-            key="portfolio_story_skill",
-        )
-        selected_skill = skill_options[selected_skill_name]
-    else:
-        selected_skill = None
+# Checkbox for pre-checks
+run_position_checks = st.checkbox(
+    "☑ Ausstehende Positions-Storychecks vor Analyse ausführen",
+    value=False,
+    key="_ps_run_prechecks",
+)
 
 st.divider()
 
 # ──────────────────────────────────────────────────────────────────────
-# Section 3: Main Button — Portfolio Story Check
+# Section 3: Story-Check Settings & Main Button
 # ──────────────────────────────────────────────────────────────────────
+
+st.subheader("3️⃣ Portfolio Story-Check")
+
+# Skill Selector for Story Analysis
+skills_repo = get_skills_repo()
+story_skills = skills_repo.get_by_area("portfolio_story")
+skill_options = {s.name: s for s in story_skills if not s.hidden}
+
+if skill_options:
+    skill_names = list(skill_options.keys())
+    selected_skill_name = st.selectbox(
+        "Story-Check Fokus-Bereich",
+        options=skill_names,
+        index=0,
+        key="portfolio_story_skill",
+    )
+    selected_skill = skill_options[selected_skill_name]
+else:
+    selected_skill = None
 
 if st.button("📖 Portfolio Story-Check ausführen", type="primary", use_container_width=True):
     if not current_story or not current_story.story:
         st.error("❌ Bitte definiere zuerst eine Portfolio-Story.")
     else:
-        # Run pre-checks if enabled
-        if run_position_checks and portfolio:
-            with st.spinner("Führe ausstehende Positions-Story-Checks aus..."):
-                # This would be a helper function similar to portfolio_story.py old code
-                # For now, we'll skip the pre-check logic and just run the main analysis
-                pass
+        # Run pre-checks if enabled (only for positions with missing verdicts)
+        if run_position_checks and n_missing_story > 0:
+            with st.spinner(f"Führe {n_missing_story} ausstehende Positions-Story-Checks aus..."):
+                positions_with_ticker = [p for p in portfolio if p.ticker]
+                portfolio_ids = [p.id for p in positions_with_ticker]
+                story_verdicts = _analysis_service.get_verdicts(portfolio_ids, "storychecker")
+                missing_ids = [pid for pid in portfolio_ids if pid not in story_verdicts]
+
+                # TODO: Call storychecker agent for missing_ids
+                # For now, just show that we would run them
+                st.info(f"Würde {len(missing_ids)} Positionen prüfen (Storychecker-Integration ausstehend)")
 
         # Build portfolio + dividend snapshots
         portfolio = _portfolio_service.get_portfolio_positions()
