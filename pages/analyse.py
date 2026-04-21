@@ -228,33 +228,17 @@ st.divider()
 # ------------------------------------------------------------------
 st.subheader("🏛️ Stabilitätscheck (Josef's Regel)")
 
+from core.portfolio_stability import compute_josef_allocation
+
 stability_skills = skills_repo.get_by_area("portfolio_stability")
 stability_skill = next((s for s in stability_skills if not s.hidden), None)
 
 if stability_skills:
-    aktien_eur = sum(
-        v.current_value_eur
-        for v in valuations
-        if v.current_value_eur and v.investment_type == "Aktien"
-    )
-    renten_eur = sum(
-        v.current_value_eur
-        for v in valuations
-        if v.current_value_eur and v.investment_type in ["Anleihen", "Geldmarkt", "Bargeld"]
-    )
-    rohstoffe_eur = sum(
-        v.current_value_eur
-        for v in valuations
-        if v.current_value_eur and v.investment_type in ["Edelmetalle", "Immobilien", "Rohstoffe"]
-    )
-    total_eur = aktien_eur + renten_eur + rohstoffe_eur
-
-    if total_eur > 0:
-        aktien_pct = aktien_eur / total_eur * 100
-        renten_pct = renten_eur / total_eur * 100
-        rohstoffe_pct = rohstoffe_eur / total_eur * 100
-    else:
-        aktien_pct = renten_pct = rohstoffe_pct = 0
+    # Use correct Josef allocation calculation
+    josef = compute_josef_allocation(valuations)
+    aktien_pct = josef["Aktien"]
+    renten_pct = josef["Renten/Geld"]
+    rohstoffe_pct = josef["Rohstoffe"]
 
     ziel_pct = 33.33
     def _dev(pct: float) -> str:
