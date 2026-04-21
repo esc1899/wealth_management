@@ -23,6 +23,7 @@ from state import (
     get_analysis_service,
     get_app_config_repo,
     get_market_agent,
+    get_portfolio_comment_model,
     get_portfolio_comment_service,
     get_portfolio_service,
     get_portfolio_story_agent,
@@ -481,7 +482,7 @@ if _ps_full_text:
 
     _comment_style_id = get_app_config_repo().get("comment_style") or "humorvoll"
     _comment_style = get_style_by_id(_comment_style_id)
-    _comment_service = get_portfolio_comment_service()
+    _comment_service = get_portfolio_comment_service(get_portfolio_comment_model())
 
     _ctx = f"Portfolio Story-Check Ergebnis:\n{_ps_full_text}"
     _ctx_hash = hashlib.md5((_ctx + _comment_style_id).encode()).hexdigest()

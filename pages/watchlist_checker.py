@@ -26,6 +26,7 @@ from state import (
     get_watchlist_checker_agent,
     get_portfolio_story_repo,
     get_agent_runs_repo,
+    get_portfolio_comment_model,
     get_portfolio_comment_service,
     get_app_config_repo,
     get_storychecker_repo,
@@ -609,7 +610,7 @@ if st.session_state.get("_watchlist_check_result"):
 
     _comment_style_id = get_app_config_repo().get("comment_style") or "humorvoll"
     _comment_style = get_style_by_id(_comment_style_id)
-    comment_service = get_portfolio_comment_service()
+    comment_service = get_portfolio_comment_service(get_portfolio_comment_model())
 
     # Cache by context + style hash (regenerate only if input changes)
     full_text = result.full_text if hasattr(result, 'full_text') else ""

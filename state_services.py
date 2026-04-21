@@ -25,14 +25,22 @@ def get_position_story_service():
     )
 
 
+def get_portfolio_comment_model() -> str:
+    """Resolve the currently configured model for portfolio comments."""
+    return _get_agent_model("portfolio_comment", "ollama", _DEFAULT_OLLAMA_MODEL)
+
+
 @st.cache_resource
-def get_portfolio_comment_service():
-    """Service for generating stylized financial commentary."""
+def get_portfolio_comment_service(model: str = ""):
+    """Service for generating stylized financial commentary.
+
+    model is passed explicitly so @st.cache_resource creates a new instance
+    when the model changes (cache key includes model).
+    """
     from core.services.portfolio_comment_service import PortfolioCommentService
-    model = _get_agent_model("portfolio_comment", "ollama", _DEFAULT_OLLAMA_MODEL)
     return PortfolioCommentService(
         host=config.OLLAMA_HOST,
-        model=model,
+        model=model or _DEFAULT_OLLAMA_MODEL,
         usage_repo=get_usage_repo(),
     )
 
