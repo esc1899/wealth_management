@@ -1,16 +1,19 @@
 """
-Portfolio Story — portfolio-level narrative, alignment check, performance review.
-V2: Clean slate — only story & performance checks, no stability/cash checks.
+Portfolio Story — portfolio-level narrative, alignment check.
+V2: Clean, focused on story integrity with position verdicts.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import threading
+import time
 from datetime import datetime
 
 import streamlit as st
 
+from config import config
 from core.currency import symbol
 from core.i18n import t
 from core.storage.models import PortfolioStory
@@ -21,7 +24,6 @@ from state import (
     get_portfolio_service,
     get_portfolio_story_agent,
     get_portfolio_story_repo,
-    get_skills_repo,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,24 +35,95 @@ def _verdict_icon(verdict: str) -> str:
         "intact": "🟢",
         "gemischt": "🟡",
         "gefaehrdet": "🔴",
-        "on_track": "🟢",
-        "achtung": "🟡",
-        "kritisch": "🔴",
         "unknown": "⚪",
     }
     return mapping.get(verdict.lower(), "⚪")
 
 
-def _fit_role_display(fit_role: str) -> tuple[str, str]:
-    """Return (icon, label) for a position fit role."""
-    mapping = {
-        "Wachstumsmotor": ("🔵", "Wachstumsmotor"),
-        "Stabilitätsanker": ("🟡", "Stabilitätsanker"),
-        "Einkommensquelle": ("🟢", "Einkommensquelle"),
-        "Diversifikationselement": ("🟣", "Diversifikationselement"),
-        "Fehlplatzierung": ("🔴", "Fehlplatzierung"),
-    }
-    return mapping.get(fit_role, ("⚪", "Unbekannt"))
+# ──────────────────────────────────────────────────────────────────────
+# Background Job for Storychecker Pre-checks
+# ──────────────────────────────────────────────────────────────────────
+
+_PS_JOB = {
+    "running": False,
+    "done": False,
+    "count": 0,
+    "error": None,
+    "agents": [],
+}
+
+_JOB_DEFAULTS = {
+    "running": False,
+    "done": False,
+    "count": 0,
+    "error": None,
+    "agents": [],
+}
+
+
+def _run_storychecker_job(
+    positions,
+    language: str,
+    job: dict,
+    db_path: str,
+    enc_key: str,
+    api_key: str,
+) -> None:
+    """
+    Run storychecker for given positions in a background thread.
+    Uses thread-local DB connection (not Streamlit singletons).
+    """
+    try:
+        from core.database import get_connection, init_db, migrate_db
+        from core.storage.positions import PositionsRepository
+        from core.storage.position_analyses import PositionAnalysesRepository
+        from core.llm.claude import ClaudeProvider
+        from core.constants import CLAUDE_HAIKU
+        from agents.storychecker_agent import StorycheckerAgent
+
+        # Establish thread-local connection
+        conn = get_connection(db_path, enc_key)
+        init_db(conn)
+        migrate_db(conn)
+
+        # Build repos
+        pos_repo = PositionsRepository(conn)
+        analyses_repo = PositionAnalysesRepository(conn)
+
+        # Build LLM
+        llm = ClaudeProvider(api_key=api_key, model=CLAUDE_HAIKU)
+
+        # Build agent
+        agent = StorycheckerAgent(
+            positions_repo=pos_repo,
+            analyses_repo=analyses_repo,
+            llm=llm,
+        )
+
+        # Run batch check
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        results = loop.run_until_complete(
+            agent.batch_check_all(positions=positions, language=language)
+        )
+        loop.close()
+
+        # Count successes
+        success_count = sum(1 for name, error in results if error is None)
+        job.update({
+            "running": False,
+            "done": True,
+            "count": success_count,
+            "error": None,
+        })
+    except Exception as e:
+        job.update({
+            "running": False,
+            "done": True,
+            "count": 0,
+            "error": str(e),
+        })
 
 
 st.set_page_config(page_title="Portfolio Story", page_icon="📖", layout="wide")
@@ -168,23 +241,21 @@ if "_ps_draft" in st.session_state:
 st.divider()
 
 # ──────────────────────────────────────────────────────────────────────
-# Section 2: Pre-checks (Story Checker)
+# Section 2: Pre-checks (Story Checker for Positions)
 # ──────────────────────────────────────────────────────────────────────
 
 st.subheader("2️⃣ Ausstehende Positions-Story-Checks")
 
-# Get portfolio positions to count pending story checks
 portfolio = _portfolio_service.get_portfolio_positions()
-n_positions_with_ticker = 0
+positions_with_story = []
 n_missing_story = 0
 
 if portfolio:
-    # Only count positions with ticker (those that can have story checks)
-    positions_with_ticker = [p for p in portfolio if p.ticker]
-    n_positions_with_ticker = len(positions_with_ticker)
+    # Only positions with story field set
+    positions_with_story = [p for p in portfolio if p.story and p.ticker]
 
-    if positions_with_ticker:
-        portfolio_ids = [p.id for p in positions_with_ticker]
+    if positions_with_story:
+        portfolio_ids = [p.id for p in positions_with_story]
 
         # Count missing story checker verdicts
         story_verdicts = _analysis_service.get_verdicts(portfolio_ids, "storychecker")
@@ -201,7 +272,7 @@ if portfolio:
 
         if n_missing_story > 0:
             st.info(
-                f"💡 **Story Checker**: {n_missing_story}/{n_positions_with_ticker} Positionen ausstehend{ts_str}"
+                f"💡 **Story Checker**: {n_missing_story}/{len(positions_with_story)} Positionen ausstehend{ts_str}"
             )
 
 # Checkbox for pre-checks
@@ -211,6 +282,10 @@ run_position_checks = st.checkbox(
     key="_ps_run_prechecks",
 )
 
+# Show job status if running
+if "_PS_JOB" in st.session_state and st.session_state["_PS_JOB"]["running"]:
+    st.info("⏳ Storychecker läuft im Hintergrund...")
+
 st.divider()
 
 # ──────────────────────────────────────────────────────────────────────
@@ -219,40 +294,43 @@ st.divider()
 
 st.subheader("3️⃣ Portfolio Story-Check")
 
-# Skill Selector for Story Analysis
-skills_repo = get_skills_repo()
-story_skills = skills_repo.get_by_area("portfolio_story")
-skill_options = {s.name: s for s in story_skills if not s.hidden}
-
-if skill_options:
-    skill_names = list(skill_options.keys())
-    selected_skill_name = st.selectbox(
-        "Story-Check Fokus-Bereich",
-        options=skill_names,
-        index=0,
-        key="portfolio_story_skill",
-    )
-    selected_skill = skill_options[selected_skill_name]
-else:
-    selected_skill = None
-
 if st.button("📖 Portfolio Story-Check ausführen", type="primary", use_container_width=True):
     if not current_story or not current_story.story:
         st.error("❌ Bitte definiere zuerst eine Portfolio-Story.")
     else:
-        # Run pre-checks if enabled (only for positions with missing verdicts)
-        if run_position_checks and n_missing_story > 0:
-            with st.spinner(f"Führe {n_missing_story} ausstehende Positions-Story-Checks aus..."):
-                positions_with_ticker = [p for p in portfolio if p.ticker]
-                portfolio_ids = [p.id for p in positions_with_ticker]
-                story_verdicts = _analysis_service.get_verdicts(portfolio_ids, "storychecker")
-                missing_ids = [pid for pid in portfolio_ids if pid not in story_verdicts]
+        # Run pre-checks if enabled (only missing ones)
+        if run_position_checks and n_missing_story > 0 and positions_with_story:
+            # Start background thread
+            missing_positions = [
+                p for p in positions_with_story
+                if p.id not in story_verdicts
+            ]
 
-                # TODO: Call storychecker agent for missing_ids
-                # For now, just show that we would run them
-                st.info(f"Würde {len(missing_ids)} Positionen prüfen (Storychecker-Integration ausstehend)")
+            _PS_JOB.update({
+                **_JOB_DEFAULTS,
+                "running": True,
+                "agents": ["Story Checker"],
+            })
+            st.session_state["_PS_JOB"] = _PS_JOB
 
-        # Build portfolio + dividend snapshots
+            threading.Thread(
+                target=_run_storychecker_job,
+                args=(missing_positions, "de", _PS_JOB,
+                      config.DB_PATH, config.ENCRYPTION_KEY, config.ANTHROPIC_API_KEY),
+                daemon=True,
+            ).start()
+
+            # Show spinner while waiting
+            with st.spinner(f"Führe {len(missing_positions)} Story-Checks aus..."):
+                while _PS_JOB["running"]:
+                    time.sleep(1)
+
+            if _PS_JOB["error"]:
+                st.error(f"❌ Error: {_PS_JOB['error']}")
+            else:
+                st.success(f"✅ {_PS_JOB['count']} Story-Checks abgeschlossen")
+
+        # Build portfolio snapshot
         portfolio = _portfolio_service.get_portfolio_positions()
         market_agent = get_market_agent()
 
@@ -271,30 +349,33 @@ if st.button("📖 Portfolio Story-Check ausführen", type="primary", use_contai
         else:
             portfolio_snapshot += "(Leer)\n"
 
-        dividend_snapshot = "## Dividenden\n"
-        total_annual_dividend = sum(
-            v.annual_dividend_eur for v in valuations_list
-            if v.annual_dividend_eur
-        )
-        total_eur = sum(v.current_value_eur for v in valuations_list if v.current_value_eur)
-        dividend_yield = (total_annual_dividend / total_eur * 100) if total_eur > 0 else 0
-        dividend_snapshot += f"**Gesamt-Dividende**: {total_annual_dividend:.0f}€/Jahr ({dividend_yield:.2f}% Rendite)\n"
+        # Load position verdicts for the story analysis
+        all_positions = _portfolio_service.get_portfolio_positions()
+        all_ids = [p.id for p in all_positions if p.id]
+        all_verdicts = _analysis_service.get_verdicts(all_ids, "storychecker") if all_ids else {}
 
-        # Get inflation rate if available
-        inflation_rate = None
-        inflation_pos = next((v for v in valuations_list if v.symbol == "HICP"), None)
-        if inflation_pos:
-            inflation_rate = inflation_pos.day_pnl_pct
+        verdict_lines = []
+        for p in all_positions:
+            if p.id and p.id in all_verdicts:
+                v = all_verdicts[p.id]
+                icon = {
+                    "intact": "🟢",
+                    "gemischt": "🟡",
+                    "gefaehrdet": "🔴",
+                }.get(v.verdict, "⚪")
+                verdict_lines.append(f"- {p.name} ({p.ticker}): {icon} {v.summary or v.verdict}")
+            elif p.story and p.ticker:
+                verdict_lines.append(f"- {p.name} ({p.ticker}): ⚪ (ausstehend)")
+
+        position_verdicts = "\n".join(verdict_lines) if verdict_lines else "(Keine Position-Verdicts verfügbar)"
 
         # Run main analysis
-        with st.spinner("Analysiere Portfolio gegen Story und Ziele..."):
+        with st.spinner("Analysiere Portfolio gegen Story..."):
             result = asyncio.run(
                 agent.analyze_story_and_performance(
                     story=current_story,
                     portfolio_snapshot=portfolio_snapshot,
-                    dividend_snapshot=dividend_snapshot,
-                    skill_prompt=selected_skill.prompt if selected_skill else None,
-                    inflation_rate=inflation_rate,
+                    position_verdicts=position_verdicts,
                 )
             )
 
@@ -320,7 +401,7 @@ if "_ps_result" in st.session_state:
 
     with col2:
         perf_icon = _verdict_icon(result.perf_verdict)
-        st.metric(f"{perf_icon} Performance-Urteil", result.perf_verdict.upper())
+        st.metric(f"{perf_icon} Positions-Urteil", result.perf_verdict.upper())
         st.info(result.perf_summary)
 
     # Full text expandable
@@ -339,7 +420,7 @@ elif latest_analysis:
 
     with col2:
         perf_icon = _verdict_icon(latest_analysis.perf_verdict)
-        st.metric(f"{perf_icon} Performance-Urteil", latest_analysis.perf_verdict.upper())
+        st.metric(f"{perf_icon} Positions-Urteil", latest_analysis.perf_verdict.upper())
         if latest_analysis.perf_summary:
             st.info(latest_analysis.perf_summary)
 

@@ -109,24 +109,17 @@ class PortfolioStoryAgentV2:
         self,
         story: PortfolioStory,
         portfolio_snapshot: str,
-        dividend_snapshot: str,
-        skill_prompt: Optional[str] = None,
-        inflation_rate: Optional[float] = None,
+        position_verdicts: str,
     ) -> StoryAndPerfResult:
         """
-        Analyze portfolio story alignment and performance.
-        Core V2 method — only Story & Performance, no Stability.
+        Analyze portfolio story alignment.
+        V2: Two focused questions only.
+        - Is the portfolio story still intact?
+        - How do the positions (with their Story Checker verdicts) support the story?
         """
         self._llm.skill_context = "portfolio_story_check"
 
-        inflation_context = ""
-        if inflation_rate is not None:
-            inflation_context = (
-                f"\n\nAktuelle Inflation (HICP): {inflation_rate:.2f}% "
-                f"(Referenzwert für Bewertung geldbasierter Anlagen)"
-            )
-
-        base_prompt = f"""Du bist ein kritischer Portfolio-Analyst der bewertet ob ein Portfolio mit den Zielen des Investors aligned ist.
+        base_prompt = f"""Du bist ein Portfolio-Analyst. Beurteile, ob ein Portfolio mit den Zielen des Investors aligned ist.
 
 Portfolio-These (Narrativ):
 {story.story}
@@ -136,42 +129,38 @@ Ziele:
 - Liquiditätsbedarf: {story.liquidity_need or 'keine angegeben'}
 - Priorität: {story.priority}
 
-Analysiere anhand der Portfolio-Daten unten ob die These noch hält.
-Antworte IMMER in diesem exakten Format (zwei Sektionen mit je eigenem Urteil):
+Antworte IMMER in diesem exakten Format:
 
 ## Portfolio Story-Check
 **Story-Urteil:** 🟢 Intakt | 🟡 Gemischt | 🔴 Gefährdet
 > {{EIN-SATZ-FAZIT}}
 
-### Was bestätigt die Portfolio-These
-### Was stellt sie in Frage
+Stimmt das Portfolio noch mit der Geschichte des Investors überein?
+- Was bestätigt die These?
+- Was stellt sie in Frage?
 
-## Performance & Dividenden
-**Performance-Urteil:** 🟢 On Track | 🟡 Achtung | 🔴 Kritisch
+## Positions-Analyse
+**Positions-Urteil:** 🟢 Unterstützen Story | 🟡 Gemischt | 🔴 Gefährden Story
 > {{EIN-SATZ-FAZIT}}
 
-### Einschätzung im Kontext der Ziele
+Welche Positionen stärken oder schwächen die Story? (Nutze die Verdicts unten.)
 
 ---
 
 Portfolio-Daten:
 {portfolio_snapshot}
 
-Dividenden-Snapshot:
-{dividend_snapshot}{inflation_context}"""
-
-        system_prompt = base_prompt
-        if skill_prompt:
-            system_prompt += f"\n\n## Story-Fokus\n{skill_prompt}"
+Positions-Story-Checker Verdicts:
+{position_verdicts}"""
 
         user_message = "Bitte analysiere mein Portfolio gegen die angegebene These und Ziele."
 
-        reply = await self._llm.complete(system_prompt + "\n\n" + user_message, max_tokens=1024)
+        reply = await self._llm.complete(base_prompt + "\n\n" + user_message, max_tokens=1024)
 
         story_verdict = _extract_verdict_from_section(reply, "Portfolio Story-Check")
         story_summary = _extract_summary(reply, "Portfolio Story-Check")
-        perf_verdict = _extract_verdict_from_section(reply, "Performance & Dividenden")
-        perf_summary = _extract_summary(reply, "Performance & Dividenden")
+        perf_verdict = _extract_verdict_from_section(reply, "Positions-Analyse")
+        perf_summary = _extract_summary(reply, "Positions-Analyse")
 
         return StoryAndPerfResult(
             verdict=story_verdict or "unknown",
