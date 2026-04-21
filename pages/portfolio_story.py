@@ -72,35 +72,42 @@ def _run_storychecker_job(
     """
     Run storychecker for given positions in a background thread.
     Uses thread-local DB connection (not Streamlit singletons).
+    Imports from core.storage.base (thread-safe) not state_db (Streamlit singleton).
     """
     try:
-        from state_db import get_db_connection
-        from core.encryption import EncryptionService
+        from core.storage.base import get_connection, init_db, migrate_db
         from core.storage.positions import PositionsRepository
-        from core.storage.position_analyses import PositionAnalysesRepository
+        from core.storage.analyses import PositionAnalysesRepository
+        from core.storage.storychecker import StorycheckerRepository
+        from core.storage.skills import SkillsRepository
         from core.llm.claude import ClaudeProvider
         from core.constants import CLAUDE_HAIKU
         from agents.storychecker_agent import StorycheckerAgent
 
-        # Establish thread-local connection
-        conn = get_db_connection(db_path, enc_key)
+        # Establish thread-local connection (not Streamlit singleton)
+        conn = get_connection(db_path)
+        init_db(conn)
+        migrate_db(conn)
 
         # Build repos
         pos_repo = PositionsRepository(conn)
         analyses_repo = PositionAnalysesRepository(conn)
+        storychecker_repo = StorycheckerRepository(conn)
+        skills_repo = SkillsRepository(conn)
 
         # Build LLM
         llm = ClaudeProvider(api_key=api_key, model=CLAUDE_HAIKU)
 
-        # Build agent
+        # Build agent with all required repos
         agent = StorycheckerAgent(
             positions_repo=pos_repo,
+            storychecker_repo=storychecker_repo,
             analyses_repo=analyses_repo,
             llm=llm,
+            skills_repo=skills_repo,
         )
 
         # Run batch check
-        import asyncio
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         results = loop.run_until_complete(
@@ -248,6 +255,7 @@ st.subheader("2️⃣ Ausstehende Positions-Story-Checks")
 portfolio = _portfolio_service.get_portfolio_positions()
 positions_with_story = []
 n_missing_story = 0
+story_verdicts = {}
 
 if portfolio:
     # Only positions with story field set
@@ -329,7 +337,7 @@ if st.button("📖 Portfolio Story-Check ausführen", type="primary", use_contai
             else:
                 st.success(f"✅ {_PS_JOB['count']} Story-Checks abgeschlossen")
 
-        # Build portfolio snapshot
+        # Build portfolio snapshot (WITHOUT dividends — LLM would invent numbers)
         portfolio = _portfolio_service.get_portfolio_positions()
         market_agent = get_market_agent()
 
@@ -341,10 +349,7 @@ if st.button("📖 Portfolio Story-Check ausführen", type="primary", use_contai
             for p in portfolio:
                 val = valuations.get(p.ticker) if p.ticker else None
                 val_eur = val.current_value_eur if val and val.current_value_eur else 0
-                div_str = ""
-                if val and val.annual_dividend_eur and val.annual_dividend_eur > 0:
-                    div_str = f", Dividende: {val.annual_dividend_eur:.0f}€/Jahr ({(val.dividend_yield_pct or 0) * 100:.1f}%)"
-                portfolio_snapshot += f"- {p.name} ({p.ticker}, {p.asset_class}): {val_eur:.0f}€{div_str}\n"
+                portfolio_snapshot += f"- {p.name} ({p.ticker}, {p.asset_class}): {val_eur:.0f}€\n"
         else:
             portfolio_snapshot += "(Leer)\n"
 
@@ -406,6 +411,38 @@ if "_ps_result" in st.session_state:
     # Full text expandable
     with st.expander("📄 Vollständige Analyse"):
         st.markdown(result.full_text)
+
+    # Dividend summary (deterministisch, nicht vom LLM erfunden)
+    st.divider()
+    st.subheader("💰 Portfolio-Dividenden")
+    total_dividend = sum(
+        v.annual_dividend_eur for v in valuations_list
+        if v.annual_dividend_eur
+    )
+    total_eur = sum(v.current_value_eur for v in valuations_list if v.current_value_eur)
+    dividend_yield = (total_dividend / total_eur * 100) if total_eur > 0 else 0
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Jährliche Gesamtdividende", f"{total_dividend:.0f}€")
+    with col2:
+        st.metric("Dividend Yield", f"{dividend_yield:.2f}%")
+
+    # Positions-Story-Details expandable
+    with st.expander("📋 Positions-Story-Details"):
+        for p in all_positions:
+            if p.id and p.id in all_verdicts:
+                v = all_verdicts[p.id]
+                icon = {
+                    "intact": "🟢",
+                    "gemischt": "🟡",
+                    "gefaehrdet": "🔴",
+                }.get(v.verdict, "⚪")
+                st.markdown(f"**{icon} {p.name}** ({p.ticker})")
+                if v.summary:
+                    st.caption(v.summary)
+            elif p.story and p.ticker:
+                st.markdown(f"**⚪ {p.name}** ({p.ticker}) — Story-Check ausstehend")
 
 # Latest saved analysis (if available)
 elif latest_analysis:

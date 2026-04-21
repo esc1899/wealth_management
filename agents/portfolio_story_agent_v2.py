@@ -129,10 +129,10 @@ Ziele:
 - Liquiditätsbedarf: {story.liquidity_need or 'keine angegeben'}
 - Priorität: {story.priority}
 
-Antworte IMMER in diesem exakten Format:
+Antworte IMMER in diesem exakten Format. Wähle bei jedem Urteil NUR EINES der drei Symbole:
 
 ## Portfolio Story-Check
-**Story-Urteil:** 🟢 Intakt | 🟡 Gemischt | 🔴 Gefährdet
+**Story-Urteil:** Schreibe NUR EINES: 🟢 Intakt ODER 🟡 Gemischt ODER 🔴 Gefährdet
 > {{EIN-SATZ-FAZIT}}
 
 Stimmt das Portfolio noch mit der Geschichte des Investors überein?
@@ -140,7 +140,7 @@ Stimmt das Portfolio noch mit der Geschichte des Investors überein?
 - Was stellt sie in Frage?
 
 ## Positions-Analyse
-**Positions-Urteil:** 🟢 Unterstützen Story | 🟡 Gemischt | 🔴 Gefährden Story
+**Positions-Urteil:** Schreibe NUR EINES: 🟢 Unterstützen Story ODER 🟡 Gemischt ODER 🔴 Gefährden Story
 > {{EIN-SATZ-FAZIT}}
 
 Welche Positionen stärken oder schwächen die Story? (Nutze die Verdicts unten.)
