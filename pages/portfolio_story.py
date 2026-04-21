@@ -74,7 +74,8 @@ def _run_storychecker_job(
     Uses thread-local DB connection (not Streamlit singletons).
     """
     try:
-        from core.database import get_connection, init_db, migrate_db
+        from state_db import get_db_connection
+        from core.encryption import EncryptionService
         from core.storage.positions import PositionsRepository
         from core.storage.position_analyses import PositionAnalysesRepository
         from core.llm.claude import ClaudeProvider
@@ -82,9 +83,7 @@ def _run_storychecker_job(
         from agents.storychecker_agent import StorycheckerAgent
 
         # Establish thread-local connection
-        conn = get_connection(db_path, enc_key)
-        init_db(conn)
-        migrate_db(conn)
+        conn = get_db_connection(db_path, enc_key)
 
         # Build repos
         pos_repo = PositionsRepository(conn)
