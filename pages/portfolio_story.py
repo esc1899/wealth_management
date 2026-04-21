@@ -146,6 +146,18 @@ cloud_notice(agent.model)
 current_story = repo.get_current()
 latest_analysis = repo.get_latest_analysis()
 
+# Load valuations and positions early (needed for both button handler and results display)
+market_agent = get_market_agent()
+_portfolio_service = get_portfolio_service()
+_analysis_service = get_analysis_service()
+
+valuations_list = market_agent.get_portfolio_valuation() if market_agent else []
+all_positions = _portfolio_service.get_portfolio_positions()
+
+# Compute verdicts for all positions
+all_ids = [p.id for p in all_positions if p.id]
+all_verdicts = _analysis_service.get_verdicts(all_ids, "storychecker") if all_ids else {}
+
 # ──────────────────────────────────────────────────────────────────────
 # Section 1: Define / Update Portfolio Story
 # ──────────────────────────────────────────────────────────────────────
@@ -335,25 +347,16 @@ if st.button("📖 Portfolio Story-Check ausführen", type="primary", use_contai
                 st.success(f"✅ {_PS_JOB['count']} Story-Checks abgeschlossen")
 
         # Build portfolio snapshot (WITHOUT dividends — LLM would invent numbers)
-        portfolio = _portfolio_service.get_portfolio_positions()
-        market_agent = get_market_agent()
-
-        valuations_list = market_agent.get_portfolio_valuation() if market_agent else []
         valuations = {v.symbol: v for v in valuations_list} if valuations_list else {}
 
         portfolio_snapshot = "## Portfolio\n"
-        if portfolio:
-            for p in portfolio:
+        if all_positions:
+            for p in all_positions:
                 val = valuations.get(p.ticker) if p.ticker else None
                 val_eur = val.current_value_eur if val and val.current_value_eur else 0
                 portfolio_snapshot += f"- {p.name} ({p.ticker}, {p.asset_class}): {val_eur:.0f}€\n"
         else:
             portfolio_snapshot += "(Leer)\n"
-
-        # Load position verdicts for the story analysis
-        all_positions = _portfolio_service.get_portfolio_positions()
-        all_ids = [p.id for p in all_positions if p.id]
-        all_verdicts = _analysis_service.get_verdicts(all_ids, "storychecker") if all_ids else {}
 
         verdict_lines = []
         for p in all_positions:
@@ -379,6 +382,19 @@ if st.button("📖 Portfolio Story-Check ausführen", type="primary", use_contai
                     position_verdicts=position_verdicts,
                 )
             )
+
+            # Save analysis to database
+            from core.storage.models import PortfolioStoryAnalysis
+            analysis = PortfolioStoryAnalysis(
+                verdict=result.verdict,
+                summary=result.summary,
+                perf_verdict=result.perf_verdict,
+                perf_summary=result.perf_summary,
+                stability_verdict="",
+                stability_summary="",
+                full_text=result.full_text,
+            )
+            repo.save_analysis(analysis)
 
             st.session_state["_ps_result"] = result
             st.session_state["_ps_result_timestamp"] = datetime.now()
@@ -408,22 +424,6 @@ if "_ps_result" in st.session_state:
     # Full text expandable
     with st.expander("📄 Vollständige Analyse"):
         st.markdown(result.full_text)
-
-    # Dividend summary (deterministisch, nicht vom LLM erfunden)
-    st.divider()
-    st.subheader("💰 Portfolio-Dividenden")
-    total_dividend = sum(
-        v.annual_dividend_eur for v in valuations_list
-        if v.annual_dividend_eur
-    )
-    total_eur = sum(v.current_value_eur for v in valuations_list if v.current_value_eur)
-    dividend_yield = (total_dividend / total_eur * 100) if total_eur > 0 else 0
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Jährliche Gesamtdividende", f"{total_dividend:.0f}€")
-    with col2:
-        st.metric("Dividend Yield", f"{dividend_yield:.2f}%")
 
     # Positions-Story-Details expandable
     with st.expander("📋 Positions-Story-Details"):

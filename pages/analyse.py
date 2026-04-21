@@ -264,3 +264,24 @@ if stability_skills:
     st.info(f"**Stabilitätsstatus:** {status} (max. Abweichung: {max_dev:.0f}pp von Ziel 33%)")
 else:
     st.info("Keine Stabilitätscheck-Regeln aktiviert")
+
+st.divider()
+
+# ------------------------------------------------------------------
+# Dividendencheck — deterministisch
+# ------------------------------------------------------------------
+st.subheader("💰 Portfolio-Dividenden")
+
+total_dividend = sum(
+    v.annual_dividend_eur
+    for v in valuations
+    if v.annual_dividend_eur
+)
+total_eur = sum(v.current_value_eur for v in valuations if v.current_value_eur)
+dividend_yield = (total_dividend / total_eur * 100) if total_eur > 0 else 0
+
+col1, col2 = st.columns(2)
+with col1:
+    st.metric("Jährliche Gesamtdividende", f"{total_dividend:.0f}€")
+with col2:
+    st.metric("Dividend Yield", f"{dividend_yield:.2f}%")
