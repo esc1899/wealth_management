@@ -112,12 +112,13 @@ def _run_storychecker_job(
         )
         loop.close()
 
-        success_count = sum(1 for name, error in results if error is None)
+        success_count = sum(1 for _, err in results if err is None)
+        errors = [f"{name}: {err}" for name, err in results if err is not None]
         job.update({
             "running": False,
             "done": True,
             "count": success_count,
-            "error": None,
+            "error": "; ".join(errors) if errors else None,
         })
     except Exception as e:
         job.update({
