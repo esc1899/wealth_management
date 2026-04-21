@@ -124,13 +124,9 @@ with col_o2:
 with col_o3:
     sel_watchlist_checker = _ollama_sel("watchlist_checker", "Watchlist Checker")
 
-col_o4, col_o5, col_o6 = st.columns(3)
+col_o4, _ = st.columns([1, 2])
 with col_o4:
     sel_portfolio_comment = _ollama_sel("portfolio_comment", "💬 KI-Kommentare")
-with col_o5:
-    pass
-with col_o6:
-    pass
 
 st.markdown(f"**{t('settings.claude_agents_header')}** ☁️")
 col_c1, col_c2, col_c3 = st.columns(3)
