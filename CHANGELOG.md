@@ -8,6 +8,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Watchlist Checker UX Refactor + Ollama Settings (2026-04-21)
+
+**Watchlist Checker Section 1 auf Checkbox-Pattern umgebaut (analog Portfolio Story Check V2).**
+
+- **Watchlist Checker Section 1 komplett neu**
+  - Alte UI: Info-Box + 2 separate rote Buttons ("Story + Konsens starten", "Fundamental-Analysen starten")
+  - Neue UI: Info-Meldungen (ausstehend + Timestamp) + 2 Checkboxen + 1 Haupt-Button
+  - Checkboxen disabled wenn keine offenen Checks vorhanden
+  - Pre-Checks laufen blocking (synchron im Spinner) vor dem Hauptcheck — analog `portfolio_story.py`
+  - Nur offene Positionen werden gecheckt (Filter analog Portfolio Story)
+  - Session-State-Polling-Block entfernt (nicht mehr nötig)
+  - Fokus-Bereich Skill-Selector entfernt — `selected_skill=None` an Agent
+
+- **Ollama Modellwahl in Settings**
+  - `portfolio_story` und `watchlist_checker` als Ollama-Agents in Settings Page hinzugefügt
+  - 3-spaltig statt 1-spaltig unter "Ollama Agents"
+
+- **cloud_notice() Provider-Fix**
+  - Zeigt jetzt `🏠 (lokal)` für Ollama-Agents statt `☁️ (Claude API)`
+  - Watchlist Checker zeigt nun cloud_notice (war bisher nicht vorhanden)
+  - `provider: str = "claude"` Parameter hinzugefügt (default für Claude-Agents unverändert)
+
+- **Bug-Fix: WatchlistCheckerAgent max_tokens**
+  - `max_tokens` von default 1024 → 4096
+  - Root Cause: Bei 14 Positionen truncated der LLM die Antwort, Parser findet letzte Positionen nicht
+
+- **Tests**: 566/566 passing
+
+---
+
 ### Portfolio Story UX Refactor (2026-04-20, Part 2)
 
 **Unified interface for Bargeldregel, Stabilitäts-Check, Story-Check with symmetric design.**

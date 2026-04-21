@@ -187,7 +187,7 @@ class WatchlistCheckerAgent:
             Message(role=Role.USER, content=f"{system_prompt}\n\n{context}")
         ]
 
-        response = await self._llm.chat(messages)
+        response = await self._llm.chat(messages, max_tokens=4096)
         full_text = response
 
         # Parse and persist results

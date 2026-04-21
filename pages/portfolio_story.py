@@ -141,7 +141,7 @@ repo = get_portfolio_story_repo()
 _portfolio_service = get_portfolio_service()
 _analysis_service = get_analysis_service()
 agent = get_portfolio_story_agent()
-cloud_notice(agent.model)
+cloud_notice(agent.model, provider="ollama")
 
 current_story = repo.get_current()
 latest_analysis = repo.get_latest_analysis()

@@ -63,9 +63,16 @@ def render_verdict_legend(config: Dict[str, Tuple[str, str]]) -> None:
             st.markdown(f"**{icon} {label}** — {t(f'common.legend_{verdict}')}")
 
 
-def cloud_notice(model: str) -> None:
-    """Render standardized cloud notice."""
+def cloud_notice(model: str, provider: str = "claude") -> None:
+    """Render standardized cloud/local notice."""
+    if provider == "ollama":
+        location = "lokal"
+        emoji = "🏠"
+    else:
+        location = "Claude API (Cloud)"
+        emoji = "☁️"
+
     st.info(
-        f"☁️ This analysis runs on **{model}** (Claude API)",
+        f"{emoji} This analysis runs on **{model}** ({location})",
         icon="ℹ️"
     )

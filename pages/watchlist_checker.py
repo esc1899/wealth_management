@@ -15,7 +15,7 @@ import time
 import streamlit as st
 from datetime import datetime
 
-from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon
+from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon, cloud_notice
 from core.i18n import current_language
 
 st.set_page_config(page_title="Watchlist Checker", layout="wide")
@@ -304,44 +304,9 @@ _analysis_service = get_analysis_service()
 portfolio_story_repo = get_portfolio_story_repo()
 agent = get_watchlist_checker_agent()
 agent_runs_repo = get_agent_runs_repo()
+cloud_notice(agent.model, provider="ollama")
 
 watchlist = _portfolio_service.get_watchlist_positions()
-
-# Initialize background job state for two separate jobs
-_JOB_DEFAULTS = {"running": False, "done": False, "count": 0, "errors": 0, "error": None, "agents": [], "logs": []}
-
-if "_wc_agents_job" not in st.session_state:
-    st.session_state["_wc_agents_job"] = dict(_JOB_DEFAULTS)
-if "_wc_fund_job" not in st.session_state:
-    st.session_state["_wc_fund_job"] = dict(_JOB_DEFAULTS)
-
-_WC_JOB = st.session_state["_wc_agents_job"]
-_WC_FUND_JOB = st.session_state["_wc_fund_job"]
-
-# Polling: Show progress while ANY job is running
-if _WC_JOB["running"] or _WC_FUND_JOB["running"]:
-    labels = _WC_JOB.get("agents", []) + _WC_FUND_JOB.get("agents", [])
-    st.info(f"⏳ Analysen laufen: {', '.join(labels) or '...'}", icon=":material/hourglass_top:")
-    time.sleep(5)
-    st.rerun()
-
-# Done-Block: Show results for each job separately
-for _job, _label in [(_WC_JOB, "Story+Konsens"), (_WC_FUND_JOB, "Fundamental")]:
-    if _job["done"]:
-        if _job["error"]:
-            st.error(f"❌ {_label}: {_job['error']}")
-        else:
-            st.success(f"✅ {_label}: {_job['count']} Analysen abgeschlossen.")
-
-        # Show logs if available
-        if _job.get("logs"):
-            with st.expander("📋 Logs"):
-                st.text("\n".join(_job.get("logs", [])))
-
-        if st.button("Dismiss", key=f"dismiss_{_label}"):
-            _job.update(dict(_JOB_DEFAULTS))
-            st.rerun()
-        st.divider()
 
 if not watchlist:
     st.info("📭 Keine Watchlist-Positionen vorhanden. Starten Sie mit dem Portfolio Chat um Watchlist-Einträge hinzuzufügen.")
@@ -349,113 +314,82 @@ if not watchlist:
 
 st.caption(f"**{len(watchlist)} Positionen** auf der Watchlist")
 
-# Pre-check: Which agents haven't analyzed watchlist positions yet?
-# (Only show if no job is currently running)
-if not _WC_JOB["running"] and not _WC_FUND_JOB["running"]:
-    watchlist_ids = [pos.id for pos in watchlist if pos.id]
-    _analyses_status = []
+# Ermittle offene Checks — analog Portfolio Story
+watchlist_ids = [pos.id for pos in watchlist if pos.id]
+sc_verdicts = _analysis_service.get_verdicts(watchlist_ids, "storychecker")
+cg_verdicts = _analysis_service.get_verdicts(watchlist_ids, "consensus_gap")
+fund_verdicts = _analysis_service.get_verdicts(watchlist_ids, "fundamental")
 
-    for agent_name, agent_label, page_path in [
-        ("storychecker", "Story Checker", "pages/storychecker.py"),
-        ("fundamental", "Fundamental Analyzer", "pages/fundamental.py"),
-        ("consensus_gap", "Konsens-Lücken", "pages/consensus_gap.py"),
-    ]:
-        bulk = _analysis_service.get_verdicts(watchlist_ids, agent_name)
-        n_missing = sum(1 for pid in watchlist_ids if pid not in bulk)
+n_missing_sc_cg = sum(1 for pid in watchlist_ids if pid not in sc_verdicts or pid not in cg_verdicts)
+n_missing_fund = sum(1 for pid in watchlist_ids if pid not in fund_verdicts)
 
-        # Get timestamp of latest analysis across all watchlist positions
-        latest_ts = None
-        for verdict_obj in bulk.values():
-            if verdict_obj and hasattr(verdict_obj, 'created_at') and verdict_obj.created_at:
-                if latest_ts is None or verdict_obj.created_at > latest_ts:
-                    latest_ts = verdict_obj.created_at
+# Timestamps
+latest_sc_ts = max((v.created_at for v in sc_verdicts.values() if v and hasattr(v, 'created_at') and v.created_at), default=None)
+latest_fund_ts = max((v.created_at for v in fund_verdicts.values() if v and hasattr(v, 'created_at') and v.created_at), default=None)
+sc_ts_str = f" (zuletzt: {latest_sc_ts.strftime('%d.%m. %H:%M')})" if latest_sc_ts else " (noch nicht gelaufen)"
+fund_ts_str = f" (zuletzt: {latest_fund_ts.strftime('%d.%m. %H:%M')})" if latest_fund_ts else " (noch nicht gelaufen)"
 
-        ts_str = f" (zuletzt: {latest_ts.strftime('%d.%m. %H:%M')})" if latest_ts else " (noch nicht gelaufen)"
+# Info-Meldungen
+if n_missing_sc_cg > 0:
+    st.info(f"💡 **Story + Konsens**: {n_missing_sc_cg}/{len(watchlist_ids)} Positionen ausstehend{sc_ts_str}")
+if n_missing_fund > 0:
+    st.info(f"💡 **Fundamental**: {n_missing_fund}/{len(watchlist_ids)} Positionen ausstehend{fund_ts_str}")
 
-        _analyses_status.append({
-            "label": agent_label,
-            "page": page_path,
-            "n_missing": n_missing,
-            "total": len(watchlist_ids),
-            "timestamp": ts_str,
-            "agent_name": agent_name,
-        })
-
-    # Show info box + action buttons if any missing
-    _has_missing = any(s["n_missing"] > 0 for s in _analyses_status)
-    if _has_missing:
-        st.info(
-            "💡 Für bessere Ergebnisse folgende Analysen ausführen:\n"
-            + "\n".join(
-                f"- {s['label']} ({s['n_missing']}/{s['total']} ausstehend){s['timestamp']}"
-                for s in _analyses_status if s["n_missing"] > 0
-            )
-        )
-
-        # Two separate buttons: Story+Consensus vs. Fundamental
-        col1, col2 = st.columns(2)
-
-        with col1:
-            if st.button(
-                "Story + Konsens starten",
-                key="_wc_start_sc_cg",
-                disabled=_WC_JOB["running"] or _WC_FUND_JOB["running"],
-                type="primary",
-                use_container_width=True,
-            ):
-                # Filter agents to run (only those with missing analyses)
-                agents_to_run = [s["agent_name"] for s in _analyses_status
-                                if s["n_missing"] > 0 and s["agent_name"] in ["storychecker", "consensus_gap"]]
-                if agents_to_run:
-                    _lang = current_language()
-                    _WC_JOB.update({**_JOB_DEFAULTS, "running": True, "agents": ["Story Checker", "Konsens-Lücken"]})
-                    threading.Thread(
-                        target=_run_storychecker_consensus_job,
-                        args=(watchlist, agents_to_run, _lang, _WC_JOB,
-                              config.DB_PATH, config.ENCRYPTION_KEY, config.ANTHROPIC_API_KEY),
-                        daemon=True,
-                    ).start()
-                    st.rerun()
-
-        with col2:
-            if st.button(
-                "Fundamental-Analysen starten",
-                key="_wc_start_fund",
-                disabled=_WC_JOB["running"] or _WC_FUND_JOB["running"],
-                type="primary",
-                use_container_width=True,
-            ):
-                # Only run if fundamental has missing analyses
-                if any(s["n_missing"] > 0 and s["agent_name"] == "fundamental" for s in _analyses_status):
-                    _lang = current_language()
-                    _WC_FUND_JOB.update({**_JOB_DEFAULTS, "running": True, "agents": ["Fundamental Analyzer"]})
-                    threading.Thread(
-                        target=_run_fundamental_job,
-                        args=(watchlist, _lang, _WC_FUND_JOB,
-                              config.DB_PATH, config.ENCRYPTION_KEY, config.ANTHROPIC_API_KEY),
-                        daemon=True,
-                    ).start()
-                    st.rerun()
-
-# Skill selector for Watchlist Checker
-st.divider()
-skills_repo = get_skills_repo()
-watchlist_skills = skills_repo.get_by_area("watchlist_checker")
-skill_options = {s.name: s for s in watchlist_skills if not s.hidden}
-
-if skill_options:
-    skill_names = list(skill_options.keys())
-    selected_skill_name = st.selectbox(
-        "Fokus-Bereich",
-        options=skill_names,
-        index=0,  # Default to first skill (Josef's Regel)
-        key="watchlist_checker_skill",
-    )
-    selected_skill = skill_options[selected_skill_name]
-else:
-    selected_skill = None
+# Checkboxen für Pre-Checks
+run_sc_cg_checks = st.checkbox(
+    "☑ Ausstehende Story + Konsens-Checks vor Analyse ausführen",
+    value=False,
+    key="_wc_run_sc_cg",
+    disabled=n_missing_sc_cg == 0,
+)
+run_fund_checks = st.checkbox(
+    "☑ Ausstehende Fundamental-Checks vor Analyse ausführen",
+    value=False,
+    key="_wc_run_fund",
+    disabled=n_missing_fund == 0,
+)
 
 if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
+    _lang = current_language()
+
+    # Pre-Check 1: Story + Konsens (blocking, nur offene)
+    if run_sc_cg_checks and n_missing_sc_cg > 0:
+        _missing_sc_cg = [p for p in watchlist if p.id and (p.id not in sc_verdicts or p.id not in cg_verdicts)]
+        _job = {"running": True, "done": False, "count": 0, "error": None, "logs": []}
+        agents_to_run = ["storychecker", "consensus_gap"]
+        threading.Thread(
+            target=_run_storychecker_consensus_job,
+            args=(_missing_sc_cg, agents_to_run, _lang, _job,
+                  config.DB_PATH, config.ENCRYPTION_KEY, config.ANTHROPIC_API_KEY),
+            daemon=True,
+        ).start()
+        with st.spinner(f"Führe {len(_missing_sc_cg)} Story + Konsens-Checks aus..."):
+            while _job["running"]:
+                time.sleep(1)
+        if _job["error"]:
+            st.error(f"❌ {_job['error']}")
+        else:
+            st.success(f"✅ {_job['count']} Story + Konsens-Checks abgeschlossen")
+
+    # Pre-Check 2: Fundamental (blocking, nur offene)
+    if run_fund_checks and n_missing_fund > 0:
+        _missing_fund = [p for p in watchlist if p.id and p.id not in fund_verdicts]
+        _fund_job = {"running": True, "done": False, "count": 0, "error": None, "logs": []}
+        threading.Thread(
+            target=_run_fundamental_job,
+            args=(_missing_fund, _lang, _fund_job,
+                  config.DB_PATH, config.ENCRYPTION_KEY, config.ANTHROPIC_API_KEY),
+            daemon=True,
+        ).start()
+        with st.spinner(f"Führe {len(_missing_fund)} Fundamental-Analysen aus..."):
+            while _fund_job["running"]:
+                time.sleep(1)
+        if _fund_job["error"]:
+            st.error(f"❌ {_fund_job['error']}")
+        else:
+            st.success(f"✅ {_fund_job['count']} Fundamental-Analysen abgeschlossen")
+
+    # Hauptcheck
     with st.spinner("Watchlist wird geprüft..."):
         # Build complete context (analog to Portfolio Story)
         portfolio = _portfolio_service.get_portfolio_positions()
@@ -465,7 +399,7 @@ if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
         valuations_list = market_agent.get_portfolio_valuation() if market_agent else []
         valuations = {v.symbol: v for v in valuations_list} if valuations_list else {}
 
-        # Portfolio snapshot with values + Josef-Regel categories
+        # Portfolio snapshot with values
         portfolio_snapshot = "## Portfolio\n"
         if portfolio:
             for p in portfolio:
@@ -499,8 +433,8 @@ Full Analysis:
                     portfolio_snapshot=portfolio_snapshot,
                     watchlist_positions=watchlist,
                     story_analysis_text=story_analysis_text,
-                    selected_skill=selected_skill,
-                    language=current_language(),
+                    selected_skill=None,
+                    language=_lang,
                 )
             )
 
