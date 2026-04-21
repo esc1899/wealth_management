@@ -75,30 +75,28 @@ def _run_storychecker_job(
     Imports from core.storage.base (thread-safe) not state_db (Streamlit singleton).
     """
     try:
-        from core.storage.base import get_connection, init_db, migrate_db
+        from core.storage.base import get_connection, init_db, migrate_db, build_encryption_service
         from core.storage.positions import PositionsRepository
         from core.storage.analyses import PositionAnalysesRepository
         from core.storage.storychecker import StorycheckerRepository
-        from core.storage.skills import SkillsRepository
         from core.llm.claude import ClaudeProvider
         from core.constants import CLAUDE_HAIKU
         from agents.storychecker_agent import StorycheckerAgent
+        from state import get_skills_repo
 
-        # Establish thread-local connection (not Streamlit singleton)
+        # Thread-local connection — exact pattern from watchlist_checker.py
         conn = get_connection(db_path)
         init_db(conn)
         migrate_db(conn)
 
-        # Build repos
-        pos_repo = PositionsRepository(conn)
+        enc = build_encryption_service(enc_key, "data/salt.bin")
+        pos_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         storychecker_repo = StorycheckerRepository(conn)
-        skills_repo = SkillsRepository(conn)
+        skills_repo = get_skills_repo()
 
-        # Build LLM
         llm = ClaudeProvider(api_key=api_key, model=CLAUDE_HAIKU)
 
-        # Build agent with all required repos
         agent = StorycheckerAgent(
             positions_repo=pos_repo,
             storychecker_repo=storychecker_repo,
@@ -107,7 +105,6 @@ def _run_storychecker_job(
             skills_repo=skills_repo,
         )
 
-        # Run batch check
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         results = loop.run_until_complete(
@@ -115,7 +112,6 @@ def _run_storychecker_job(
         )
         loop.close()
 
-        # Count successes
         success_count = sum(1 for name, error in results if error is None)
         job.update({
             "running": False,
