@@ -9,7 +9,7 @@ import asyncio
 import logging
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import streamlit as st
 
@@ -393,6 +393,7 @@ if st.button("📖 Portfolio Story-Check ausführen", type="primary", use_contai
                 stability_verdict="",
                 stability_summary="",
                 full_text=result.full_text,
+                created_at=datetime.now(timezone.utc),
             )
             repo.save_analysis(analysis)
 
