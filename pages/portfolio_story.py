@@ -6,6 +6,7 @@ V2: Clean, focused on story integrity with position verdicts.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import threading
 import time
@@ -20,7 +21,9 @@ from core.storage.models import PortfolioStory
 from core.ui.verdicts import cloud_notice
 from state import (
     get_analysis_service,
+    get_app_config_repo,
     get_market_agent,
+    get_portfolio_comment_service,
     get_portfolio_service,
     get_portfolio_story_agent,
     get_portfolio_story_repo,
@@ -462,3 +465,39 @@ elif latest_analysis:
         st.markdown(latest_analysis.full_text)
 else:
     st.info("Noch keine Analyse vorhanden. Klick auf 'Portfolio Story-Check ausführen' um zu starten.")
+
+# ──────────────────────────────────────────────────────────────────────
+# Section 5: KI-Kommentar
+# ──────────────────────────────────────────────────────────────────────
+
+_ps_full_text = None
+if "_ps_result" in st.session_state:
+    _ps_full_text = st.session_state["_ps_result"].full_text
+elif latest_analysis and latest_analysis.full_text:
+    _ps_full_text = latest_analysis.full_text
+
+if _ps_full_text:
+    from core.services.portfolio_comment_service import get_style_by_id
+
+    _comment_style_id = get_app_config_repo().get("comment_style") or "humorvoll"
+    _comment_style = get_style_by_id(_comment_style_id)
+    _comment_service = get_portfolio_comment_service()
+
+    _ctx = f"Portfolio Story-Check Ergebnis:\n{_ps_full_text}"
+    _ctx_hash = hashlib.md5((_ctx + _comment_style_id).encode()).hexdigest()
+
+    if st.session_state.get("_ps_comment_hash") != _ctx_hash:
+        with st.spinner(f"{_comment_style['emoji']} Generiere Kommentar..."):
+            try:
+                st.session_state["_ps_comment"] = _comment_service.generate_comment(_ctx, _comment_style_id)
+                st.session_state["_ps_comment_hash"] = _ctx_hash
+            except Exception as _e:
+                logger.warning("KI-Kommentar fehlgeschlagen: %s", _e)
+                st.session_state["_ps_comment"] = None
+
+    if st.session_state.get("_ps_comment"):
+        st.divider()
+        st.subheader("💬 KI-Kommentar")
+        with st.container(border=True):
+            st.caption(f"{_comment_style['emoji']} **{_comment_style['name']}**")
+            st.markdown(st.session_state["_ps_comment"])

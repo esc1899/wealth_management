@@ -618,8 +618,12 @@ if st.session_state.get("_watchlist_check_result"):
 
     if st.session_state.get("_watchlist_comment_hash") != _ctx_hash:
         with st.spinner(f"{_comment_style['emoji']} Generiere Kommentar..."):
-            st.session_state["_watchlist_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
-            st.session_state["_watchlist_comment_hash"] = _ctx_hash
+            try:
+                st.session_state["_watchlist_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
+                st.session_state["_watchlist_comment_hash"] = _ctx_hash
+            except Exception as _e:
+                logger.warning("KI-Kommentar fehlgeschlagen: %s", _e)
+                st.warning("⚠️ KI-Kommentar nicht verfügbar — Ollama prüfen (Einstellungen > Verbindungstest).")
 
     st.divider()
     st.subheader("3️⃣ KI-Kommentar")
