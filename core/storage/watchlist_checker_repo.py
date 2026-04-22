@@ -79,7 +79,7 @@ class WatchlistCheckerRepository:
         if fit_counts and isinstance(fit_counts, str):
             try:
                 fit_counts = json.loads(fit_counts)
-            except:
+            except (json.JSONDecodeError, ValueError):
                 fit_counts = None
 
         return WatchlistCheckerAnalysis(

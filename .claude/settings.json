@@ -94,7 +94,12 @@
       "Bash(python -c \"from core.storage.base import get_connection, init_db, migrate_db; from core.storage.positions import PositionsRepository; from core.storage.analyses import PositionAnalysesRepository; from core.storage.storychecker import StorycheckerRepository; from core.storage.skills import SkillsRepository; from core.llm.claude import ClaudeProvider; from core.constants import CLAUDE_HAIKU; from agents.storychecker_agent import StorycheckerAgent; print\\('✅ All imports OK'\\)\")",
       "Bash(curl -s http://localhost:8501/_stcore/stream)",
       "Bash(python -m pytest tests/unit/test_watchlist_checker_agent.py -q --tb=short)",
-      "Bash(grep -E \"\\\\.db$\")"
+      "Bash(grep -E \"\\\\.db$\")",
+      "Bash(grep -E \"\\\\.\\(db|sqlite|sqlite3\\)$\")",
+      "Bash(awk '{print $4}')",
+      "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py::TestPageLoadability::test_structural_scan_page_loads -v)",
+      "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py::TestPageLoadability::test_structural_scan_page_loads -v --tb=short)",
+      "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py::TestPageLoadability::test_structural_scan_page_loads -xvs)"
     ],
     "additionalDirectories": [
       "/Users/erik",

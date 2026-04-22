@@ -267,7 +267,7 @@ Welche Dimensionen sollten wir in der Tiefe analysieren?
 Gib eine prägnante, fokussierte Agenda (4–6 Punkte).
 """
         # Simple LLM call without session context
-        response = self._llm.chat(
+        response = await self._llm.chat(
             messages=[{"role": "user", "content": prompt}],
             system="Du bist ein Investmentanalyst. Antworte auf Deutsch.",
         )

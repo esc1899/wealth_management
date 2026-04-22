@@ -10,6 +10,7 @@ Cleanroom Neuimplementierung (2026-04-14):
 import asyncio
 import json
 import logging
+import os
 import threading
 import time
 import streamlit as st
@@ -130,7 +131,8 @@ def _run_storychecker_consensus_job(
         migrate_db(conn)
 
         # Build repos with thread-safe connection
-        enc = build_encryption_service(enc_key, "data/salt.bin")
+        salt_path = os.path.join(os.path.dirname(os.path.abspath(db_path)), "salt.bin")
+        enc = build_encryption_service(enc_key, salt_path)
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         storychecker_repo = StorycheckerRepository(conn)
@@ -235,7 +237,8 @@ def _run_fundamental_job(
         migrate_db(conn)
 
         # Build repos with thread-safe connection
-        enc = build_encryption_service(enc_key, "data/salt.bin")
+        salt_path = os.path.join(os.path.dirname(os.path.abspath(db_path)), "salt.bin")
+        enc = build_encryption_service(enc_key, salt_path)
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         skills_repo = get_skills_repo()  # Read-only for skill resolution
@@ -509,7 +512,7 @@ if st.session_state.get("_watchlist_check_result"):
                 fit_counts = json.loads(result.fit_counts)
             else:
                 fit_counts = result.fit_counts or {}
-        except:
+        except (json.JSONDecodeError, ValueError):
             fit_counts = {
                 "sehr_passend": sum(1 for f in position_fits if f.verdict == "sehr_passend"),
                 "passend": sum(1 for f in position_fits if f.verdict == "passend"),

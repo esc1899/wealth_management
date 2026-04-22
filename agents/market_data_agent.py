@@ -4,7 +4,7 @@ Market Data Agent — orchestrates price fetching, storage, and scheduling.
 
 from __future__ import annotations
 import logging
-
+import os
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -382,7 +382,8 @@ class MarketDataAgent:
         conn = get_connection(self._db_path)
         init_db(conn)
         migrate_db(conn)
-        enc = build_encryption_service(self._encryption_key, "data/salt.bin")
+        salt_path = os.path.join(os.path.dirname(os.path.abspath(self._db_path)), "salt.bin")
+        enc = build_encryption_service(self._encryption_key, salt_path)
         market_repo = MarketDataRepository(conn)
         positions_repo = PositionsRepository(conn, enc)
 

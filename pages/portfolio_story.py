@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import os
 import threading
 import time
 from datetime import datetime, timezone
@@ -93,7 +94,8 @@ def _run_storychecker_job(
         init_db(conn)
         migrate_db(conn)
 
-        enc = build_encryption_service(enc_key, "data/salt.bin")
+        salt_path = os.path.join(os.path.dirname(os.path.abspath(db_path)), "salt.bin")
+        enc = build_encryption_service(enc_key, salt_path)
         pos_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         storychecker_repo = StorycheckerRepository(conn)

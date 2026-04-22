@@ -167,7 +167,10 @@ def get_structural_change_agent() -> StructuralChangeAgent:
 def get_fundamental_agent() -> FundamentalAgent:
     model = _get_agent_model("fundamental", "claude", CLAUDE_SONNET)
     llm = _make_claude_provider(model, "fundamental")
-    return FundamentalAgent(llm=llm)
+    return FundamentalAgent(
+        llm=llm,
+        analyses_repo=get_analyses_repo(),
+    )
 
 
 @st.cache_resource

@@ -13,6 +13,7 @@ import time
 import streamlit as st
 
 from core.i18n import t, current_language
+from core.ui.verdicts import cloud_notice
 from state import (
     get_analysis_service,
     get_portfolio_service,
@@ -32,6 +33,7 @@ st.title(f"🔭 {t('structural_scan.title')}")
 st.caption(t("structural_scan.subtitle"))
 
 _agent = get_structural_change_agent()
+cloud_notice(_agent._llm.model, provider="claude")
 _repo = get_structural_scans_repo()
 _skills = get_skills_repo().get_by_area("structural_scan")
 _analysis_service = get_analysis_service()
