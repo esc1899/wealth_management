@@ -21,7 +21,6 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Portfolio Management** — track 11 asset types: stocks, ETFs, funds, precious metals, crypto, bonds, fixed deposits, cash, real estate, and land
 - **Live Market Data** — automatic and on-demand prices via yfinance with EUR conversion
 - **P&L Analysis** — daily gains/losses, allocation charts, day performance
-- **Rebalancing** — Josef's Rule (1/3 each: equities / bonds+cash / real estate) as hidden strategy layer
 
 ### Wealth Snapshots (historical tracking)
 - **Wealth Timeline** — view portfolio value over time with asset class breakdown
@@ -31,16 +30,16 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Coverage Tracking** — visibility into which positions have valid values; warnings for incomplete data
 
 ### Local Assistants (private, Ollama)
-- **Portfolio Chat** — natural language CRUD interface; data never leaves your machine
-- **Invest / Rebalance** — portfolio rebalancing analysis including watchlist candidates and all cloud verdicts
+- **Portfolio Chat** — natural language CRUD interface for your positions; data never leaves your machine
+- **Portfolio Story** — analyzes portfolio narrative alignment and position support; validates whether holdings match your investment thesis
+- **Watchlist Checker** — evaluates which watchlist positions fit into current portfolio structure and strategy, with optional configurable analysis skills
 
 ### Research (cloud, Claude API + web search)
-- **Research Chat** — deep-dive research per position using Claude
+- **Research Chat** — deep-dive research per position using Claude with multi-turn conversation
 - **News Digest** — recent news for all portfolio positions, filtered by investment strategy
-- **Investment Search** — screen for new opportunities; thesis saved automatically to watchlist
-- **Story Checker** — validates investment theses against current news and fundamentals
+- **Investment Search** — screen for new opportunities; investment thesis saved automatically to watchlist
+- **Story Checker** — validates investment theses against current news and fundamentals (Claude API)
 - **Fundamental Analyzer** — in-depth fundamental analysis of individual positions with multi-turn chat (cloud, Claude)
-- **Watchlist Checker** — evaluates which watchlist positions fit into current portfolio (local, Ollama)
 
 ### Claude Strategy (cloud, Claude Sonnet + web search)
 - **Structural Change Scanner** — identifies irreversible market shifts not yet priced by consensus; adds candidates directly to watchlist
@@ -83,7 +82,7 @@ Portfolio data (quantities, prices, notes, investment thesis) is encrypted at re
 The Skills system lets you save and edit prompt templates for each agent. Learn that a well-written system prompt dramatically changes LLM output quality, and that externalising prompts from code makes them easier to iterate on.
 
 ### Agent design trade-offs
-The app has ten agents with different characteristics: stateful vs. stateless, local vs. cloud, one-shot vs. conversational, agentic loop vs. single call. Comparing Portfolio Chat, Rebalance, Research Chat, News Digest, the Story Checker, and the Claude Strategy agents shows the practical trade-offs: privacy, cost, speed, and capability.
+The app has eleven agents with different characteristics: stateful vs. stateless, local vs. cloud, one-shot vs. conversational, agentic loop vs. single call. Comparing Portfolio Chat, Portfolio Story, Research Chat, News Digest, Story Checker, Fundamental Analyzer, Watchlist Checker, Structural Change Scanner, and Consensus Gap Analysis shows the practical trade-offs: privacy, cost, speed, and capability.
 
 ### Agentic loops and tool use
 The Structural Change Scanner runs an agentic loop: Claude decides when to call `web_search` and when to call the custom `add_structural_candidate` tool to populate your watchlist — no user interaction needed. Compare this to the simpler Research Chat (single call) to understand the cost/quality trade-off.
@@ -127,9 +126,9 @@ Copy `.env.example` to `.env` and fill in your values.
 | Variable | Required | Description |
 |---|---|---|
 | `ENCRYPTION_KEY` | Yes | Fernet key — generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
-| `ANTHROPIC_API_KEY` | Yes* | Anthropic API key (for Research Chat, News Digest, Investment Search, Story Checker, Structural Change Scanner, Consensus Gap Analysis, Fundamental Value) |
+| `ANTHROPIC_API_KEY` | Yes* | Anthropic API key (for Research Chat, News Digest, Investment Search, Story Checker, Fundamental Analyzer, Structural Change Scanner, Consensus Gap Analysis) |
 | `OLLAMA_HOST` | Optional | Default: `http://localhost:11434` |
-| `OLLAMA_MODEL` | Optional | Default model for Portfolio Chat and Rebalance (overridable in Settings UI) |
+| `OLLAMA_MODEL` | Optional | Default model for Portfolio Chat and Portfolio Story (overridable in Settings UI) |
 | `TAVILY_API_KEY` | Optional | Tavily search — replaces Anthropic's built-in web_search when set. Free tier: 1000 searches/month |
 | `DEMO_MODE` | Optional | Set to `true` to use the demo database |
 | `DB_PATH` | Optional | Default: `data/portfolio.db` |
@@ -137,9 +136,9 @@ Copy `.env.example` to `.env` and fill in your values.
 | `LOG_LEVEL` | Optional | Logging level: DEBUG, INFO (default), WARNING, ERROR, CRITICAL |
 | `BASE_CURRENCY` | Optional | Currency for display: EUR (default), CHF, GBP, USD, JPY |
 
-*`ANTHROPIC_API_KEY` is required to use Research Chat, News Digest, Investment Search, Story Checker, Structural Change Scanner, Consensus Gap Analysis, or Fundamental Value.
+*`ANTHROPIC_API_KEY` is required to use Research Chat, News Digest, Investment Search, Story Checker, Fundamental Analyzer, Structural Change Scanner, or Consensus Gap Analysis.
 
-**Note on model choice:** Claude Sonnet (or better) is required for agents that use `web_search` (Structural Change Scanner, Consensus Gap, Fundamental Value). Claude Haiku works for Research Chat, News Digest, and Story Checker.
+**Note on model choice:** Claude Sonnet (or better) is required for agents that use `web_search` (Structural Change Scanner, Consensus Gap Analysis). Claude Haiku works for Research Chat, News Digest, Story Checker, and Fundamental Analyzer.
 
 ### Multi-Environment Setup
 

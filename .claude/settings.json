@@ -90,7 +90,11 @@
       "Bash(python -m pytest tests/ -q --no-header -x)",
       "Bash(python -m pytest tests/unit/test_portfolio_story.py -xvs)",
       "Bash(python -m py_compile /Users/erik/Projects/wealth_management/pages/portfolio_story.py)",
-      "Bash(python -m py_compile pages/portfolio_story.py pages/storychecker.py pages/consensus_gap.py)"
+      "Bash(python -m py_compile pages/portfolio_story.py pages/storychecker.py pages/consensus_gap.py)",
+      "Bash(python -c \"from core.storage.base import get_connection, init_db, migrate_db; from core.storage.positions import PositionsRepository; from core.storage.analyses import PositionAnalysesRepository; from core.storage.storychecker import StorycheckerRepository; from core.storage.skills import SkillsRepository; from core.llm.claude import ClaudeProvider; from core.constants import CLAUDE_HAIKU; from agents.storychecker_agent import StorycheckerAgent; print\\('✅ All imports OK'\\)\")",
+      "Bash(curl -s http://localhost:8501/_stcore/stream)",
+      "Bash(python -m pytest tests/unit/test_watchlist_checker_agent.py -q --tb=short)",
+      "Bash(grep -E \"\\\\.db$\")"
     ],
     "additionalDirectories": [
       "/Users/erik",

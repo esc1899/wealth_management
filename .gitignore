@@ -5,6 +5,12 @@
 # Local data (encrypted, never in git)
 data/
 
+# SQLite temporary files (WAL, SHM)
+*.db-shm
+*.db-wal
+:memory:-shm
+:memory:-wal
+
 # Python
 __pycache__/
 *.py[cod]
