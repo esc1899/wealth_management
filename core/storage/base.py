@@ -405,6 +405,37 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_runs_agent ON agent_runs(agent_name)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_runs_created ON agent_runs(created_at)")
 
+    # Make stability_verdict and stability_summary nullable (2026-04-23)
+    # PortfolioStoryAgentV2 intentionally doesn't generate stability data
+    existing_analyses = {row[1] for row in conn.execute("PRAGMA table_info(portfolio_story_analyses)")}
+    if "stability_verdict" in existing_analyses:
+        # Check if column is currently NOT NULL by examining the create statement
+        try:
+            table_info = [row for row in conn.execute("PRAGMA table_info(portfolio_story_analyses)") if row[1] in ("stability_verdict", "stability_summary")]
+            if table_info and any(row[3] == 1 for row in table_info):  # notnull flag is column index 3
+                # Recreate table with nullable stability columns
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS portfolio_story_analyses_new (
+                        id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                        verdict            TEXT NOT NULL,
+                        summary            TEXT NOT NULL,
+                        perf_verdict       TEXT NOT NULL,
+                        perf_summary       TEXT NOT NULL,
+                        stability_verdict  TEXT,
+                        stability_summary  TEXT,
+                        full_text          TEXT NOT NULL,
+                        created_at         TEXT NOT NULL
+                    )
+                """)
+                conn.execute("""
+                    INSERT INTO portfolio_story_analyses_new
+                    SELECT * FROM portfolio_story_analyses
+                """)
+                conn.execute("DROP TABLE portfolio_story_analyses")
+                conn.execute("ALTER TABLE portfolio_story_analyses_new RENAME TO portfolio_story_analyses")
+        except Exception:
+            pass  # Table might not exist yet or migration already applied
+
     conn.commit()
 
 
