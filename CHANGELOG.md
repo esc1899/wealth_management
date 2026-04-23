@@ -8,6 +8,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Schema Migration & App Startup Fixes (2026-04-23)
+
+**Session 3 Completion + Infrastructure Robustness.**
+
+- **Schema Migration: Nullable Stability Fields**
+  - Fixed `sqlite3.IntegrityError: NOT NULL constraint failed: portfolio_story_analyses.stability_verdict`
+  - Root cause: PortfolioStoryAgentV2 intentionally doesn't generate stability data (separate check), but schema enforced NOT NULL
+  - Solution: Added migration in `core/storage/base.py` that recreates table with nullable stability columns
+  - Handles both new installs and existing databases seamlessly
+
+- **Improved Dock App Launcher (`start.command`)**
+  - Previous: Terminal closed after Streamlit started → killed background process
+  - Fixed: Use `nohup` to decouple Streamlit from terminal session
+  - Added: Health check (polls `/_stcore/health` until server ready, max 10s)
+  - Added: Auto-browser launch to `http://localhost:8501`
+  - Added: Logging to `~/.wealth-management/streamlit.log` for debugging
+  - Added: Validation that `.venv` exists with helpful error messages
+  - Robust startup: Kills old instances cleanly before starting new one
+
+- **Tests**: 562/562 passing (69.80% coverage)
+
+---
+
 ### Watchlist Checker UX Refactor + Ollama Settings (2026-04-21)
 
 **Watchlist Checker Section 1 auf Checkbox-Pattern umgebaut (analog Portfolio Story Check V2).**

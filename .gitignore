@@ -4,6 +4,7 @@
 
 # Local data (encrypted, never in git)
 data/
+salt.bin
 
 # SQLite temporary files (WAL, SHM)
 *.db-shm
