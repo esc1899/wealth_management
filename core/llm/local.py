@@ -98,6 +98,7 @@ class OllamaProvider(LLMProvider):
                 data.get("eval_count", 0),
                 self.skill_context,
                 _duration_ms,
+                self.position_count,
             )
         return OllamaResponse(
             content=message.get("content", ""),

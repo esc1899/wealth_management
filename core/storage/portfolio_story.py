@@ -148,8 +148,8 @@ class PortfolioStoryRepository:
                    VALUES (?, ?, ?, ?)""",
                 (fit.position_id, fit.fit_role, fit.fit_summary, now.isoformat()),
             )
-            self._conn.commit()
             saved.append(fit.model_copy(update={"id": cur.lastrowid, "created_at": now}))
+        self._conn.commit()
         return saved
 
     def get_latest_position_fits(self, position_ids: list[int]) -> dict[int, PortfolioStoryPositionFit]:

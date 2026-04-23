@@ -6,7 +6,6 @@ Local Ollama LLM (private 🔒 — no data leaves the machine).
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Optional

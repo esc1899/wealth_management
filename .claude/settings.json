@@ -99,7 +99,11 @@
       "Bash(awk '{print $4}')",
       "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py::TestPageLoadability::test_structural_scan_page_loads -v)",
       "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py::TestPageLoadability::test_structural_scan_page_loads -v --tb=short)",
-      "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py::TestPageLoadability::test_structural_scan_page_loads -xvs)"
+      "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py::TestPageLoadability::test_structural_scan_page_loads -xvs)",
+      "Bash(awk '/^research_chat:/,/^[a-z]/' /Users/erik/Projects/wealth_management/translations/de.yaml)",
+      "Bash(awk '/^research_chat:/,/^[a-z]/' /Users/erik/Projects/wealth_management/translations/en.yaml)",
+      "Bash(python -m pytest tests/unit/test_i18n.py -xvs)",
+      "Bash(python -c \"from core.i18n import t; print\\(t\\('fundamental.select_header'\\)\\); print\\(t\\('portfolio_story.title'\\)\\); print\\(t\\('watchlist_checker.title'\\)\\)\")"
     ],
     "additionalDirectories": [
       "/Users/erik",

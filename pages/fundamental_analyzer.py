@@ -16,28 +16,15 @@ from core.ui.verdicts import cloud_notice
 from state import get_analyses_repo, get_fundamental_analyzer_agent, get_portfolio_service
 
 st.set_page_config(page_title="Fundamental Analyzer", page_icon="📊", layout="wide")
-st.title("📊 Fundamental Analyzer")
-st.caption("Tiefgehende Fundamentalwert-Analyse einzelner Positionen")
+st.title(f"📊 {t('fundamental.title')}")
+st.caption(t("fundamental.subtitle"))
 
 agent = get_fundamental_analyzer_agent()
 analyses_repo = get_analyses_repo()
 cloud_notice(agent.model)
 
-with st.expander("ℹ️ Wie nutze ich das?", expanded=False):
-    st.markdown("""
-**Fundamental Analyzer** analysiert einzelne Positionen aus Ihrem Portfolio oder Ihrer Watchlist tiefgehend.
-
-Fokusthemen:
-- **Geschäftsmodell & Strategie:** Kerngeschäft, Profitabilität, Management-Quality
-- **Bewertung:** KGV, EV/EBITDA, Fair Value, Margin of Safety
-- **Wachstum:** Historische Trends, TAM-Expansion, Katalysatoren
-- **Risiken:** Finanzielle, operative, makroökonomische Risiken
-- **Zeithorizont:** Wann wird die Bewertung gerecht?
-
-Der Agent nutzt Web-Search um aktuelle Daten zu finden (Finanzkennzahlen, Management-Updates, Konkurrenztrends).
-
-**Tipp:** Starten Sie mit einer Position und stellen Sie Folgefragen um tiefer einzusteigen.
-""")
+with st.expander(t("fundamental.how_to_use"), expanded=False):
+    st.markdown(t("fundamental.how_to_use_text"))
 
 # ------------------------------------------------------------------
 # Load data
@@ -60,10 +47,10 @@ col_left, col_right = st.columns([0.8, 2.2], gap="medium")
 # ------------------------------------------------------------------
 
 with col_left:
-    st.subheader("Position wählen")
+    st.subheader(t("fundamental.select_header"))
 
     if not positions_with_required_fields:
-        st.warning("Keine Positionen vorhanden. Fügen Sie zunächst Positionen hinzu.")
+        st.warning(t("fundamental.no_positions"))
         st.stop()
     else:
         pos_labels = [
@@ -73,27 +60,27 @@ with col_left:
 
         with st.form("new_analysis_form"):
             selected_idx = st.selectbox(
-                "Position für Analyse",
+                t("fundamental.position_label"),
                 options=range(len(positions_with_required_fields)),
                 format_func=lambda i: pos_labels[i],
             )
             selected_position = positions_with_required_fields[selected_idx]
 
-            submitted = st.form_submit_button("▶️ Analyse starten", use_container_width=True, type="primary")
+            submitted = st.form_submit_button(t("fundamental.start_button"), use_container_width=True, type="primary")
 
         # Show position details as reference
         if selected_position:
             with st.expander(f"📋 {selected_position.name}", expanded=False):
                 if selected_position.ticker:
-                    st.caption(f"**Ticker:** {selected_position.ticker}")
+                    st.caption(f"{t('fundamental.ticker_label')} {selected_position.ticker}")
                 if selected_position.asset_class:
-                    st.caption(f"**Anlageklasse:** {selected_position.asset_class}")
+                    st.caption(f"{t('fundamental.asset_class_label')} {selected_position.asset_class}")
                 if selected_position.anlageart:
-                    st.caption(f"**Anlage-Art:** {selected_position.anlageart}")
+                    st.caption(f"{t('fundamental.investment_type_label')} {selected_position.anlageart}")
                 if selected_position.purchase_price:
                     st.metric("Kaufpreis", f"€{selected_position.purchase_price:,.2f}")
                 if selected_position.story:
-                    st.caption("**Investment-These:**")
+                    st.caption(t("fundamental.thesis_label"))
                     st.markdown(selected_position.story)
 
         # Past analyses
@@ -116,10 +103,10 @@ with col_left:
                         st.rerun()
 
         if st.session_state.get("fa_start_error"):
-            st.error(f"⚠️ Fehler: {st.session_state.pop('fa_start_error')}")
+            st.error(t("fundamental.start_error").format(error=st.session_state.pop('fa_start_error')))
 
         if submitted:
-            with st.spinner("Starte Analyse..."):
+            with st.spinner(t("fundamental.starting")):
                 try:
                     # Clear old session if position changed
                     current_session = agent.get_session(st.session_state.get("fa_session_id")) if st.session_state.get("fa_session_id") else None
@@ -140,11 +127,11 @@ with col_right:
     session_id = st.session_state.get("fa_session_id")
 
     if session_id is None:
-        st.info("Wählen Sie eine Position und starten Sie die Analyse")
+        st.info(t("fundamental.select_prompt"))
     else:
         session = agent.get_session(session_id)
         if session is None:
-            st.warning("Sitzung nicht gefunden")
+            st.warning(t("fundamental.session_not_found"))
             st.session_state.pop("fa_session_id", None)
         else:
             st.markdown(f"### {session.position_name}")
@@ -160,17 +147,17 @@ with col_right:
                 with st.chat_message(msg["role"]):
                     st.markdown(msg["content"])
                     if msg["role"] == "assistant":
-                        st.caption("💡 Mit Web-Search gesammelte Informationen")
+                        st.caption(t("fundamental.web_search_info"))
 
-            if prompt := st.chat_input("Weitere Fragen zur Position..."):
+            if prompt := st.chat_input(t("fundamental.chat_placeholder")):
                 with st.chat_message("user"):
                     st.markdown(prompt)
                 with st.chat_message("assistant"):
-                    with st.spinner("Analysiere..."):
+                    with st.spinner(t("fundamental.analyzing")):
                         try:
                             response = agent.chat(session_id, prompt)
                         except Exception as exc:
-                            response = f"⚠️ Fehler: {exc}"
+                            response = t("fundamental.start_error").format(error=str(exc))
                     st.markdown(response)
-                    st.caption("💡 Mit Web-Search gesammelte Informationen")
+                    st.caption(t("fundamental.web_search_info"))
                 st.rerun()

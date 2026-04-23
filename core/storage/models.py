@@ -526,8 +526,8 @@ class PortfolioStoryAnalysis(BaseModel):
     summary: str                  # Ein-Satz-Fazit Story-Check
     perf_verdict: str             # "on_track" | "achtung" | "kritisch"
     perf_summary: str             # Ein-Satz-Fazit Performance
-    stability_verdict: str        # "stabil" | "achtung" | "instabil"
-    stability_summary: str        # Ein-Satz-Fazit Stabilität
+    stability_verdict: Optional[str] = None        # "stabil" | "achtung" | "instabil"
+    stability_summary: Optional[str] = None        # Ein-Satz-Fazit Stabilität
     full_text: str                # Vollständige LLM-Antwort (Markdown)
     created_at: datetime
 
