@@ -17,7 +17,7 @@ import streamlit as st
 from datetime import datetime
 
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon, cloud_notice
-from core.i18n import current_language
+from core.i18n import t, current_language
 
 st.set_page_config(page_title="Watchlist Checker", layout="wide")
 
@@ -294,14 +294,14 @@ def _run_fundamental_job(
 
 # ─────────────────────────────────────────────────────────────────────
 
-st.title("📋 Watchlist Checker")
-st.caption("Welche Watchlist-Positionen würden gut ins Portfolio passen?")
+st.title(f"📋 {t('watchlist_checker.title')}")
+st.caption(t("watchlist_checker.subtitle"))
 
 # ─────────────────────────────────────────────────────────────────────
 # Section 1: Run Watchlist Check
 # ─────────────────────────────────────────────────────────────────────
 
-st.subheader("1️⃣ Watchlist prüfen")
+st.subheader(t("watchlist_checker.check_section"))
 
 _portfolio_service = get_portfolio_service()
 _analysis_service = get_analysis_service()
@@ -313,10 +313,10 @@ cloud_notice(agent.model, provider="ollama")
 watchlist = _portfolio_service.get_watchlist_positions()
 
 if not watchlist:
-    st.info("📭 Keine Watchlist-Positionen vorhanden. Starten Sie mit dem Portfolio Chat um Watchlist-Einträge hinzuzufügen.")
+    st.info(t("watchlist_checker.no_watchlist"))
     st.stop()
 
-st.caption(f"**{len(watchlist)} Positionen** auf der Watchlist")
+st.caption(t("watchlist_checker.watchlist_count").format(n=len(watchlist)))
 
 # Ermittle offene Checks — analog Portfolio Story
 watchlist_ids = [pos.id for pos in watchlist if pos.id]
@@ -330,30 +330,30 @@ n_missing_fund = sum(1 for pid in watchlist_ids if pid not in fund_verdicts)
 # Timestamps
 latest_sc_ts = max((v.created_at for v in sc_verdicts.values() if v and hasattr(v, 'created_at') and v.created_at), default=None)
 latest_fund_ts = max((v.created_at for v in fund_verdicts.values() if v and hasattr(v, 'created_at') and v.created_at), default=None)
-sc_ts_str = f" (zuletzt: {latest_sc_ts.strftime('%d.%m. %H:%M')})" if latest_sc_ts else " (noch nicht gelaufen)"
-fund_ts_str = f" (zuletzt: {latest_fund_ts.strftime('%d.%m. %H:%M')})" if latest_fund_ts else " (noch nicht gelaufen)"
+sc_ts_str = t("watchlist_checker.ts_last_run").format(ts=latest_sc_ts.strftime('%d.%m. %H:%M')) if latest_sc_ts else t("watchlist_checker.ts_never")
+fund_ts_str = t("watchlist_checker.ts_last_run").format(ts=latest_fund_ts.strftime('%d.%m. %H:%M')) if latest_fund_ts else t("watchlist_checker.ts_never")
 
 # Info-Meldungen
 if n_missing_sc_cg > 0:
-    st.info(f"💡 **Story + Konsens**: {n_missing_sc_cg}/{len(watchlist_ids)} Positionen ausstehend{sc_ts_str}")
+    st.info(t("watchlist_checker.pending_story_info").format(n=n_missing_sc_cg, total=len(watchlist_ids), ts=sc_ts_str))
 if n_missing_fund > 0:
-    st.info(f"💡 **Fundamental**: {n_missing_fund}/{len(watchlist_ids)} Positionen ausstehend{fund_ts_str}")
+    st.info(t("watchlist_checker.pending_fund_info").format(n=n_missing_fund, total=len(watchlist_ids), ts=fund_ts_str))
 
 # Checkboxen für Pre-Checks
 run_sc_cg_checks = st.checkbox(
-    "☑ Ausstehende Story + Konsens-Checks vor Analyse ausführen",
+    t("watchlist_checker.run_story_checkbox"),
     value=False,
     key="_wc_run_sc_cg",
     disabled=n_missing_sc_cg == 0,
 )
 run_fund_checks = st.checkbox(
-    "☑ Ausstehende Fundamental-Checks vor Analyse ausführen",
+    t("watchlist_checker.run_fund_checkbox"),
     value=False,
     key="_wc_run_fund",
     disabled=n_missing_fund == 0,
 )
 
-if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
+if st.button(t("watchlist_checker.run_button"), key="check_watchlist_btn"):
     _lang = current_language()
 
     # Pre-Check 1: Story + Konsens (blocking, nur offene)
@@ -367,13 +367,13 @@ if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
                   config.DB_PATH, config.ENCRYPTION_KEY, config.ANTHROPIC_API_KEY),
             daemon=True,
         ).start()
-        with st.spinner(f"Führe {len(_missing_sc_cg)} Story + Konsens-Checks aus..."):
+        with st.spinner(t("watchlist_checker.running_story_spinner").format(n=len(_missing_sc_cg))):
             while _job["running"]:
                 time.sleep(1)
         if _job["error"]:
             st.error(f"❌ {_job['error']}")
         else:
-            st.success(f"✅ {_job['count']} Story + Konsens-Checks abgeschlossen")
+            st.success(t("watchlist_checker.story_checks_done").format(n=_job['count']))
 
     # Pre-Check 2: Fundamental (blocking, nur offene)
     if run_fund_checks and n_missing_fund > 0:
@@ -385,16 +385,16 @@ if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
                   config.DB_PATH, config.ENCRYPTION_KEY, config.ANTHROPIC_API_KEY),
             daemon=True,
         ).start()
-        with st.spinner(f"Führe {len(_missing_fund)} Fundamental-Analysen aus..."):
+        with st.spinner(t("watchlist_checker.running_fund_spinner").format(n=len(_missing_fund))):
             while _fund_job["running"]:
                 time.sleep(1)
         if _fund_job["error"]:
             st.error(f"❌ {_fund_job['error']}")
         else:
-            st.success(f"✅ {_fund_job['count']} Fundamental-Analysen abgeschlossen")
+            st.success(t("watchlist_checker.fund_checks_done").format(n=_fund_job['count']))
 
     # Hauptcheck
-    with st.spinner("Watchlist wird geprüft..."):
+    with st.spinner(t("watchlist_checker.checking_spinner")):
         # Build complete context (analog to Portfolio Story)
         portfolio = _portfolio_service.get_portfolio_positions()
         market_agent = get_market_agent()
@@ -411,10 +411,10 @@ if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
                 val_eur = val.current_value_eur if val and val.current_value_eur else 0
                 div_str = ""
                 if val and val.annual_dividend_eur and val.annual_dividend_eur > 0:
-                    div_str = f", Dividende/Ausschüttung: {val.annual_dividend_eur:.0f}€/Jahr ({(val.dividend_yield_pct or 0) * 100:.1f}%, Quelle: {val.dividend_source or 'unbekannt'})"
+                    div_str = t("watchlist_checker.dividend_label").format(val=f"{val.annual_dividend_eur:.0f}€/Jahr ({(val.dividend_yield_pct or 0) * 100:.1f}%)", source=val.dividend_source or 'unbekannt')
                 portfolio_snapshot += f"- {p.name} ({p.ticker}, {p.asset_class}): {val_eur:.0f}€{div_str}\n"
         else:
-            portfolio_snapshot += "(Leer)\n"
+            portfolio_snapshot += t("watchlist_checker.empty_portfolio") + "\n"
 
         # Complete story analysis context with full_text
         story_analysis_text = None
@@ -424,7 +424,7 @@ if st.button("▶️ Watchlist prüfen", key="check_watchlist_btn"):
 Story: {story_analysis.verdict}
 Summary: {story_analysis.summary}
 Performance: {story_analysis.perf_verdict} - {story_analysis.perf_summary}
-Stabilität: {story_analysis.stability_verdict} - {story_analysis.stability_summary}
+{t("watchlist_checker.stability_label")} {story_analysis.stability_verdict} - {story_analysis.stability_summary}
 
 Full Analysis:
 {story_analysis.full_text}
@@ -442,11 +442,11 @@ Full Analysis:
                 )
             )
 
-            st.success("✅ Watchlist-Prüfung durchgeführt!")
+            st.success(t("watchlist_checker.check_done"))
             st.session_state["_watchlist_check_result"] = result
 
         except Exception as e:
-            st.error(f"❌ Fehler: {e}")
+            st.error(t("watchlist_checker.error").format(error=str(e)))
 
 # ─────────────────────────────────────────────────────────────────────
 # Section 2: Display Results (persistent from DB)
@@ -496,7 +496,7 @@ else:
 
 if st.session_state.get("_watchlist_check_result"):
     st.divider()
-    st.subheader("2️⃣ Ergebnisse")
+    st.subheader(t("watchlist_checker.results_section"))
 
     result = st.session_state["_watchlist_check_result"]
     result, position_fits = _normalize_result(result)
@@ -527,14 +527,14 @@ if st.session_state.get("_watchlist_check_result"):
 
     _wc_config = VERDICT_CONFIGS["watchlist_checker"]
     st.markdown(
-        f"{verdict_icon('sehr_passend', _wc_config)} Sehr passend: {fit_counts.get('sehr_passend', 0)} | "
-        f"{verdict_icon('passend', _wc_config)} Passend: {fit_counts.get('passend', 0)} | "
-        f"{verdict_icon('neutral', _wc_config)} Neutral: {fit_counts.get('neutral', 0)} | "
-        f"{verdict_icon('nicht_passend', _wc_config)} Nicht passend: {fit_counts.get('nicht_passend', 0)}"
+        f"{verdict_icon('sehr_passend', _wc_config)} {t('watchlist_checker.very_fitting')}: {fit_counts.get('sehr_passend', 0)} | "
+        f"{verdict_icon('passend', _wc_config)} {t('watchlist_checker.fitting')}: {fit_counts.get('passend', 0)} | "
+        f"{verdict_icon('neutral', _wc_config)} {t('watchlist_checker.neutral')}: {fit_counts.get('neutral', 0)} | "
+        f"{verdict_icon('nicht_passend', _wc_config)} {t('watchlist_checker.not_fitting')}: {fit_counts.get('nicht_passend', 0)}"
     )
 
     st.divider()
-    st.markdown("**Position-Details**")
+    st.markdown(t("watchlist_checker.position_details_header"))
 
     # Bulk-fetch analyses for all watchlist positions (used in expanders below)
     _all_fit_ids = [fit.position_id for fit in position_fits if fit.position_id]
@@ -560,7 +560,7 @@ if st.session_state.get("_watchlist_check_result"):
                     st.metric("Fit", fit.verdict.replace("_", " ").title())
 
                 # Position details (Story, Fundamental Analysis, Consensus Gap)
-                with st.expander("📋 Position-Details"):
+                with st.expander(t("watchlist_checker.position_details_label")):
                     detail_cols = st.columns(3)
 
                     # Story Analysis (pre-fetched in bulk above)
@@ -574,7 +574,7 @@ if st.session_state.get("_watchlist_check_result"):
                             if latest_story.summary:
                                 st.caption(latest_story.summary)
                         else:
-                            st.caption("⚪ Noch nicht analysiert")
+                            st.caption(t("watchlist_checker.not_analyzed"))
 
                     # Fundamental Analysis (pre-fetched in bulk above)
                     with detail_cols[1]:
@@ -602,7 +602,7 @@ if st.session_state.get("_watchlist_check_result"):
                             if latest_consensus.summary:
                                 st.caption(latest_consensus.summary)
                         else:
-                            st.caption("⚪ Noch nicht analysiert")
+                            st.caption(t("watchlist_checker.not_analyzed"))
 
     # --- KI-Kommentar (Auto-generated, cached) --
 
@@ -619,16 +619,16 @@ if st.session_state.get("_watchlist_check_result"):
     _ctx_hash = hashlib.md5((_ctx + _comment_style_id).encode()).hexdigest()
 
     if st.session_state.get("_watchlist_comment_hash") != _ctx_hash:
-        with st.spinner(f"{_comment_style['emoji']} Generiere Kommentar..."):
+        with st.spinner(f"{_comment_style['emoji']} {t('watchlist_checker.ai_comment_spinner')}"):
             try:
                 st.session_state["_watchlist_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
                 st.session_state["_watchlist_comment_hash"] = _ctx_hash
             except Exception as _e:
                 logger.warning("KI-Kommentar fehlgeschlagen: %s", _e)
-                st.warning("⚠️ KI-Kommentar nicht verfügbar — Ollama prüfen (Einstellungen > Verbindungstest).")
+                st.warning(t("watchlist_checker.ai_comment_unavailable"))
 
     st.divider()
-    st.subheader("3️⃣ KI-Kommentar")
+    st.subheader(t("watchlist_checker.ai_comment_section"))
 
     if st.session_state.get("_watchlist_comment"):
         with st.container(border=True):
@@ -638,12 +638,12 @@ if st.session_state.get("_watchlist_check_result"):
     # --- Details (Metadata + Full Analysis) --
 
     st.divider()
-    with st.expander("📋 Vollständige Analyse & Metadaten"):
-        st.caption("**Vollständige LLM-Analyse**")
+    with st.expander(t("watchlist_checker.full_analysis_label")):
+        st.caption(t("watchlist_checker.full_llm_label"))
         st.text(result.full_text if hasattr(result, 'full_text') else "")
 
         st.divider()
-        st.caption("**Agent Metadata**")
+        st.caption(t("watchlist_checker.metadata_label"))
         latest_run = agent_runs_repo.get_latest_run("watchlist_checker")
         if latest_run:
             col1, col2, col3 = st.columns(3)
