@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from datetime import datetime, date
 from core.storage.models import PortfolioStory, Position, PositionAnalysis
-from agents.portfolio_story_agent import PortfolioStoryAgent
+from agents.portfolio_story_agent_v2 import PortfolioStoryAgentV2
 
 
 class MockLLM:
@@ -51,7 +51,7 @@ async def test_analyze_positions_generates_fits():
     verdicts = {1: {}, 2: {}}
     
     # Create agent with mock LLM
-    agent = PortfolioStoryAgent(MockLLM(), None, None)
+    agent = PortfolioStoryAgentV2(MockLLM(), None, None)
     
     # Run analyze_positions
     fits = await agent.analyze_positions(story, positions, verdicts)

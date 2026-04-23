@@ -447,8 +447,6 @@ Full Analysis:
 
         except Exception as e:
             st.error(f"❌ Fehler: {e}")
-            import traceback
-            st.text(traceback.format_exc())
 
 # ─────────────────────────────────────────────────────────────────────
 # Section 2: Display Results (persistent from DB)

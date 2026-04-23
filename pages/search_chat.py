@@ -7,13 +7,14 @@ import asyncio
 import streamlit as st
 
 from core.i18n import t
+from core.ui.verdicts import cloud_notice
 from state import get_search_agent, get_skills_repo
 
 st.set_page_config(page_title="Investment Search", page_icon="🔎", layout="wide")
 st.title(f"🔎 {t('search_chat.title')}")
 st.caption(t("search_chat.subtitle"))
 agent = get_search_agent()
-st.info(t("search_chat.cloud_notice").format(model=agent.model), icon="ℹ️")
+cloud_notice(agent.model, "claude")
 
 # Load search skills from DB
 search_skills = get_skills_repo().get_by_area("search")
