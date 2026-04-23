@@ -136,8 +136,8 @@ def _run_storychecker_job(
 
 
 st.set_page_config(page_title="Portfolio Story", page_icon="📖", layout="wide")
-st.title("📖 Portfolio Story")
-st.caption("Dein langfristiges Anlage-Narrativ und Alignment-Check")
+st.title(f"📖 {t('portfolio_story.title')}")
+st.caption(t("portfolio_story.subtitle"))
 
 # ──────────────────────────────────────────────────────────────────────
 # Load data
