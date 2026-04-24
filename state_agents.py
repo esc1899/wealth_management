@@ -72,19 +72,15 @@ def _safe_take_snapshot() -> None:
     """Helper: take wealth and dividend snapshots after market fetch, fail silently on errors."""
     agent = get_wealth_snapshot_agent()
 
-    # Take wealth snapshot
+    # Take wealth snapshot (overwrite so new/removed positions are reflected immediately)
     try:
-        agent.take_snapshot(is_manual=False, overwrite=False)
-    except ValueError:
-        pass  # Snapshot for today already exists — ok
+        agent.take_snapshot(is_manual=False, overwrite=True)
     except Exception as e:
         logger.warning("Auto wealth snapshot failed: %s", e)
 
-    # Take dividend snapshot
+    # Take dividend snapshot (overwrite so new/removed positions are reflected immediately)
     try:
-        agent.take_dividend_snapshot(is_manual=False, overwrite=False)
-    except ValueError:
-        pass  # Snapshot for today already exists — ok
+        agent.take_dividend_snapshot(is_manual=False, overwrite=True)
     except Exception as e:
         logger.warning("Auto dividend snapshot failed: %s", e)
 
