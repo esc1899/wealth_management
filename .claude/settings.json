@@ -121,7 +121,9 @@
       "Bash(python3 -c \"import json,sys; pkgs = json.load\\(sys.stdin\\); [print\\(p['name'], p['version']\\) for p in pkgs if p['name'].lower\\(\\) in ['cryptography','pyyaml','requests','anthropic','streamlit','pillow','setuptools']]\")",
       "Bash(.venv/bin/pip list *)",
       "Bash(git filter-repo *)",
-      "Bash(pytest tests/ -q)"
+      "Bash(pytest tests/ -q)",
+      "Bash(awk '/^if _ss\\\\\\(\"_pos_show_form\"\\\\\\):/{start=NR} start && /^\\(if|st\\\\.|# ---\\)/ && NR>start+10 && !/^[[:space:]]/{print NR\": \"$0; exit}' /Users/erik/Projects/wealth_management/pages/positionen.py)",
+      "Bash(awk '/^    if shows_isin_wkn:/{start=NR} start && /^[^ ]/ && NR>start+100 {print NR\": \"$0; exit}' /Users/erik/Projects/wealth_management/pages/positionen.py)"
     ],
     "additionalDirectories": [
       "/Users/erik",

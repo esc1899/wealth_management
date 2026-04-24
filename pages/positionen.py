@@ -903,20 +903,20 @@ def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
         [p.id for p in positions if p.id], "storychecker"
     )
 
-    # Header row (11 columns: name, ticker, isin, class, qty, unit, current_value, div_yield, detail, edit, del)
-    hc = st.columns([3, 1, 2, 1, 1, 1, 1.3, 0.8, 0.4, 0.4, 0.4])
+    # Header row (13 columns: name, ticker, isin, class, qty, unit, current_value, div_yield, analysis_excl, override, detail, edit, del)
+    hc = st.columns([3, 1, 2, 1, 1, 1, 1.3, 0.8, 0.35, 0.35, 0.4, 0.4, 0.4])
     for col, label in zip(hc, [
         t("positionen.col_name"), t("positionen.col_ticker"),
         t("positionen.col_isin"), t("positionen.col_asset_class"),
         t("positionen.col_quantity"), t("positionen.col_unit"),
-        "Akt. Wert", "Div.-Rendite", "", "", "",
+        "Akt. Wert", "Div.-Rendite", "", "", "", "", "",
     ]):
         col.markdown(f"**{label}**")
 
     st.divider()
 
     for pos in positions:
-        cols = st.columns([3, 1, 2, 1, 1, 1, 1.3, 0.8, 0.4, 0.4, 0.4])
+        cols = st.columns([3, 1, 2, 1, 1, 1, 1.3, 0.8, 0.35, 0.35, 0.4, 0.4, 0.4])
         analysis = verdicts.get(pos.id)
         verdict_badge = _VERDICT_ICON.get(analysis.verdict, "") if analysis else ""
         cols[0].write(f"{verdict_badge} {pos.name}" if verdict_badge else pos.name)
@@ -950,13 +950,24 @@ def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
         div_yield = _get_dividend_yield(pos)
         cols[7].write(div_yield or "—")
 
-        if cols[8].button("🔍", key=f"{key_prefix}_det_{pos.id}", help=t("positionen.detail_tooltip")):
+        # analysis_excluded indicator
+        cols[8].write("🔬" if pos.analysis_excluded else "—")
+
+        # Manual override indicator
+        extra = pos.extra_data or {}
+        cfg = registry.get(pos.asset_class)
+        has_override = bool(extra.get("dividend_yield_override")) or (
+            bool(extra.get("estimated_value")) and cfg and cfg.manual_valuation
+        )
+        cols[9].write("⚠️" if has_override else "—")
+
+        if cols[10].button("🔍", key=f"{key_prefix}_det_{pos.id}", help=t("positionen.detail_tooltip")):
             _open_detail(pos.id)
             st.rerun()
-        if cols[9].button("✏️", key=f"{key_prefix}_edit_{pos.id}", help=t("positionen.edit_tooltip")):
+        if cols[11].button("✏️", key=f"{key_prefix}_edit_{pos.id}", help=t("positionen.edit_tooltip")):
             _open_edit(pos.id)
             st.rerun()
-        if cols[10].button("🗑️", key=f"{key_prefix}_del_{pos.id}", help=t("positionen.delete_tooltip")):
+        if cols[12].button("🗑️", key=f"{key_prefix}_del_{pos.id}", help=t("positionen.delete_tooltip")):
             _open_delete(pos.id)
             st.rerun()
 
