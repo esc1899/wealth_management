@@ -244,8 +244,11 @@ def _render_edit_form(pos_id: int | None, readonly: bool = False):
 
     st.divider()
 
-    # ── Main form ─────────────────────────────────────────────────────────────
-    with st.form("pos_form", clear_on_submit=False):
+    # ── Main form (only in edit mode; view mode renders without form wrapper) ───
+    if not readonly:
+        form_cm = st.form("pos_form", clear_on_submit=False).__enter__()
+
+    # Form contents (rendered whether or not in form context)
 
         # Name (always required)
         col_a, col_b = st.columns(2)
@@ -569,6 +572,9 @@ def _render_edit_form(pos_id: int | None, readonly: bool = False):
         else:
             submitted = False
             cancelled = False
+
+    if not readonly:
+        form_cm.__exit__(None, None, None)
 
     if cancelled:
         _clear_form()
