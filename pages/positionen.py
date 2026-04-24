@@ -5,6 +5,7 @@ Positionen — direktes CRUD für Portfolio und Watchlist, kein LLM.
 from __future__ import annotations
 
 import logging
+from contextlib import nullcontext
 from datetime import date, timedelta
 from typing import Optional
 
@@ -244,342 +245,336 @@ def _render_edit_form(pos_id: int | None, readonly: bool = False):
 
     st.divider()
 
-    # Initialize form button variables (defaults for readonly mode)
-    submitted = False
-    cancelled = False
+    # ── Form wrapper (conditional: only in edit mode; view mode uses nullcontext) ───
+    form_ctx = st.form("pos_form", clear_on_submit=False) if not readonly else nullcontext()
+    with form_ctx:
 
-    # ── Main form (only in edit mode; view mode renders without form wrapper) ───
-    if not readonly:
-        form_cm = st.form("pos_form", clear_on_submit=False).__enter__()
+        # Form contents (rendered in proper context manager)
 
-    # Form contents (rendered whether or not in form context)
+        # Name (always required)
+        col_a, col_b = st.columns(2)
+        with col_a:
+            form_name = st.text_input(
+                t("positionen.col_name") + " *",
+                value=_ss("_pos_name", editing.name if editing else "") or "",
+                disabled=readonly,
+            )
 
-    # Name (always required)
-    col_a, col_b = st.columns(2)
-    with col_a:
-        form_name = st.text_input(
-            t("positionen.col_name") + " *",
-            value=_ss("_pos_name", editing.name if editing else "") or "",
+        # Ticker (only for auto_fetch types)
+        with col_b:
+            if cfg.auto_fetch:
+                form_ticker = st.text_input(
+                    t("positionen.col_ticker"),
+                    value=_ss("_pos_ticker", editing.ticker if editing else "") or "",
+                    disabled=readonly,
+                )
+            else:
+                form_ticker = None
+                st.empty()
+
+        # Unit (only if multiple options or "unit" in visible_fields)
+        with st.container():
+            unit_options = cfg.unit_options if cfg.unit_options else [cfg.default_unit]
+            if len(unit_options) > 1:
+                unit_default_idx = (
+                    unit_options.index(editing.unit)
+                    if editing and editing.unit in unit_options
+                    else 0
+                )
+                form_unit = st.selectbox(
+                    t("positionen.col_unit"),
+                    options=unit_options,
+                    index=unit_default_idx,
+                    disabled=readonly,
+                )
+            else:
+                form_unit = unit_options[0]
+                st.caption(f"{t('positionen.col_unit')}: {form_unit}")
+
+        form_empfehlung = editing.empfehlung if editing else None
+
+        # Anlageart (sub-type dropdown — only if asset class has anlagearten defined)
+        _anlagearten = cfg.anlagearten
+        if _anlagearten:
+            _al_opts = [""] + _anlagearten
+            _al_default = (editing.anlageart or "") if editing else ""
+            _al_idx = _al_opts.index(_al_default) if _al_default in _al_opts else 0
+            col_al, _ = st.columns(2)
+            with col_al:
+                form_anlageart = st.selectbox(
+                    t("positionen.anlageart_label"),
+                    options=_al_opts,
+                    index=_al_idx,
+                    format_func=lambda x: x if x else "—",
+                    disabled=readonly,
+                )
+        else:
+            form_anlageart = None
+
+        # Empfehlung: Source + Analysis Exclusion (in bordered container)
+        with st.container(border=True):
+            col_rec, col_excl = st.columns(2)
+
+            with col_rec:
+                # Collect all existing recommendation sources
+                all_positions = repo.get_portfolio() + repo.get_watchlist()
+                existing_sources = sorted(
+                    {p.recommendation_source for p in all_positions if p.recommendation_source},
+                    key=str.lower
+                )
+
+                # Default index: use editing value if it exists in options, else None (first option)
+                source_default = editing.recommendation_source if editing and editing.recommendation_source in existing_sources else None
+                source_idx = existing_sources.index(source_default) if source_default else 0
+
+                # Selectbox: only for existing sources
+                selected_existing = st.selectbox(
+                    t("positionen.empfohlen_von"),
+                    options=[None] + existing_sources,
+                    index=source_idx + 1 if source_default else 0,
+                    format_func=lambda x: x or "—",
+                    disabled=readonly,
+                )
+
+                # Text input: for entering a new source (appears below selectbox)
+                new_source_input = st.text_input(
+                    t("positionen.new_recommendation_source_label"),
+                    value="",
+                    placeholder="Oder neuen Empfehler eingeben...",
+                    disabled=readonly,
+                )
+
+                # Use whichever was filled in: new_source_input takes priority
+                form_rec_source = new_source_input if new_source_input else selected_existing
+
+            with col_excl:
+                # Analysis exclusion checkbox
+                analysis_excluded = st.checkbox(
+                    t("positionen.analysis_excluded_label"),
+                    value=editing.analysis_excluded if editing else False,
+                    help=t("positionen.analysis_excluded_help") if t("positionen.analysis_excluded_help") else None,
+                    disabled=readonly,
+                )
+
+        # Quantity (optional for manual_valuation types; hidden for Grundstück)
+        shows_quantity = cfg.is_field_visible("quantity") or (
+            cfg.manual_valuation and selected_ac != "Grundstück"
+        )
+        col_e, col_f = st.columns(2)
+        with col_e:
+            if shows_quantity:
+                form_qty = st.number_input(
+                    t("positionen.col_quantity"),
+                    min_value=0.0,
+                    step=1.0,
+                    format="%.4f",
+                    value=float(editing.quantity) if editing and editing.quantity else 0.0,
+                    disabled=readonly,
+                )
+            else:
+                form_qty = None
+
+        # Purchase price (for types with purchase_price visible)
+        with col_f:
+            if cfg.is_field_visible("purchase_price"):
+                form_price = st.number_input(
+                    t("positionen.col_purchase_price"),
+                    min_value=0.0,
+                    step=0.01,
+                    format="%.4f",
+                    value=float(editing.purchase_price) if editing and editing.purchase_price else 0.0,
+                    disabled=readonly,
+                )
+            else:
+                form_price = None
+
+        # Purchase date
+        col_g, col_h = st.columns(2)
+        with col_g:
+            if cfg.is_field_visible("purchase_date"):
+                form_date = st.date_input(
+                    t("positionen.col_purchase_date"),
+                    value=editing.purchase_date if editing else None,
+                    min_value=date(2000, 1, 1),
+                    max_value=date.today(),
+                    disabled=readonly,
+                )
+            else:
+                form_date = None
+
+        # Get existing extra_data early (needed for manual valuation fields)
+        _existing_extra_early = (editing.extra_data or {}) if editing else {}
+
+        # Portfolio / Watchlist flags + Analysis exclusion
+        with col_h:
+            if cfg.watchlist_eligible:
+                flag_col1, flag_col2 = st.columns(2)
+                with flag_col1:
+                    in_portfolio = st.checkbox(
+                        t("positionen.in_portfolio"),
+                        value=editing.in_portfolio if editing else True,
+                        disabled=readonly,
+                    )
+                with flag_col2:
+                    in_watchlist = st.checkbox(
+                        t("positionen.in_watchlist"),
+                        value=editing.in_watchlist if editing else False,
+                        disabled=readonly,
+                    )
+            else:
+                in_portfolio = True
+                in_watchlist = False
+
+
+        # Manual valuation fields (Grundstück, Immobilie, Festgeld, Bargeld, Anleihe)
+        if cfg.manual_valuation:
+            st.markdown("---")
+            st.markdown("#### 💰 Schätzwert")
+            mv_col1, mv_col2 = st.columns(2)
+            with mv_col1:
+                form_estimated_value = st.number_input(
+                    t("positionen.estimated_value"),
+                    min_value=0.0,
+                    step=1000.0,
+                    format="%.2f",
+                    value=float(_existing_extra_early.get("estimated_value", 0.0)) if _existing_extra_early.get("estimated_value") else 0.0,
+                    disabled=readonly,
+                )
+            with mv_col2:
+                val_date_raw = _existing_extra_early.get("valuation_date")
+                form_valuation_date = st.date_input(
+                    t("positionen.valuation_date"),
+                    value=date.fromisoformat(val_date_raw) if val_date_raw else date.today(),
+                    disabled=readonly,
+                )
+        else:
+            form_estimated_value = None
+            form_valuation_date = None
+
+        # Notes (always)
+        form_notes = st.text_input(
+            t("positionen.col_notes"),
+            value=(editing.notes or "") if editing else "",
             disabled=readonly,
         )
 
-    # Ticker (only for auto_fetch types)
-    with col_b:
-        if cfg.auto_fetch:
-            form_ticker = st.text_input(
-                t("positionen.col_ticker"),
-                value=_ss("_pos_ticker", editing.ticker if editing else "") or "",
-                disabled=readonly,
-            )
-        else:
-            form_ticker = None
-            st.empty()
+        # Story textarea — state managed via "_pos_form_story" key (supports AI draft injection)
+        form_story = st.text_area(
+            t("positionen.story_label"),
+            key="_pos_form_story",
+            placeholder=t("positionen.story_placeholder"),
+            height=120,
+            disabled=readonly,
+        )
 
-    # Unit (only if multiple options or "unit" in visible_fields)
-    with st.container():
-        unit_options = cfg.unit_options if cfg.unit_options else [cfg.default_unit]
-        if len(unit_options) > 1:
-            unit_default_idx = (
-                unit_options.index(editing.unit)
-                if editing and editing.unit in unit_options
-                else 0
-            )
-            form_unit = st.selectbox(
-                t("positionen.col_unit"),
-                options=unit_options,
-                index=unit_default_idx,
-                disabled=readonly,
-            )
-        else:
-            form_unit = unit_options[0]
-            st.caption(f"{t('positionen.col_unit')}: {form_unit}")
+        # Anlage-Idee selector — only visible when a story is being written
+        _sc_skills = get_skills_repo().get_by_area("storychecker")
+        _sc_skill_options = [""] + [s.name for s in _sc_skills]
+        _current_skill = (editing.story_skill or "") if editing else ""
+        _skill_idx = _sc_skill_options.index(_current_skill) if _current_skill in _sc_skill_options else 0
+        form_story_skill = st.selectbox(
+            t("positionen.story_skill_label"),
+            options=_sc_skill_options,
+            index=_skill_idx,
+            help=t("positionen.story_skill_help"),
+            disabled=readonly,
+        )
 
-    form_empfehlung = editing.empfehlung if editing else None
-
-    # Anlageart (sub-type dropdown — only if asset class has anlagearten defined)
-    _anlagearten = cfg.anlagearten
-    if _anlagearten:
-        _al_opts = [""] + _anlagearten
-        _al_default = (editing.anlageart or "") if editing else ""
-        _al_idx = _al_opts.index(_al_default) if _al_default in _al_opts else 0
-        col_al, _ = st.columns(2)
-        with col_al:
-            form_anlageart = st.selectbox(
-                t("positionen.anlageart_label"),
-                options=_al_opts,
-                index=_al_idx,
-                format_func=lambda x: x if x else "—",
-                disabled=readonly,
-            )
-    else:
-        form_anlageart = None
-
-    # Empfehlung: Source + Analysis Exclusion (in bordered container)
-    with st.container(border=True):
-        col_rec, col_excl = st.columns(2)
-
-        with col_rec:
-            # Collect all existing recommendation sources
-            all_positions = repo.get_portfolio() + repo.get_watchlist()
-            existing_sources = sorted(
-                {p.recommendation_source for p in all_positions if p.recommendation_source},
-                key=str.lower
-            )
-
-            # Default index: use editing value if it exists in options, else None (first option)
-            source_default = editing.recommendation_source if editing and editing.recommendation_source in existing_sources else None
-            source_idx = existing_sources.index(source_default) if source_default else 0
-
-            # Selectbox: only for existing sources
-            selected_existing = st.selectbox(
-                t("positionen.empfohlen_von"),
-                options=[None] + existing_sources,
-                index=source_idx + 1 if source_default else 0,
-                format_func=lambda x: x or "—",
-                disabled=readonly,
-            )
-
-            # Text input: for entering a new source (appears below selectbox)
-            new_source_input = st.text_input(
-                t("positionen.new_recommendation_source_label"),
-                value="",
-                placeholder="Oder neuen Empfehler eingeben...",
-                disabled=readonly,
-            )
-
-            # Use whichever was filled in: new_source_input takes priority
-            form_rec_source = new_source_input if new_source_input else selected_existing
-
-        with col_excl:
-            # Analysis exclusion checkbox
-            analysis_excluded = st.checkbox(
-                t("positionen.analysis_excluded_label"),
-                value=editing.analysis_excluded if editing else False,
-                help=t("positionen.analysis_excluded_help") if t("positionen.analysis_excluded_help") else None,
-                disabled=readonly,
-            )
-
-    # Quantity (optional for manual_valuation types; hidden for Grundstück)
-    shows_quantity = cfg.is_field_visible("quantity") or (
-        cfg.manual_valuation and selected_ac != "Grundstück"
-    )
-    col_e, col_f = st.columns(2)
-    with col_e:
-        if shows_quantity:
-            form_qty = st.number_input(
-                t("positionen.col_quantity"),
-                min_value=0.0,
-                step=1.0,
-                format="%.4f",
-                value=float(editing.quantity) if editing and editing.quantity else 0.0,
-                disabled=readonly,
-            )
-        else:
-            form_qty = None
-
-    # Purchase price (for types with purchase_price visible)
-    with col_f:
-        if cfg.is_field_visible("purchase_price"):
-            form_price = st.number_input(
-                t("positionen.col_purchase_price"),
-                min_value=0.0,
-                step=0.01,
-                format="%.4f",
-                value=float(editing.purchase_price) if editing and editing.purchase_price else 0.0,
-                disabled=readonly,
-            )
-        else:
-            form_price = None
-
-    # Purchase date
-    col_g, col_h = st.columns(2)
-    with col_g:
-        if cfg.is_field_visible("purchase_date"):
-            form_date = st.date_input(
-                t("positionen.col_purchase_date"),
-                value=editing.purchase_date if editing else None,
-                min_value=date(2000, 1, 1),
-                max_value=date.today(),
-                disabled=readonly,
-            )
-        else:
-            form_date = None
-
-    # Get existing extra_data early (needed for manual valuation fields)
-    _existing_extra_early = (editing.extra_data or {}) if editing else {}
-
-    # Portfolio / Watchlist flags + Analysis exclusion
-    with col_h:
-        if cfg.watchlist_eligible:
-            flag_col1, flag_col2 = st.columns(2)
-            with flag_col1:
-                in_portfolio = st.checkbox(
-                    t("positionen.in_portfolio"),
-                    value=editing.in_portfolio if editing else True,
+        # ── Festgeld extra fields ──────────────────────────────────────────────
+        existing_extra = (editing.extra_data or {}) if editing else {}
+        if selected_ac == "Festgeld":
+            st.markdown("---")
+            fe_a, fe_b, fe_c = st.columns(3)
+            with fe_a:
+                form_interest_rate = st.number_input(
+                    t("positionen.interest_rate"),
+                    min_value=0.0,
+                    max_value=100.0,
+                    step=0.1,
+                    format="%.2f",
+                    value=float(existing_extra.get("interest_rate", 0.0)),
                     disabled=readonly,
                 )
-            with flag_col2:
-                in_watchlist = st.checkbox(
-                    t("positionen.in_watchlist"),
-                    value=editing.in_watchlist if editing else False,
+            with fe_b:
+                maturity_raw = existing_extra.get("maturity_date")
+                form_maturity = st.date_input(
+                    t("positionen.maturity_date"),
+                    value=date.fromisoformat(maturity_raw) if maturity_raw else None,
+                    min_value=date.today(),
                     disabled=readonly,
                 )
+            with fe_c:
+                form_bank = st.text_input(
+                    t("positionen.bank"),
+                    value=existing_extra.get("bank", ""),
+                    disabled=readonly,
+                )
+        elif selected_ac == "Anleihe":
+            st.markdown("---")
+            an_a, an_b = st.columns(2)
+            with an_a:
+                form_interest_rate = st.number_input(
+                    t("positionen.interest_rate"),
+                    min_value=0.0,
+                    max_value=100.0,
+                    step=0.1,
+                    format="%.2f",
+                    value=float(existing_extra.get("interest_rate", 0.0)),
+                    disabled=readonly,
+                )
+            with an_b:
+                maturity_raw = existing_extra.get("maturity_date")
+                form_maturity = st.date_input(
+                    t("positionen.maturity_date"),
+                    value=date.fromisoformat(maturity_raw) if maturity_raw else None,
+                    min_value=date.today(),
+                    disabled=readonly,
+                )
+            form_bank = None
         else:
-            in_portfolio = True
-            in_watchlist = False
+            form_interest_rate = None
+            form_maturity = None
+            form_bank = None
 
-
-    # Manual valuation fields (Grundstück, Immobilie, Festgeld, Bargeld, Anleihe)
-    if cfg.manual_valuation:
+        # ── Dividend Yield Override (all asset classes) ────────────────────────
         st.markdown("---")
-        st.markdown("#### 💰 Schätzwert")
-        mv_col1, mv_col2 = st.columns(2)
-        with mv_col1:
-            form_estimated_value = st.number_input(
-                t("positionen.estimated_value"),
-                min_value=0.0,
-                step=1000.0,
-                format="%.2f",
-                value=float(_existing_extra_early.get("estimated_value", 0.0)) if _existing_extra_early.get("estimated_value") else 0.0,
-                disabled=readonly,
-            )
-        with mv_col2:
-            val_date_raw = _existing_extra_early.get("valuation_date")
-            form_valuation_date = st.date_input(
-                t("positionen.valuation_date"),
-                value=date.fromisoformat(val_date_raw) if val_date_raw else date.today(),
-                disabled=readonly,
-            )
-    else:
-        form_estimated_value = None
-        form_valuation_date = None
+        st.markdown("#### 📊 Dividende / Zinssatz (manueller Override)")
 
-    # Notes (always)
-    form_notes = st.text_input(
-        t("positionen.col_notes"),
-        value=(editing.notes or "") if editing else "",
-        disabled=readonly,
-    )
+        # Show current yfinance value if available
+        form_ticker = editing.ticker if editing else _ss("_pos_ticker", "")
+        if form_ticker:
+            div_rec = _market_repo.get_dividend(form_ticker)
+            if div_rec:
+                rate_str = f"{div_rec.rate_eur:.4f}€/Aktie" if div_rec.rate_eur is not None else "Kurs n/a"
+                date_str = div_rec.fetched_at.strftime('%d.%m.%Y') if div_rec.fetched_at else "—"
+                st.info(f"ℹ️ Aktuell von yfinance: {(div_rec.yield_pct or 0) * 100:.2f}% ({rate_str}, Stand: {date_str})")
+            existing_override = existing_extra.get("dividend_yield_override", 0.0)
+            if existing_override and existing_override > 0:
+                st.info(f"⚠️ Override aktiv: {existing_override:.2f}% → yfinance-Wert wird ignoriert")
 
-    # Story textarea — state managed via "_pos_form_story" key (supports AI draft injection)
-    form_story = st.text_area(
-        t("positionen.story_label"),
-        key="_pos_form_story",
-        placeholder=t("positionen.story_placeholder"),
-        height=120,
-        disabled=readonly,
-    )
+        form_dividend_override = st.number_input(
+            "Jährlicher Zinssatz / Dividendenrendite (%)",
+            min_value=0.0,
+            max_value=100.0,
+            step=0.1,
+            format="%.2f",
+            value=float(existing_extra.get("dividend_yield_override", 0.0)),
+            help="Wenn > 0: nutze diesen Wert statt yfinance-Daten oder berechneter Werte. Z.B. 3.5 für 3,5%",
+            disabled=readonly,
+        )
 
-    # Anlage-Idee selector — only visible when a story is being written
-    _sc_skills = get_skills_repo().get_by_area("storychecker")
-    _sc_skill_options = [""] + [s.name for s in _sc_skills]
-    _current_skill = (editing.story_skill or "") if editing else ""
-    _skill_idx = _sc_skill_options.index(_current_skill) if _current_skill in _sc_skill_options else 0
-    form_story_skill = st.selectbox(
-        t("positionen.story_skill_label"),
-        options=_sc_skill_options,
-        index=_skill_idx,
-        help=t("positionen.story_skill_help"),
-        disabled=readonly,
-    )
+        # ── Save / Cancel (only in edit mode) ──────────────────────────────────
+        if not readonly:
+            col_save, col_cancel = st.columns([1, 5])
+            with col_save:
+                submitted = st.form_submit_button(t("positionen.save_button"), type="primary")
+            with col_cancel:
+                cancelled = st.form_submit_button(t("positionen.cancel_button"))
+        else:
+            submitted = False
+            cancelled = False
 
-    # ── Festgeld extra fields ──────────────────────────────────────────────
-    existing_extra = (editing.extra_data or {}) if editing else {}
-    if selected_ac == "Festgeld":
-        st.markdown("---")
-        fe_a, fe_b, fe_c = st.columns(3)
-        with fe_a:
-            form_interest_rate = st.number_input(
-                t("positionen.interest_rate"),
-                min_value=0.0,
-                max_value=100.0,
-                step=0.1,
-                format="%.2f",
-                value=float(existing_extra.get("interest_rate", 0.0)),
-                disabled=readonly,
-            )
-        with fe_b:
-            maturity_raw = existing_extra.get("maturity_date")
-            form_maturity = st.date_input(
-                t("positionen.maturity_date"),
-                value=date.fromisoformat(maturity_raw) if maturity_raw else None,
-                min_value=date.today(),
-                disabled=readonly,
-            )
-        with fe_c:
-            form_bank = st.text_input(
-                t("positionen.bank"),
-                value=existing_extra.get("bank", ""),
-                disabled=readonly,
-            )
-    elif selected_ac == "Anleihe":
-        st.markdown("---")
-        an_a, an_b = st.columns(2)
-        with an_a:
-            form_interest_rate = st.number_input(
-                t("positionen.interest_rate"),
-                min_value=0.0,
-                max_value=100.0,
-                step=0.1,
-                format="%.2f",
-                value=float(existing_extra.get("interest_rate", 0.0)),
-                disabled=readonly,
-            )
-        with an_b:
-            maturity_raw = existing_extra.get("maturity_date")
-            form_maturity = st.date_input(
-                t("positionen.maturity_date"),
-                value=date.fromisoformat(maturity_raw) if maturity_raw else None,
-                min_value=date.today(),
-                disabled=readonly,
-            )
-        form_bank = None
-    else:
-        form_interest_rate = None
-        form_maturity = None
-        form_bank = None
-
-    # ── Dividend Yield Override (all asset classes) ────────────────────────
-    st.markdown("---")
-    st.markdown("#### 📊 Dividende / Zinssatz (manueller Override)")
-
-    # Show current yfinance value if available
-    form_ticker = editing.ticker if editing else _ss("_pos_ticker", "")
-    if form_ticker:
-        div_rec = _market_repo.get_dividend(form_ticker)
-        if div_rec:
-            rate_str = f"{div_rec.rate_eur:.4f}€/Aktie" if div_rec.rate_eur is not None else "Kurs n/a"
-            date_str = div_rec.fetched_at.strftime('%d.%m.%Y') if div_rec.fetched_at else "—"
-            st.info(f"ℹ️ Aktuell von yfinance: {(div_rec.yield_pct or 0) * 100:.2f}% ({rate_str}, Stand: {date_str})")
-        existing_override = existing_extra.get("dividend_yield_override", 0.0)
-        if existing_override and existing_override > 0:
-            st.info(f"⚠️ Override aktiv: {existing_override:.2f}% → yfinance-Wert wird ignoriert")
-
-    form_dividend_override = st.number_input(
-        "Jährlicher Zinssatz / Dividendenrendite (%)",
-        min_value=0.0,
-        max_value=100.0,
-        step=0.1,
-        format="%.2f",
-        value=float(existing_extra.get("dividend_yield_override", 0.0)),
-        help="Wenn > 0: nutze diesen Wert statt yfinance-Daten oder berechneter Werte. Z.B. 3.5 für 3,5%",
-        disabled=readonly,
-    )
-
-    # ── Save / Cancel (only in edit mode) ──────────────────────────────────
-    if not readonly:
-        col_save, col_cancel = st.columns([1, 5])
-        with col_save:
-            submitted = st.form_submit_button(t("positionen.save_button"), type="primary")
-        with col_cancel:
-            cancelled = st.form_submit_button(t("positionen.cancel_button"))
-    else:
-        submitted = False
-        cancelled = False
-
-    if not readonly:
-        form_cm.__exit__(None, None, None)
-
+    # Handle form submission (after with block, variables always defined)
     if cancelled:
         _clear_form()
         st.rerun()
@@ -721,107 +716,6 @@ def _show_detail(pos_id: int | None):
 
         st.divider()
         _render_edit_form(pos_id, readonly=True)
-
-        if pos.quantity is not None:
-            col_e, col_f = st.columns(2)
-            col_e.markdown(f"**{t('positionen.col_quantity')}:** {_fmtnum(pos.quantity, 4).rstrip('0').rstrip(',')}")
-            col_f.markdown(
-                f"**{t('positionen.col_purchase_price')}:** "
-                f"{_fmtnum(pos.purchase_price)} {symbol()}" if pos.purchase_price else f"**{t('positionen.col_purchase_price')}:** —"
-            )
-
-        if pos.purchase_date:
-            st.markdown(f"**{t('positionen.col_purchase_date')}:** {pos.purchase_date.isoformat()}")
-
-        if pos.empfehlung or pos.recommendation_source:
-            rec_parts = []
-            if pos.empfehlung:
-                rec_parts.append(pos.empfehlung)
-            if pos.recommendation_source:
-                rec_parts.append(f"{t('positionen.empfohlen_von')}: {pos.recommendation_source}")
-            st.markdown(f"**{t('positionen.empfehlung')}:** {' · '.join(rec_parts)}")
-
-        if pos.story:
-            st.markdown(f"**{t('positionen.story_label')}:**")
-            st.info(pos.story)
-
-        if pos.notes:
-            st.markdown(f"**{t('positionen.col_notes')}:** {pos.notes}")
-
-        # ── Festgeld extra fields ────────────────────────────────────────────────
-        if pos.asset_class == "Festgeld":
-            st.divider()
-            fe_a, fe_b, fe_c = st.columns(3)
-            fe_a.markdown(
-                f"**{t('positionen.interest_rate')}:** "
-                f"{extra.get('interest_rate', '—')} %"
-                if extra.get("interest_rate") else f"**{t('positionen.interest_rate')}:** —"
-            )
-            fe_b.markdown(
-                f"**{t('positionen.maturity_date')}:** "
-                f"{extra.get('maturity_date', '—')}"
-            )
-            fe_c.markdown(
-                f"**{t('positionen.bank')}:** {extra.get('bank', '—')}"
-            )
-
-        # ── Anleihe extra fields ───────────────────────────────────────────────
-        if pos.asset_class == "Anleihe":
-            st.divider()
-            an_a, an_b = st.columns(2)
-            an_a.markdown(
-                f"**{t('positionen.interest_rate')}:** "
-                f"{extra.get('interest_rate', '—')} %"
-                if extra.get("interest_rate") else f"**{t('positionen.interest_rate')}:** —"
-            )
-            an_b.markdown(
-                f"**{t('positionen.maturity_date')}:** "
-                f"{extra.get('maturity_date', '—')}"
-            )
-
-        # ── Manual valuation section (Immobilie, Grundstück) ────────────────────
-        if cfg and cfg.manual_valuation:
-            st.divider()
-            st.markdown(f"#### {t('positionen.update_value_header')}")
-
-            current_est = extra.get("estimated_value")
-            current_val_date_str = extra.get("valuation_date")
-
-            # Stale warning
-            if current_val_date_str:
-                try:
-                    val_date = date.fromisoformat(current_val_date_str)
-                    days_old = (date.today() - val_date).days
-                    if days_old > 180:
-                        st.warning(t("positionen.valuation_stale_warning").format(days=days_old))
-                except ValueError:
-                    pass
-
-            col_val, col_date = st.columns(2)
-            with col_val:
-                new_est = st.number_input(
-                    t("positionen.estimated_value"),
-                    min_value=0.0,
-                    step=1000.0,
-                    format="%.2f",
-                    value=float(current_est) if current_est is not None else 0.0,
-                    key=f"_detail_est_val_{pos_id}",
-                )
-            with col_date:
-                new_val_date = st.date_input(
-                    t("positionen.valuation_date"),
-                    value=date.fromisoformat(current_val_date_str) if current_val_date_str else date.today(),
-                    key=f"_detail_val_date_{pos_id}",
-                )
-
-            if st.button(t("positionen.save_estimated_value"), key=f"_save_est_{pos_id}", type="primary"):
-                new_extra = dict(extra)
-                new_extra["estimated_value"] = new_est if new_est > 0 else None
-                new_extra["valuation_date"] = new_val_date.isoformat() if new_val_date else None
-                updated = pos.model_copy(update={"extra_data": new_extra})
-                repo.update(updated)
-                st.toast(t("positionen.value_updated"), icon="✅")
-                st.rerun()
 
         st.divider()
 
