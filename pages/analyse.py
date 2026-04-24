@@ -310,6 +310,7 @@ class AttributionRow:
 def _compute_attribution(positions, valuations) -> dict[str, AttributionRow]:
     """
     Compute performance attribution by recommendation_source.
+    Only includes portfolio positions (excludes watchlist).
 
     Returns dict {source_name: AttributionRow}, sorted by absolute P&L descending.
     """
@@ -318,9 +319,12 @@ def _compute_attribution(positions, valuations) -> dict[str, AttributionRow]:
     # Map valuations by symbol for quick lookup
     val_by_symbol = {v.symbol: v for v in valuations}
 
+    # Filter: only portfolio positions (exclude watchlist)
+    portfolio_positions = [p for p in positions if p.in_portfolio]
+
     # Group positions by recommendation_source
     grouped = {}
-    for pos in positions:
+    for pos in portfolio_positions:
         source = pos.recommendation_source or "(ohne Angabe)"
         if source not in grouped:
             grouped[source] = []
@@ -374,8 +378,8 @@ def _compute_attribution(positions, valuations) -> dict[str, AttributionRow]:
                     except (ValueError, ZeroDivisionError):
                         pass
 
-        # Compute weighted averages
-        cagr = (cagr_sum_weighted / cagr_sum_weight * 100 if cagr_sum_weight > 0 else None)
+        # Compute weighted averages (cagr already includes * 100 from formula)
+        cagr = (cagr_sum_weighted / cagr_sum_weight if cagr_sum_weight > 0 else None)
         cagr_div = (cagr_div_sum_weighted / cagr_sum_weight if cagr_sum_weight > 0 else None)
 
         hit_rate = (profitable_count / count * 100) if count > 0 else 0

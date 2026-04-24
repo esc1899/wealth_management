@@ -520,7 +520,8 @@ if _ss("_pos_show_form"):
             )
 
             # Build selectbox options
-            source_options = existing_sources + ["─ " + t("positionen.new_recommendation_source") + " ─"]
+            new_source_marker = "─ " + t("positionen.new_recommendation_source") + " ─"
+            source_options = existing_sources + [new_source_marker]
             source_default = editing.recommendation_source if editing and editing.recommendation_source in existing_sources else None
             source_idx = source_options.index(source_default) if source_default and source_default in source_options else 0
 
@@ -528,15 +529,20 @@ if _ss("_pos_show_form"):
                 t("positionen.empfohlen_von"),
                 options=[None] + source_options,
                 index=source_idx + 1 if source_default else 0,
-                format_func=lambda x: (x or "—") if x != ("─ " + t("positionen.new_recommendation_source") + " ─") else ("─ " + t("positionen.new_recommendation_source") + " ─"),
+                format_func=lambda x: (x or "—") if x != new_source_marker else new_source_marker,
+                key="_pos_rec_source_select",
             )
 
-            # If "new" is selected, show text input
-            if selected_source == ("─ " + t("positionen.new_recommendation_source") + " ─"):
+            # Handle "new" selection with session state
+            if selected_source == new_source_marker:
+                st.session_state._pos_entering_new_source = True
+
+            if st.session_state.get("_pos_entering_new_source", False):
                 form_rec_source = st.text_input(
                     t("positionen.new_recommendation_source_label"),
-                    value="",
+                    value=st.session_state.get("_pos_new_rec_input", ""),
                     placeholder="z.B. 'Börsenbrief XY', 'Freund Max'",
+                    key="_pos_new_rec_input",
                 )
             else:
                 form_rec_source = selected_source
