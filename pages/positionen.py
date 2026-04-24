@@ -118,8 +118,13 @@ def _open_delete(pos_id: int):
 # Edit form rendering (used in unified dialog)
 # ---------------------------------------------------------------------------
 
-def _render_edit_form(pos_id: int | None):
-    """Render the edit form for a position (view or inside dialog)."""
+def _render_edit_form(pos_id: int | None, readonly: bool = False):
+    """Render the edit form for a position (view or inside dialog).
+
+    Args:
+        pos_id: Position ID to edit, or None for new position
+        readonly: If True, all fields are disabled (view-only mode)
+    """
     editing = repo.get(pos_id) if pos_id else None
 
     # Initialize form state explicitly to prevent sticky state between opens
@@ -139,6 +144,7 @@ def _render_edit_form(pos_id: int | None):
         t("positionen.col_asset_class") + " *",
         options=all_ac_options,
         key=ac_key,
+        disabled=readonly,
     )
     cfg = registry.require(selected_ac)
 
@@ -156,12 +162,14 @@ def _render_edit_form(pos_id: int | None):
                 t("positionen.col_isin"),
                 value=_ss("_pos_isin", editing.isin if editing else "") or "",
                 key="_pos_isin",
+                disabled=readonly,
             )
         with col_wkn:
             lookup_wkn = st.text_input(
                 t("positionen.col_wkn"),
                 value=_ss("_pos_wkn", editing.wkn if editing else "") or "",
                 key="_pos_wkn",
+                disabled=readonly,
             )
         with col_btn:
             st.write("")
@@ -245,6 +253,7 @@ def _render_edit_form(pos_id: int | None):
             form_name = st.text_input(
                 t("positionen.col_name") + " *",
                 value=_ss("_pos_name", editing.name if editing else "") or "",
+                disabled=readonly,
             )
 
         # Ticker (only for auto_fetch types)
@@ -253,6 +262,7 @@ def _render_edit_form(pos_id: int | None):
                 form_ticker = st.text_input(
                     t("positionen.col_ticker"),
                     value=_ss("_pos_ticker", editing.ticker if editing else "") or "",
+                    disabled=readonly,
                 )
             else:
                 form_ticker = None
@@ -271,6 +281,7 @@ def _render_edit_form(pos_id: int | None):
                     t("positionen.col_unit"),
                     options=unit_options,
                     index=unit_default_idx,
+                    disabled=readonly,
                 )
             else:
                 form_unit = unit_options[0]
@@ -291,6 +302,7 @@ def _render_edit_form(pos_id: int | None):
                     options=_al_opts,
                     index=_al_idx,
                     format_func=lambda x: x if x else "—",
+                    disabled=readonly,
                 )
         else:
             form_anlageart = None
@@ -317,6 +329,7 @@ def _render_edit_form(pos_id: int | None):
                     options=[None] + existing_sources,
                     index=source_idx + 1 if source_default else 0,
                     format_func=lambda x: x or "—",
+                    disabled=readonly,
                 )
 
                 # Text input: for entering a new source (appears below selectbox)
@@ -324,6 +337,7 @@ def _render_edit_form(pos_id: int | None):
                     t("positionen.new_recommendation_source_label"),
                     value="",
                     placeholder="Oder neuen Empfehler eingeben...",
+                    disabled=readonly,
                 )
 
                 # Use whichever was filled in: new_source_input takes priority
@@ -335,6 +349,7 @@ def _render_edit_form(pos_id: int | None):
                     t("positionen.analysis_excluded_label"),
                     value=editing.analysis_excluded if editing else False,
                     help=t("positionen.analysis_excluded_help") if t("positionen.analysis_excluded_help") else None,
+                    disabled=readonly,
                 )
 
         # Quantity (optional for manual_valuation types; hidden for Grundstück)
@@ -350,6 +365,7 @@ def _render_edit_form(pos_id: int | None):
                     step=1.0,
                     format="%.4f",
                     value=float(editing.quantity) if editing and editing.quantity else 0.0,
+                    disabled=readonly,
                 )
             else:
                 form_qty = None
@@ -363,6 +379,7 @@ def _render_edit_form(pos_id: int | None):
                     step=0.01,
                     format="%.4f",
                     value=float(editing.purchase_price) if editing and editing.purchase_price else 0.0,
+                    disabled=readonly,
                 )
             else:
                 form_price = None
@@ -376,6 +393,7 @@ def _render_edit_form(pos_id: int | None):
                     value=editing.purchase_date if editing else None,
                     min_value=date(2000, 1, 1),
                     max_value=date.today(),
+                    disabled=readonly,
                 )
             else:
                 form_date = None
@@ -391,11 +409,13 @@ def _render_edit_form(pos_id: int | None):
                     in_portfolio = st.checkbox(
                         t("positionen.in_portfolio"),
                         value=editing.in_portfolio if editing else True,
+                        disabled=readonly,
                     )
                 with flag_col2:
                     in_watchlist = st.checkbox(
                         t("positionen.in_watchlist"),
                         value=editing.in_watchlist if editing else False,
+                        disabled=readonly,
                     )
             else:
                 in_portfolio = True
@@ -414,12 +434,14 @@ def _render_edit_form(pos_id: int | None):
                     step=1000.0,
                     format="%.2f",
                     value=float(_existing_extra_early.get("estimated_value", 0.0)) if _existing_extra_early.get("estimated_value") else 0.0,
+                    disabled=readonly,
                 )
             with mv_col2:
                 val_date_raw = _existing_extra_early.get("valuation_date")
                 form_valuation_date = st.date_input(
                     t("positionen.valuation_date"),
                     value=date.fromisoformat(val_date_raw) if val_date_raw else date.today(),
+                    disabled=readonly,
                 )
         else:
             form_estimated_value = None
@@ -429,6 +451,7 @@ def _render_edit_form(pos_id: int | None):
         form_notes = st.text_input(
             t("positionen.col_notes"),
             value=(editing.notes or "") if editing else "",
+            disabled=readonly,
         )
 
         # Story textarea — state managed via "_pos_form_story" key (supports AI draft injection)
@@ -437,6 +460,7 @@ def _render_edit_form(pos_id: int | None):
             key="_pos_form_story",
             placeholder=t("positionen.story_placeholder"),
             height=120,
+            disabled=readonly,
         )
 
         # Anlage-Idee selector — only visible when a story is being written
@@ -449,6 +473,7 @@ def _render_edit_form(pos_id: int | None):
             options=_sc_skill_options,
             index=_skill_idx,
             help=t("positionen.story_skill_help"),
+            disabled=readonly,
         )
 
         # ── Festgeld extra fields ──────────────────────────────────────────────
@@ -464,6 +489,7 @@ def _render_edit_form(pos_id: int | None):
                     step=0.1,
                     format="%.2f",
                     value=float(existing_extra.get("interest_rate", 0.0)),
+                    disabled=readonly,
                 )
             with fe_b:
                 maturity_raw = existing_extra.get("maturity_date")
@@ -471,11 +497,13 @@ def _render_edit_form(pos_id: int | None):
                     t("positionen.maturity_date"),
                     value=date.fromisoformat(maturity_raw) if maturity_raw else None,
                     min_value=date.today(),
+                    disabled=readonly,
                 )
             with fe_c:
                 form_bank = st.text_input(
                     t("positionen.bank"),
                     value=existing_extra.get("bank", ""),
+                    disabled=readonly,
                 )
         elif selected_ac == "Anleihe":
             st.markdown("---")
@@ -488,6 +516,7 @@ def _render_edit_form(pos_id: int | None):
                     step=0.1,
                     format="%.2f",
                     value=float(existing_extra.get("interest_rate", 0.0)),
+                    disabled=readonly,
                 )
             with an_b:
                 maturity_raw = existing_extra.get("maturity_date")
@@ -495,6 +524,7 @@ def _render_edit_form(pos_id: int | None):
                     t("positionen.maturity_date"),
                     value=date.fromisoformat(maturity_raw) if maturity_raw else None,
                     min_value=date.today(),
+                    disabled=readonly,
                 )
             form_bank = None
         else:
@@ -526,14 +556,19 @@ def _render_edit_form(pos_id: int | None):
             format="%.2f",
             value=float(existing_extra.get("dividend_yield_override", 0.0)),
             help="Wenn > 0: nutze diesen Wert statt yfinance-Daten oder berechneter Werte. Z.B. 3.5 für 3,5%",
+            disabled=readonly,
         )
 
-        # ── Save / Cancel ──────────────────────────────────────────────────────
-        col_save, col_cancel = st.columns([1, 5])
-        with col_save:
-            submitted = st.form_submit_button(t("positionen.save_button"), type="primary")
-        with col_cancel:
-            cancelled = st.form_submit_button(t("positionen.cancel_button"))
+        # ── Save / Cancel (only in edit mode) ──────────────────────────────────
+        if not readonly:
+            col_save, col_cancel = st.columns([1, 5])
+            with col_save:
+                submitted = st.form_submit_button(t("positionen.save_button"), type="primary")
+            with col_cancel:
+                cancelled = st.form_submit_button(t("positionen.cancel_button"))
+        else:
+            submitted = False
+            cancelled = False
 
     if cancelled:
         _clear_form()
@@ -670,27 +705,12 @@ def _show_detail(pos_id: int | None):
 
     # ── VIEW MODE ──────────────────────────────────────────────────────────────
     if mode == "view":
-        cfg = registry.get(pos.asset_class)
-        extra = pos.extra_data or {}
-
-        # ── Krypto-Warnung ───────────────────────────────────────────────────────
+        # Show the same form as edit mode, but with all fields disabled (readonly)
         if pos.asset_class == "Kryptowährung":
             st.warning(t("positionen.crypto_warning"), icon="⚠️")
 
         st.divider()
-
-        # ── Core fields ─────────────────────────────────────────────────────────
-        col_a, col_b = st.columns(2)
-        col_a.markdown(f"**{t('positionen.col_asset_class')}:** {pos.asset_class}")
-        col_b.markdown(f"**{t('positionen.col_unit')}:** {pos.unit}")
-
-        if pos.anlageart:
-            st.markdown(f"**{t('positionen.anlageart_label')}:** {pos.anlageart}")
-
-        if pos.isin or pos.wkn:
-            col_c, col_d = st.columns(2)
-            col_c.markdown(f"**{t('positionen.col_isin')}:** {pos.isin or '—'}")
-            col_d.markdown(f"**{t('positionen.col_wkn')}:** {pos.wkn or '—'}")
+        _render_edit_form(pos_id, readonly=True)
 
         if pos.quantity is not None:
             col_e, col_f = st.columns(2)
@@ -925,7 +945,7 @@ def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
         t("positionen.col_name"), t("positionen.col_ticker"),
         t("positionen.col_isin"), t("positionen.col_asset_class"),
         t("positionen.col_quantity"), t("positionen.col_unit"),
-        "Akt. Wert", "Div.-Rendite", "", "", "", "", "",
+        "Akt. Wert", "Div.-Rendite", "🔬 Analys.", "⚠️ Overr.", "", "", "",
     ]):
         col.markdown(f"**{label}**")
 
