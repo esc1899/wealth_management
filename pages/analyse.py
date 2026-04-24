@@ -319,8 +319,8 @@ def _compute_attribution(positions, valuations) -> dict[str, AttributionRow]:
     # Map valuations by symbol for quick lookup
     val_by_symbol = {v.symbol: v for v in valuations}
 
-    # Filter: only portfolio positions (exclude watchlist)
-    portfolio_positions = [p for p in positions if p.in_portfolio]
+    # Filter: only portfolio positions (exclude watchlist and analysis_excluded)
+    portfolio_positions = [p for p in positions if p.in_portfolio and not p.analysis_excluded]
 
     # Group positions by recommendation_source
     grouped = {}

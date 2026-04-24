@@ -526,6 +526,7 @@ positionen:
   col_notes: "Notizen"
   in_portfolio: "Im Portfolio"
   in_watchlist: "Auf Watchlist"
+  analysis_excluded: "Von Analysen ausschließen"
   error_no_flag: "Mindestens Portfolio oder Watchlist muss ausgewählt sein."
   empty_portfolio: "Noch keine Positionen im Portfolio."
   empty_watchlist: "Watchlist ist leer."

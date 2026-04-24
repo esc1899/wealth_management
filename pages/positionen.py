@@ -509,7 +509,7 @@ if _ss("_pos_show_form"):
         else:
             form_anlageart = None
 
-        # Empfohlen von (recommendation source — combobox with existing values)
+        # Empfohlen von (recommendation source — combobox with existing values + new text input)
         col_rec, _ = st.columns(2)
         with col_rec:
             # Collect all existing recommendation sources
@@ -519,33 +519,27 @@ if _ss("_pos_show_form"):
                 key=str.lower
             )
 
-            # Build selectbox options
-            new_source_marker = "─ " + t("positionen.new_recommendation_source") + " ─"
-            source_options = existing_sources + [new_source_marker]
+            # Default index: use editing value if it exists in options, else None (first option)
             source_default = editing.recommendation_source if editing and editing.recommendation_source in existing_sources else None
-            source_idx = source_options.index(source_default) if source_default and source_default in source_options else 0
+            source_idx = existing_sources.index(source_default) if source_default else 0
 
-            selected_source = st.selectbox(
+            # Selectbox: only for existing sources
+            selected_existing = st.selectbox(
                 t("positionen.empfohlen_von"),
-                options=[None] + source_options,
+                options=[None] + existing_sources,
                 index=source_idx + 1 if source_default else 0,
-                format_func=lambda x: (x or "—") if x != new_source_marker else new_source_marker,
-                key="_pos_rec_source_select",
+                format_func=lambda x: x or "—",
             )
 
-            # Handle "new" selection with session state
-            if selected_source == new_source_marker:
-                st.session_state._pos_entering_new_source = True
+            # Text input: for entering a new source (appears below selectbox)
+            new_source_input = st.text_input(
+                t("positionen.new_recommendation_source_label"),
+                value="",
+                placeholder="Oder neuen Empfehler eingeben...",
+            )
 
-            if st.session_state.get("_pos_entering_new_source", False):
-                form_rec_source = st.text_input(
-                    t("positionen.new_recommendation_source_label"),
-                    value=st.session_state.get("_pos_new_rec_input", ""),
-                    placeholder="z.B. 'Börsenbrief XY', 'Freund Max'",
-                    key="_pos_new_rec_input",
-                )
-            else:
-                form_rec_source = selected_source
+            # Use whichever was filled in: new_source_input takes priority
+            form_rec_source = new_source_input if new_source_input else selected_existing
 
         # Quantity (optional for manual_valuation types; hidden for Grundstück)
         shows_quantity = cfg.is_field_visible("quantity") or (
@@ -593,7 +587,7 @@ if _ss("_pos_show_form"):
         # Get existing extra_data early (needed for manual valuation fields)
         _existing_extra_early = (editing.extra_data or {}) if editing else {}
 
-        # Portfolio / Watchlist flags
+        # Portfolio / Watchlist flags + Analysis exclusion
         with col_h:
             if cfg.watchlist_eligible:
                 flag_col1, flag_col2 = st.columns(2)
@@ -610,6 +604,14 @@ if _ss("_pos_show_form"):
             else:
                 in_portfolio = True
                 in_watchlist = False
+
+        # Analysis exclusion checkbox
+        col_i, _ = st.columns(2)
+        with col_i:
+            analysis_excluded = st.checkbox(
+                t("positionen.analysis_excluded"),
+                value=editing.analysis_excluded if editing else False,
+            )
 
         # Manual valuation fields (Grundstück, Immobilie, Festgeld, Bargeld, Anleihe)
         if cfg.manual_valuation:
@@ -812,6 +814,7 @@ if _ss("_pos_show_form"):
                 extra_data=extra if extra else None,
                 in_portfolio=in_portfolio,
                 in_watchlist=in_watchlist,
+                analysis_excluded=analysis_excluded,
                 empfehlung=form_empfehlung or None,
                 recommendation_source=(form_rec_source or "").strip() or None,
                 story=(form_story or "").strip() or None,
