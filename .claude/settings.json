@@ -108,7 +108,20 @@
       "Bash(bash ~/scripts/wm_start.sh)",
       "Bash(bash /Users/erik/Projects/wealth_management/start.command)",
       "Bash(curl -s http://localhost:6655/)",
-      "Bash(python -m pytest tests/unit/test_positions_repository.py -q)"
+      "Bash(python -m pytest tests/unit/test_positions_repository.py -q)",
+      "Bash(xargs kill *)",
+      "Bash(curl -s http://localhost:6655)",
+      "Bash(git grep *)",
+      "Bash(git ls-tree *)",
+      "Bash(grep -E \"\\\\.db$|\\\\.sqlite$|salt\\\\.bin|\\\\.env$|secret|credential|password\")",
+      "Bash(git -C /Users/erik/Projects/wealth_management log --oneline --all)",
+      "Bash(git -C /Users/erik/Projects/wealth_management log --diff-filter=A --name-only --format=\"\" -- \".env\")",
+      "Bash(git -C /Users/erik/Projects/wealth_management log --all --full-history -- .env)",
+      "Bash(python3 -c \"import pip; pip.main\\(['list', '--format=json']\\)\")",
+      "Bash(python3 -c \"import json,sys; pkgs = json.load\\(sys.stdin\\); [print\\(p['name'], p['version']\\) for p in pkgs if p['name'].lower\\(\\) in ['cryptography','pyyaml','requests','anthropic','streamlit','pillow','setuptools']]\")",
+      "Bash(.venv/bin/pip list *)",
+      "Bash(git filter-repo *)",
+      "Bash(pytest tests/ -q)"
     ],
     "additionalDirectories": [
       "/Users/erik",

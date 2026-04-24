@@ -5,6 +5,7 @@ Navigation is defined explicitly via st.navigation with grouped sections.
 
 import logging
 import streamlit as st
+import time
 
 st.set_page_config(
     page_title="Wealth Management",
@@ -33,7 +34,7 @@ if _config_errors:
         st.error(f"⚙️ **Configuration error:** {_err}")
     st.stop()
 
-# Optional: App authentication (login gate)
+# Optional: App authentication (login gate) with session timeout (8h)
 def _login_form():
     """Full-page login form — renders as main content for password manager autofill."""
     st.markdown("## 🔐 Login")
@@ -45,13 +46,20 @@ def _login_form():
         import hmac
         if hmac.compare_digest(password, config.APP_PASSWORD):
             st.session_state["authenticated"] = True
+            st.session_state["auth_time"] = time.time()
             st.rerun()
         else:
             st.error("Falsches Passwort.")
 
-if config.APP_PASSWORD and not st.session_state.get("authenticated"):
-    _login_form()
-    st.stop()
+if config.APP_PASSWORD:
+    # Check session timeout (8h = 28800 seconds)
+    auth_time = st.session_state.get("auth_time")
+    if auth_time and time.time() - auth_time > 8 * 3600:
+        st.session_state.clear()
+
+    if not st.session_state.get("authenticated"):
+        _login_form()
+        st.stop()
 
 if config.DEMO_MODE:
     st.warning(t("demo.banner"), icon="🎭")
@@ -136,6 +144,12 @@ _has_errors   = any(c.severity == Severity.ERROR   for c in _health_checks)
 _has_warnings = any(c.severity == Severity.WARNING for c in _health_checks)
 
 with st.sidebar:
+    # Logout button (top right)
+    if config.APP_PASSWORD and st.session_state.get("authenticated"):
+        if st.button("🔓 Abmelden", use_container_width=False, key="logout_btn"):
+            st.session_state.clear()
+            st.rerun()
+        st.divider()
     if _has_errors:
         st.error(t("health.sidebar_status_error"), icon=":material/error:")
     elif _has_warnings:

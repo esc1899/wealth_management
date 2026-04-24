@@ -130,7 +130,10 @@ if _JOB["running"]:
 # Done: set active run and reset job state
 if _JOB["done"]:
     if _JOB["error"]:
-        st.error(f"❌ {_JOB['error']}")
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error("Structural scan error: %s", _JOB['error'])
+        st.error("❌ Strukturwandel-Scan fehlgeschlagen. Bitte versuchen Sie es später erneut.")
     elif _JOB["run_id"]:
         st.session_state["scan_run_id"] = _JOB["run_id"]
         n = _JOB.get("story_check_count", 0)
@@ -142,7 +145,10 @@ if _JOB["done"]:
 
 # Persistent error
 if _JOB["last_error"] and not _JOB["running"]:
-    st.error(f"❌ Letzter Scan fehlgeschlagen: {_JOB['last_error']}")
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.error("Last structural scan error: %s", _JOB['last_error'])
+    st.error("❌ Letzter Scan fehlgeschlagen. Bitte versuchen Sie es später erneut.")
 
 # ------------------------------------------------------------------
 # Active run: report + follow-up chat

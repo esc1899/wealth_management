@@ -52,7 +52,10 @@ with col_chat:
                 try:
                     response = asyncio.run(agent.chat(prompt))
                 except Exception as exc:
-                    response = f"⚠️ {t('common.agent_error')}: {exc}"
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error("Portfolio chat error: %s", exc, exc_info=True)
+                    response = f"⚠️ {t('common.agent_error')} Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut."
             st.markdown(response)
 
         st.session_state.messages.append({"role": "assistant", "content": response})

@@ -188,11 +188,30 @@ cash_skills = skills_repo.get_by_area("portfolio_cash_rule")
 cash_skill = next((s for s in cash_skills if not s.hidden), None)
 
 if cash_skill:
-    import yaml
+    # Parse skill prompt for min/max cash percentages (simple string parsing, not YAML to avoid injection)
     try:
-        params = yaml.safe_load(cash_skill.prompt) if cash_skill.prompt else {}
-        min_pct = float(params.get("min_pct", 5.0))
-        max_pct = float(params.get("max_pct", 15.0))
+        min_pct = 5.0
+        max_pct = 15.0
+        if cash_skill.prompt:
+            # Extract min_pct and max_pct from skill prompt (supports "min_pct: 5" format)
+            lines = cash_skill.prompt.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('min_pct:'):
+                    try:
+                        min_pct = float(line.split(':', 1)[1].strip())
+                    except (ValueError, IndexError):
+                        pass
+                elif line.startswith('max_pct:'):
+                    try:
+                        max_pct = float(line.split(':', 1)[1].strip())
+                    except (ValueError, IndexError):
+                        pass
+        # Validate ranges
+        min_pct = max(0, min(100, min_pct))
+        max_pct = max(0, min(100, max_pct))
+        if min_pct > max_pct:
+            min_pct, max_pct = 5.0, 15.0
     except Exception:
         min_pct, max_pct = 5.0, 15.0
 

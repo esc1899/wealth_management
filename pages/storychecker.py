@@ -105,7 +105,11 @@ if _BATCH["running"]:
 
 if _BATCH["done"]:
     if _BATCH["error"]:
-        st.error(f"❌ {_BATCH['error']}")
+        # Log detailed error, show safe summary to user
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error("Batch error details: %s", _BATCH['error'])
+        st.error("❌ Der Batch-Lauf ist fehlgeschlagen. Bitte versuchen Sie es später erneut.")
     else:
         msg = f"✅ {_BATCH['count']} {t('storychecker.batch_done')}"
         if _BATCH["errors"]:
@@ -115,7 +119,9 @@ if _BATCH["done"]:
     st.rerun()
 
 if _BATCH["last_error"] and not _BATCH["running"]:
-    st.error(f"❌ Letzter Batch-Lauf fehlgeschlagen: {_BATCH['last_error']}")
+    logger = logging.getLogger(__name__)
+    logger.error("Last batch error details: %s", _BATCH['last_error'])
+    st.error("❌ Letzter Batch-Lauf fehlgeschlagen. Bitte versuchen Sie es später erneut.")
 
 st.divider()
 
@@ -173,7 +179,10 @@ with col_left:
                         st.caption(a.summary)
 
         if st.session_state.get("sc_start_error"):
-            st.error(f"⚠️ {t('storychecker.error')}: {st.session_state.pop('sc_start_error')}")
+            error_details = st.session_state.pop('sc_start_error')
+            logger = logging.getLogger(__name__)
+            logger.error("Story checker start error: %s", error_details)
+            st.error(f"⚠️ {t('storychecker.error')} Die Story-Analyse konnte nicht gestartet werden.")
 
         if submitted:
             with st.spinner(t("storychecker.thinking")):
