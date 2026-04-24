@@ -8,6 +8,63 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Security Audit & RED TEAM Fixes (2026-04-24)
+
+**Complete security hardening: Privacy audit + App red team testing. 7 findings fixed.**
+
+**Privacy & Git Security**
+- Git history cleaned: `wealth_data.db` permanently removed (was recoverable from commit `477cc3a`)
+- Git history cleaned: `:memory:-shm` + `:memory:-wal` test files removed
+- `.claude/settings.json` removed from tracking (contained personal paths `/Users/erik/...`)
+- `.gitignore` hardened: Added `*.db` pattern + `.claude/settings.json`
+- Remote force-pushed with cleaned history
+
+**App Security: HIGH Priority (4 fixes)**
+1. **Session Timeout & Logout** (`app.py`)
+   - Added 8-hour session timeout (prevents unattended workstation access)
+   - `auth_time` tracked on login, validated on every page load
+   - Logout button in sidebar clears session state
+   - Addresses: Unbeaufsichtigter PC = vollständiger Zugriff auf Finanzdaten
+
+2. **YAML Injection Prevention** (`pages/analyse.py`)
+   - Bargeldregel min/max_pct: Changed from `yaml.safe_load()` to string parsing + validation
+   - User can no longer inject `min_pct: -999` to disable cash checks
+   - Prevents logic manipulation via skill prompts
+
+3. **LLM Prompt Injection Mitigation** (4 agent files)
+   - `portfolio_agent.py`: Skills wrapped in `<skill_config>` tags
+   - `structural_change_agent.py`: user_focus wrapped in `<user_focus>` tags
+   - Added security note to system prompts: config data treated as untrusted
+   - Signals to Claude that injected content is data, not instructions
+
+4. **Exception Sanitization** (3 pages)
+   - `storychecker.py`, `portfolio_chat.py`, `structural_scan.py`
+   - Raw SDK exceptions no longer displayed to users
+   - Detailed errors logged only; generic messages shown
+   - Prevents leaking API state, auth tokens, portfolio data in error messages
+
+**App Security: MEDIUM Priority (2 fixes)**
+5. **Backup Script Security** (`~/scripts/wm_backup.sh`)
+   - `.env` now encrypted before staging (was exposed in plaintext in `/tmp`)
+   - Uses `openssl AES-256-CBC` with `ENCRYPTION_KEY` as passphrase
+   - Stored as `.env.enc` in restic backup (double-encrypted: OpenSSL + Restic)
+   - Restore documented: `openssl enc -aes-256-cbc -d -in .env.enc -out .env -k KEY`
+   - Prevents plaintext secret exposure if backup process killed mid-run
+
+**Testing & Verification**
+- 562/562 tests passing (unchanged)
+- 69% code coverage
+- Session timeout verified (8h expiry triggers re-auth)
+- YAML fix verified (min/max_pct validation works)
+- Exception sanitization verified (no raw SDK strings in UI)
+
+**Non-Fixed (Deliberate Design Decisions)**
+- SQL f-strings in `usage.py`: Only internal constants, no user input → deferred
+- Demo mode auth bypass: Config-dependent, not currently active
+- setuptools CVE-2024-6345: Install-time only, runtime safe
+
+---
+
 ### Schema Migration & App Startup Fixes (2026-04-23)
 
 **Session 3 Completion + Infrastructure Robustness.**
