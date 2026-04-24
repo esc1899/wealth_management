@@ -195,7 +195,7 @@ class Position(BaseModel):
     # State
     in_portfolio: bool = False
     in_watchlist: bool = False
-    analysis_excluded: bool = False  # True = counted in allocation (Josef's Regel) but skipped by agents
+    analysis_excluded: bool = False  # True = excluded from recommendation attribution analysis
 
     # Sub-type (optional, driven by asset_classes.yaml anlagearten list)
     anlageart: Optional[str] = None
