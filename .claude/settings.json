@@ -107,7 +107,8 @@
       "Bash(curl -s http://localhost:6655/_stcore/health)",
       "Bash(bash ~/scripts/wm_start.sh)",
       "Bash(bash /Users/erik/Projects/wealth_management/start.command)",
-      "Bash(curl -s http://localhost:6655/)"
+      "Bash(curl -s http://localhost:6655/)",
+      "Bash(python -m pytest tests/unit/test_positions_repository.py -q)"
     ],
     "additionalDirectories": [
       "/Users/erik",

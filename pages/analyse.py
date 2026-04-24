@@ -2,7 +2,9 @@
 Analysis — performance charts, historical prices, allocation.
 """
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 import pandas as pd
 import plotly.express as px
@@ -10,7 +12,7 @@ import streamlit as st
 
 from core.currency import symbol
 from core.i18n import t
-from state import get_market_agent
+from state import get_market_agent, get_portfolio_service
 
 st.set_page_config(page_title="Analyse", page_icon="🔍", layout="wide")
 st.title(f"🔍 {t('analysis.title')}")
@@ -285,3 +287,147 @@ with col1:
     st.metric("Jährliche Gesamtdividende", f"{total_dividend:.0f}€")
 with col2:
     st.metric("Dividend Yield", f"{dividend_yield:.2f}%")
+
+st.divider()
+
+# ------------------------------------------------------------------
+# Empfehler-Attribution
+# ------------------------------------------------------------------
+
+@dataclass
+class AttributionRow:
+    """Performance metrics aggregated by recommendation source."""
+    source: Optional[str]
+    count: int
+    cost_basis_eur: float
+    current_value_eur: float
+    pnl_eur: float
+    hit_rate_pct: float
+    cagr_pct: Optional[float]
+    cagr_with_dividend_pct: Optional[float]
+
+
+def _compute_attribution(positions, valuations) -> dict[str, AttributionRow]:
+    """
+    Compute performance attribution by recommendation_source.
+
+    Returns dict {source_name: AttributionRow}, sorted by absolute P&L descending.
+    """
+    from datetime import date as dateobj
+
+    # Map valuations by symbol for quick lookup
+    val_by_symbol = {v.symbol: v for v in valuations}
+
+    # Group positions by recommendation_source
+    grouped = {}
+    for pos in positions:
+        source = pos.recommendation_source or "(ohne Angabe)"
+        if source not in grouped:
+            grouped[source] = []
+        grouped[source].append(pos)
+
+    # Compute metrics per source
+    results = {}
+    for source, pos_list in grouped.items():
+        count = len(pos_list)
+        cost_basis_eur = 0.0
+        current_value_eur = 0.0
+        pnl_eur = 0.0
+        profitable_count = 0
+
+        cagr_sum_weighted = 0.0
+        cagr_sum_weight = 0.0
+        cagr_div_sum_weighted = 0.0
+
+        for pos in pos_list:
+            val = val_by_symbol.get(pos.ticker or pos.name)
+            if not val:
+                continue
+
+            # Aggregates
+            if val.cost_basis_eur:
+                cost_basis_eur += val.cost_basis_eur
+            if val.current_value_eur:
+                current_value_eur += val.current_value_eur
+            if val.pnl_eur is not None:
+                pnl_eur += val.pnl_eur
+                if val.pnl_eur > 0:
+                    profitable_count += 1
+
+            # CAGR calculation (only if purchase_date exists and is recent enough)
+            if (pos.purchase_date and val.cost_basis_eur and val.cost_basis_eur > 0
+                    and val.current_value_eur and val.current_value_eur > 0):
+                years_held = (dateobj.today() - pos.purchase_date).days / 365.25
+
+                # Only compute CAGR if held > 14 days (avoid extreme annualization)
+                if years_held > 14 / 365.25:
+                    try:
+                        cagr = (pow(val.current_value_eur / val.cost_basis_eur, 1 / years_held) - 1) * 100
+                        cagr_sum_weighted += cagr * val.cost_basis_eur
+                        cagr_sum_weight += val.cost_basis_eur
+
+                        # CAGR with estimated dividend
+                        estimated_div = (val.annual_dividend_eur or 0) * years_held
+                        total_gain = (val.pnl_eur or 0) + estimated_div
+                        cagr_div = (pow((val.cost_basis_eur + total_gain) / val.cost_basis_eur, 1 / years_held) - 1) * 100
+                        cagr_div_sum_weighted += cagr_div * val.cost_basis_eur
+                    except (ValueError, ZeroDivisionError):
+                        pass
+
+        # Compute weighted averages
+        cagr = (cagr_sum_weighted / cagr_sum_weight * 100 if cagr_sum_weight > 0 else None)
+        cagr_div = (cagr_div_sum_weighted / cagr_sum_weight if cagr_sum_weight > 0 else None)
+
+        hit_rate = (profitable_count / count * 100) if count > 0 else 0
+
+        results[source] = AttributionRow(
+            source=source,
+            count=count,
+            cost_basis_eur=cost_basis_eur,
+            current_value_eur=current_value_eur,
+            pnl_eur=pnl_eur,
+            hit_rate_pct=hit_rate,
+            cagr_pct=cagr,
+            cagr_with_dividend_pct=cagr_div,
+        )
+
+    # Sort by P&L descending
+    return dict(sorted(results.items(), key=lambda x: x[1].pnl_eur, reverse=True))
+
+
+# Render attribution expander
+with st.expander("📊 Empfehler-Attribution", expanded=False):
+    portfolio_service = get_portfolio_service()
+    all_positions = portfolio_service.get_all_positions(include_portfolio=True, include_watchlist=True)
+
+    if not all_positions:
+        st.info("Keine Positionen vorhanden.")
+    else:
+        attribution = _compute_attribution(all_positions, valuations)
+
+        if not attribution:
+            st.info("Keine Empfehler-Daten verfügbar.")
+        else:
+            # Build dataframe for display
+            rows = []
+            for source, row in attribution.items():
+                rows.append({
+                    "Empfehler": row.source,
+                    "Anzahl": row.count,
+                    "Kapital (€)": f"{row.cost_basis_eur:,.0f}",
+                    "Aktuell (€)": f"{row.current_value_eur:,.0f}",
+                    "G/V (€)": f"{row.pnl_eur:+,.0f}",
+                    "Hit Rate": f"{row.hit_rate_pct:.0f}%",
+                    "CAGR": f"{row.cagr_pct:.1f}%" if row.cagr_pct is not None else "n/a",
+                    "Total Return (~)": f"{row.cagr_with_dividend_pct:.1f}%" if row.cagr_with_dividend_pct is not None else "n/a",
+                })
+
+            df_attr = pd.DataFrame(rows)
+            st.dataframe(df_attr, use_container_width=True, hide_index=True)
+
+            # Explanation
+            st.caption(
+                "**CAGR**: Kapitalgewichtete annualisierte Rendite (nur Kursgewinne). "
+                "**Total Return (~)**: geschätzte Rendite inklusive Dividenden (basiert auf aktuelle Jahresrate). "
+                "Positionen ohne Kaufdatum oder Zeitraum < 2 Wochen werden ausgeklammert."
+            )

@@ -509,14 +509,37 @@ if _ss("_pos_show_form"):
         else:
             form_anlageart = None
 
-        # Empfohlen von (recommendation source — free text)
+        # Empfohlen von (recommendation source — combobox with existing values)
         col_rec, _ = st.columns(2)
         with col_rec:
-            form_rec_source = st.text_input(
-                t("positionen.empfohlen_von"),
-                value=(editing.recommendation_source or "") if editing else "",
-                placeholder=t("positionen.empfohlen_von_placeholder"),
+            # Collect all existing recommendation sources
+            all_positions = repo.get_portfolio() + repo.get_watchlist()
+            existing_sources = sorted(
+                {p.recommendation_source for p in all_positions if p.recommendation_source},
+                key=str.lower
             )
+
+            # Build selectbox options
+            source_options = existing_sources + ["─ " + t("positionen.new_recommendation_source") + " ─"]
+            source_default = editing.recommendation_source if editing and editing.recommendation_source in existing_sources else None
+            source_idx = source_options.index(source_default) if source_default and source_default in source_options else 0
+
+            selected_source = st.selectbox(
+                t("positionen.empfohlen_von"),
+                options=[None] + source_options,
+                index=source_idx + 1 if source_default else 0,
+                format_func=lambda x: (x or "—") if x != ("─ " + t("positionen.new_recommendation_source") + " ─") else ("─ " + t("positionen.new_recommendation_source") + " ─"),
+            )
+
+            # If "new" is selected, show text input
+            if selected_source == ("─ " + t("positionen.new_recommendation_source") + " ─"):
+                form_rec_source = st.text_input(
+                    t("positionen.new_recommendation_source_label"),
+                    value="",
+                    placeholder="z.B. 'Börsenbrief XY', 'Freund Max'",
+                )
+            else:
+                form_rec_source = selected_source
 
         # Quantity (optional for manual_valuation types; hidden for Grundstück)
         shows_quantity = cfg.is_field_visible("quantity") or (

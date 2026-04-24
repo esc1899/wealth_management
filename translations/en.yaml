@@ -545,6 +545,8 @@ positionen:
   empfehlung: "Recommendation"
   empfohlen_von: "Recommended by"
   empfohlen_von_placeholder: "e.g. Newsletter, Analyst, ..."
+  new_recommendation_source: "Enter new recommendation source"
+  new_recommendation_source_label: "New Recommendation Source"
   anlageart_label: "Investment Sub-Type"
   story_label: "Investment Thesis"
   story_label: "Investment Thesis"

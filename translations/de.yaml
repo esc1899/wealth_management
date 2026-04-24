@@ -546,6 +546,8 @@ positionen:
   empfehlung: "Empfehlung"
   empfohlen_von: "Empfohlen von"
   empfohlen_von_placeholder: "z.B. Newsletter, Analyst, ..."
+  new_recommendation_source: "Neuen Empfehler eingeben"
+  new_recommendation_source_label: "Neuer Empfehler"
   anlageart_label: "Anlage-Art"
   story_label: "Investment-These"
   story_placeholder: "Warum hältst du diese Position?"
