@@ -707,6 +707,9 @@ wealth_history:
   no_wealth_snapshots: "Keine Vermögenshistorie vorhanden."
   no_dividend_snapshots: "Keine Dividendenhistorie vorhanden."
   no_data: "Keine Daten"
+  update_button: "Snapshots jetzt aktualisieren"
+  update_success: "Snapshots aktualisiert."
+  update_error: "Fehler beim Aktualisieren: {error}"
 
 portfolio_story:
   cash_rule_title: "💰 Bargeldregel"

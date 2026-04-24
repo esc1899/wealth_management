@@ -11,7 +11,20 @@ from core.i18n import t
 from state import get_wealth_snapshot_agent, get_dividend_snapshot_repo
 
 
-st.markdown(f"## {t('nav.wealth_history')}")
+col_title, col_btn = st.columns([5, 1])
+with col_title:
+    st.markdown(f"## {t('nav.wealth_history')}")
+with col_btn:
+    st.write("")
+    if st.button(t("wealth_history.update_button"), use_container_width=True):
+        try:
+            _agent = get_wealth_snapshot_agent()
+            _agent.take_snapshot(is_manual=True, overwrite=True)
+            _agent.take_dividend_snapshot(is_manual=True, overwrite=True)
+            st.success(t("wealth_history.update_success"))
+            st.rerun()
+        except Exception as e:
+            st.error(t("wealth_history.update_error").format(error=e))
 
 agent = get_wealth_snapshot_agent()
 div_repo = get_dividend_snapshot_repo()

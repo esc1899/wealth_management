@@ -706,6 +706,9 @@ wealth_history:
   no_wealth_snapshots: "No wealth history available."
   no_dividend_snapshots: "No dividend history available."
   no_data: "No data"
+  update_button: "Update snapshots now"
+  update_success: "Snapshots updated."
+  update_error: "Error updating: {error}"
 
 portfolio_story:
   cash_rule_title: "💰 Cash Rule"
