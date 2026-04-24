@@ -1,54 +1,23 @@
 #!/bin/bash
-set -e
+# Dock launcher: ensure background service is running and open browser
 
-PROJECT_DIR="$(dirname "$0")"
-LOG_DIR="$HOME/.wealth-management"
-mkdir -p "$LOG_DIR"
+PLIST="$HOME/Library/LaunchAgents/com.erik.wealth-management.plist"
+SERVICE_URL="http://localhost:6655"
+MAX_WAIT=5
 
-# Pause background agent during development
-launchctl unload ~/Library/LaunchAgents/com.erik.wealth-management.plist 2>/dev/null || true
-
-cd "$PROJECT_DIR"
-
-# Verify venv exists
-if [ ! -f ".venv/bin/activate" ]; then
-    echo "Error: .venv not found. Run: python -m venv .venv && .venv/bin/pip install -r requirements.txt"
-    sleep 5
-    exit 1
+# Ensure LaunchAgent is loaded (starts the background service)
+if [ -f "$PLIST" ]; then
+    launchctl list com.erik.wealth-management > /dev/null 2>&1 || launchctl load "$PLIST"
 fi
 
-# Activate virtual environment
-source .venv/bin/activate
-
-# Kill any existing Streamlit instances
-pkill -f "streamlit run" 2>/dev/null || true
-sleep 1
-
-# Start Streamlit in background, immune to terminal closure
-nohup streamlit run app.py > "$LOG_DIR/streamlit.log" 2>&1 &
-STREAMLIT_PID=$!
-
-# Wait for Streamlit to start (check if server is ready)
-sleep 3
-for i in {1..10}; do
-    if curl -s http://localhost:8501/_stcore/health > /dev/null 2>&1; then
-        echo "Streamlit started successfully (PID: $STREAMLIT_PID)"
+# Wait for service to be ready (max 5 seconds)
+for i in $(seq 1 $MAX_WAIT); do
+    if curl -s "$SERVICE_URL/_stcore/health" > /dev/null 2>&1; then
         break
     fi
-    if [ $i -eq 10 ]; then
-        echo "Warning: Streamlit may not have started properly. Check: $LOG_DIR/streamlit.log"
-        sleep 2
-    else
-        sleep 1
-    fi
+    sleep 1
 done
 
-# Open browser to the Streamlit app
-open http://localhost:8501
-
-# Resume background agent
-launchctl load ~/Library/LaunchAgents/com.erik.wealth-management.plist 2>/dev/null || true
-
-echo "App started. Browser opened. Close this window to continue."
-sleep 2
+# Open browser
+open "$SERVICE_URL"
 exit 0
