@@ -26,7 +26,7 @@ resources_dir.mkdir(parents=True, exist_ok=True)
 # Create the launcher script
 launcher = macos_dir / "Wealth Management"
 launcher.write_text("""#!/bin/bash
-open /Applications/Wealth\\ Management.command
+bash /Users/erik/Projects/wealth_management/start.command
 """)
 launcher.chmod(0o755)
 
