@@ -103,7 +103,11 @@
       "Bash(awk '/^research_chat:/,/^[a-z]/' /Users/erik/Projects/wealth_management/translations/de.yaml)",
       "Bash(awk '/^research_chat:/,/^[a-z]/' /Users/erik/Projects/wealth_management/translations/en.yaml)",
       "Bash(python -m pytest tests/unit/test_i18n.py -xvs)",
-      "Bash(python -c \"from core.i18n import t; print\\(t\\('fundamental.select_header'\\)\\); print\\(t\\('portfolio_story.title'\\)\\); print\\(t\\('watchlist_checker.title'\\)\\)\")"
+      "Bash(python -c \"from core.i18n import t; print\\(t\\('fundamental.select_header'\\)\\); print\\(t\\('portfolio_story.title'\\)\\); print\\(t\\('watchlist_checker.title'\\)\\)\")",
+      "Bash(curl -s http://localhost:6655/_stcore/health)",
+      "Bash(bash ~/scripts/wm_start.sh)",
+      "Bash(bash /Users/erik/Projects/wealth_management/start.command)",
+      "Bash(curl -s http://localhost:6655/)"
     ],
     "additionalDirectories": [
       "/Users/erik",
