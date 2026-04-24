@@ -32,6 +32,9 @@ htmlcov/
 # Private skills (personal prompts, not for public repo)
 config/private_skills.yaml
 
+# Local documentation (personal release notes, not for git)
+CHANGELOG.md
+
 # IDE
 .vscode/
 .idea/
