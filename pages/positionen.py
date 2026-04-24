@@ -720,6 +720,7 @@ def _show_detail(pos_id: int | None):
         st.divider()
 
         # ── Dividend / Interest display ──────────────────────────────────────────
+        extra = pos.extra_data or {}
         div_record = _market_repo.get_dividend(pos.ticker) if pos.ticker else None
         override_yield = extra.get("dividend_yield_override")
 
