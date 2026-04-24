@@ -574,7 +574,7 @@ positionen:
   close_button: "Close"
   crypto_warning: "Cryptocurrencies are highly speculative assets and not a conventional investment. Story Checker assessments and rebalancing recommendations should reflect this."
   analysis_excluded_label: "Exclude from analysis"
-  analysis_excluded_help: "Position is counted in overall allocation (Josef's Rule) but will not be analyzed by Story Checker, Fundamental Analyzer, or Consensus Gap."
+  analysis_excluded_help: "Position is counted in allocation but excluded from recommendation attribution and agent analyses. Useful for positions that should not count toward a recommender's performance (e.g. own research, pension)."
 
 demo:
   banner: "⚠️ Demo Mode active — data is stored unencrypted"

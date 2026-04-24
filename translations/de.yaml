@@ -574,7 +574,7 @@ positionen:
   close_button: "Schließen"
   crypto_warning: "Kryptowährungen sind hochspekulative Assets und kein klassisches Anlageinstrument. Bewertungen im Storychecker und Rebalancing sollten diese Einschätzung widerspiegeln."
   analysis_excluded_label: "Von Analyse ausschließen"
-  analysis_excluded_help: "Position wird in der Gesamtallokation (Josef's Regel) berücksichtigt, aber nicht von Story Checker, Fundamental Analyzer oder Konsens-Lücken analysiert."
+  analysis_excluded_help: "Position wird in der Allokation berücksichtigt, aber aus der Empfehler-Attribution und Agent-Analysen ausgeschlossen. Sinnvoll für Positionen, die nicht dem Empfehler zugerechnet werden sollen (z.B. eigene Überlegung, Altersvorsorge)."
 
 demo:
   banner: "⚠️ Demo-Modus aktiv — Daten werden unverschlüsselt gespeichert"
