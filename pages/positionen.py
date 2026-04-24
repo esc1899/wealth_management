@@ -85,7 +85,7 @@ def _clear_form():
     """Clear all form-related keys from session state, including any open detail dialog."""
     for k in [
         "_pos_edit_id", "_pos_show_form", "_pos_confirm_del",
-        "_pos_detail_id",
+        "_pos_detail_id", "_pos_dialog_mode",
         "_pos_ticker", "_pos_name", "_pos_figi_results",
         "_pos_isin", "_pos_wkn", "_pos_asset_class",
         "_pos_story_draft", "_pos_form_story", "_pos_form_story_owner", "_pos_figi_pick",
@@ -100,14 +100,14 @@ def _clear_form():
         st.session_state.pop(k, None)
 
 def _open_detail(pos_id: int):
-    """Open detail dialog, clearing any other state."""
+    """Open position dialog in view mode, clearing any other state."""
     _clear_form()
-    _set(_pos_detail_id=pos_id)
+    _set(_pos_detail_id=pos_id, _pos_dialog_mode="view")
 
 def _open_edit(pos_id: int | None):
-    """Open edit form, clearing any other state."""
+    """Open position dialog in edit mode, clearing any other state."""
     _clear_form()
-    _set(_pos_show_form=True, _pos_edit_id=pos_id)
+    _set(_pos_detail_id=pos_id, _pos_dialog_mode="edit")
 
 def _open_delete(pos_id: int):
     """Open delete confirmation, clearing any other state."""
@@ -115,231 +115,17 @@ def _open_delete(pos_id: int):
     _set(_pos_confirm_del=pos_id)
 
 # ---------------------------------------------------------------------------
-# Detail dialog
+# Edit form rendering (used in unified dialog)
 # ---------------------------------------------------------------------------
 
-@st.dialog(t("positionen.detail_title"), width="large")
-def _show_detail(pos_id: int):
-    pos = repo.get(pos_id)
-    if not pos:
-        st.error("Position not found.")
-        return
-
-    cfg = registry.get(pos.asset_class)
-    extra = pos.extra_data or {}
-
-    # ── Header ──────────────────────────────────────────────────────────────
-    c1, c2 = st.columns([3, 1])
-    c1.subheader(pos.name)
-    if pos.ticker:
-        c1.caption(pos.ticker)
-    if c2.button(t("positionen.edit_button_detail"), use_container_width=True):
-        _open_edit(pos_id)
-        st.rerun()
-        return  # Exit dialog immediately to avoid re-rendering
-
-    # ── Krypto-Warnung ───────────────────────────────────────────────────────
-    if pos.asset_class == "Kryptowährung":
-        st.warning(t("positionen.crypto_warning"), icon="⚠️")
-
-    st.divider()
-
-    # ── Core fields ─────────────────────────────────────────────────────────
-    col_a, col_b = st.columns(2)
-    col_a.markdown(f"**{t('positionen.col_asset_class')}:** {pos.asset_class}")
-    col_b.markdown(f"**{t('positionen.col_unit')}:** {pos.unit}")
-
-    if pos.anlageart:
-        st.markdown(f"**{t('positionen.anlageart_label')}:** {pos.anlageart}")
-
-    if pos.isin or pos.wkn:
-        col_c, col_d = st.columns(2)
-        col_c.markdown(f"**{t('positionen.col_isin')}:** {pos.isin or '—'}")
-        col_d.markdown(f"**{t('positionen.col_wkn')}:** {pos.wkn or '—'}")
-
-    if pos.quantity is not None:
-        col_e, col_f = st.columns(2)
-        col_e.markdown(f"**{t('positionen.col_quantity')}:** {_fmtnum(pos.quantity, 4).rstrip('0').rstrip(',')}")
-        col_f.markdown(
-            f"**{t('positionen.col_purchase_price')}:** "
-            f"{_fmtnum(pos.purchase_price)} {symbol()}" if pos.purchase_price else f"**{t('positionen.col_purchase_price')}:** —"
-        )
-
-    if pos.purchase_date:
-        st.markdown(f"**{t('positionen.col_purchase_date')}:** {pos.purchase_date.isoformat()}")
-
-    if pos.empfehlung or pos.recommendation_source:
-        rec_parts = []
-        if pos.empfehlung:
-            rec_parts.append(pos.empfehlung)
-        if pos.recommendation_source:
-            rec_parts.append(f"{t('positionen.empfohlen_von')}: {pos.recommendation_source}")
-        st.markdown(f"**{t('positionen.empfehlung')}:** {' · '.join(rec_parts)}")
-
-    if pos.story:
-        st.markdown(f"**{t('positionen.story_label')}:**")
-        st.info(pos.story)
-
-    if pos.notes:
-        st.markdown(f"**{t('positionen.col_notes')}:** {pos.notes}")
-
-    # ── Festgeld extra fields ────────────────────────────────────────────────
-    if pos.asset_class == "Festgeld":
-        st.divider()
-        fe_a, fe_b, fe_c = st.columns(3)
-        fe_a.markdown(
-            f"**{t('positionen.interest_rate')}:** "
-            f"{extra.get('interest_rate', '—')} %"
-            if extra.get("interest_rate") else f"**{t('positionen.interest_rate')}:** —"
-        )
-        fe_b.markdown(
-            f"**{t('positionen.maturity_date')}:** "
-            f"{extra.get('maturity_date', '—')}"
-        )
-        fe_c.markdown(
-            f"**{t('positionen.bank')}:** {extra.get('bank', '—')}"
-        )
-
-    # ── Anleihe extra fields ───────────────────────────────────────────────
-    if pos.asset_class == "Anleihe":
-        st.divider()
-        an_a, an_b = st.columns(2)
-        an_a.markdown(
-            f"**{t('positionen.interest_rate')}:** "
-            f"{extra.get('interest_rate', '—')} %"
-            if extra.get("interest_rate") else f"**{t('positionen.interest_rate')}:** —"
-        )
-        an_b.markdown(
-            f"**{t('positionen.maturity_date')}:** "
-            f"{extra.get('maturity_date', '—')}"
-        )
-
-    # ── Manual valuation section (Immobilie, Grundstück) ────────────────────
-    if cfg and cfg.manual_valuation:
-        st.divider()
-        st.markdown(f"#### {t('positionen.update_value_header')}")
-
-        current_est = extra.get("estimated_value")
-        current_val_date_str = extra.get("valuation_date")
-
-        # Stale warning
-        if current_val_date_str:
-            try:
-                val_date = date.fromisoformat(current_val_date_str)
-                days_old = (date.today() - val_date).days
-                if days_old > 180:
-                    st.warning(t("positionen.valuation_stale_warning").format(days=days_old))
-            except ValueError:
-                pass
-
-        col_val, col_date = st.columns(2)
-        with col_val:
-            new_est = st.number_input(
-                t("positionen.estimated_value"),
-                min_value=0.0,
-                step=1000.0,
-                format="%.2f",
-                value=float(current_est) if current_est is not None else 0.0,
-                key=f"_detail_est_val_{pos_id}",
-            )
-        with col_date:
-            new_val_date = st.date_input(
-                t("positionen.valuation_date"),
-                value=date.fromisoformat(current_val_date_str) if current_val_date_str else date.today(),
-                key=f"_detail_val_date_{pos_id}",
-            )
-
-        if st.button(t("positionen.save_estimated_value"), key=f"_save_est_{pos_id}", type="primary"):
-            new_extra = dict(extra)
-            new_extra["estimated_value"] = new_est if new_est > 0 else None
-            new_extra["valuation_date"] = new_val_date.isoformat() if new_val_date else None
-            updated = pos.model_copy(update={"extra_data": new_extra})
-            repo.update(updated)
-            st.toast(t("positionen.value_updated"), icon="✅")
-            st.rerun()
-
-    st.divider()
-
-    # ── Dividend / Interest display ──────────────────────────────────────────
-    div_record = _market_repo.get_dividend(pos.ticker) if pos.ticker else None
-    override_yield = extra.get("dividend_yield_override")
-
-    if div_record or override_yield:
-        st.markdown("#### 📊 Dividende / Ausschüttung")
-        if override_yield and override_yield > 0:
-            annual = (pos.quantity * div_record.rate_eur) if (pos.quantity and div_record and div_record.rate_eur) else None
-            if annual is None and pos.quantity:
-                annual = (pos.quantity * _position_current_value(pos) * override_yield / 100) if _position_current_value(pos) else None
-            col_src, col_yield, col_annual = st.columns(3)
-            col_src.markdown(f"**Quelle:** Override")
-            col_yield.markdown(f"**Rendite:** {override_yield:.2f} %")
-            if annual:
-                col_annual.markdown(f"**Jährlich:** {symbol()}{annual:,.0f}")
-        elif div_record:
-            annual = pos.quantity * div_record.rate_eur if pos.quantity else None
-            col_src, col_yield, col_annual = st.columns(3)
-            col_src.markdown(f"**Quelle:** yfinance")
-            col_yield.markdown(f"**Rendite:** {(div_record.yield_pct or 0) * 100:.2f} %")
-            if annual:
-                col_annual.markdown(f"**Jährlich:** {symbol()}{annual:,.0f}")
-
-    st.divider()
-
-    # ── Analysis exclusion toggle ────────────────────────────────────────────
-    new_excl = st.toggle(
-        t("positionen.analysis_excluded_label"),
-        value=pos.analysis_excluded,
-        help=t("positionen.analysis_excluded_help"),
-        key=f"_detail_excl_{pos_id}",
-    )
-    if new_excl != pos.analysis_excluded:
-        updated = pos.model_copy(update={"analysis_excluded": new_excl})
-        repo.update(updated)
-        st.success(t("positionen.saved"))
-        st.rerun()
-
-    st.divider()
-    if st.button(t("positionen.close_button"), use_container_width=True):
-        _clear_form()
-        st.rerun()
-
-# ---------------------------------------------------------------------------
-# Open detail dialog if requested
-# ---------------------------------------------------------------------------
-
-detail_id = _ss("_pos_detail_id")
-if detail_id is not None:
-    _show_detail(detail_id)
-
-# ---------------------------------------------------------------------------
-# [+ Neue Position] button
-# ---------------------------------------------------------------------------
-
-if st.button(t("positionen.add_button"), type="primary"):
-    _open_edit(None)
-    st.rerun()
-
-# ---------------------------------------------------------------------------
-# Form (add or edit)
-# ---------------------------------------------------------------------------
-
-if _ss("_pos_show_form"):
-    edit_id: int | None = _ss("_pos_edit_id")
-    editing: Optional[Position] = repo.get(edit_id) if edit_id else None
-
-    st.subheader(
-        t("positionen.form_header_edit") if editing else t("positionen.form_header_add")
-    )
+def _render_edit_form(pos_id: int | None):
+    """Render the edit form for a position (view or inside dialog)."""
+    editing = repo.get(pos_id) if pos_id else None
 
     # Initialize form state explicitly to prevent sticky state between opens
-    if "_pos_form_story" not in st.session_state or st.session_state.get("_pos_form_story_owner") != edit_id:
+    if "_pos_form_story" not in st.session_state or st.session_state.get("_pos_form_story_owner") != pos_id:
         st.session_state["_pos_form_story"] = (editing.story or "") if editing else ""
-        st.session_state["_pos_form_story_owner"] = edit_id
-
-    # Notify if form was just opened (for scroll navigation)
-    if not _ss("_pos_form_notified"):
-        st.info("✏️ Formular oben auf der Seite — scrollen Sie nach oben")
-        _set(_pos_form_notified=True)
+        st.session_state["_pos_form_story_owner"] = pos_id
 
     # ── Asset class selector OUTSIDE the form ────────────────────────────────
     # This must be outside so changing it triggers a rerun before the form renders.
@@ -841,7 +627,237 @@ if _ss("_pos_show_form"):
             st.session_state["_pos_just_saved"] = True
             st.rerun()
 
+# ---------------------------------------------------------------------------
+# Detail dialog
+# ---------------------------------------------------------------------------
+
+@st.dialog(t("positionen.detail_title"), width="large")
+def _show_detail(pos_id: int | None):
+    # Handle new position (pos_id=None) - skip to edit form
+    if pos_id is None:
+        st.subheader(t("positionen.form_header_add"))
+        st.divider()
+        _render_edit_form(None)
+        return
+
+    pos = repo.get(pos_id)
+    if not pos:
+        st.error("Position not found.")
+        return
+
+    mode = _ss("_pos_dialog_mode", "view")
+
+    # ── Header with mode toggle ──────────────────────────────────────────────
+    c1, c2, c3 = st.columns([3, 1, 1])
+    c1.subheader(pos.name)
+    if pos.ticker:
+        c1.caption(pos.ticker)
+
+    # Mode toggle button
+    toggle_label = "✏️ " + t("positionen.edit_button_detail") if mode == "view" else "👁 Ansicht"
+    if c2.button(toggle_label, key=f"toggle_mode_{pos_id}", use_container_width=True):
+        _set(_pos_dialog_mode="edit" if mode == "view" else "view")
+        st.rerun()
+        return
+
+    # Close button
+    if c3.button("✕", key=f"close_dialog_{pos_id}", use_container_width=True):
+        _clear_form()
+        st.rerun()
+        return
+
     st.divider()
+
+    # ── VIEW MODE ──────────────────────────────────────────────────────────────
+    if mode == "view":
+        cfg = registry.get(pos.asset_class)
+        extra = pos.extra_data or {}
+
+        # ── Krypto-Warnung ───────────────────────────────────────────────────────
+        if pos.asset_class == "Kryptowährung":
+            st.warning(t("positionen.crypto_warning"), icon="⚠️")
+
+        st.divider()
+
+        # ── Core fields ─────────────────────────────────────────────────────────
+        col_a, col_b = st.columns(2)
+        col_a.markdown(f"**{t('positionen.col_asset_class')}:** {pos.asset_class}")
+        col_b.markdown(f"**{t('positionen.col_unit')}:** {pos.unit}")
+
+        if pos.anlageart:
+            st.markdown(f"**{t('positionen.anlageart_label')}:** {pos.anlageart}")
+
+        if pos.isin or pos.wkn:
+            col_c, col_d = st.columns(2)
+            col_c.markdown(f"**{t('positionen.col_isin')}:** {pos.isin or '—'}")
+            col_d.markdown(f"**{t('positionen.col_wkn')}:** {pos.wkn or '—'}")
+
+        if pos.quantity is not None:
+            col_e, col_f = st.columns(2)
+            col_e.markdown(f"**{t('positionen.col_quantity')}:** {_fmtnum(pos.quantity, 4).rstrip('0').rstrip(',')}")
+            col_f.markdown(
+                f"**{t('positionen.col_purchase_price')}:** "
+                f"{_fmtnum(pos.purchase_price)} {symbol()}" if pos.purchase_price else f"**{t('positionen.col_purchase_price')}:** —"
+            )
+
+        if pos.purchase_date:
+            st.markdown(f"**{t('positionen.col_purchase_date')}:** {pos.purchase_date.isoformat()}")
+
+        if pos.empfehlung or pos.recommendation_source:
+            rec_parts = []
+            if pos.empfehlung:
+                rec_parts.append(pos.empfehlung)
+            if pos.recommendation_source:
+                rec_parts.append(f"{t('positionen.empfohlen_von')}: {pos.recommendation_source}")
+            st.markdown(f"**{t('positionen.empfehlung')}:** {' · '.join(rec_parts)}")
+
+        if pos.story:
+            st.markdown(f"**{t('positionen.story_label')}:**")
+            st.info(pos.story)
+
+        if pos.notes:
+            st.markdown(f"**{t('positionen.col_notes')}:** {pos.notes}")
+
+        # ── Festgeld extra fields ────────────────────────────────────────────────
+        if pos.asset_class == "Festgeld":
+            st.divider()
+            fe_a, fe_b, fe_c = st.columns(3)
+            fe_a.markdown(
+                f"**{t('positionen.interest_rate')}:** "
+                f"{extra.get('interest_rate', '—')} %"
+                if extra.get("interest_rate") else f"**{t('positionen.interest_rate')}:** —"
+            )
+            fe_b.markdown(
+                f"**{t('positionen.maturity_date')}:** "
+                f"{extra.get('maturity_date', '—')}"
+            )
+            fe_c.markdown(
+                f"**{t('positionen.bank')}:** {extra.get('bank', '—')}"
+            )
+
+        # ── Anleihe extra fields ───────────────────────────────────────────────
+        if pos.asset_class == "Anleihe":
+            st.divider()
+            an_a, an_b = st.columns(2)
+            an_a.markdown(
+                f"**{t('positionen.interest_rate')}:** "
+                f"{extra.get('interest_rate', '—')} %"
+                if extra.get("interest_rate") else f"**{t('positionen.interest_rate')}:** —"
+            )
+            an_b.markdown(
+                f"**{t('positionen.maturity_date')}:** "
+                f"{extra.get('maturity_date', '—')}"
+            )
+
+        # ── Manual valuation section (Immobilie, Grundstück) ────────────────────
+        if cfg and cfg.manual_valuation:
+            st.divider()
+            st.markdown(f"#### {t('positionen.update_value_header')}")
+
+            current_est = extra.get("estimated_value")
+            current_val_date_str = extra.get("valuation_date")
+
+            # Stale warning
+            if current_val_date_str:
+                try:
+                    val_date = date.fromisoformat(current_val_date_str)
+                    days_old = (date.today() - val_date).days
+                    if days_old > 180:
+                        st.warning(t("positionen.valuation_stale_warning").format(days=days_old))
+                except ValueError:
+                    pass
+
+            col_val, col_date = st.columns(2)
+            with col_val:
+                new_est = st.number_input(
+                    t("positionen.estimated_value"),
+                    min_value=0.0,
+                    step=1000.0,
+                    format="%.2f",
+                    value=float(current_est) if current_est is not None else 0.0,
+                    key=f"_detail_est_val_{pos_id}",
+                )
+            with col_date:
+                new_val_date = st.date_input(
+                    t("positionen.valuation_date"),
+                    value=date.fromisoformat(current_val_date_str) if current_val_date_str else date.today(),
+                    key=f"_detail_val_date_{pos_id}",
+                )
+
+            if st.button(t("positionen.save_estimated_value"), key=f"_save_est_{pos_id}", type="primary"):
+                new_extra = dict(extra)
+                new_extra["estimated_value"] = new_est if new_est > 0 else None
+                new_extra["valuation_date"] = new_val_date.isoformat() if new_val_date else None
+                updated = pos.model_copy(update={"extra_data": new_extra})
+                repo.update(updated)
+                st.toast(t("positionen.value_updated"), icon="✅")
+                st.rerun()
+
+        st.divider()
+
+        # ── Dividend / Interest display ──────────────────────────────────────────
+        div_record = _market_repo.get_dividend(pos.ticker) if pos.ticker else None
+        override_yield = extra.get("dividend_yield_override")
+
+        if div_record or override_yield:
+            st.markdown("#### 📊 Dividende / Ausschüttung")
+            if override_yield and override_yield > 0:
+                annual = (pos.quantity * div_record.rate_eur) if (pos.quantity and div_record and div_record.rate_eur) else None
+                if annual is None and pos.quantity:
+                    annual = (pos.quantity * _position_current_value(pos) * override_yield / 100) if _position_current_value(pos) else None
+                col_src, col_yield, col_annual = st.columns(3)
+                col_src.markdown(f"**Quelle:** Override")
+                col_yield.markdown(f"**Rendite:** {override_yield:.2f} %")
+                if annual:
+                    col_annual.markdown(f"**Jährlich:** {symbol()}{annual:,.0f}")
+            elif div_record:
+                annual = pos.quantity * div_record.rate_eur if pos.quantity else None
+                col_src, col_yield, col_annual = st.columns(3)
+                col_src.markdown(f"**Quelle:** yfinance")
+                col_yield.markdown(f"**Rendite:** {(div_record.yield_pct or 0) * 100:.2f} %")
+                if annual:
+                    col_annual.markdown(f"**Jährlich:** {symbol()}{annual:,.0f}")
+
+        st.divider()
+
+        # ── Analysis exclusion toggle ────────────────────────────────────────────
+        new_excl = st.toggle(
+            t("positionen.analysis_excluded_label"),
+            value=pos.analysis_excluded,
+            help=t("positionen.analysis_excluded_help"),
+            key=f"_detail_excl_{pos_id}",
+        )
+        if new_excl != pos.analysis_excluded:
+            updated = pos.model_copy(update={"analysis_excluded": new_excl})
+            repo.update(updated)
+            st.success(t("positionen.saved"))
+            st.rerun()
+
+    else:
+        # ── EDIT MODE ──────────────────────────────────────────────────────────────
+        _render_edit_form(pos_id)
+
+# ---------------------------------------------------------------------------
+# Open dialog if requested (detail/edit view)
+# ---------------------------------------------------------------------------
+
+mode = _ss("_pos_dialog_mode")
+detail_id = _ss("_pos_detail_id")
+# Dialog triggered when: viewing existing pos, editing existing pos, or creating new pos
+if mode is not None:
+    _show_detail(detail_id)
+
+# ---------------------------------------------------------------------------
+# [+ Neue Position] button
+# ---------------------------------------------------------------------------
+
+if st.button(t("positionen.add_button"), type="primary"):
+    _open_edit(None)
+    st.rerun()
+
+# ---------------------------------------------------------------------------
+# Delete confirmation dialog
+# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # Delete confirmation dialog
