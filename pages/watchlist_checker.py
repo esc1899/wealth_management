@@ -396,23 +396,18 @@ if st.button(t("watchlist_checker.run_button"), key="check_watchlist_btn"):
     # Hauptcheck
     with st.spinner(t("watchlist_checker.checking_spinner")):
         # Build complete context (analog to Portfolio Story)
+        # Use anonymized allocation snapshot (no private values/quantities)
+        from collections import Counter
         portfolio = _portfolio_service.get_portfolio_positions()
-        market_agent = get_market_agent()
 
-        # Get valuations as dict (ticker -> PortfolioValuation)
-        valuations_list = market_agent.get_portfolio_valuation() if market_agent else []
-        valuations = {v.symbol: v for v in valuations_list} if valuations_list else {}
-
-        # Portfolio snapshot with values
-        portfolio_snapshot = "## Portfolio\n"
+        # Portfolio allocation snapshot (anonymized - no values)
+        portfolio_snapshot = "## Portfolio Allocation (Josef's Regel)\n"
         if portfolio:
-            for p in portfolio:
-                val = valuations.get(p.ticker) if p.ticker else None
-                val_eur = val.current_value_eur if val and val.current_value_eur else 0
-                div_str = ""
-                if val and val.annual_dividend_eur and val.annual_dividend_eur > 0:
-                    div_str = t("watchlist_checker.dividend_label").format(val=f"{val.annual_dividend_eur:.0f}€/Jahr ({(val.dividend_yield_pct or 0) * 100:.1f}%)", source=val.dividend_source or 'unbekannt')
-                portfolio_snapshot += f"- {p.name} ({p.ticker}, {p.asset_class}): {val_eur:.0f}€{div_str}\n"
+            counts = Counter(p.asset_class for p in portfolio if p.asset_class)
+            total = len(portfolio)
+            for asset_class, count in counts.most_common():
+                pct = 100 * count / total if total else 0
+                portfolio_snapshot += f"- {asset_class}: {count} Positionen ({pct:.0f}%)\n"
         else:
             portfolio_snapshot += t("watchlist_checker.empty_portfolio") + "\n"
 

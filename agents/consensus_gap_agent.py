@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
-from core.storage.models import Position
+from core.storage.models import PublicPosition
 from agents.agent_language import response_language_with_fixed_codes
 
 AGENT_NAME = "consensus_gap"
@@ -112,7 +112,7 @@ class ConsensusGapAgent:
 
     async def analyze_portfolio(
         self,
-        positions: List[Position],
+        positions: List[PublicPosition],
         skill_name: str,
         skill_prompt: str,
         language: str = "de",
@@ -198,7 +198,7 @@ class ConsensusGapAgent:
     # Helpers
     # ------------------------------------------------------------------
 
-    def _format_positions(self, positions: List[Position]) -> str:
+    def _format_positions(self, positions: List[PublicPosition]) -> str:
         lines = []
         for p in positions:
             lines.append(f"### Position ID: {p.id}")

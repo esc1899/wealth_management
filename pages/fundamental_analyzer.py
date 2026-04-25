@@ -31,7 +31,7 @@ with st.expander(t("fundamental.how_to_use"), expanded=False):
 # ------------------------------------------------------------------
 
 portfolio_service = get_portfolio_service()
-all_positions = portfolio_service.get_all_positions(
+all_positions = portfolio_service.get_public_positions(
     include_portfolio=True, include_watchlist=True
 )
 positions_with_required_fields = [p for p in all_positions if p.name]
@@ -77,8 +77,6 @@ with col_left:
                     st.caption(f"{t('fundamental.asset_class_label')} {selected_position.asset_class}")
                 if selected_position.anlageart:
                     st.caption(f"{t('fundamental.investment_type_label')} {selected_position.anlageart}")
-                if selected_position.purchase_price:
-                    st.metric("Kaufpreis", f"€{selected_position.purchase_price:,.2f}")
                 if selected_position.story:
                     st.caption(t("fundamental.thesis_label"))
                     st.markdown(selected_position.story)

@@ -74,7 +74,7 @@ _VERDICT_CONFIG = VERDICT_CONFIGS["consensus_gap"]
 # Portfolio + Watchlist positions with stories
 # ------------------------------------------------------------------
 
-_eligible = _portfolio_service.get_all_positions(
+_eligible = _portfolio_service.get_public_positions(
     include_portfolio=True, include_watchlist=True, require_story=True
 )
 _all_ids = [p.id for p in _eligible if p.id]

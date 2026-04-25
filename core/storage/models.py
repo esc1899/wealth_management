@@ -237,6 +237,30 @@ class Position(BaseModel):
         return self
 
 
+class PublicPosition(BaseModel):
+    """Read-only view of a position for public/cloud agents.
+
+    Contains NO private financial data:
+    - ❌ quantity (how much user owns)
+    - ❌ purchase_price (cost basis)
+    - ❌ notes (private annotations)
+    - ❌ extra_data (private metadata)
+    - ❌ in_portfolio / in_watchlist (reveals ownership intent)
+
+    Safe to pass to cloud LLM agents. Investment thesis (story) is included
+    as it is the core input for analysis.
+    """
+
+    id: Optional[int] = None
+    name: str
+    ticker: Optional[str] = None
+    isin: Optional[str] = None
+    asset_class: str
+    anlageart: Optional[str] = None
+    story: Optional[str] = None
+    story_skill: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # Research models
 # ---------------------------------------------------------------------------

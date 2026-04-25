@@ -9,7 +9,7 @@ Replaces patterns across pages:
 from typing import List
 
 from core.storage.positions import PositionsRepository
-from core.storage.models import Position
+from core.storage.models import Position, PublicPosition
 
 
 class PortfolioService:
@@ -63,3 +63,44 @@ class PortfolioService:
     def get_watchlist_positions(self) -> List[Position]:
         """Get all watchlist positions (convenience method)."""
         return self._positions.get_watchlist()
+
+    def get_public_positions(
+        self,
+        include_portfolio: bool = True,
+        include_watchlist: bool = True,
+        require_story: bool = False,
+        require_ticker: bool = False,
+    ) -> List[PublicPosition]:
+        """Get positions stripped of private data. Safe for cloud/public agents.
+
+        Removes: quantity, purchase_price, notes, extra_data, in_portfolio, in_watchlist.
+        Keeps: ticker, name, asset_class, story (investment thesis), isin, wkn, anlageart.
+
+        Args:
+            include_portfolio: Include portfolio positions
+            include_watchlist: Include watchlist positions
+            require_story: Only return positions with investment story
+            require_ticker: Only return positions with ticker symbol
+
+        Returns:
+            List of PublicPosition objects (no private financial data)
+        """
+        positions = self.get_all_positions(
+            include_portfolio=include_portfolio,
+            include_watchlist=include_watchlist,
+            require_story=require_story,
+            require_ticker=require_ticker,
+        )
+        return [
+            PublicPosition(
+                id=p.id,
+                name=p.name,
+                ticker=p.ticker,
+                isin=p.isin,
+                asset_class=p.asset_class,
+                anlageart=p.anlageart,
+                story=p.story,
+                story_skill=p.story_skill,
+            )
+            for p in positions
+        ]

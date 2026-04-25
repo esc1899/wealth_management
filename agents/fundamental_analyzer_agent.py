@@ -17,7 +17,7 @@ from typing import List, Optional, Tuple, Dict, Any
 
 from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
-from core.storage.models import Position
+from core.storage.models import PublicPosition
 from agents.agent_language import response_language_instruction
 
 
@@ -137,7 +137,7 @@ class FundamentalAnalyzerAgent:
     # Session management
     # ------------------------------------------------------------------
 
-    def start_session(self, position: Position, language: str = "de") -> AnalyzerSession:
+    def start_session(self, position: PublicPosition, language: str = "de") -> AnalyzerSession:
         """Create a new session and run the initial analysis.
 
         Args:
@@ -238,7 +238,7 @@ class FundamentalAnalyzerAgent:
         )
         return response
 
-    def _resolve_skill(self, position: Position) -> Tuple[str, Optional[str]]:
+    def _resolve_skill(self, position: PublicPosition) -> Tuple[str, Optional[str]]:
         """Resolve skill context if available. Returns (skill_name, skill_prompt) where skill_name is never None."""
         if not self._skills_repo or not position.story_skill:
             return "Standard", None
@@ -254,7 +254,7 @@ class FundamentalAnalyzerAgent:
             return []
         return session.messages
 
-    async def generate_analysis_proposal(self, position: Position) -> str:
+    async def generate_analysis_proposal(self, position: PublicPosition) -> str:
         """Generate an AI proposal for deeper analysis of a position."""
         prompt = f"""Erstelle eine strukturierte Analyse-Agenda für {position.name} ({position.ticker or 'N/A'}):
 
@@ -279,7 +279,7 @@ Gib eine prägnante, fokussierte Agenda (4–6 Punkte).
 # ------------------------------------------------------------------
 
 
-def _build_initial_message(position: Position, skill_name: Optional[str], skill_prompt: Optional[str]) -> str:
+def _build_initial_message(position: PublicPosition, skill_name: Optional[str], skill_prompt: Optional[str]) -> str:
     """Build the initial analysis request message."""
     msg = f"Analysiere folgende Position tiefgehend:\n\n"
     msg += f"**Name:** {position.name}\n"
@@ -288,8 +288,6 @@ def _build_initial_message(position: Position, skill_name: Optional[str], skill_
     msg += f"**Anlageklasse:** {position.asset_class}\n"
     if position.anlageart:
         msg += f"**Anlage-Art:** {position.anlageart}\n"
-    if position.purchase_price:
-        msg += f"**Kaufpreis:** €{position.purchase_price:,.2f}\n"
 
     if position.story:
         msg += f"\n**Investment-These:**\n{position.story}\n"

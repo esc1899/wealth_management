@@ -130,7 +130,9 @@
       "Bash(python create_automator_app.py)",
       "Bash(xattr -rd com.apple.quarantine \"/Applications/Wealth Management.app\")",
       "Bash(bash \"/Applications/Wealth Management.app/Contents/MacOS/Wealth Management\")",
-      "Bash(grep -E \"^[A-Z]{2}[A-Z0-9]{10}$|AAPL|MSFT|US[0-9]\")"
+      "Bash(grep -E \"^[A-Z]{2}[A-Z0-9]{10}$|AAPL|MSFT|US[0-9]\")",
+      "Bash(pytest tests/ -q --tb=no)",
+      "Bash(pytest tests/ -q --tb=short)"
     ],
     "additionalDirectories": [
       "/Users/erik",
