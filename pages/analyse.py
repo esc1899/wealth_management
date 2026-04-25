@@ -152,8 +152,21 @@ st.divider()
 # Portfolio allocation — Sunburst with positions outer ring
 # ------------------------------------------------------------------
 st.subheader(t("analysis.weight_by_position"))
+
+# Sector grouping for 3-level sunburst (Sektor → Anlageklasse → Position)
+_SEKTOR_MAP = {
+    "Wertpapiere": "Wertpapiere",
+    "Renten": "Geldwerte",
+    "Geld": "Geldwerte",
+    "Bargeld": "Geldwerte",
+    "Immobilien": "Sachwerte",
+    "Rohstoffe": "Sachwerte",
+    "Krypto": "Krypto",
+}
+
 rows = [
     {
+        "sektor": _SEKTOR_MAP.get(v.investment_type, v.investment_type),
         "anlageklasse": t(f"investment_types.{v.investment_type}"),
         "position": v.symbol,
         "wert": v.current_value_eur
@@ -162,12 +175,12 @@ rows = [
     if v.current_value_eur
 ]
 if rows:
-    df = pd.DataFrame(rows).groupby(["anlageklasse", "position"])["wert"].sum().reset_index()
+    df = pd.DataFrame(rows).groupby(["sektor", "anlageklasse", "position"])["wert"].sum().reset_index()
     fig = px.sunburst(
         df,
-        path=["anlageklasse", "position"],
+        path=["sektor", "anlageklasse", "position"],
         values="wert",
-        color="anlageklasse"
+        color="sektor"
     )
     fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
     st.plotly_chart(fig, use_container_width=True)

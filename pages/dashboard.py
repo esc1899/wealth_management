@@ -147,10 +147,22 @@ if has_prices:
 
     col_sunburst1, col_sunburst2 = st.columns(2)
 
+    # Sector grouping for 3-level sunburst (Sektor → Anlageklasse → Anlageform/Position)
+    _SEKTOR_MAP = {
+        "Wertpapiere": "Wertpapiere",
+        "Renten": "Geldwerte",
+        "Geld": "Geldwerte",
+        "Bargeld": "Geldwerte",
+        "Immobilien": "Sachwerte",
+        "Rohstoffe": "Sachwerte",
+        "Krypto": "Krypto",
+    }
+
     with col_sunburst1:
         st.caption(t("analysis.weight_by_type"))
         rows = [
             {
+                "sektor": _SEKTOR_MAP.get(v.investment_type, v.investment_type),
                 "anlageklasse": t(f"investment_types.{v.investment_type}"),
                 "anlageform": v.asset_class,
                 "wert": v.current_value_eur
@@ -159,12 +171,12 @@ if has_prices:
             if v.current_value_eur
         ]
         if rows:
-            df = pd.DataFrame(rows).groupby(["anlageklasse", "anlageform"])["wert"].sum().reset_index()
+            df = pd.DataFrame(rows).groupby(["sektor", "anlageklasse", "anlageform"])["wert"].sum().reset_index()
             fig = px.sunburst(
                 df,
-                path=["anlageklasse", "anlageform"],
+                path=["sektor", "anlageklasse", "anlageform"],
                 values="wert",
-                color="anlageklasse"
+                color="sektor"
             )
             fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
             st.plotly_chart(fig, use_container_width=True)
@@ -173,6 +185,7 @@ if has_prices:
         st.caption(t("analysis.weight_by_position"))
         rows = [
             {
+                "sektor": _SEKTOR_MAP.get(v.investment_type, v.investment_type),
                 "anlageklasse": t(f"investment_types.{v.investment_type}"),
                 "position": v.symbol,
                 "wert": v.current_value_eur
@@ -181,12 +194,12 @@ if has_prices:
             if v.current_value_eur
         ]
         if rows:
-            df = pd.DataFrame(rows).groupby(["anlageklasse", "position"])["wert"].sum().reset_index()
+            df = pd.DataFrame(rows).groupby(["sektor", "anlageklasse", "position"])["wert"].sum().reset_index()
             fig2 = px.sunburst(
                 df,
-                path=["anlageklasse", "position"],
+                path=["sektor", "anlageklasse", "position"],
                 values="wert",
-                color="anlageklasse"
+                color="sektor"
             )
             fig2.update_layout(margin=dict(t=0, b=0, l=0, r=0))
             st.plotly_chart(fig2, use_container_width=True)
