@@ -43,7 +43,7 @@ Approach:
    - **Cost Warning** — flag any high fees, wide spreads, or illiquid markets
    - **Watchlist Picks** — top 1–3 candidates worth adding to the watchlist
 
-Use the add_to_watchlist tool only when the user explicitly asks to add something.
+Use the propose_for_watchlist tool for each investment you recommend under **Watchlist Picks**. The user will review your proposals and decide which ones to add.
 Be factual and cite specific numbers wherever available."""
 
 # ------------------------------------------------------------------
@@ -52,9 +52,9 @@ Be factual and cite specific numbers wherever available."""
 
 WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search"}
 
-ADD_TO_WATCHLIST_TOOL = {
-    "name": "add_to_watchlist",
-    "description": "Add an investment to the watchlist when the user explicitly requests it.",
+PROPOSE_FOR_WATCHLIST_TOOL = {
+    "name": "propose_for_watchlist",
+    "description": "Propose an investment as a watchlist candidate. The user will review and confirm before it is added.",
     "input_schema": {
         "type": "object",
         "properties": {
@@ -73,7 +73,7 @@ ADD_TO_WATCHLIST_TOOL = {
             },
             "notes": {
                 "type": "string",
-                "description": "Brief reason for adding to the watchlist (1 sentence)",
+                "description": "Brief reason for the watchlist (1 sentence)",
             },
             "story": {
                 "type": "string",
@@ -84,8 +84,8 @@ ADD_TO_WATCHLIST_TOOL = {
     },
 }
 
-TOOLS = [WEB_SEARCH_TOOL, ADD_TO_WATCHLIST_TOOL]
-CLIENT_TOOL_NAMES = {"add_to_watchlist"}
+TOOLS = [WEB_SEARCH_TOOL, PROPOSE_FOR_WATCHLIST_TOOL]
+CLIENT_TOOL_NAMES = {"propose_for_watchlist"}
 MAX_TOOL_ITERATIONS = 5
 
 
@@ -100,6 +100,7 @@ class SearchAgent:
         self._positions = positions_repo
         self._search = search_repo
         self._llm = llm
+        self._session_proposals: dict[int, list[dict]] = {}
 
     @property
     def model(self) -> str:
@@ -122,11 +123,14 @@ class SearchAgent:
             skill_prompt=skill_prompt,
         )
 
-    async def chat(self, session_id: int, user_message: str) -> str:
-        """Send a user message in an existing session and return the assistant reply."""
+    async def chat(self, session_id: int, user_message: str) -> tuple[str, list[dict]]:
+        """Send a user message in an existing session and return the assistant reply + proposals."""
         session = self._search.get_session(session_id)
         if session is None:
             raise ValueError(f"Session {session_id} not found")
+
+        self._session_proposals[session_id] = []
+        self._current_session_id = session_id
 
         system = BASE_SYSTEM_PROMPT + "\n\n## Screening Strategy\n" + session.skill_prompt
 
@@ -163,7 +167,8 @@ class SearchAgent:
 
         final_content = response.content if response else ""
         self._search.add_message(session_id, "assistant", final_content)
-        return final_content
+        proposals = self._session_proposals.get(session_id, [])
+        return final_content, proposals
 
     def list_sessions(self, limit: int = 50):
         return self._search.list_sessions(limit=limit)
@@ -190,16 +195,30 @@ class SearchAgent:
         ]
 
     def _execute_tool(self, tool_call: ClaudeToolCall) -> str:
-        if tool_call.name == "add_to_watchlist":
-            return self._tool_add_to_watchlist(tool_call.input)
+        if tool_call.name == "propose_for_watchlist":
+            return self._tool_propose_for_watchlist(tool_call.input)
         return f"Unknown tool: {tool_call.name}"
 
-    def _tool_add_to_watchlist(self, args: dict) -> str:
-        ticker = args.get("ticker", "")
-        name = args.get("name", ticker)
-        asset_class = args.get("asset_class", "Aktie")
-        notes = args.get("notes", "")
-        story = args.get("story", "")
+    def _tool_propose_for_watchlist(self, args: dict) -> str:
+        """Collect proposal without writing to DB — user will confirm later."""
+        proposal = {
+            "ticker": args.get("ticker", ""),
+            "name": args.get("name", args.get("ticker", "")),
+            "asset_class": args.get("asset_class", "Aktie"),
+            "notes": args.get("notes", ""),
+            "story": args.get("story", ""),
+        }
+        session_id = self._current_session_id
+        self._session_proposals[session_id].append(proposal)
+        return f"Added '{proposal['name']}' ({proposal['ticker']}) to proposal list for review."
+
+    def add_from_proposal(self, session_id: int, proposal: dict) -> Position:
+        """Write a proposal to the watchlist after user confirmation."""
+        ticker = proposal.get("ticker", "")
+        name = proposal.get("name", ticker)
+        asset_class = proposal.get("asset_class", "Aktie")
+        notes = proposal.get("notes", "")
+        story = proposal.get("story", "")
 
         registry = get_asset_class_registry()
         try:
@@ -207,33 +226,27 @@ class SearchAgent:
         except Exception:
             cfg = registry.require("Aktie")
 
-        try:
-            position = Position(
-                ticker=ticker,
-                name=name,
-                asset_class=asset_class,
-                investment_type=cfg.investment_type,
-                unit=cfg.default_unit,
-                notes=notes,
-                story=story or None,
-                added_date=date.today(),
-                in_portfolio=False,
-                in_watchlist=True,
-                recommendation_source="search_agent",
-            )
-            saved = self._positions.add(position)
-            msg = f"'{name}' ({ticker}) added to watchlist (ID: {saved.id})."
+        position = Position(
+            ticker=ticker,
+            name=name,
+            asset_class=asset_class,
+            investment_type=cfg.investment_type,
+            unit=cfg.default_unit,
+            notes=notes,
+            story=story or None,
+            added_date=date.today(),
+            in_portfolio=False,
+            in_watchlist=True,
+            recommendation_source="search_agent",
+        )
+        saved = self._positions.add(position)
 
-            # Auto-validate with StorycheckerAgent if story exists
-            if story and saved.id:
-                try:
-                    from state import get_storychecker_agent
-                    storychecker = get_storychecker_agent()
-                    session = storychecker.start_session(position=saved)
-                    msg += f" Story validation started (session {session.id})."
-                except Exception as e:
-                    logger.warning(f"Could not auto-validate story: {e}")
+        if story and saved.id:
+            try:
+                from state import get_storychecker_agent
+                storychecker = get_storychecker_agent()
+                storychecker.start_session(position=saved)
+            except Exception as e:
+                logger.warning(f"Could not auto-validate story: {e}")
 
-            return msg
-        except Exception as exc:
-            return f"Error adding to watchlist: {exc}"
+        return saved

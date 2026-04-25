@@ -132,7 +132,11 @@
       "Bash(bash \"/Applications/Wealth Management.app/Contents/MacOS/Wealth Management\")",
       "Bash(grep -E \"^[A-Z]{2}[A-Z0-9]{10}$|AAPL|MSFT|US[0-9]\")",
       "Bash(pytest tests/ -q --tb=no)",
-      "Bash(pytest tests/ -q --tb=short)"
+      "Bash(pytest tests/ -q --tb=short)",
+      "Bash(curl -s http://localhost:8501/api/health/)",
+      "Bash(python -m py_compile /Users/erik/Projects/wealth_management/pages/dashboard.py)",
+      "Bash(python -m py_compile /Users/erik/Projects/wealth_management/pages/analyse.py)",
+      "Bash(python -m pytest tests/unit/test_search_agent.py -xvs)"
     ],
     "additionalDirectories": [
       "/Users/erik",

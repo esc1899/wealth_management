@@ -100,14 +100,15 @@ class TestChat:
         mock_search_repo.add_message.assert_any_call(1, "assistant", "Here are top ETFs.")
 
     @pytest.mark.asyncio
-    async def test_returns_assistant_text(self, agent, mock_llm):
+    async def test_returns_assistant_text_and_proposals(self, agent, mock_llm):
         mock_llm.chat_with_tools = AsyncMock(return_value=ClaudeResponse(
             content="Nestlé is a strong candidate.",
             tool_calls=[],
             stop_reason="end_turn",
         ))
-        result = await agent.chat(1, "Best picks?")
+        result, proposals = await agent.chat(1, "Best picks?")
         assert result == "Nestlé is a strong candidate."
+        assert proposals == []
 
     @pytest.mark.asyncio
     async def test_raises_if_session_not_found(self, agent, mock_search_repo):
@@ -121,7 +122,7 @@ class TestChat:
         call_kwargs = mock_llm.chat_with_tools.call_args[1]
         tools = call_kwargs["tools"]
         tool_names = [t.get("name") or t.get("type", "") for t in tools]
-        assert "add_to_watchlist" in tool_names
+        assert "propose_for_watchlist" in tool_names
         assert any("web_search" in n for n in tool_names)
 
     @pytest.mark.asyncio
@@ -147,40 +148,41 @@ class TestChat:
 
 
 # ------------------------------------------------------------------
-# Tool execution — add_to_watchlist
+# Tool execution — propose_for_watchlist
 # ------------------------------------------------------------------
 
-class TestAddToWatchlistTool:
+class TestProposeForWatchlistTool:
     @pytest.mark.asyncio
-    async def test_executes_add_to_watchlist(self, agent, mock_llm, mock_positions_repo):
+    async def test_collects_proposals_during_chat(self, agent, mock_llm):
         tool_call = ClaudeToolCall(
             id="tool_1",
-            name="add_to_watchlist",
+            name="propose_for_watchlist",
             input={"ticker": "NESN.SW", "name": "Nestlé", "asset_class": "Aktie", "notes": "High yield"},
         )
         mock_llm.chat_with_tools = AsyncMock(side_effect=[
             ClaudeResponse(content="", tool_calls=[tool_call], stop_reason="tool_use", raw_blocks=[]),
-            ClaudeResponse(content="Nestlé added to watchlist.", tool_calls=[], stop_reason="end_turn"),
+            ClaudeResponse(content="Proposed Nestlé for review.", tool_calls=[], stop_reason="end_turn"),
         ])
-        result = await agent.chat(1, "Add Nestlé to my watchlist.")
-        mock_positions_repo.add.assert_called_once()
-        assert result
+        result, proposals = await agent.chat(1, "Find dividend stocks.")
+        assert len(proposals) == 1
+        assert proposals[0]["ticker"] == "NESN.SW"
+        assert proposals[0]["name"] == "Nestlé"
 
     @pytest.mark.asyncio
-    async def test_watchlist_entry_source_is_search_agent(self, agent, mock_llm, mock_positions_repo):
-        tool_call = ClaudeToolCall(
-            id="tool_1",
-            name="add_to_watchlist",
-            input={"ticker": "NESN.SW", "name": "Nestlé", "asset_class": "Aktie"},
-        )
-        mock_llm.chat_with_tools = AsyncMock(side_effect=[
-            ClaudeResponse(content="", tool_calls=[tool_call], stop_reason="tool_use", raw_blocks=[]),
-            ClaudeResponse(content="Done.", tool_calls=[], stop_reason="end_turn"),
-        ])
-        await agent.chat(1, "Add it.")
+    async def test_add_from_proposal_writes_to_watchlist(self, agent, mock_positions_repo):
+        proposal = {
+            "ticker": "NESN.SW",
+            "name": "Nestlé",
+            "asset_class": "Aktie",
+            "notes": "High yield",
+            "story": "Strong dividend history"
+        }
+        agent.add_from_proposal(1, proposal)
+        mock_positions_repo.add.assert_called_once()
         position = mock_positions_repo.add.call_args[0][0]
+        assert position.ticker == "NESN.SW"
         assert position.recommendation_source == "search_agent"
-        assert position.in_portfolio is False
+        assert position.in_watchlist is True
 
 
 # ------------------------------------------------------------------
