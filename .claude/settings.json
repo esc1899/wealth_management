@@ -124,7 +124,13 @@
       "Bash(pytest tests/ -q)",
       "Bash(awk '/^if _ss\\\\\\(\"_pos_show_form\"\\\\\\):/{start=NR} start && /^\\(if|st\\\\.|# ---\\)/ && NR>start+10 && !/^[[:space:]]/{print NR\": \"$0; exit}' /Users/erik/Projects/wealth_management/pages/positionen.py)",
       "Bash(awk '/^    if shows_isin_wkn:/{start=NR} start && /^[^ ]/ && NR>start+100 {print NR\": \"$0; exit}' /Users/erik/Projects/wealth_management/pages/positionen.py)",
-      "Bash(python -m py_compile /Users/erik/Projects/wealth_management/pages/positionen.py)"
+      "Bash(python -m py_compile /Users/erik/Projects/wealth_management/pages/positionen.py)",
+      "Bash(python -m py_compile pages/positionen.py)",
+      "Bash(echo \"Streamlit started \\(PID: $!\\)\")",
+      "Bash(python create_automator_app.py)",
+      "Bash(xattr -rd com.apple.quarantine \"/Applications/Wealth Management.app\")",
+      "Bash(bash \"/Applications/Wealth Management.app/Contents/MacOS/Wealth Management\")",
+      "Bash(grep -E \"^[A-Z]{2}[A-Z0-9]{10}$|AAPL|MSFT|US[0-9]\")"
     ],
     "additionalDirectories": [
       "/Users/erik",
