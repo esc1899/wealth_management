@@ -92,7 +92,6 @@ class OpenAICompatibleProvider(LLMProvider):
             temperature=temperature,
         )
 
-        _t0_import = __import__("time").monotonic() if self.on_usage else None
         if self.on_usage and response.usage:
             self.on_usage(
                 response.usage.prompt_tokens,

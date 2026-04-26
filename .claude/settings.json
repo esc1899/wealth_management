@@ -138,7 +138,8 @@
       "Bash(python -m py_compile /Users/erik/Projects/wealth_management/pages/analyse.py)",
       "Bash(python -m pytest tests/unit/test_search_agent.py -xvs)",
       "Bash(python -m pytest tests/unit/test_search_agent.py -q)",
-      "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py::TestPageLoadability::test_dashboard_page_loads -v)"
+      "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py::TestPageLoadability::test_dashboard_page_loads -v)",
+      "Bash(python -m pytest tests/unit/test_llm_openai_compatible.py -v)"
     ],
     "additionalDirectories": [
       "/Users/erik",

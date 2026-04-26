@@ -126,7 +126,12 @@ Copy `.env.example` to `.env` and fill in your values.
 | Variable | Required | Description |
 |---|---|---|
 | `ENCRYPTION_KEY` | Yes | Fernet key — generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
-| `ANTHROPIC_API_KEY` | Yes* | Anthropic API key (for Research Chat, News Digest, Investment Search, Story Checker, Fundamental Analyzer, Structural Change Scanner, Consensus Gap Analysis) |
+| `LLM_API_KEY` | Yes* | API key for the cloud LLM provider (Anthropic Claude, or ANTHROPIC_API_KEY for backward compat) |
+| `LLM_BASE_URL` | Optional | Custom endpoint for LLM (e.g. OpenRouter). Default: empty = Anthropic direkt |
+| `LLM_DEFAULT_MODEL` | Optional | Model override for public (cloud) agents. Default: empty = claude-haiku-4-5-20251001 |
+| `OPENAI_API_KEY` | Optional* | API key for OpenAI-compatible provider (Perplexity Sonar, Groq, Together, etc.) |
+| `OPENAI_BASE_URL` | Optional | Endpoint URL for OpenAI-compatible provider (e.g. https://api.perplexity.ai) |
+| `OPENAI_MODELS` | Optional | Komma-separated list of models for Settings dropdown (e.g. `sonar,sonar-pro`) |
 | `OLLAMA_HOST` | Optional | Default: `http://localhost:11434` |
 | `OLLAMA_MODEL` | Optional | Default model for Portfolio Chat and Portfolio Story (overridable in Settings UI) |
 | `TAVILY_API_KEY` | Optional | Tavily search — replaces Anthropic's built-in web_search when set. Free tier: 1000 searches/month |
@@ -136,9 +141,22 @@ Copy `.env.example` to `.env` and fill in your values.
 | `LOG_LEVEL` | Optional | Logging level: DEBUG, INFO (default), WARNING, ERROR, CRITICAL |
 | `BASE_CURRENCY` | Optional | Currency for display: EUR (default), CHF, GBP, USD, JPY |
 
-*`ANTHROPIC_API_KEY` is required to use Research Chat, News Digest, Investment Search, Story Checker, Fundamental Analyzer, Structural Change Scanner, or Consensus Gap Analysis.
+*`LLM_API_KEY` is required for Research Chat, News Digest, Investment Search, Story Checker, Fundamental Analyzer, Structural Change Scanner, Consensus Gap Analysis — unless `OPENAI_BASE_URL` is configured, in which case `OPENAI_API_KEY` is used instead.
 
 **Note on model choice:** Claude Sonnet (or better) is required for agents that use `web_search` (Structural Change Scanner, Consensus Gap Analysis). Claude Haiku works for Research Chat, News Digest, Story Checker, and Fundamental Analyzer.
+
+### Provider Switch
+
+By default, cloud agents use Anthropic Claude. To switch all cloud agents to an OpenAI-compatible provider (Perplexity Sonar, Groq, Together, etc.), set:
+
+```env
+OPENAI_API_KEY=pplx-...
+OPENAI_BASE_URL=https://api.perplexity.ai
+OPENAI_MODELS=sonar,sonar-pro,sonar-reasoning
+LLM_DEFAULT_MODEL=sonar
+```
+
+The Settings page will automatically show "OpenAI-compatible 🌐" instead of "Claude ☁️". Cloud agents route through the OpenAI provider; local agents (Ollama) are unaffected. This requires no code changes — configuration only.
 
 ### Multi-Environment Setup
 
