@@ -166,7 +166,7 @@ with col_s1:
 with col_s2:
     sel_consensus = _public_sel("consensus_gap", t("settings.agent_consensus_gap"))
 with col_s3:
-    sel_fundamental = _public_sel("fundamental", t("settings.agent_fundamental"))
+    sel_fundamental = _public_sel("fundamental_analyzer", t("settings.agent_fundamental"))
 
 if st.button(t("settings.save_models_button"), key="_save_models_btn", use_container_width=False):
     app_config.set("model_ollama_portfolio", sel_portfolio)
@@ -178,7 +178,7 @@ if st.button(t("settings.save_models_button"), key="_save_models_btn", use_conta
     app_config.set(f"model_{_PUBLIC_TYPE}_storychecker", sel_storychecker)
     app_config.set(f"model_{_PUBLIC_TYPE}_structural_scan", sel_structural)
     app_config.set(f"model_{_PUBLIC_TYPE}_consensus_gap", sel_consensus)
-    app_config.set(f"model_{_PUBLIC_TYPE}_fundamental", sel_fundamental)
+    app_config.set(f"model_{_PUBLIC_TYPE}_fundamental_analyzer", sel_fundamental)
     st.cache_resource.clear()
     st.success(t("settings.models_saved"))
 
