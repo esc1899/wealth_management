@@ -256,6 +256,21 @@ with col_right:
                     st.caption(_a.created_at.strftime("%d.%m.%Y %H:%M"))
                 if _a.summary:
                     st.caption(_a.summary)
+
+                # Inline history expander
+                _history = [
+                    a for a in analyses_repo.get_for_position(_p.id, limit=20)
+                    if a.agent == "storychecker"
+                ]
+                if len(_history) > 1:
+                    with st.expander(f"{t('storychecker.verdict_history')} ({len(_history) - 1})", expanded=False):
+                        for _h in _history[1:]:
+                            _icon = verdict_icon(_h.verdict or "unknown", _VERDICT_CONFIG)
+                            _date_str = _h.created_at.strftime("%d.%m.%Y") if _h.created_at else "—"
+                            st.markdown(f"{_icon} **{_date_str}**")
+                            if _h.summary:
+                                st.caption(_h.summary)
+
                 st.divider()
         else:
             st.info(t("storychecker.select_to_start"))

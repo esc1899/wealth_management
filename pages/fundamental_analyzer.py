@@ -9,6 +9,7 @@ import asyncio
 import logging
 import threading
 import time
+from datetime import datetime
 
 import streamlit as st
 
@@ -243,36 +244,38 @@ with col_right:
         # Show batch results if available
         if _current_verdicts:
             st.subheader("Aktuelle Ergebnisse")
-            _positions_sorted = sorted(positions_with_required_fields, key=lambda p: p.name.lower())
-            for _pos in _positions_sorted:
-                _analysis = _current_verdicts.get(_pos.id)
-                if _analysis:
-                    _verdict = _analysis.verdict or "unknown"
-                    _icon = verdict_icon(_verdict, _VERDICT_CONFIG)
-                    st.markdown(f"{_icon} **{_pos.name}**")
-                    if _analysis.created_at:
-                        st.caption(_analysis.created_at.strftime("%d.%m.%Y %H:%M"))
-                    if _analysis.summary:
-                        st.caption(_analysis.summary)
-            st.divider()
+            _verdicts_with_pos = [
+                (_p, _current_verdicts[_p.id])
+                for _p in positions_with_required_fields
+                if _p.id in _current_verdicts
+            ]
+            _verdicts_with_pos.sort(key=lambda x: x[1].created_at or datetime.min, reverse=True)
 
-        st.subheader("Ältere Tests")
-        _positions_sorted = sorted(positions_with_required_fields, key=lambda p: p.name.lower())
-        for _pos in _positions_sorted:
-            _past_analyses = [
-                a for a in analyses_repo.get_for_position(_pos.id, limit=20)
-                if a.agent == "fundamental"
-            ][:5]
-            if _past_analyses:
-                with st.expander(f"📊 {_pos.name}", expanded=False):
-                    for _a in _past_analyses:
-                        _icon = verdict_icon(_a.verdict or "unknown", _VERDICT_CONFIG)
-                        _date_str = _a.created_at.strftime("%d.%m.%Y") if _a.created_at else "—"
-                        st.markdown(f"{_icon} **{_date_str}**")
-                        if _a.summary:
-                            st.caption(_a.summary)
+            for _pos, _analysis in _verdicts_with_pos:
+                _verdict = _analysis.verdict or "unknown"
+                _icon = verdict_icon(_verdict, _VERDICT_CONFIG)
+                st.markdown(f"{_icon} **{_pos.name}**")
+                if _analysis.created_at:
+                    st.caption(_analysis.created_at.strftime("%d.%m.%Y %H:%M"))
+                if _analysis.summary:
+                    st.caption(_analysis.summary)
 
-        if not _current_verdicts:
+                # Inline history expander
+                _history = [
+                    a for a in analyses_repo.get_for_position(_pos.id, limit=20)
+                    if a.agent == "fundamental"
+                ]
+                if len(_history) > 1:
+                    with st.expander(f"{t('storychecker.verdict_history')} ({len(_history) - 1})", expanded=False):
+                        for _h in _history[1:]:
+                            _icon = verdict_icon(_h.verdict or "unknown", _VERDICT_CONFIG)
+                            _date_str = _h.created_at.strftime("%d.%m.%Y") if _h.created_at else "—"
+                            st.markdown(f"{_icon} **{_date_str}**")
+                            if _h.summary:
+                                st.caption(_h.summary)
+
+                st.divider()
+        else:
             st.info(t("fundamental.select_prompt"))
     else:
         session = agent.get_session(session_id)
