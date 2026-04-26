@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 from config import config
 from core.health import Severity, check_ollama_connectivity, run_static_checks
 from core.i18n import SUPPORTED_LANGUAGES, current_language, set_language, t
+from core.llm.claude import fetch_available_models as _fetch_claude_models
 from core.storage.models import ScheduledJob
 from state import get_agent_scheduler, get_app_config_repo, get_scheduled_jobs_repo
 
@@ -84,7 +85,15 @@ app_config = get_app_config_repo()
 
 st.subheader(t("settings.model_selection_header"))
 
-_CLAUDE_MODELS = config.CLAUDE_MODELS
+# Fetch available Claude models from Anthropic API, fallback to config
+@st.cache_resource(ttl=3600)
+def _get_claude_model_list() -> list[str]:
+    if not config.LLM_API_KEY:
+        return config.CLAUDE_MODELS
+    models = _fetch_claude_models(config.LLM_API_KEY, config.LLM_BASE_URL)
+    return models if models else config.CLAUDE_MODELS
+
+_CLAUDE_MODELS = _get_claude_model_list()
 
 # Detect if OpenAI-compatible provider is active
 _OPENAI_ACTIVE = bool(config.OPENAI_BASE_URL)

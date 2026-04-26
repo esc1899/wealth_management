@@ -33,6 +33,19 @@ _OUTPUT_COMPILED_PATTERNS = [
 DEFAULT_MODEL = CLAUDE_SONNET
 
 
+def fetch_available_models(api_key: str, base_url: str = "") -> list[str]:
+    """Fetch available Claude models from Anthropic API. Returns empty list on error."""
+    try:
+        kwargs = {"api_key": api_key}
+        if base_url:
+            kwargs["base_url"] = base_url
+        client = anthropic.Anthropic(**kwargs)
+        return [m.id for m in client.models.list()]
+    except Exception as e:
+        _logger.debug("Anthropic model discovery failed: %s", e)
+        return []
+
+
 @dataclass
 class ClaudeToolCall:
     id: str
