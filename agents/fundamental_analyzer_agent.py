@@ -10,11 +10,13 @@ Sessions are stored in memory (Streamlit session_state), verdicts in position_an
 """
 
 from __future__ import annotations
+import asyncio
 import logging
 
 import re
 from typing import List, Optional, Tuple, Dict, Any
 
+from core.llm.base import Message, Role
 from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.models import PublicPosition
@@ -228,11 +230,11 @@ class FundamentalAnalyzerAgent:
         # Build system prompt with language instruction
         system = BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(session.language)
 
-        # Call async chat method with system= kwarg
+        # Prepend system message (both providers handle Role.SYSTEM correctly)
+        system_msg = Message(role=Role.SYSTEM, content=system)
         response = asyncio.run(
             self._llm.chat(
-                messages=messages,
-                system=system,
+                messages=[system_msg] + messages,
                 max_tokens=4096,
             )
         )
@@ -266,12 +268,11 @@ Welche Dimensionen sollten wir in der Tiefe analysieren?
 
 Gib eine prägnante, fokussierte Agenda (4–6 Punkte).
 """
-        # Simple LLM call without session context
-        response = await self._llm.chat(
-            messages=[{"role": "user", "content": prompt}],
+        return await self._llm.complete(
+            prompt,
             system="Du bist ein Investmentanalyst. Antworte auf Deutsch.",
+            max_tokens=512,
         )
-        return response
 
 
 # ------------------------------------------------------------------

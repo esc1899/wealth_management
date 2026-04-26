@@ -139,14 +139,21 @@
       "Bash(python -m pytest tests/unit/test_search_agent.py -xvs)",
       "Bash(python -m pytest tests/unit/test_search_agent.py -q)",
       "Bash(python -m pytest tests/integration/test_watchlist_checker_ui.py::TestPageLoadability::test_dashboard_page_loads -v)",
-      "Bash(python -m pytest tests/unit/test_llm_openai_compatible.py -v)"
+      "Bash(python -m pytest tests/unit/test_llm_openai_compatible.py -v)",
+      "Bash(python -c \"from config import config; print\\(f'OPENAI_API_KEY: {bool\\(config.OPENAI_API_KEY\\)}'\\); print\\(f'OPENAI_BASE_URL: {config.OPENAI_BASE_URL}'\\); print\\(f'OPENAI_MODELS: {config.OPENAI_MODELS}'\\)\")",
+      "Bash(kill 737)",
+      "Bash(nohup .venv/bin/streamlit run app.py --server.headless=true --server.port=6655 --server.address=localhost)",
+      "Bash(python -c \"import urllib.request; urllib.request.urlopen\\('http://localhost:6655/_stcore/health'\\)\")",
+      "Bash(pkill -9 -f \"streamlit run app.py\")",
+      "Bash(python -m pytest tests/unit/test_llm_openai_compatible.py::TestChatWithTools::test_response_object_structure -xvs)"
     ],
     "additionalDirectories": [
       "/Users/erik",
       "/Applications/Wealth Management.app/Contents/MacOS",
       "/Users/erik/Projects/wealth_management/monitoring",
       "/Users/erik/Projects/wealth_management",
-      "/Users/erik/Projects/wealth_management/htmlcov"
+      "/Users/erik/Projects/wealth_management/htmlcov",
+      "/private/tmp"
     ]
   }
 }

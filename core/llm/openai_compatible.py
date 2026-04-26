@@ -78,6 +78,41 @@ class OpenAICompatibleProvider(LLMProvider):
         self._client = AsyncOpenAI(api_key=api_key, base_url=base_url or None)
         self._model = model
 
+    def _normalize_messages(self, messages: list[dict]) -> list[dict]:
+        """
+        Normalize messages for OpenAI API, converting Anthropic multi-turn format.
+
+        Handles:
+        - Unwrap OAI assistant message from raw_blocks list
+        - Convert Anthropic tool_result → OpenAI role=tool messages
+        """
+        result = []
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content")
+
+            # Unwrap OAI assistant message stored in raw_blocks list
+            if role == "assistant" and isinstance(content, list) and content:
+                first = content[0]
+                if isinstance(first, dict) and first.get("role") == "assistant":
+                    result.append(first)
+                    continue
+
+            # Convert Anthropic tool_result → OpenAI role=tool messages
+            if role == "user" and isinstance(content, list) and content:
+                first = content[0]
+                if isinstance(first, dict) and first.get("type") == "tool_result":
+                    for item in content:
+                        result.append({
+                            "role": "tool",
+                            "tool_call_id": item["tool_use_id"],
+                            "content": str(item["content"]),
+                        })
+                    continue
+
+            result.append(msg)
+        return result
+
     async def chat(
         self,
         messages: list[Message],
@@ -117,6 +152,9 @@ class OpenAICompatibleProvider(LLMProvider):
         For other providers: full function calling support.
         """
         import time
+
+        # Normalize Anthropic multi-turn format → OpenAI format
+        messages = self._normalize_messages(messages)
 
         oai_tools = _to_openai_tools(tools)
         oai_messages = [{"role": "system", "content": system}] if system else []
@@ -158,9 +196,22 @@ class OpenAICompatibleProvider(LLMProvider):
                 self.position_count,
             )
 
+        # Build OAI-format assistant message for multi-turn compatibility
+        oai_assistant_msg: dict = {"role": "assistant", "content": msg.content or None}
+        if tool_calls:
+            oai_assistant_msg["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {"name": tc.name, "arguments": json.dumps(tc.input)},
+                }
+                for tc in tool_calls
+            ]
+
         stop_reason = "tool_use" if tool_calls else "end_turn"
         return _OAIResponse(
             content=msg.content or "",
             tool_calls=tool_calls,
             stop_reason=stop_reason,
+            raw_blocks=[oai_assistant_msg],
         )

@@ -404,7 +404,11 @@ class TestChatWithTools:
         assert result.content == "searching"
         assert result.stop_reason == "tool_use"
         assert result.has_tool_calls is True
-        assert len(result.raw_blocks) == 0
+        # raw_blocks contains OAI-format assistant message for multi-turn compatibility
+        assert len(result.raw_blocks) == 1
+        assert result.raw_blocks[0]["role"] == "assistant"
+        assert result.raw_blocks[0]["content"] == "searching"
+        assert "tool_calls" in result.raw_blocks[0]
 
     @pytest.mark.asyncio
     async def test_multiple_tool_calls(self, provider):
