@@ -206,8 +206,6 @@ class ConsensusGapAgent:
             if p.ticker:
                 lines.append(f"**Ticker:** {p.ticker}")
             lines.append(f"**Asset-Klasse:** {p.asset_class}")
-            if p.purchase_date:
-                lines.append(f"**Kaufdatum:** {p.purchase_date.isoformat()}")
             lines.append(f"**Investment-These (Story):**\n{p.story}")
             lines.append("")
         return "\n".join(lines)
