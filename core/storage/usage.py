@@ -270,9 +270,11 @@ def compute_cost(
     output_tokens: float,
     model: str,
     model_prices: dict,
+    cache_read_tokens: Optional[float] = None,
+    cache_write_tokens: Optional[float] = None,
 ) -> float:
     """Cost in EUR/USD (same unit as prices dict) for given token counts."""
-    return _compute_cost(input_tokens, output_tokens, model, model_prices)
+    return _compute_cost(input_tokens, output_tokens, model, model_prices, cache_read_tokens, cache_write_tokens)
 
 
 def _compute_cost(
