@@ -152,7 +152,12 @@
       "Bash(sqlite3 /Users/erik/Projects/wealth_management/data/portfolio.db)",
       "Bash(python -m pytest tests/unit/test_llm_openai_compatible.py::TestChat::test_on_usage_callback_fires tests/unit/test_llm_openai_compatible.py::TestChatWithTools::test_on_usage_callback_with_duration -xvs)",
       "Bash(python -c \"import streamlit.web.cli as streamlit_cli; streamlit_cli.main\\(\\)\" --version)",
-      "Bash(python -m py_compile /Users/erik/Projects/wealth_management/pages/consensus_gap.py /Users/erik/Projects/wealth_management/pages/fundamental_analyzer.py)"
+      "Bash(python -m py_compile /Users/erik/Projects/wealth_management/pages/consensus_gap.py /Users/erik/Projects/wealth_management/pages/fundamental_analyzer.py)",
+      "Read(//private/var/log/**)",
+      "Bash(python -m py_compile /Users/erik/Projects/wealth_management/pages/consensus_gap.py)",
+      "Read(//private/var/folders/**)",
+      "Bash(git -C /Users/erik/Projects/wealth_management log --oneline -5)",
+      "Bash(nohup /Users/erik/Projects/wealth_management/.venv/bin/streamlit run app.py --server.headless=true --server.port=6655 --server.address=localhost)"
     ],
     "additionalDirectories": [
       "/Users/erik",

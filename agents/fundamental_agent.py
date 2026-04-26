@@ -203,10 +203,6 @@ class FundamentalAgent:
             lines.append(f"**Asset-Klasse:** {p.asset_class}")
             if p.anlageart:
                 lines.append(f"**Anlage-Art:** {p.anlageart}")
-            if p.purchase_price:
-                lines.append(f"**Kaufpreis:** {p.purchase_price:.2f} {symbol()}")
-            if p.purchase_date:
-                lines.append(f"**Kaufdatum:** {p.purchase_date.isoformat()}")
             if p.story:
                 lines.append(f"**Investment-These:** {p.story}")
             lines.append("")

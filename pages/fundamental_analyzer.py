@@ -41,7 +41,7 @@ with st.expander(t("fundamental.how_to_use"), expanded=False):
 # ------------------------------------------------------------------
 
 all_positions = portfolio_service.get_public_positions(
-    include_portfolio=True, include_watchlist=True
+    include_portfolio=True, include_watchlist=True, require_ticker=True
 )
 positions_with_required_fields = [p for p in all_positions if p.name]
 
