@@ -65,9 +65,16 @@ def render_verdict_legend(config: Dict[str, Tuple[str, str]]) -> None:
 
 def cloud_notice(model: str, provider: str = "claude") -> None:
     """Render standardized cloud/local notice."""
+    from config import config
+    if provider != "ollama" and config.OPENAI_BASE_URL:
+        provider = "openai"
+
     if provider == "ollama":
         location = "lokal"
         emoji = "🏠"
+    elif provider == "openai":
+        location = "Cloud (OpenAI-kompatibel)"
+        emoji = "🌐"
     else:
         location = "Claude API (Cloud)"
         emoji = "☁️"

@@ -55,9 +55,13 @@ def _make_ollama_provider(model: str, agent_name: str, timeout: float = 120.0) -
 def _get_agent_model(agent_key: str, model_type: str, default: str) -> str:
     """Return model for a specific agent. Falls back to global setting then env default."""
     repo = get_app_config_repo()
+    if model_type == "openai":
+        env_default = config.LLM_DEFAULT_MODEL or (config.OPENAI_MODELS[0] if config.OPENAI_MODELS else "")
+    else:
+        env_default = config.LLM_DEFAULT_MODEL
     return (
         repo.get(f"model_{model_type}_{agent_key}")
         or repo.get(f"model_{model_type}")
-        or (config.LLM_DEFAULT_MODEL if model_type == "claude" else "")
+        or env_default
         or default
     )
