@@ -13,7 +13,7 @@ import time
 import streamlit as st
 
 from core.i18n import t, current_language
-from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon, cloud_notice
+from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon, verdict_badge, render_verdict_legend, cloud_notice
 from state import (
     get_analyses_repo,
     get_consensus_gap_agent,
@@ -106,7 +106,9 @@ if st.session_state.pop("_auto_run_consensus_gap", False) and _pending and not _
 if not _skills:
     st.warning(t("consensus_gap.no_skills"))
 else:
-    with st.expander(t("consensus_gap.batch_header"), expanded=False):
+    _skill_options = {s.name: s for s in _skills}
+
+    with st.expander(t("consensus_gap.batch_header"), expanded=True):
         _only_pending = st.checkbox(
             t("consensus_gap.batch_only_pending"),
             value=True,
@@ -120,7 +122,6 @@ else:
             )
         )
 
-        _skill_options = {s.name: s for s in _skills}
         _sel_skill_name = st.selectbox(
             t("consensus_gap.skill_label"),
             options=list(_skill_options.keys()),
@@ -137,10 +138,7 @@ else:
         ):
             _sel_skill = _skill_options[_sel_skill_name]
             _lang = current_language()
-            _BATCH["running"] = True
-            _BATCH["done"] = False
-            _BATCH["error"] = None
-            _BATCH["last_error"] = None
+            _BATCH.update({"running": True, "done": False, "error": None, "last_error": None})
             threading.Thread(
                 target=_run_batch_background,
                 args=(_agent, _target_positions, _sel_skill.name, _sel_skill.prompt, _lang, _BATCH),
@@ -156,7 +154,7 @@ if _BATCH["running"]:
 if _BATCH["done"]:
     if _BATCH["error"]:
         logger = logging.getLogger(__name__)
-        logger.error("Batch error details: %s", _BATCH['error'])
+        logger.error("Batch error: %s", _BATCH["error"])
         st.error("❌ Der Batch-Lauf ist fehlgeschlagen. Bitte versuchen Sie es später erneut.")
     else:
         msg = f"✅ {_BATCH['count']} {t('consensus_gap.batch_done')}"
@@ -168,70 +166,146 @@ if _BATCH["done"]:
 
 if _BATCH["last_error"] and not _BATCH["running"]:
     logger = logging.getLogger(__name__)
-    logger.error("Last batch error details: %s", _BATCH['last_error'])
+    logger.error("Last batch error: %s", _BATCH["last_error"])
     st.error("❌ Letzter Batch-Lauf fehlgeschlagen. Bitte versuchen Sie es später erneut.")
 
 st.divider()
 
 # ------------------------------------------------------------------
-# Layout: left current results | right older tests
+# Layout: left selector + list | right detail view
 # ------------------------------------------------------------------
 
 col_left, col_right = st.columns([0.8, 2.2], gap="medium")
 
+_eligible_sorted = sorted(_eligible, key=lambda p: p.name.lower())
+pos_labels = [
+    f"{p.name} ({p.ticker})" if p.ticker else p.name
+    for p in _eligible_sorted
+]
+
 # ------------------------------------------------------------------
-# Left: current verdicts summary
+# Left: position selector + single-run + past verdict list
 # ------------------------------------------------------------------
 
 with col_left:
-    st.subheader(t("consensus_gap.positions_header"))
+    st.subheader(t("storychecker.new_check"))
 
-    _eligible_sorted = sorted(_eligible, key=lambda p: p.name.lower())
+    if not _skills:
+        st.warning(t("consensus_gap.no_skills"))
+    else:
+        with st.form("cgap_single_form"):
+            _sel_idx = st.selectbox(
+                t("storychecker.pick_position"),
+                options=range(len(_eligible_sorted)),
+                format_func=lambda i: pos_labels[i],
+            )
+            _sel_pos = _eligible_sorted[_sel_idx]
+            _single_skill_name = st.selectbox(
+                t("consensus_gap.skill_label"),
+                options=list(_skill_options.keys()),
+                key="_cgap_single_skill",
+            )
+            _single_submitted = st.form_submit_button(
+                t("consensus_gap.run_button"),
+                use_container_width=True,
+                type="primary",
+            )
 
-    for _pos in _eligible_sorted:
-        _analysis = _current_verdicts.get(_pos.id)
-        _verdict = _analysis.verdict if _analysis else None
-        _icon = verdict_icon(_verdict or "unknown", _VERDICT_CONFIG)
+        if _sel_pos.story:
+            with st.expander(t("consensus_gap.show_story"), expanded=False):
+                st.markdown(_sel_pos.story)
 
-        with st.container(border=True):
-            st.markdown(f"{_icon} **{_pos.name}**" + (f" · {_pos.ticker}" if _pos.ticker else ""))
-            st.caption(f"{_pos.asset_class}" + (f" · {_pos.anlageart}" if _pos.anlageart else ""))
+        if st.session_state.get("_cgap_single_error"):
+            logger = logging.getLogger(__name__)
+            logger.error("Single analysis error: %s", st.session_state["_cgap_single_error"])
+            st.error("⚠️ Die Analyse konnte nicht gestartet werden.")
+            del st.session_state["_cgap_single_error"]
 
-            if _verdict:
-                if _analysis and _analysis.created_at:
-                    st.caption(_analysis.created_at.strftime("%d.%m.%Y"))
-                if _analysis and _analysis.summary:
-                    st.caption(_analysis.summary)
-            else:
-                st.caption(t("consensus_gap.not_yet_analyzed"))
+        if _single_submitted:
+            with st.spinner(t("storychecker.thinking")):
+                _single_skill = _skill_options[_single_skill_name]
+                try:
+                    _loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(_loop)
+                    try:
+                        _loop.run_until_complete(
+                            _agent.analyze_portfolio(
+                                positions=[_sel_pos],
+                                skill_name=_single_skill.name,
+                                skill_prompt=_single_skill.prompt,
+                                language=current_language(),
+                            )
+                        )
+                    finally:
+                        _loop.close()
+                    st.session_state["cgap_selected_id"] = _sel_pos.id
+                except Exception as exc:
+                    st.session_state["_cgap_single_error"] = str(exc)
+            st.rerun()
+
+        st.divider()
+        st.subheader(t("storychecker.past_checks"))
+
+        _analyzed = [p for p in _eligible_sorted if p.id in _current_verdicts]
+        if not _analyzed:
+            st.info(t("storychecker.no_checks"))
+        else:
+            for _p in _analyzed:
+                _a = _current_verdicts[_p.id]
+                _icon = verdict_icon(_a.verdict or "unknown", _VERDICT_CONFIG)
+                _date_str = _a.created_at.strftime("%d.%m. %H:%M") if _a.created_at else ""
+                _active = st.session_state.get("cgap_selected_id") == _p.id
+                if st.button(
+                    f"{_icon} **{_p.name}**  \n{_date_str}",
+                    key=f"cgap_pos_{_p.id}",
+                    use_container_width=True,
+                    type="primary" if _active else "secondary",
+                ):
+                    st.session_state["cgap_selected_id"] = _p.id
+                    st.rerun()
 
 # ------------------------------------------------------------------
-# Right: older analyses per position
+# Right: detail view for selected position
 # ------------------------------------------------------------------
 
 with col_right:
-    st.subheader("Ältere Tests")
+    _sel_id = st.session_state.get("cgap_selected_id")
 
-    for _pos in _eligible_sorted:
-        _past_analyses = _analyses_repo.get_for_position(_pos.id, agent="consensus_gap", limit=5)
-        if _past_analyses:
-            with st.expander(f"📊 {_pos.name}", expanded=False):
-                for _a in _past_analyses:
-                    _icon = verdict_icon(_a.verdict or "unknown", _VERDICT_CONFIG)
-                    _date_str = _a.created_at.strftime("%d.%m.%Y") if _a.created_at else "—"
-                    st.markdown(f"{_icon} **{_date_str}**")
-                    if _a.summary:
-                        st.caption(_a.summary)
+    if _sel_id is None:
+        st.info(t("storychecker.select_to_start"))
+    else:
+        _detail_pos = next((p for p in _eligible if p.id == _sel_id), None)
+        if _detail_pos is None:
+            st.session_state.pop("cgap_selected_id", None)
+        else:
+            _latest = _current_verdicts.get(_sel_id) or _analyses_repo.get_latest(_sel_id, agent="consensus_gap")
+
+            st.markdown(f"### {_detail_pos.name}")
+            if _detail_pos.ticker:
+                st.caption(f"`{_detail_pos.ticker}`")
+
+            if _latest:
+                st.markdown(verdict_badge(_latest.verdict or "unknown", _VERDICT_CONFIG))
+                if _latest.created_at:
+                    st.caption(_latest.created_at.strftime("%d.%m.%Y %H:%M"))
+                if _latest.summary:
+                    st.markdown(_latest.summary)
+            else:
+                st.caption(t("consensus_gap.not_yet_analyzed"))
+
+            # Verdict history
+            _history = [
+                a for a in _analyses_repo.get_for_position(_sel_id, limit=20)
+                if a.agent == "consensus_gap"
+            ]
+            if len(_history) > 1:
+                with st.expander(t("storychecker.verdict_history"), expanded=False):
+                    for _a in _history[1:]:  # skip the latest (already shown)
+                        _icon = verdict_icon(_a.verdict or "unknown", _VERDICT_CONFIG)
+                        _date_str = _a.created_at.strftime("%d.%m.%Y") if _a.created_at else "—"
+                        st.markdown(f"{_icon} **{_date_str}**")
+                        if _a.summary:
+                            st.caption(_a.summary)
 
 st.divider()
-
-# ------------------------------------------------------------------
-# Legend
-# ------------------------------------------------------------------
-
-st.subheader(t("consensus_gap.legend_header"))
-for _verdict_key in ["verdict_waechst", "verdict_stabil", "verdict_schliesst", "verdict_eingeholt"]:
-    _icon = verdict_icon(_verdict_key, _VERDICT_CONFIG)
-    _label = t(f"consensus_gap.{_verdict_key}")
-    _desc = t(f"consensus_gap.legend_{_verdict_key.replace('verdict_', '')}")
-    st.markdown(f"{_icon} **{_label}**: {_desc}")
+render_verdict_legend(_VERDICT_CONFIG)

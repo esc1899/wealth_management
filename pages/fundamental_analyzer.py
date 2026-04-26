@@ -31,7 +31,7 @@ analyses_repo = get_analyses_repo()
 portfolio_service = get_portfolio_service()
 cloud_notice(agent.model)
 
-_VERDICT_CONFIG = VERDICT_CONFIGS.get("fundamental", {})
+_VERDICT_CONFIG = VERDICT_CONFIGS.get("fundamental_analyzer", {})
 
 with st.expander(t("fundamental.how_to_use"), expanded=False):
     st.markdown(t("fundamental.how_to_use_text"))
@@ -258,7 +258,10 @@ with col_right:
         st.subheader("Ältere Tests")
         _positions_sorted = sorted(positions_with_required_fields, key=lambda p: p.name.lower())
         for _pos in _positions_sorted:
-            _past_analyses = analyses_repo.get_for_position(_pos.id, agent="fundamental", limit=5)
+            _past_analyses = [
+                a for a in analyses_repo.get_for_position(_pos.id, limit=20)
+                if a.agent == "fundamental"
+            ][:5]
             if _past_analyses:
                 with st.expander(f"📊 {_pos.name}", expanded=False):
                     for _a in _past_analyses:
