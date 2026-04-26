@@ -11,7 +11,7 @@ Purpose: Prevent hardcoded model strings scattered across codebase (DEBT-3).
 
 CLAUDE_HAIKU = "claude-haiku-4-5-20251001"
 CLAUDE_SONNET = "claude-sonnet-4-6"
-CLAUDE_OPUS = "claude-opus-4-6"
+CLAUDE_OPUS = "claude-opus-4-7"
 
 # Per-agent default models (based on cost/capability trade-offs)
 CLAUDE_MODEL_DEFAULTS = {
