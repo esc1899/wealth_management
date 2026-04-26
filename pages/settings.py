@@ -86,6 +86,11 @@ st.subheader(t("settings.model_selection_header"))
 
 _CLAUDE_MODELS = config.CLAUDE_MODELS
 
+# Detect if OpenAI-compatible provider is active
+_OPENAI_ACTIVE = bool(config.OPENAI_BASE_URL)
+_PUBLIC_MODELS = config.OPENAI_MODELS if _OPENAI_ACTIVE else _CLAUDE_MODELS
+_PUBLIC_TYPE = "openai" if _OPENAI_ACTIVE else "claude"
+
 # Fetch available Ollama models
 import requests as _requests
 
@@ -115,6 +120,20 @@ def _claude_sel(agent_key: str, label: str) -> str:
     idx = _CLAUDE_MODELS.index(saved) if saved in _CLAUDE_MODELS else 0
     return st.selectbox(label, options=_CLAUDE_MODELS, index=idx, key=f"_model_claude_{agent_key}")
 
+def _public_sel(agent_key: str, label: str) -> str:
+    saved = (
+        app_config.get(f"model_{_PUBLIC_TYPE}_{agent_key}")
+        or app_config.get(f"model_{_PUBLIC_TYPE}")
+        or (_PUBLIC_MODELS[0] if _PUBLIC_MODELS else "")
+    )
+    idx = _PUBLIC_MODELS.index(saved) if saved in _PUBLIC_MODELS else 0
+    return st.selectbox(
+        label,
+        options=_PUBLIC_MODELS or ["(configure OPENAI_MODELS)" if _OPENAI_ACTIVE else "(no models)"],
+        index=idx,
+        key=f"_model_{_PUBLIC_TYPE}_{agent_key}"
+    )
+
 st.markdown(f"**{t('settings.ollama_agents_header')}** 🔒")
 col_o1, col_o2, col_o3 = st.columns(3)
 with col_o1:
@@ -128,35 +147,38 @@ col_o4, _ = st.columns([1, 2])
 with col_o4:
     sel_portfolio_comment = _ollama_sel("portfolio_comment", "💬 KI-Kommentare")
 
-st.markdown(f"**{t('settings.claude_agents_header')}** ☁️")
+_provider_icon = "🌐" if _OPENAI_ACTIVE else "☁️"
+_provider_label = t('settings.claude_agents_header') if not _OPENAI_ACTIVE else "OpenAI-compatible"
+
+st.markdown(f"**{_provider_label}** {_provider_icon}")
 col_c1, col_c2, col_c3 = st.columns(3)
 with col_c1:
-    sel_news = _claude_sel("news", t("settings.agent_news"))
+    sel_news = _public_sel("news", t("settings.agent_news"))
 with col_c2:
-    sel_search = _claude_sel("search", t("settings.agent_search"))
+    sel_search = _public_sel("search", t("settings.agent_search"))
 with col_c3:
-    sel_storychecker = _claude_sel("storychecker", t("settings.agent_storychecker"))
+    sel_storychecker = _public_sel("storychecker", t("settings.agent_storychecker"))
 
-st.markdown(f"**{t('settings.claude_strategy_header')}** ☁️")
+st.markdown(f"**{_provider_label} Strategy** {_provider_icon}")
 col_s1, col_s2, col_s3 = st.columns(3)
 with col_s1:
-    sel_structural = _claude_sel("structural_scan", t("settings.agent_structural_scan"))
+    sel_structural = _public_sel("structural_scan", t("settings.agent_structural_scan"))
 with col_s2:
-    sel_consensus = _claude_sel("consensus_gap", t("settings.agent_consensus_gap"))
+    sel_consensus = _public_sel("consensus_gap", t("settings.agent_consensus_gap"))
 with col_s3:
-    sel_fundamental = _claude_sel("fundamental", t("settings.agent_fundamental"))
+    sel_fundamental = _public_sel("fundamental", t("settings.agent_fundamental"))
 
 if st.button(t("settings.save_models_button"), key="_save_models_btn", use_container_width=False):
     app_config.set("model_ollama_portfolio", sel_portfolio)
     app_config.set("model_ollama_portfolio_story", sel_portfolio_story)
     app_config.set("model_ollama_watchlist_checker", sel_watchlist_checker)
     app_config.set("model_ollama_portfolio_comment", sel_portfolio_comment)
-    app_config.set("model_claude_news", sel_news)
-    app_config.set("model_claude_search", sel_search)
-    app_config.set("model_claude_storychecker", sel_storychecker)
-    app_config.set("model_claude_structural_scan", sel_structural)
-    app_config.set("model_claude_consensus_gap", sel_consensus)
-    app_config.set("model_claude_fundamental", sel_fundamental)
+    app_config.set(f"model_{_PUBLIC_TYPE}_news", sel_news)
+    app_config.set(f"model_{_PUBLIC_TYPE}_search", sel_search)
+    app_config.set(f"model_{_PUBLIC_TYPE}_storychecker", sel_storychecker)
+    app_config.set(f"model_{_PUBLIC_TYPE}_structural_scan", sel_structural)
+    app_config.set(f"model_{_PUBLIC_TYPE}_consensus_gap", sel_consensus)
+    app_config.set(f"model_{_PUBLIC_TYPE}_fundamental", sel_fundamental)
     st.cache_resource.clear()
     st.success(t("settings.models_saved"))
 
