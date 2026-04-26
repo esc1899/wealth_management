@@ -215,6 +215,46 @@ async def chat_with_tools(messages, tools, ...) -> ProviderResponse
 
 ---
 
+## UI Patterns
+
+### Agent Analysis Pages (Unified Design — FEAT-19)
+
+**Storychecker, Consensus Gap, Fundamental Analyzer** follow a consistent pattern:
+
+```
+┌─ Help Expander ("Was ist X?")
+├─ Batch Section
+│  ├─ Only-Pending Checkbox (filter to positions without verdict)
+│  ├─ Total/Pending Count (N positions, M pending)
+│  ├─ Skill Selector (Consensus Gap, Fundamental)
+│  └─ Run All Button (starts background thread)
+├─ Divider
+└─ 2-Column Layout
+   ├─ Left (0.8): Current Results
+   │  └─ Card per position (icon, name, verdict, date, summary)
+   └─ Right (2.2): Older Tests or Chat
+      ├─ Older Tests: Expander per position (limit=5)
+      └─ (Chat only in Storychecker/Fundamental)
+```
+
+**Batch Processing (Background Thread Pattern):**
+- Session state tracks: `running`, `done`, `count`, `errors`, `error`, `last_error`
+- Thread calls `agent.analyze_portfolio(positions, skill_name, skill_prompt, language)`
+- UI polls every 5s with `st.rerun()` while running
+- On done: reload verdicts, show success/error summary, refresh page
+
+**Error Handling:**
+- Detailed errors logged to Python logger (level=ERROR)
+- User sees safe summary: "❌ Der Batch-Lauf ist fehlgeschlagen. Bitte versuchen Sie es später erneut."
+- Last error persisted in session state for debugging
+
+**Verdict Display (with verdict_icon):**
+- All agent pages use shared `verdict_icon(verdict, VERDICT_CONFIG)` from `core.ui.verdicts`
+- Colors + icons defined per agent in VERDICT_CONFIGS dict
+- Older tests shown collapsible per position
+
+---
+
 ## Configuration Files
 
 ### `config/default_skills.yaml`
