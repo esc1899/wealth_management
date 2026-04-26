@@ -91,7 +91,7 @@ class Config:
                 "ENCRYPTION_KEY is not set. "
                 "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
             )
-        if not self.LLM_API_KEY:
+        if not self.LLM_API_KEY and not self.OPENAI_BASE_URL:
             errors.append(
                 "LLM_API_KEY is not set. "
                 "Set it in your .env file (or ANTHROPIC_API_KEY for backward compatibility)."
