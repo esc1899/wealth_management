@@ -133,6 +133,7 @@ if _BATCH["last_error"] and not _BATCH["running"]:
     logger = logging.getLogger(__name__)
     logger.error("Last batch error details: %s", _BATCH['last_error'])
     st.error("❌ Letzter Batch-Lauf fehlgeschlagen. Bitte versuchen Sie es später erneut.")
+    _BATCH["last_error"] = None
 
 st.divider()
 
