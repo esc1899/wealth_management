@@ -83,9 +83,22 @@ with tab_summary:
             df_today = pd.DataFrame(today_rows)
             df_today["total"] = df_today["input_tokens"] + df_today["output_tokens"]
             df_today["cost"] = df_today.apply(
-                lambda r: compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices),
+                lambda r: compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
+                                      r.get("cache_read_tokens"), r.get("cache_write_tokens")),
                 axis=1,
             ).round(4)
+            # Cache savings % = (cache_read_tokens × 0.9 × input_price) / total_cost × 100
+            def _cache_savings_pct(r):
+                if r.get("cache_read_tokens", 0) == 0:
+                    return 0.0
+                cache_read = r.get("cache_read_tokens", 0)
+                model = r.get("model", "")
+                price = model_prices.get(model, {})
+                input_price = price.get("input", 0.0)
+                total_cost = r["cost"] * 1_000_000
+                savings = cache_read * input_price * 0.9
+                return (savings / total_cost * 100) if total_cost > 0 else 0.0
+            df_today["cache_savings_pct"] = df_today.apply(_cache_savings_pct, axis=1).round(1)
             df_today = df_today.rename(columns={
                 "agent":         t("statistics.col_agent"),
                 "skill":         t("statistics.col_skill"),
@@ -95,6 +108,7 @@ with tab_summary:
                 "output_tokens": t("statistics.col_output"),
                 "total":         t("statistics.col_total"),
                 "cost":          t("statistics.col_cost"),
+                "cache_savings_pct": "Cache Savings %",
             })
             st.dataframe(df_today, use_container_width=True, hide_index=True)
             total_today = sum(r["input_tokens"] + r["output_tokens"] for r in today_rows)
