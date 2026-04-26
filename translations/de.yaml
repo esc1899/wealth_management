@@ -494,6 +494,8 @@ storychecker:
   error: "Fehler bei der Analyse"
   batch_header: "Alle Positionen auf einmal prüfen"
   batch_caption: "{n} Positionen mit Story gefunden — alle werden nacheinander geprüft."
+  batch_caption_v2: "{total} Positionen mit Story ({pending} ausstehend)"
+  batch_only_pending: "Nur ausstehende prüfen"
   batch_button: "Alle prüfen"
   batch_running: "Story-Checks laufen im Hintergrund…"
   batch_done: "Positionen geprüft"

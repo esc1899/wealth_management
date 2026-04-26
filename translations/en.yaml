@@ -493,6 +493,8 @@ storychecker:
   error: "Error during analysis"
   batch_header: "Check all positions at once"
   batch_caption: "{n} positions with a story found — all will be checked sequentially."
+  batch_caption_v2: "{total} positions with a story ({pending} pending)"
+  batch_only_pending: "Check pending only"
   batch_button: "Check all"
   batch_running: "Story checks running in background…"
   batch_done: "positions checked"

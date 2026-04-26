@@ -78,13 +78,24 @@ if st.session_state.pop("_auto_run_storychecker", False) and pending_positions a
 
 if positions_with_story:
     with st.expander(t("storychecker.batch_header"), expanded=False):
-        st.caption(t("storychecker.batch_caption").format(n=len(pending_positions)))
+        only_pending = st.checkbox(
+            t("storychecker.batch_only_pending"),
+            value=True,
+            key="_sc_only_pending",
+        )
+        target_positions = pending_positions if only_pending else positions_with_story
+        st.caption(
+            t("storychecker.batch_caption_v2").format(
+                total=len(positions_with_story),
+                pending=len(pending_positions),
+            )
+        )
         if st.button(
             t("storychecker.batch_button"),
             type="primary",
             key="_sc_batch_run",
             use_container_width=False,
-            disabled=_BATCH["running"] or not pending_positions,
+            disabled=_BATCH["running"] or not target_positions,
         ):
             _lang = current_language()
             _BATCH["running"] = True
@@ -93,7 +104,7 @@ if positions_with_story:
             _BATCH["last_error"] = None
             threading.Thread(
                 target=_run_batch_background,
-                args=(agent, pending_positions, _lang, _BATCH),
+                args=(agent, target_positions, _lang, _BATCH),
                 daemon=True,
             ).start()
             st.rerun()
