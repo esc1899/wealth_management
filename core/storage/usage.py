@@ -27,12 +27,14 @@ class UsageRepository:
         source: str = "manual",
         duration_ms: Optional[int] = None,
         position_count: Optional[int] = None,
+        cache_read_tokens: Optional[int] = None,
+        cache_write_tokens: Optional[int] = None,
     ) -> None:
         self._conn.execute(
             "INSERT INTO llm_usage"
-            " (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count, datetime.utcnow().isoformat()),
+            " (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count, cache_read_tokens, cache_write_tokens, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count, cache_read_tokens, cache_write_tokens, datetime.utcnow().isoformat()),
         )
         self._conn.commit()
 
@@ -278,8 +280,25 @@ def _compute_cost(
     output_tokens: float,
     model: str,
     model_prices: dict,
+    cache_read_tokens: Optional[float] = None,
+    cache_write_tokens: Optional[float] = None,
 ) -> float:
     price = model_prices.get(model, {})
     input_price = price.get("input", 0.0)
     output_price = price.get("output", 0.0)
-    return (input_tokens * input_price + output_tokens * output_price) / 1_000_000
+
+    if cache_read_tokens is None:
+        cache_read_tokens = 0
+    if cache_write_tokens is None:
+        cache_write_tokens = 0
+
+    # Input tokens = regular + cache_read + cache_write
+    # Cache write tokens cost 1.25x, cache read tokens cost 0.10x, regular cost 1.0x
+    regular_input = input_tokens - cache_read_tokens - cache_write_tokens
+    cost = (
+        regular_input * input_price +
+        cache_write_tokens * input_price * 1.25 +
+        cache_read_tokens * input_price * 0.10 +
+        output_tokens * output_price
+    ) / 1_000_000
+    return cost

@@ -162,7 +162,7 @@ class TestChat:
         """chat() calls on_usage callback with token counts."""
         captured_usage = {}
 
-        def capture_usage(in_tokens, out_tokens, skill=None, duration=None, pos=None):
+        def capture_usage(in_tokens, out_tokens, skill=None, duration=None, pos=None, cache_read=None, cache_write=None):
             captured_usage.update({
                 "in": in_tokens,
                 "out": out_tokens,
@@ -355,7 +355,7 @@ class TestChatWithTools:
         """chat_with_tools() includes duration_ms in on_usage callback."""
         captured_usage = {}
 
-        def capture_usage(in_tokens, out_tokens, skill=None, duration=None, pos=None):
+        def capture_usage(in_tokens, out_tokens, skill=None, duration=None, pos=None, cache_read=None, cache_write=None):
             captured_usage.update({
                 "duration": duration,
             })

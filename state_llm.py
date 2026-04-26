@@ -16,7 +16,7 @@ def _make_claude_provider(model: str, agent_name: str) -> ClaudeProvider:
         model=model,
         base_url=config.LLM_BASE_URL,
     )
-    provider.on_usage = lambda i, o, skill=None, dur=None, pos=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos)
+    provider.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write)
     return provider
 
 
@@ -28,7 +28,7 @@ def _make_openai_provider(model: str, agent_name: str) -> "OpenAICompatibleProvi
         model=model,
         base_url=config.OPENAI_BASE_URL,
     )
-    provider.on_usage = lambda i, o, skill=None, dur=None, pos=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos)
+    provider.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write)
     return provider
 
 
@@ -48,7 +48,7 @@ def _get_public_agent_model(agent_key: str, default: str) -> str:
 def _make_ollama_provider(model: str, agent_name: str, timeout: float = 120.0) -> OllamaProvider:
     """Create and wire up an Ollama provider with usage tracking."""
     provider = OllamaProvider(host=config.OLLAMA_HOST, model=model, timeout=timeout, num_ctx=config.OLLAMA_NUM_CTX)
-    provider.on_usage = lambda i, o, skill=None, dur=None, pos=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos)
+    provider.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write)
     return provider
 
 

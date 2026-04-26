@@ -127,7 +127,9 @@ class ClaudeProvider(LLMProvider):
         response = await self._client.messages.create(**kwargs)
         _duration_ms = int((time.monotonic() - _t0) * 1000)
         if self.on_usage:
-            self.on_usage(response.usage.input_tokens, response.usage.output_tokens, self.skill_context, _duration_ms, self.position_count)
+            cache_read = getattr(response.usage, 'cache_read_input_tokens', 0) or 0
+            cache_write = getattr(response.usage, 'cache_creation_input_tokens', 0) or 0
+            self.on_usage(response.usage.input_tokens, response.usage.output_tokens, self.skill_context, _duration_ms, self.position_count, cache_read, cache_write)
         return response.content[0].text
 
     async def chat_with_tools(
@@ -170,11 +172,15 @@ class ClaudeProvider(LLMProvider):
             "tools": resolved_tools,
         }
         if system:
-            kwargs["system"] = system
+            kwargs["system"] = [
+                {"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}
+            ]
 
         _t0 = time.monotonic()
         total_input = 0
         total_output = 0
+        total_cache_read = 0
+        total_cache_write = 0
 
         # Loop to handle Tavily tool calls (max 10 iterations as safety net)
         for _ in range(10):
@@ -191,6 +197,8 @@ class ClaudeProvider(LLMProvider):
 
             total_input += response.usage.input_tokens
             total_output += response.usage.output_tokens
+            total_cache_read += getattr(response.usage, 'cache_read_input_tokens', 0) or 0
+            total_cache_write += getattr(response.usage, 'cache_creation_input_tokens', 0) or 0
 
             # Collect web_search tool calls if Tavily is active
             if tavily_key and response.stop_reason == "tool_use":
@@ -252,7 +260,7 @@ class ClaudeProvider(LLMProvider):
 
         _duration_ms = int((time.monotonic() - _t0) * 1000)
         if self.on_usage:
-            self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count)
+            self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count, total_cache_read, total_cache_write)
         return ClaudeResponse(
             content=content_text,
             tool_calls=tool_calls,

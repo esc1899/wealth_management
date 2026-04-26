@@ -134,6 +134,8 @@ class OpenAICompatibleProvider(LLMProvider):
                 self.skill_context,
                 None,
                 self.position_count,
+                None,
+                None,
             )
         return response.choices[0].message.content or ""
 
@@ -194,6 +196,8 @@ class OpenAICompatibleProvider(LLMProvider):
                 self.skill_context,
                 _duration_ms,
                 self.position_count,
+                None,
+                None,
             )
 
         # Build OAI-format assistant message for multi-turn compatibility

@@ -182,6 +182,6 @@ class NewsAgent:
             messages=[{"role": "user", "content": user_message}],
             tools=[WEB_SEARCH_TOOL],
             system=system,
-            max_tokens=8192,
+            max_tokens=4096,
         )
         return response.content or "No news digest generated."

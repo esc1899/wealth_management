@@ -149,7 +149,8 @@
       "Bash(sqlite3 /Users/erik/Projects/wealth_management/data/portfolio.db \"SELECT key, value FROM app_config WHERE key LIKE 'model_price%' ORDER BY key;\")",
       "Bash(sqlite3 /Users/erik/Projects/wealth_management/data/portfolio.db \"SELECT value FROM app_config WHERE key = 'model_prices';\")",
       "Bash(python3 -m json.tool)",
-      "Bash(sqlite3 /Users/erik/Projects/wealth_management/data/portfolio.db)"
+      "Bash(sqlite3 /Users/erik/Projects/wealth_management/data/portfolio.db)",
+      "Bash(python -m pytest tests/unit/test_llm_openai_compatible.py::TestChat::test_on_usage_callback_fires tests/unit/test_llm_openai_compatible.py::TestChatWithTools::test_on_usage_callback_with_duration -xvs)"
     ],
     "additionalDirectories": [
       "/Users/erik",

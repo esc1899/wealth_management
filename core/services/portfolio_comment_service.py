@@ -113,7 +113,7 @@ class PortfolioCommentService:
         if self._usage_repo:
             repo, model = self._usage_repo, self._model
 
-            def _on_usage(inp, out, skill=None, dur=None, pos=None):
+            def _on_usage(inp, out, skill=None, dur=None, pos=None, cache_read=None, cache_write=None):
                 repo.record(
                     "portfolio_comment",
                     model,
@@ -122,6 +122,8 @@ class PortfolioCommentService:
                     skill=style_id,
                     source="manual",
                     duration_ms=dur,
+                    cache_read_tokens=cache_read,
+                    cache_write_tokens=cache_write,
                 )
 
             llm.on_usage = _on_usage

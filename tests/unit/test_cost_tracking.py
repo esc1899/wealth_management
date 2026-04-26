@@ -279,11 +279,11 @@ def test_llm_provider_on_usage_receives_skill():
     from core.llm.claude import ClaudeProvider
     received = []
     provider = ClaudeProvider(api_key="test", model="claude-haiku-4-5-20251001")
-    provider.on_usage = lambda i, o, skill=None: received.append((i, o, skill))
+    provider.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None: received.append((i, o, skill))
     provider.skill_context = "Test Skill"
 
     # Simulate on_usage being fired
-    provider.on_usage(100, 200, provider.skill_context)
+    provider.on_usage(100, 200, provider.skill_context, None, None, None, None)
     assert received == [(100, 200, "Test Skill")]
 
 
@@ -292,8 +292,8 @@ def test_usage_repo_records_skill_from_callback(usage_repo):
     agent_name = "news_digest"
     model = "claude-haiku-4-5-20251001"
 
-    on_usage = lambda i, o, skill=None: usage_repo.record(agent_name, model, i, o, skill=skill)
-    on_usage(100, 200, "Standard News")
+    on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None: usage_repo.record(agent_name, model, i, o, skill=skill, cache_read_tokens=cache_read, cache_write_tokens=cache_write)
+    on_usage(100, 200, "Standard News", None, None, None, None)
 
     rows = usage_repo.total_all_time()
     assert len(rows) == 1

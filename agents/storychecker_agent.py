@@ -293,7 +293,7 @@ Schreibe nur die These selbst, keine Einleitung oder Überschrift."""
                 messages=messages,
                 tools=[WEB_SEARCH_TOOL],
                 system=system_prompt,
-                max_tokens=4096,
+                max_tokens=2048,
             )
             # Web search is server-side — no client tool calls to handle.
             # Loop exits when there are no remaining tool calls (stop_reason != "tool_use")

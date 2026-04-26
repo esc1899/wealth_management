@@ -191,8 +191,8 @@ class AgentSchedulerService:
             llm = OpenAICompatibleProvider(api_key=self._openai_api_key, model=model, base_url=self._openai_base_url)
         else:
             llm = ClaudeProvider(api_key=self._anthropic_key, model=model, base_url=self._llm_base_url)
-        llm.on_usage = lambda i, o, skill=None, dur=None, pos=None: usage_repo.record(
-            agent_name, model, i, o, skill=skill, source="scheduled", duration_ms=dur, position_count=pos
+        llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None: usage_repo.record(
+            agent_name, model, i, o, skill=skill, source="scheduled", duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write
         )
         return llm
 
