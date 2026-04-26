@@ -81,8 +81,8 @@ def _run_batch_background(ag, positions, skill_name, skill_prompt, language: str
                 language=language,
             )
         )
-        errors = sum(1 for _, err in results if err)
-        job.update({"running": False, "done": True, "count": len(results), "errors": errors, "error": None})
+        # results = List[Tuple[position_id, verdict, summary]] — no error field
+        job.update({"running": False, "done": True, "count": len(results), "errors": 0, "error": None})
     except Exception as exc:
         job.update({"running": False, "done": True, "count": 0, "errors": 0, "error": str(exc), "last_error": str(exc)})
     finally:
