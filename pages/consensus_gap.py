@@ -273,7 +273,22 @@ with col_right:
     _sel_id = st.session_state.get("cgap_selected_id")
 
     if _sel_id is None:
-        st.info(t("storychecker.select_to_start"))
+        if _current_verdicts:
+            st.subheader("Aktuelle Ergebnisse")
+            _eligible_alpha = sorted(_eligible, key=lambda p: p.name.lower())
+            for _p in _eligible_alpha:
+                _a = _current_verdicts.get(_p.id)
+                if _a:
+                    st.markdown(verdict_badge(_a.verdict or "unknown", _VERDICT_CONFIG) + f" **{_p.name}**")
+                    if _p.ticker:
+                        st.caption(f"`{_p.ticker}`")
+                    if _a.created_at:
+                        st.caption(_a.created_at.strftime("%d.%m.%Y %H:%M"))
+                    if _a.summary:
+                        st.caption(_a.summary)
+                    st.divider()
+        else:
+            st.info(t("storychecker.select_to_start"))
     else:
         _detail_pos = next((p for p in _eligible if p.id == _sel_id), None)
         if _detail_pos is None:

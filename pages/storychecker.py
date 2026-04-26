@@ -240,7 +240,21 @@ with col_right:
     session_id = st.session_state.get("sc_session_id")
 
     if session_id is None:
-        st.info(t("storychecker.select_to_start"))
+        if _sc_existing:
+            st.subheader("Aktuelle Ergebnisse")
+            _positions_sorted = sorted(positions_with_story, key=lambda p: p.name.lower())
+            for _p in _positions_sorted:
+                _a = _sc_existing.get(_p.id)
+                if _a:
+                    _icon = verdict_icon(_a.verdict or "unknown", _VERDICT_CONFIG)
+                    st.markdown(f"{_icon} **{_p.name}**")
+                    if _a.created_at:
+                        st.caption(_a.created_at.strftime("%d.%m.%Y %H:%M"))
+                    if _a.summary:
+                        st.caption(_a.summary)
+                    st.divider()
+        else:
+            st.info(t("storychecker.select_to_start"))
     else:
         session = agent.get_session(session_id)
         if session is None:

@@ -157,7 +157,10 @@
       "Bash(python -m py_compile /Users/erik/Projects/wealth_management/pages/consensus_gap.py)",
       "Read(//private/var/folders/**)",
       "Bash(git -C /Users/erik/Projects/wealth_management log --oneline -5)",
-      "Bash(nohup /Users/erik/Projects/wealth_management/.venv/bin/streamlit run app.py --server.headless=true --server.port=6655 --server.address=localhost)"
+      "Bash(nohup /Users/erik/Projects/wealth_management/.venv/bin/streamlit run app.py --server.headless=true --server.port=6655 --server.address=localhost)",
+      "Bash(awk '/^fundamental:/{found=1} found && /start_button/{print NR\": \"$0; found=0}' /Users/erik/Projects/wealth_management/translations/de.yaml)",
+      "Bash(sed -i '' '482s/run_button: \"Start story check\"/run_button: \"Start Analysis\"/' /Users/erik/Projects/wealth_management/translations/en.yaml)",
+      "Bash(sed -i '' '683s/run_button: \"Analyse Portfolio\"/run_button: \"Start Analysis\"/' /Users/erik/Projects/wealth_management/translations/en.yaml)"
     ],
     "additionalDirectories": [
       "/Users/erik",

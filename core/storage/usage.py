@@ -79,7 +79,9 @@ class UsageRepository:
         rows = self._conn.execute(
             f"""SELECT agent, skill, model, source,
                       SUM(input_tokens) AS input_tokens,
-                      SUM(output_tokens) AS output_tokens
+                      SUM(output_tokens) AS output_tokens,
+                      SUM(cache_read_tokens) AS cache_read_tokens,
+                      SUM(cache_write_tokens) AS cache_write_tokens
                FROM llm_usage lu
                WHERE date(created_at) = ?
                GROUP BY agent, skill, model, source
