@@ -132,18 +132,16 @@ class ConsensusGapAgent:
             return []
 
         self._llm.skill_context = skill_name
-        self._llm.position_count = len(eligible)  # Track how many positions in this batch
+        self._llm.position_count = len(eligible)
         system = ANALYSIS_SYSTEM_PROMPT + "\n" + response_language_with_fixed_codes(language, ["wächst", "stabil", "schließt", "eingeholt"])
         system += f"\n\n## Strategie-Skill\n{skill_prompt}"
-        all_results: List[Tuple[str, str, str, str]] = []
+        results: List[Tuple[int, str, str]] = []
 
-        # Process in batches of 2 to stay within rate limits
-        batch_size = 2
-        for i in range(0, len(eligible), batch_size):
-            batch = eligible[i: i + batch_size]
-            positions_text = self._format_positions(batch)
+        # Process 1 position at a time — ensures Claude completes verdict submission
+        for idx, pos in enumerate(eligible):
+            positions_text = self._format_positions([pos])
             user_msg = (
-                f"Analysiere diese Portfolio-Positionen auf ihre Konsens-Lücke.\n\n{positions_text}"
+                f"Analysiere diese Portfolio-Position auf ihre Konsens-Lücke.\n\n{positions_text}"
             )
             response = await self._llm.chat_with_tools(
                 messages=[{"role": "user", "content": user_msg}],
@@ -154,7 +152,7 @@ class ConsensusGapAgent:
                 system=system,
                 max_tokens=2500,
             )
-            # Extract verdicts from tool calls
+            # Extract verdict from tool calls
             parsed = [
                 (
                     str(c.input.get("position_id")),
@@ -167,32 +165,30 @@ class ConsensusGapAgent:
                 and c.input.get("verdict", "").lower() in VALID_VERDICTS
             ]
             if not parsed:
-                logger.warning(
-                    "consensus_gap: no submit_consensus_verdict calls in batch %d", i
-                )
-            all_results.extend(parsed)
+                logger.warning("consensus_gap: no verdict for position %d (%s)", pos.id or 0, pos.name)
+            else:
+                # Persist immediately after each position
+                for pos_id_str, verdict, summary, analysis in parsed:
+                    try:
+                        pos_id = int(pos_id_str)
+                    except ValueError:
+                        continue
+                    if verdict not in VALID_VERDICTS:
+                        continue
+                    self._analyses_repo.save(
+                        position_id=pos_id,
+                        agent=AGENT_NAME,
+                        skill_name=skill_name,
+                        verdict=verdict,
+                        summary=summary,
+                    )
+                    results.append((pos_id, verdict, summary))
 
-            # Pause between batches to avoid rate limit
-            if i + batch_size < len(eligible):
-                await asyncio.sleep(12)
+            # Pause between positions to avoid rate limit
+            if idx < len(eligible) - 1:
+                await asyncio.sleep(1)
 
-        # Persist all found verdicts
-        for pos_id_str, verdict, summary, analysis in all_results:
-            try:
-                pos_id = int(pos_id_str)
-            except ValueError:
-                continue
-            if verdict not in VALID_VERDICTS:
-                continue
-            self._analyses_repo.save(
-                position_id=pos_id,
-                agent=AGENT_NAME,
-                skill_name=skill_name,
-                verdict=verdict,
-                summary=summary,
-            )
-
-        return [(int(r[0]), r[1], r[2]) for r in all_results if r[1] in VALID_VERDICTS]
+        return results
 
     # ------------------------------------------------------------------
     # Helpers

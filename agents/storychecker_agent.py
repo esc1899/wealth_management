@@ -195,7 +195,7 @@ class StorycheckerAgent:
             except Exception as exc:
                 results.append((pos.name, str(exc)))
             if i < len(eligible) - 1:
-                await asyncio.sleep(15)  # rate limit
+                await asyncio.sleep(1)
         return results
 
     def chat(self, session_id: int, user_message: str) -> str:

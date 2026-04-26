@@ -9,6 +9,7 @@ import asyncio
 import logging
 import threading
 import time
+from datetime import datetime
 
 import streamlit as st
 
@@ -239,89 +240,51 @@ with col_left:
                         )
                     finally:
                         _loop.close()
-                    st.session_state["cgap_selected_id"] = _sel_pos.id
                 except Exception as exc:
                     st.session_state["_cgap_single_error"] = str(exc)
             st.rerun()
-
-        st.divider()
-        st.subheader(t("storychecker.past_checks"))
-
-        _analyzed = [p for p in _eligible_sorted if p.id in _current_verdicts]
-        if not _analyzed:
-            st.info(t("storychecker.no_checks"))
-        else:
-            for _p in _analyzed:
-                _a = _current_verdicts[_p.id]
-                _icon = verdict_icon(_a.verdict or "unknown", _VERDICT_CONFIG)
-                _date_str = _a.created_at.strftime("%d.%m. %H:%M") if _a.created_at else ""
-                _active = st.session_state.get("cgap_selected_id") == _p.id
-                if st.button(
-                    f"{_icon} **{_p.name}**  \n{_date_str}",
-                    key=f"cgap_pos_{_p.id}",
-                    use_container_width=True,
-                    type="primary" if _active else "secondary",
-                ):
-                    st.session_state["cgap_selected_id"] = _p.id
-                    st.rerun()
 
 # ------------------------------------------------------------------
 # Right: detail view for selected position
 # ------------------------------------------------------------------
 
 with col_right:
-    _sel_id = st.session_state.get("cgap_selected_id")
+    if _current_verdicts:
+        st.subheader("Aktuelle Ergebnisse")
+        # Sort by created_at DESC (newest first)
+        _verdicts_with_pos = [
+            (_p, _current_verdicts[_p.id])
+            for _p in _eligible
+            if _p.id in _current_verdicts
+        ]
+        _verdicts_with_pos.sort(key=lambda x: x[1].created_at or datetime.min, reverse=True)
 
-    if _sel_id is None:
-        if _current_verdicts:
-            st.subheader("Aktuelle Ergebnisse")
-            _eligible_alpha = sorted(_eligible, key=lambda p: p.name.lower())
-            for _p in _eligible_alpha:
-                _a = _current_verdicts.get(_p.id)
-                if _a:
-                    st.markdown(verdict_badge(_a.verdict or "unknown", _VERDICT_CONFIG) + f" **{_p.name}**")
-                    if _p.ticker:
-                        st.caption(f"`{_p.ticker}`")
-                    if _a.created_at:
-                        st.caption(_a.created_at.strftime("%d.%m.%Y %H:%M"))
-                    if _a.summary:
-                        st.caption(_a.summary)
-                    st.divider()
-        else:
-            st.info(t("storychecker.select_to_start"))
-    else:
-        _detail_pos = next((p for p in _eligible if p.id == _sel_id), None)
-        if _detail_pos is None:
-            st.session_state.pop("cgap_selected_id", None)
-        else:
-            _latest = _current_verdicts.get(_sel_id) or _analyses_repo.get_latest(_sel_id, agent="consensus_gap")
+        for _p, _a in _verdicts_with_pos:
+            st.markdown(verdict_badge(_a.verdict or "unknown", _VERDICT_CONFIG) + f" **{_p.name}**")
+            if _p.ticker:
+                st.caption(f"`{_p.ticker}`")
+            if _a.created_at:
+                st.caption(_a.created_at.strftime("%d.%m.%Y %H:%M"))
+            if _a.summary:
+                st.caption(_a.summary)
 
-            st.markdown(f"### {_detail_pos.name}")
-            if _detail_pos.ticker:
-                st.caption(f"`{_detail_pos.ticker}`")
-
-            if _latest:
-                st.markdown(verdict_badge(_latest.verdict or "unknown", _VERDICT_CONFIG))
-                if _latest.created_at:
-                    st.caption(_latest.created_at.strftime("%d.%m.%Y %H:%M"))
-                if _latest.summary:
-                    st.markdown(_latest.summary)
-            else:
-                st.caption(t("consensus_gap.not_yet_analyzed"))
-
-            # Verdict history
+            # Inline history expander
             _history = [
-                a for a in _analyses_repo.get_for_position(_sel_id, limit=20)
+                a for a in _analyses_repo.get_for_position(_p.id, limit=20)
                 if a.agent == "consensus_gap"
             ]
             if len(_history) > 1:
-                with st.expander(t("storychecker.verdict_history"), expanded=False):
-                    for _a in _history[1:]:  # skip the latest (already shown)
-                        _icon = verdict_icon(_a.verdict or "unknown", _VERDICT_CONFIG)
-                        _date_str = _a.created_at.strftime("%d.%m.%Y") if _a.created_at else "—"
+                with st.expander(f"{t('storychecker.verdict_history')} ({len(_history) - 1})", expanded=False):
+                    for _h in _history[1:]:
+                        _icon = verdict_icon(_h.verdict or "unknown", _VERDICT_CONFIG)
+                        _date_str = _h.created_at.strftime("%d.%m.%Y") if _h.created_at else "—"
                         st.markdown(f"{_icon} **{_date_str}**")
-                        if _a.summary:
-                            st.caption(_a.summary)
+                        if _h.summary:
+                            st.caption(_h.summary)
+
+            st.divider()
+    else:
+        st.info(t("storychecker.select_to_start"))
 
 st.divider()
 render_verdict_legend(_VERDICT_CONFIG)

@@ -89,40 +89,47 @@ async def test_single_verdict_extraction():
 
 @pytest.mark.asyncio
 async def test_multiple_verdicts_in_batch():
-    """Agent extracts multiple verdicts from a single batch."""
+    """Agent processes multiple positions, one at a time."""
     analyses_repo = MagicMock()
     agent = make_agent(analyses_repo=analyses_repo)
 
-    tool_calls = [
-        ClaudeToolCall(
-            id="call_1",
-            name="submit_consensus_verdict",
-            input={
-                "position_id": 1,
-                "verdict": "wächst",
-                "summary": "Gap growing.",
-                "analysis": "Market wrong.",
-            },
+    # Agent now processes 1 position per call, so mock different responses
+    responses = [
+        ClaudeResponse(
+            content="",
+            tool_calls=[
+                ClaudeToolCall(
+                    id="call_1",
+                    name="submit_consensus_verdict",
+                    input={
+                        "position_id": 1,
+                        "verdict": "wächst",
+                        "summary": "Gap growing.",
+                        "analysis": "Market wrong.",
+                    },
+                )
+            ],
+            stop_reason="tool_use",
         ),
-        ClaudeToolCall(
-            id="call_2",
-            name="submit_consensus_verdict",
-            input={
-                "position_id": 2,
-                "verdict": "eingeholt",
-                "summary": "Gap closed.",
-                "analysis": "Consensus caught up.",
-            },
+        ClaudeResponse(
+            content="",
+            tool_calls=[
+                ClaudeToolCall(
+                    id="call_2",
+                    name="submit_consensus_verdict",
+                    input={
+                        "position_id": 2,
+                        "verdict": "eingeholt",
+                        "summary": "Gap closed.",
+                        "analysis": "Consensus caught up.",
+                    },
+                )
+            ],
+            stop_reason="tool_use",
         ),
     ]
 
-    agent._llm.chat_with_tools = AsyncMock(
-        return_value=ClaudeResponse(
-            content="",
-            tool_calls=tool_calls,
-            stop_reason="tool_use",
-        )
-    )
+    agent._llm.chat_with_tools = AsyncMock(side_effect=responses)
 
     positions = [
         make_test_position(1, "Apple"),
@@ -207,40 +214,47 @@ async def test_invalid_verdict_filtered():
 
 @pytest.mark.asyncio
 async def test_mixed_valid_and_invalid():
-    """Valid and invalid verdicts are separated."""
+    """Valid verdicts are accepted, invalid ones are filtered."""
     analyses_repo = MagicMock()
     agent = make_agent(analyses_repo=analyses_repo)
 
-    tool_calls = [
-        ClaudeToolCall(
-            id="call_1",
-            name="submit_consensus_verdict",
-            input={
-                "position_id": 1,
-                "verdict": "wächst",
-                "summary": "Valid.",
-                "analysis": "OK.",
-            },
+    # Agent processes 1 position per call
+    responses = [
+        ClaudeResponse(
+            content="",
+            tool_calls=[
+                ClaudeToolCall(
+                    id="call_1",
+                    name="submit_consensus_verdict",
+                    input={
+                        "position_id": 1,
+                        "verdict": "wächst",
+                        "summary": "Valid.",
+                        "analysis": "OK.",
+                    },
+                )
+            ],
+            stop_reason="tool_use",
         ),
-        ClaudeToolCall(
-            id="call_2",
-            name="submit_consensus_verdict",
-            input={
-                "position_id": 2,
-                "verdict": "invalid",  # Invalid!
-                "summary": "Invalid verdict.",
-                "analysis": "Dropped.",
-            },
+        ClaudeResponse(
+            content="",
+            tool_calls=[
+                ClaudeToolCall(
+                    id="call_2",
+                    name="submit_consensus_verdict",
+                    input={
+                        "position_id": 2,
+                        "verdict": "invalid",  # Invalid!
+                        "summary": "Invalid verdict.",
+                        "analysis": "Dropped.",
+                    },
+                )
+            ],
+            stop_reason="tool_use",
         ),
     ]
 
-    agent._llm.chat_with_tools = AsyncMock(
-        return_value=ClaudeResponse(
-            content="",
-            tool_calls=tool_calls,
-            stop_reason="tool_use",
-        )
-    )
+    agent._llm.chat_with_tools = AsyncMock(side_effect=responses)
 
     positions = [
         make_test_position(1, "A"),

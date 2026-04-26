@@ -136,16 +136,13 @@ class FundamentalAgent:
             return output
 
         self._llm.skill_context = skill_name
-        self._llm.position_count = len(eligible)  # Track how many positions in this batch
+        self._llm.position_count = len(eligible)
         system = ANALYSIS_SYSTEM_PROMPT + "\n" + response_language_with_fixed_codes(language, ["unterbewertet", "fair", "überbewertet", "unbekannt"])
         system += f"\n\n## Bewertungs-Skill\n{skill_prompt}"
-        all_results: List[Tuple[str, str, str, str, str, str]] = []
 
-        # Process one position at a time — fundamental analysis is very token-heavy
-        batch_size = 1
-        for i in range(0, len(eligible), batch_size):
-            batch = eligible[i: i + batch_size]
-            positions_text = self._format_positions(batch)
+        # Process one position at a time, persist immediately
+        for idx, pos in enumerate(eligible):
+            positions_text = self._format_positions([pos])
             user_msg = (
                 f"Analysiere die Fundamentalbewertung dieser Position.\n\n{positions_text}"
             )
@@ -155,38 +152,38 @@ class FundamentalAgent:
                 system=system,
                 max_tokens=1800,
             )
-            all_results.extend(self._parse_verdicts(response.content or ""))
+            parsed = self._parse_verdicts(response.content or "")
 
-            if i + batch_size < len(eligible):
-                await asyncio.sleep(5)
+            # Persist immediately after parsing
+            for pos_id_str, verdict, fair_value, upside, summary, analysis in parsed:
+                if verdict not in VALID_VERDICTS:
+                    continue
+                try:
+                    pos_id = int(pos_id_str)
+                except ValueError:
+                    continue
 
-        # Persist verdicts; embed fair value + upside in summary
-        for pos_id_str, verdict, fair_value, upside, summary, analysis in all_results:
-            if verdict not in VALID_VERDICTS:
-                continue
-            try:
-                pos_id = int(pos_id_str)
-            except ValueError:
-                continue
+                # Enrich summary with fair value / upside if available
+                rich_summary = summary
+                extras = []
+                if fair_value and fair_value.upper() != "N/A":
+                    extras.append(f"Fair Value: {fair_value} {symbol()}")
+                if upside and upside.upper() != "N/A":
+                    extras.append(f"Upside: {upside}")
+                if extras:
+                    rich_summary = f"{summary} ({', '.join(extras)})"
 
-            # Enrich summary with fair value / upside if available
-            rich_summary = summary
-            extras = []
-            if fair_value and fair_value.upper() != "N/A":
-                extras.append(f"Fair Value: {fair_value} {symbol()}")
-            if upside and upside.upper() != "N/A":
-                extras.append(f"Upside: {upside}")
-            if extras:
-                rich_summary = f"{summary} ({', '.join(extras)})"
+                self._analyses_repo.save(
+                    position_id=pos_id,
+                    agent=AGENT_NAME,
+                    skill_name=skill_name,
+                    verdict=verdict,
+                    summary=rich_summary,
+                )
+                output.append((pos_id, verdict, rich_summary))
 
-            self._analyses_repo.save(
-                position_id=pos_id,
-                agent=AGENT_NAME,
-                skill_name=skill_name,
-                verdict=verdict,
-                summary=rich_summary,
-            )
-            output.append((pos_id, verdict, rich_summary))
+            if idx < len(eligible) - 1:
+                await asyncio.sleep(1)
 
         return output
 

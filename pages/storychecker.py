@@ -9,6 +9,7 @@ Uses built-in web search to find current news before assessing the thesis.
 import asyncio
 import threading
 import time
+from datetime import datetime
 
 import streamlit as st
 
@@ -242,17 +243,20 @@ with col_right:
     if session_id is None:
         if _sc_existing:
             st.subheader("Aktuelle Ergebnisse")
-            _positions_sorted = sorted(positions_with_story, key=lambda p: p.name.lower())
-            for _p in _positions_sorted:
-                _a = _sc_existing.get(_p.id)
-                if _a:
-                    _icon = verdict_icon(_a.verdict or "unknown", _VERDICT_CONFIG)
-                    st.markdown(f"{_icon} **{_p.name}**")
-                    if _a.created_at:
-                        st.caption(_a.created_at.strftime("%d.%m.%Y %H:%M"))
-                    if _a.summary:
-                        st.caption(_a.summary)
-                    st.divider()
+            _verdicts_with_pos = [
+                (_p, _sc_existing[_p.id])
+                for _p in positions_with_story
+                if _p.id in _sc_existing
+            ]
+            _verdicts_with_pos.sort(key=lambda x: x[1].created_at or datetime.min, reverse=True)
+            for _p, _a in _verdicts_with_pos:
+                _icon = verdict_icon(_a.verdict or "unknown", _VERDICT_CONFIG)
+                st.markdown(f"{_icon} **{_p.name}**")
+                if _a.created_at:
+                    st.caption(_a.created_at.strftime("%d.%m.%Y %H:%M"))
+                if _a.summary:
+                    st.caption(_a.summary)
+                st.divider()
         else:
             st.info(t("storychecker.select_to_start"))
     else:
