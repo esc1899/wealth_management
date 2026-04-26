@@ -666,6 +666,13 @@ fundamental:
   web_search_info: "💡 Mit Web-Search gesammelte Informationen"
   chat_placeholder: "Weitere Fragen zur Position..."
   analyzing: "Analysiere..."
+  batch_header: "Alle Positionen auf einmal analysieren"
+  batch_caption: "{total} Positionen ({pending} ausstehend)"
+  batch_only_pending: "Nur ausstehende prüfen"
+  batch_button: "Alle analysieren"
+  batch_running: "Claude analysiert alle Positionen …"
+  batch_done: "Positionen analysiert"
+  batch_errors: "Fehler dabei"
 
 consensus_gap:
   title: "Konsens-Lücken-Analyse"
@@ -688,6 +695,22 @@ consensus_gap:
   legend_stabil: "Keine wesentliche Konsens-Verschiebung. These intakt — halten."
   legend_schließt: "Der Markt holt auf. Alpha nimmt ab — Ausstieg vorbereiten."
   legend_eingeholt: "These vollständig eingepreist. Position neu bewerten."
+  what_is_this: "Was ist Konsens-Lücken-Analyse?"
+  explanation: |
+    Konsens-Lücken-Analyse misst für jede Position den **Abstand zwischen deiner Investment-These und dem Markt-Konsens**.
+
+    Sie zeigt:
+    - **Lücke wächst**: Der Markt divergiert immer weiter von deiner These ab. Strukturelle Gelegenheit.
+    - **Stabil**: Keine wesentliche Verschiebung. Deine These bleibt intakt.
+    - **Lücke schließt sich**: Der Markt nähert sich an. Dein Alpha nimmt ab.
+    - **Eingeholt**: These vollständig im Preis eingepreist. Position neu bewerten.
+  batch_header: "Alle Positionen auf einmal analysieren"
+  batch_caption: "{total} Positionen mit These ({pending} ausstehend)"
+  batch_only_pending: "Nur ausstehende prüfen"
+  batch_button: "Alle analysieren"
+  batch_running: "Claude analysiert alle Positionen …"
+  batch_done: "Positionen analysiert"
+  batch_errors: "Fehler dabei"
 
 
 wealth_history:

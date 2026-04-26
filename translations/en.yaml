@@ -666,6 +666,13 @@ fundamental:
   web_search_info: "💡 Information gathered via web search"
   chat_placeholder: "More questions about the position..."
   analyzing: "Analyzing..."
+  batch_header: "Analyze all positions at once"
+  batch_caption: "{total} positions ({pending} pending)"
+  batch_only_pending: "Check pending only"
+  batch_button: "Analyze All"
+  batch_running: "Claude analyzing all positions…"
+  batch_done: "Positions analyzed"
+  batch_errors: "Errors"
 
 consensus_gap:
   title: "Consensus Gap Analysis"
@@ -688,6 +695,23 @@ consensus_gap:
   legend_stabil: "No major consensus shift. Thesis intact — hold."
   legend_schließt: "Market catching up. Alpha decreasing — prepare exit."
   legend_eingeholt: "Thesis fully priced in. Reassess position."
+  what_is_this: "What is Consensus Gap Analysis?"
+  explanation: |
+    Consensus Gap Analysis measures the **distance between your investment thesis and market consensus** for each position.
+
+    It shows:
+    - **Gap Growing**: Market diverging further from your thesis. Structural opportunity.
+    - **Stable**: No major consensus shift. Your thesis remains intact.
+    - **Gap Closing**: Market catching up. Your alpha is decreasing.
+    - **Caught Up**: Thesis fully priced in. Reassess position.
+  batch_header: "Analyze all positions at once"
+  batch_caption: "{total} positions with thesis ({pending} pending)"
+  batch_only_pending: "Check pending only"
+  batch_button: "Analyze All"
+  batch_running: "Claude analyzing all positions…"
+  batch_done: "Positions analyzed"
+  batch_errors: "Errors"
+
 
 wealth_history:
   wealth_section: "Wealth Development"
