@@ -101,7 +101,11 @@ def _run_storychecker_job(
         storychecker_repo = StorycheckerRepository(conn)
         skills_repo = get_skills_repo()
 
-        llm = ClaudeProvider(api_key=api_key, model=CLAUDE_HAIKU)
+        if config.OPENAI_BASE_URL:
+            from core.llm.openai_compatible import OpenAICompatibleProvider
+            llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
+        else:
+            llm = ClaudeProvider(api_key=api_key, model=CLAUDE_HAIKU, base_url=config.LLM_BASE_URL)
 
         agent = StorycheckerAgent(
             positions_repo=pos_repo,
@@ -338,7 +342,7 @@ if st.button(t("portfolio_story.run_button"), type="primary", use_container_widt
             threading.Thread(
                 target=_run_storychecker_job,
                 args=(missing_positions, "de", _PS_JOB,
-                      config.DB_PATH, config.ENCRYPTION_KEY, config.ANTHROPIC_API_KEY),
+                      config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY),
                 daemon=True,
             ).start()
 

@@ -44,12 +44,18 @@ class AgentSchedulerService:
         anthropic_api_key: str,
         default_claude_model: str,
         timezone: str = "Europe/Berlin",
+        llm_base_url: str = "",
+        openai_api_key: str = "",
+        openai_base_url: str = "",
     ):
         import os
         self._db_path = db_path
         self._salt_path = os.path.join(os.path.dirname(os.path.abspath(db_path)), "salt.bin")
         self._enc_key = encryption_key
         self._anthropic_key = anthropic_api_key
+        self._llm_base_url = llm_base_url
+        self._openai_api_key = openai_api_key
+        self._openai_base_url = openai_base_url
         self._default_claude_model = default_claude_model
         self._timezone = timezone
         self._scheduler = BackgroundScheduler(timezone=timezone)
@@ -177,10 +183,14 @@ class AgentSchedulerService:
         else:
             logger.warning("Unknown agent_name '%s' in job %s", job.agent_name, job.id)
 
-    def _make_scheduled_llm(self, agent_name: str, model: str, conn) -> "ClaudeProvider":
+    def _make_scheduled_llm(self, agent_name: str, model: str, conn):
         from core.llm.claude import ClaudeProvider
+        from core.llm.openai_compatible import OpenAICompatibleProvider
         usage_repo = UsageRepository(conn)
-        llm = ClaudeProvider(api_key=self._anthropic_key, model=model)
+        if self._openai_base_url:
+            llm = OpenAICompatibleProvider(api_key=self._openai_api_key, model=model, base_url=self._openai_base_url)
+        else:
+            llm = ClaudeProvider(api_key=self._anthropic_key, model=model, base_url=self._llm_base_url)
         llm.on_usage = lambda i, o, skill=None, dur=None, pos=None: usage_repo.record(
             agent_name, model, i, o, skill=skill, source="scheduled", duration_ms=dur, position_count=pos
         )

@@ -146,7 +146,11 @@ def _run_storychecker_consensus_job(
         if "storychecker" in agents_to_run:
             job["agents"] = ["Story Checker"]
             sc_skill_name, sc_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "storychecker")
-            sc_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_HAIKU)
+            if config.OPENAI_BASE_URL:
+                from core.llm.openai_compatible import OpenAICompatibleProvider
+                sc_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
+            else:
+                sc_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_HAIKU, base_url=config.LLM_BASE_URL)
             sc_llm.skill_context = sc_skill_name
             sc_agent = StorycheckerAgent(
                 positions_repo=positions_repo,
@@ -177,7 +181,11 @@ def _run_storychecker_consensus_job(
                 job["agents"] = ["Story Checker", "Konsens-Lücken"]
 
             cg_skill_name, cg_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "consensus_gap")
-            cg_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET)
+            if config.OPENAI_BASE_URL:
+                from core.llm.openai_compatible import OpenAICompatibleProvider
+                cg_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
+            else:
+                cg_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET, base_url=config.LLM_BASE_URL)
             cg_agent = ConsensusGapAgent(llm=cg_llm, analyses_repo=analyses_repo)
             try:
                 _log_to_job(job, f"Running ConsensusGapAgent with skill '{cg_skill_name}'")
@@ -252,7 +260,11 @@ def _run_fundamental_job(
             _log_to_job(job, "⚠️ No skill prompt found, using empty")
 
         # Create agent with thread-safe repos (same as Scheduler does)
-        fund_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET)
+        if config.OPENAI_BASE_URL:
+            from core.llm.openai_compatible import OpenAICompatibleProvider
+            fund_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
+        else:
+            fund_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET, base_url=config.LLM_BASE_URL)
         fund_agent = FundamentalAgent(llm=fund_llm, analyses_repo=analyses_repo)
 
         job["agents"] = ["Fundamental"]
@@ -364,7 +376,7 @@ if st.button(t("watchlist_checker.run_button"), key="check_watchlist_btn"):
         threading.Thread(
             target=_run_storychecker_consensus_job,
             args=(_missing_sc_cg, agents_to_run, _lang, _job,
-                  config.DB_PATH, config.ENCRYPTION_KEY, config.ANTHROPIC_API_KEY),
+                  config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY),
             daemon=True,
         ).start()
         with st.spinner(t("watchlist_checker.running_story_spinner").format(n=len(_missing_sc_cg))):
@@ -382,7 +394,7 @@ if st.button(t("watchlist_checker.run_button"), key="check_watchlist_btn"):
         threading.Thread(
             target=_run_fundamental_job,
             args=(_missing_fund, _lang, _fund_job,
-                  config.DB_PATH, config.ENCRYPTION_KEY, config.ANTHROPIC_API_KEY),
+                  config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY),
             daemon=True,
         ).start()
         with st.spinner(t("watchlist_checker.running_fund_spinner").format(n=len(_missing_fund))):

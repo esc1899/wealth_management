@@ -375,4 +375,99 @@ verdicts = analysis_service.get_verdicts(ids, "storychecker")
 
 ---
 
+## LLM Provider Configuration
+
+Der Public-LLM-Layer ist provider-agnostisch über Umgebungsvariablen konfigurierbar.
+
+### Konfigurationsvariablen
+
+| Variable | Zweck | Default |
+|---|---|---|
+| `LLM_API_KEY` | API-Key des Providers | — (Pflicht) |
+| `LLM_BASE_URL` | Endpoint-URL | leer = Anthropic direkt |
+| `LLM_DEFAULT_MODEL` | Fallback-Modell wenn kein DB-Override | leer = `claude-haiku-4-5-20251001` |
+| `CLAUDE_MODELS` | Komma-Liste für Settings-Dropdown | `claude-haiku-4-5-20251001,claude-sonnet-4-6,claude-opus-4-6` |
+
+### Modell-Auflösungskette
+
+```
+DB(agent-spezifisch) 
+  → DB(global) 
+  → LLM_DEFAULT_MODEL (falls gesetzt)
+  → Hardcoded Constant (CLAUDE_HAIKU/CLAUDE_SONNET)
+```
+
+Die DB-Einträge werden per Settings-UI gespeichert. `LLM_DEFAULT_MODEL` ist als Fallback für Infrastruktur-Wechsel (Provider-Switch ohne Settings-Neuconfig).
+
+### Web Search
+
+| Modus | Bedingung | Portabilität |
+|---|---|---|
+| Anthropic built-in (`web_search_20250305`) | kein `TAVILY_API_KEY` | Nur Anthropic / OpenRouter |
+| Tavily (client-side) | `TAVILY_API_KEY` gesetzt | Alle Provider mit Tool Use |
+
+Agents mit Web Search (SearchAgent, StructuralChangeAgent, NewsAgent): Bei OpenRouter oder anderen Providern mit Tavily aktiviert. Oder Modelle wählen mit integrierter Suche (Perplexity Sonar).
+
+### Bekannte Provider-Konfigurationen
+
+#### Anthropic direkt (Default)
+```env
+LLM_API_KEY=sk-ant-...
+# LLM_BASE_URL, LLM_DEFAULT_MODEL = leer
+```
+
+#### OpenRouter  
+*Anthropic-SDK-kompatibel, 100+ Modelle (Claude, GPT-4o, Perplexity Sonar, etc.)*
+
+```env
+LLM_API_KEY=sk-or-...
+LLM_BASE_URL=https://openrouter.ai/api/v1
+LLM_DEFAULT_MODEL=anthropic/claude-sonnet-4-6
+CLAUDE_MODELS=anthropic/claude-haiku-4-5-20251001,anthropic/claude-sonnet-4-6,perplexity/sonar,openai/gpt-4o
+TAVILY_API_KEY=tvly-...  # Optional: für Web Search bei GPT-4o, etc.
+```
+
+**Perplexity Sonar über OpenRouter:** Sonar hat integrierte Websuche — keine separaten Web-Search-Tool-Calls nötig. Wähle Sonar über Settings → kein Tavily erforderlich.
+
+#### Perplexity Sonar direkt  
+*OpenAI-API-Format, gebaut-in web search, keine Tools nötig*
+
+```env
+OPENAI_API_KEY=pplx-...
+OPENAI_BASE_URL=https://api.perplexity.ai
+OPENAI_MODELS=sonar,sonar-pro,sonar-reasoning
+```
+
+**Besonderheit:** Mit Sonar wird `OpenAICompatibleProvider` genutzt (nicht ClaudeProvider). Sonar hat interne Web Search → Agents arbeiten ohne Tavily/Tool-Use-Loop. Perfekt für "out of Anthropic tokens"-Szenarien.
+
+#### Weitere kompatible Endpoints (OpenAI-Format)
+Jeder Endpunkt der die OpenAI API-Format unterstützt nutzt `OpenAICompatibleProvider`:
+- **Groq**: `OPENAI_BASE_URL=https://api.groq.com/openai/v1`
+- **Together AI**: `OPENAI_BASE_URL=https://api.together.xyz/v1`
+- Beliebige OpenAI-kompatible Proxies
+
+**Wichtig nach Provider-Wechsel:**  
+1. `OPENAI_MODELS` (oder `CLAUDE_MODELS` für Anthropic-kompatible) auf neue Modell-IDs setzen
+2. Settings-Seite öffnen → Modelle für jeden Agent neu wählen (schreibt in DB)
+3. DB-Einträge überschreiben dann alle Fallbacks
+
+### Provider-Wechsel Workflow (Beispiel: Anthropic → Sonar)
+
+```bash
+# 1. .env anpassen (kein Ändern von LLM_API_KEY nötig, bleibt für OpenRouter-Scenario)
+OPENAI_API_KEY=pplx-...
+OPENAI_BASE_URL=https://api.perplexity.ai
+OPENAI_MODELS=sonar,sonar-pro
+
+# 2. App starten
+streamlit run app.py
+
+# 3. Settings → Cloud Agents (zeigt jetzt "OpenAI-kompatibel 🌐" statt "Claude ☁️")
+# → Modelle für News, Search, etc. auf "sonar" setzen → Save
+
+# 4. Agent führen → verwendet automatisch Sonar mit integrierter Web Search
+```
+
+---
+
 *Last updated: 2026-04-19*

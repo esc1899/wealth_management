@@ -42,7 +42,7 @@ from state_repos import (
     get_watchlist_checker_repo,
     get_dividend_snapshot_repo,
 )
-from state_llm import _make_claude_provider, _make_ollama_provider, _get_agent_model
+from state_llm import _make_claude_provider, _make_ollama_provider, _get_agent_model, _make_public_provider, _get_public_agent_model
 
 # Default model values (overridable via app_config)
 _DEFAULT_OLLAMA_MODEL = config.OLLAMA_MODEL
@@ -108,8 +108,8 @@ def get_market_agent() -> MarketDataAgent:
 
 @st.cache_resource
 def get_research_agent() -> ResearchAgent:
-    model = _get_agent_model("research", "claude", _DEFAULT_CLAUDE_MODEL)
-    llm = _make_claude_provider(model, "research_chat")
+    model = _get_public_agent_model("research", _DEFAULT_CLAUDE_MODEL)
+    llm = _make_public_provider(model, "research_chat")
     return ResearchAgent(
         positions_repo=get_positions_repo(),
         research_repo=get_research_repo(),
@@ -120,15 +120,15 @@ def get_research_agent() -> ResearchAgent:
 
 @st.cache_resource
 def get_news_agent() -> NewsAgent:
-    model = _get_agent_model("news", "claude", _DEFAULT_CLAUDE_MODEL)
-    llm = _make_claude_provider(model, "news_digest")
+    model = _get_public_agent_model("news", _DEFAULT_CLAUDE_MODEL)
+    llm = _make_public_provider(model, "news_digest")
     return NewsAgent(llm=llm)
 
 
 @st.cache_resource
 def get_search_agent() -> SearchAgent:
-    model = _get_agent_model("search", "claude", CLAUDE_SONNET)
-    llm = _make_claude_provider(model, "investment_search")
+    model = _get_public_agent_model("search", CLAUDE_SONNET)
+    llm = _make_public_provider(model, "investment_search")
     return SearchAgent(
         positions_repo=get_positions_repo(),
         search_repo=get_search_repo(),
@@ -138,8 +138,8 @@ def get_search_agent() -> SearchAgent:
 
 @st.cache_resource
 def get_storychecker_agent() -> StorycheckerAgent:
-    model = _get_agent_model("storychecker", "claude", _DEFAULT_CLAUDE_MODEL)
-    llm = _make_claude_provider(model, "storychecker")
+    model = _get_public_agent_model("storychecker", _DEFAULT_CLAUDE_MODEL)
+    llm = _make_public_provider(model, "storychecker")
     return StorycheckerAgent(
         positions_repo=get_positions_repo(),
         storychecker_repo=get_storychecker_repo(),
@@ -151,8 +151,8 @@ def get_storychecker_agent() -> StorycheckerAgent:
 
 @st.cache_resource
 def get_structural_change_agent() -> StructuralChangeAgent:
-    model = _get_agent_model("structural_scan", "claude", CLAUDE_SONNET)
-    llm = _make_claude_provider(model, "structural_scan")
+    model = _get_public_agent_model("structural_scan", CLAUDE_SONNET)
+    llm = _make_public_provider(model, "structural_scan")
     return StructuralChangeAgent(
         positions_repo=get_positions_repo(),
         llm=llm,
@@ -161,8 +161,8 @@ def get_structural_change_agent() -> StructuralChangeAgent:
 
 @st.cache_resource
 def get_fundamental_agent() -> FundamentalAgent:
-    model = _get_agent_model("fundamental", "claude", CLAUDE_SONNET)
-    llm = _make_claude_provider(model, "fundamental")
+    model = _get_public_agent_model("fundamental", CLAUDE_SONNET)
+    llm = _make_public_provider(model, "fundamental")
     return FundamentalAgent(
         llm=llm,
         analyses_repo=get_analyses_repo(),
@@ -171,8 +171,8 @@ def get_fundamental_agent() -> FundamentalAgent:
 
 @st.cache_resource
 def get_fundamental_analyzer_agent() -> FundamentalAnalyzerAgent:
-    model = _get_agent_model("fundamental_analyzer", "claude", _DEFAULT_CLAUDE_MODEL)
-    llm = _make_claude_provider(model, "fundamental_analyzer")
+    model = _get_public_agent_model("fundamental_analyzer", _DEFAULT_CLAUDE_MODEL)
+    llm = _make_public_provider(model, "fundamental_analyzer")
     return FundamentalAnalyzerAgent(
         positions_repo=get_positions_repo(),
         analyses_repo=get_analyses_repo(),
@@ -183,8 +183,8 @@ def get_fundamental_analyzer_agent() -> FundamentalAnalyzerAgent:
 
 @st.cache_resource
 def get_consensus_gap_agent() -> ConsensusGapAgent:
-    model = _get_agent_model("consensus_gap", "claude", CLAUDE_SONNET)
-    llm = _make_claude_provider(model, "consensus_gap")
+    model = _get_public_agent_model("consensus_gap", CLAUDE_SONNET)
+    llm = _make_public_provider(model, "consensus_gap")
     return ConsensusGapAgent(
         llm=llm,
         analyses_repo=get_analyses_repo(),
@@ -196,8 +196,11 @@ def get_agent_scheduler() -> AgentSchedulerService:
     service = AgentSchedulerService(
         db_path=config.DB_PATH,
         encryption_key=config.ENCRYPTION_KEY,
-        anthropic_api_key=config.ANTHROPIC_API_KEY,
+        anthropic_api_key=config.LLM_API_KEY,
         default_claude_model=_DEFAULT_CLAUDE_MODEL,
+        llm_base_url=config.LLM_BASE_URL,
+        openai_api_key=config.OPENAI_API_KEY,
+        openai_base_url=config.OPENAI_BASE_URL,
     )
     service.start()
     return service

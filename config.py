@@ -24,8 +24,15 @@ if _profile:
 
 
 class Config:
-    # Claude API
-    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+    # Public LLM — Anthropic-compatible endpoint
+    LLM_API_KEY: str = os.getenv("LLM_API_KEY") or os.getenv("ANTHROPIC_API_KEY", "")
+    LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "")
+    LLM_DEFAULT_MODEL: str = os.getenv("LLM_DEFAULT_MODEL", "")
+
+    # OpenAI-compatible provider (optional — Perplexity Sonar, Groq, Together, etc.)
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "")
+    OPENAI_MODELS: list = [m.strip() for m in os.getenv("OPENAI_MODELS", "").split(",") if m.strip()]
 
     # Tavily Search (optional — replaces Anthropic's built-in web_search when set)
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
@@ -84,10 +91,15 @@ class Config:
                 "ENCRYPTION_KEY is not set. "
                 "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
             )
-        if not self.ANTHROPIC_API_KEY:
+        if not self.LLM_API_KEY:
             errors.append(
-                "ANTHROPIC_API_KEY is not set. "
-                "Set it in your .env file."
+                "LLM_API_KEY is not set. "
+                "Set it in your .env file (or ANTHROPIC_API_KEY for backward compatibility)."
+            )
+        if self.OPENAI_BASE_URL and not self.OPENAI_API_KEY:
+            errors.append(
+                "OPENAI_API_KEY is not set. "
+                "Set it in your .env file (required when OPENAI_BASE_URL is configured)."
             )
         return errors
 

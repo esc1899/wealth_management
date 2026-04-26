@@ -24,16 +24,14 @@ class PositionStoryService:
         api_key: str,
         usage_repo: Optional[UsageRepository] = None,
         model: Optional[str] = None,
+        base_url: str = "",
+        openai_api_key: str = "",
+        openai_base_url: str = "",
     ):
-        """
-        Initialize the service.
-
-        Args:
-            api_key: Anthropic API key
-            usage_repo: Optional UsageRepository for tracking token usage
-            model: Model to use (default: CLAUDE_HAIKU)
-        """
         self._api_key = api_key
+        self._base_url = base_url
+        self._openai_api_key = openai_api_key
+        self._openai_base_url = openai_base_url
         self._usage_repo = usage_repo
         self._model = model or CLAUDE_HAIKU
 
@@ -68,7 +66,11 @@ class PositionStoryService:
         """
         Async implementation of position story generation.
         """
-        llm = ClaudeProvider(api_key=self._api_key, model=self._model)
+        if self._openai_base_url:
+            from core.llm.openai_compatible import OpenAICompatibleProvider
+            llm = OpenAICompatibleProvider(api_key=self._openai_api_key, model=self._model, base_url=self._openai_base_url)
+        else:
+            llm = ClaudeProvider(api_key=self._api_key, model=self._model, base_url=self._base_url)
 
         # Track position context for usage stats
         llm.skill_context = "position_story"
