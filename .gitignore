@@ -39,3 +39,6 @@ CHANGELOG.md
 # IDE
 .vscode/
 .idea/
+
+# Private Notizen
+.notes

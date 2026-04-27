@@ -97,7 +97,9 @@ class UsageRepository:
                       SUM(input_tokens) AS input_tokens,
                       SUM(output_tokens) AS output_tokens,
                       COUNT(*) AS calls,
-                      AVG(duration_ms) AS avg_duration_ms
+                      AVG(duration_ms) AS avg_duration_ms,
+                      SUM(cache_read_tokens) AS cache_read_tokens,
+                      SUM(cache_write_tokens) AS cache_write_tokens
                FROM llm_usage lu
                WHERE {self._RESET_FILTER}
                GROUP BY agent, skill, model, source

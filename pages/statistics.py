@@ -129,9 +129,18 @@ with tab_summary:
             df_all["total"] = df_all["input_tokens"] + df_all["output_tokens"]
             df_all["avg_per_call"] = (df_all["total"] / df_all["calls"]).round(0).astype(int)
             df_all["cost"] = df_all.apply(
-                lambda r: compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices),
+                lambda r: compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
+                                      r.get("cache_read_tokens"), r.get("cache_write_tokens")),
                 axis=1,
             ).round(4)
+            def _cache_savings_usd(r):
+                cache_read = r.get("cache_read_tokens") or 0
+                if cache_read == 0:
+                    return 0.0
+                price = model_prices.get(r.get("model", ""), {})
+                input_price = price.get("input", 0.0)
+                return round(cache_read * 0.90 * input_price / 1_000_000, 4)
+            df_all["savings_usd"] = df_all.apply(_cache_savings_usd, axis=1)
             df_all["avg_cost"] = (df_all["cost"] / df_all["calls"]).round(6)
             df_all["avg_duration_s"] = pd.to_numeric(df_all["avg_duration_ms"], errors="coerce").div(1000).round(1)
             df_all = df_all.drop(columns=["avg_duration_ms"], errors="ignore")
@@ -148,18 +157,26 @@ with tab_summary:
                 "cost":           t("statistics.col_cost"),
                 "avg_cost":       t("statistics.col_avg_cost"),
                 "avg_duration_s": "Ø Dauer (s)",
+                "cache_read_tokens": "Cache Reads",
+                "savings_usd":    "Einsparung $",
             })
             st.dataframe(df_all, use_container_width=True, hide_index=True)
             total_all = sum(r["input_tokens"] + r["output_tokens"] for r in alltime_rows)
             total_calls = sum(r["calls"] for r in alltime_rows)
             cost_all = sum(
-                compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices)
+                compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
+                            r.get("cache_read_tokens"), r.get("cache_write_tokens"))
                 for r in alltime_rows
             )
-            m1, m2, m3 = st.columns(3)
+            total_cache_savings = sum(
+                round(r.get("cache_read_tokens", 0) * 0.90 * model_prices.get(r.get("model", ""), {}).get("input", 0.0) / 1_000_000, 4)
+                for r in alltime_rows
+            )
+            m1, m2, m3, m4 = st.columns(4)
             m1.metric(t("statistics.total_tokens"), f"{total_all:,}")
             m2.metric(t("statistics.total_calls"), f"{total_calls:,}")
             m3.metric(t("statistics.total_cost"), f"${cost_all:.4f}")
+            m4.metric("Cache Einsparung", f"${total_cache_savings:.4f}")
         else:
             st.info(t("statistics.no_data"))
 
