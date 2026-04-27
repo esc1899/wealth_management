@@ -186,7 +186,7 @@ class ConsensusGapAgent:
 
             # Pause between positions to avoid rate limit
             if idx < len(eligible) - 1:
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.3)
 
         return results
 

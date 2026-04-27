@@ -183,7 +183,7 @@ class FundamentalAgent:
                 output.append((pos_id, verdict, rich_summary))
 
             if idx < len(eligible) - 1:
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.3)
 
         return output
 
