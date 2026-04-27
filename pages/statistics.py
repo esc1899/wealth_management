@@ -169,7 +169,7 @@ with tab_summary:
                 for r in alltime_rows
             )
             total_cache_savings = sum(
-                round(r.get("cache_read_tokens", 0) * 0.90 * model_prices.get(r.get("model", ""), {}).get("input", 0.0) / 1_000_000, 4)
+                round((r.get("cache_read_tokens") or 0) * 0.90 * model_prices.get(r.get("model", ""), {}).get("input", 0.0) / 1_000_000, 4)
                 for r in alltime_rows
             )
             m1, m2, m3, m4 = st.columns(4)
