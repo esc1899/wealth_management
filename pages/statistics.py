@@ -313,6 +313,11 @@ with tab_summary:
 
 with tab_recent:
     st.caption("Letzte 50 LLM-Aufrufe (chronologisch, neueste zuerst)")
+    st.caption(
+        "**Eff. Input** = tatsächlich verarbeitete Input-Tokens (regulär + Cache Write + Cache Read). "
+        "**Cache Write** = neue Tokens im Cache (Web-Ergebnisse, 1.25× teurer). "
+        "**Cache Read** = aus Cache gelesen (0.1× Preis, fast kostenlos)."
+    )
 
     recent_calls = repo.get_recent_calls(limit=50)
 
@@ -332,15 +337,25 @@ with tab_recent:
 
         df_recent["duration_ms"] = df_recent["duration_ms"].apply(_duration_color)
 
+        # Effective input = all token types combined
+        df_recent["eff_input"] = (
+            df_recent["input_tokens"].fillna(0).astype(int) +
+            df_recent.get("cache_write_tokens", pd.Series(0, index=df_recent.index)).fillna(0).astype(int) +
+            df_recent.get("cache_read_tokens", pd.Series(0, index=df_recent.index)).fillna(0).astype(int)
+        )
+
         df_recent = df_recent.rename(columns={
-            "created_at":      "Zeit",
-            "agent":           t("statistics.col_agent"),
-            "skill":           t("statistics.col_skill"),
-            "model":           t("statistics.col_model"),
-            "source":          "Quelle",
-            "input_tokens":    t("statistics.col_input"),
-            "output_tokens":   t("statistics.col_output"),
-            "duration_ms":     "Dauer (ms)",
+            "created_at":           "Zeit",
+            "agent":                t("statistics.col_agent"),
+            "skill":                t("statistics.col_skill"),
+            "model":                t("statistics.col_model"),
+            "source":               "Quelle",
+            "input_tokens":         t("statistics.col_input"),
+            "output_tokens":        t("statistics.col_output"),
+            "cache_write_tokens":   "Cache Write (1.25×)",
+            "cache_read_tokens":    "Cache Read (0.1×)",
+            "eff_input":            "Eff. Input",
+            "duration_ms":          "Dauer (ms)",
         })
 
         st.dataframe(df_recent, use_container_width=True, hide_index=True)

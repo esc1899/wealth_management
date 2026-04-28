@@ -177,26 +177,29 @@ class StorycheckerAgent:
 
     async def batch_check_all(self, positions: List[Position], language: str = "de") -> List[Tuple[str, str | None]]:
         """
-        Run story checks for all eligible positions sequentially.
+        Run story checks for all eligible positions in parallel.
         Each position uses its own story_skill (or none if not set).
         Returns list of (position_name, error_or_None).
+
+        Parallel execution improves cache efficiency (System Prompt cached once, reused N times
+        within 5-minute TTL) and completes faster than sequential checks.
 
         Args:
             positions: List of positions to check
             language: Language code for LLM output (default: "de")
         """
         eligible = [p for p in positions if p.story and p.id is not None]
-        self._llm.position_count = len(eligible)  # Track how many positions in this batch
-        results: List[Tuple[str, str | None]] = []
-        for i, pos in enumerate(eligible):
+        self._llm.position_count = len(eligible)
+
+        async def _check_one(pos: Position) -> Tuple[str, str | None]:
             try:
                 await self.start_session_async(pos, language=language)
-                results.append((pos.name, None))
+                return (pos.name, None)
             except Exception as exc:
-                results.append((pos.name, str(exc)))
-            if i < len(eligible) - 1:
-                await asyncio.sleep(0.3)
-        return results
+                return (pos.name, str(exc))
+
+        results = await asyncio.gather(*[_check_one(pos) for pos in eligible])
+        return list(results)
 
     def chat(self, session_id: int, user_message: str) -> str:
         """Send a follow-up message and return the assistant reply."""
