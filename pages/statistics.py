@@ -81,7 +81,8 @@ with tab_summary:
         st.subheader(t("statistics.today"))
         if today_rows:
             df_today = pd.DataFrame(today_rows)
-            df_today["total"] = df_today["input_tokens"] + df_today["output_tokens"]
+            df_today["total"] = (df_today["input_tokens"] + df_today["output_tokens"] +
+                                  df_today["cache_read_tokens"].fillna(0) + df_today["cache_write_tokens"].fillna(0)).astype(int)
             df_today["cost"] = df_today.apply(
                 lambda r: compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
                                       r.get("cache_read_tokens"), r.get("cache_write_tokens")),
@@ -111,9 +112,14 @@ with tab_summary:
                 "cache_savings_pct": "Cache Savings %",
             })
             st.dataframe(df_today, use_container_width=True, hide_index=True)
-            total_today = sum(r["input_tokens"] + r["output_tokens"] for r in today_rows)
+            total_today = sum(
+                r["input_tokens"] + r["output_tokens"] +
+                (r.get("cache_read_tokens") or 0) + (r.get("cache_write_tokens") or 0)
+                for r in today_rows
+            )
             cost_today = sum(
-                compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices)
+                compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
+                           r.get("cache_read_tokens"), r.get("cache_write_tokens"))
                 for r in today_rows
             )
             m1, m2 = st.columns(2)
@@ -126,7 +132,8 @@ with tab_summary:
         st.subheader(t("statistics.all_time"))
         if alltime_rows:
             df_all = pd.DataFrame(alltime_rows)
-            df_all["total"] = df_all["input_tokens"] + df_all["output_tokens"]
+            df_all["total"] = (df_all["input_tokens"] + df_all["output_tokens"] +
+                                df_all["cache_read_tokens"].fillna(0) + df_all["cache_write_tokens"].fillna(0)).astype(int)
             df_all["avg_per_call"] = (df_all["total"] / df_all["calls"]).round(0).astype(int)
             df_all["cost"] = df_all.apply(
                 lambda r: compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
@@ -161,7 +168,11 @@ with tab_summary:
                 "savings_usd":    "Einsparung $",
             })
             st.dataframe(df_all, use_container_width=True, hide_index=True)
-            total_all = sum(r["input_tokens"] + r["output_tokens"] for r in alltime_rows)
+            total_all = sum(
+                r["input_tokens"] + r["output_tokens"] +
+                (r.get("cache_read_tokens") or 0) + (r.get("cache_write_tokens") or 0)
+                for r in alltime_rows
+            )
             total_calls = sum(r["calls"] for r in alltime_rows)
             cost_all = sum(
                 compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
@@ -223,7 +234,7 @@ with tab_summary:
     daily_rows = repo.daily_totals(limit=30)
     if daily_rows:
         df_daily = pd.DataFrame(daily_rows)
-        df_daily["total"] = df_daily["input_tokens"] + df_daily["output_tokens"]
+        df_daily["total"] = df_daily["input_tokens"] + df_daily["output_tokens"]  # daily_totals doesn't include cache tokens
         df_daily = df_daily.sort_values("day")
         fig = px.bar(
             df_daily,
@@ -253,7 +264,8 @@ with tab_summary:
     if alltime_rows:
         st.subheader(t("statistics.by_agent"))
         df_pie = pd.DataFrame(alltime_rows)
-        df_pie["total"] = df_pie["input_tokens"] + df_pie["output_tokens"]
+        df_pie["total"] = (df_pie["input_tokens"] + df_pie["output_tokens"] +
+                            df_pie["cache_read_tokens"].fillna(0) + df_pie["cache_write_tokens"].fillna(0)).astype(int)
         fig2 = px.pie(
             df_pie,
             names="agent",
