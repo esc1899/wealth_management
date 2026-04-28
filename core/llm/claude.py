@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
 import anthropic
-from core.constants import CLAUDE_SONNET
+from core.constants import CLAUDE_SONNET, CLAUDE_OPUS
 from core.llm.base import LLMProvider, Message, Role
 
 _logger = logging.getLogger(__name__)
@@ -138,6 +138,7 @@ class ClaudeProvider(LLMProvider):
         tools: list[dict],
         system: str = "",
         max_tokens: int = 2048,
+        enable_cache: bool = True,
     ) -> ClaudeResponse:
         """
         Single API call with tool definitions.
@@ -147,6 +148,10 @@ class ClaudeProvider(LLMProvider):
         When TAVILY_API_KEY is set, web_search_20250305 is replaced with a
         client-side Tavily tool — the search loop runs internally so callers
         see no difference.
+
+        Args:
+            enable_cache: If False, disables prompt caching (useful for web-search agents
+                where cache_write > input cost makes caching uneconomical).
         """
         import os
         from core.search import tavily as _tavily
@@ -172,9 +177,13 @@ class ClaudeProvider(LLMProvider):
             "tools": resolved_tools,
         }
         if system:
-            kwargs["system"] = [
-                {"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}
-            ]
+            system_block = {"type": "text", "text": system}
+            if enable_cache:
+                system_block["cache_control"] = {"type": "ephemeral"}
+            kwargs["system"] = [system_block]
+        # effort: "high" reduces thinking token overhead; Haiku does not support effort
+        if self._model in {CLAUDE_SONNET, CLAUDE_OPUS}:
+            kwargs["output_config"] = {"effort": "high"}
 
         _t0 = time.monotonic()
         total_input = 0

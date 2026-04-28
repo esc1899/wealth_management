@@ -138,15 +138,20 @@ class NewsAgent:
         # Skip the first two messages (initial user context + digest) — they're in the system prompt
         followup_history = history[2:] if len(history) > 2 else []
 
-        messages = [Message(role=Role.SYSTEM, content=system)] + [
-            Message(
-                role=Role.USER if m.role == "user" else Role.ASSISTANT,
-                content=m.content,
-            )
+        # Build message list in chat_with_tools format (plain dicts, no system message in list)
+        api_messages = [
+            {"role": m.role, "content": m.content}
             for m in followup_history
         ]
 
-        reply = await self._llm.chat(messages, max_tokens=2048)
+        # Use chat_with_tools (no tools, but enables cache_control on system prompt)
+        cr = await self._llm.chat_with_tools(
+            messages=api_messages,
+            tools=[],
+            system=system,
+            max_tokens=2048,
+        )
+        reply = cr.content
         repo.add_message(run_id, "assistant", reply)
         return reply
 
@@ -183,5 +188,6 @@ class NewsAgent:
             tools=[WEB_SEARCH_TOOL],
             system=system,
             max_tokens=4096,
+            enable_cache=False,
         )
         return response.content or "No news digest generated."

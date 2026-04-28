@@ -59,7 +59,7 @@ Output-Format:
 ### Thema 2: ...
 ---
 
-Füge die besten 3–5 Kandidaten via add_structural_candidate zur Watchlist hinzu.
+Schlage die besten 3–5 Kandidaten via add_structural_candidate für die Watchlist vor — der Nutzer bestätigt die Aufnahme.
 Apply skill below."""
 
 FOLLOWUP_SYSTEM_PROMPT = """You are Claude's investment strategist running the "Struktureller Wandel" strategy.
@@ -128,7 +128,7 @@ class StructuralChangeAgent:
     ):
         self._positions = positions_repo
         self._llm = llm
-        self._scan_added: List[Position] = []  # candidates added in the current scan
+        self._scan_proposals: List[dict] = []  # proposal dicts collected during scan
 
     # ------------------------------------------------------------------
     # Public API
@@ -141,10 +141,10 @@ class StructuralChangeAgent:
         user_focus: Optional[str],
         repo: StructuralScansRepository,
         language: str = "de",
-    ) -> Tuple[StructuralScanRun, str, List[Position]]:
+    ) -> Tuple[StructuralScanRun, str, List[dict]]:
         """
         Run a structural change scan. Saves the run + messages.
-        Returns (run, report, newly_added_candidates).
+        Returns (run, report, proposal_dicts).
 
         Args:
             skill_name: Name of the configured skill
@@ -153,7 +153,7 @@ class StructuralChangeAgent:
             repo: Repository for persisting scan runs
             language: Language code for LLM output (default: "de")
         """
-        self._scan_added = []  # reset for this scan
+        self._scan_proposals = []  # reset for this scan
 
         system = BASE_SYSTEM_PROMPT
         system += "\n" + response_language_instruction(language)
@@ -182,7 +182,7 @@ class StructuralChangeAgent:
         )
         repo.add_message(run.id, "user", user_msg)
         repo.add_message(run.id, "assistant", report)
-        return run, report, list(self._scan_added)
+        return run, report, list(self._scan_proposals)
 
     async def chat(
         self,
@@ -216,10 +216,45 @@ class StructuralChangeAgent:
             tools=[WEB_SEARCH_TOOL],
             system=system,
             max_tokens=4096,
+            enable_cache=False,
         )
         reply = response.content or ""
         repo.add_message(run_id, "assistant", reply)
         return reply
+
+    def add_from_proposal(self, proposal: dict) -> Position:
+        """Write a proposal to the watchlist after user confirmation."""
+        registry = get_asset_class_registry()
+        asset_class = proposal.get("asset_class", "Aktie")
+        try:
+            cfg = registry.require(asset_class)
+        except ValueError:
+            asset_class = "Aktie"
+            cfg = registry.require(asset_class)
+
+        position = Position(
+            ticker=proposal.get("ticker", ""),
+            name=proposal.get("name", proposal.get("ticker", "")),
+            asset_class=asset_class,
+            investment_type=cfg.investment_type,
+            unit=cfg.default_unit,
+            story=proposal.get("full_story") or proposal.get("story") or None,
+            notes="Kandidat: Claude Strukturwandel-Scan",
+            recommendation_source="Claude Strukturwandel-Agent",
+            added_date=date.today(),
+            in_portfolio=False,
+            in_watchlist=True,
+        )
+        saved = self._positions.add(position)
+
+        if proposal.get("full_story") and saved.id:
+            try:
+                from state import get_storychecker_agent
+                get_storychecker_agent().start_session(position=saved)
+            except Exception as e:
+                logger.warning(f"Could not auto-validate story: {e}")
+
+        return saved
 
     # ------------------------------------------------------------------
     # Internal
@@ -238,6 +273,7 @@ class StructuralChangeAgent:
                 tools=TOOLS,
                 system=system,
                 max_tokens=4000,
+                enable_cache=False,
             )
 
             client_calls = [
@@ -277,31 +313,17 @@ class StructuralChangeAgent:
         return {"error": f"Unknown tool: {name}"}
 
     def _tool_add_candidate(self, args: dict) -> dict:
-        registry = get_asset_class_registry()
-        asset_class = args.get("asset_class", "Aktie")
-        try:
-            cfg = registry.require(asset_class)
-        except ValueError:
-            asset_class = "Aktie"
-            cfg = registry.require(asset_class)
-
         story = args.get("story", "")
         theme = args.get("theme", "")
         full_story = f"[Struktureller Wandel] {theme}\n\n{story}".strip() if theme else story
 
-        position = Position(
-            ticker=args["ticker"],
-            name=args["name"],
-            asset_class=asset_class,
-            investment_type=cfg.investment_type,
-            unit=cfg.default_unit,
-            story=full_story,
-            notes="Kandidat: Claude Strukturwandel-Scan",
-            recommendation_source="Claude Strukturwandel-Agent",
-            added_date=date.today(),
-            in_portfolio=False,
-            in_watchlist=True,
-        )
-        saved = self._positions.add(position)
-        self._scan_added.append(saved)
-        return {"success": True, "id": saved.id, "ticker": saved.ticker, "name": saved.name}
+        proposal = {
+            "ticker": args.get("ticker", ""),
+            "name": args.get("name", args.get("ticker", "")),
+            "asset_class": args.get("asset_class", "Aktie"),
+            "story": story,
+            "theme": theme,
+            "full_story": full_story,
+        }
+        self._scan_proposals.append(proposal)
+        return {"proposed": True, "ticker": proposal["ticker"], "name": proposal["name"]}

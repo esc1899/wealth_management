@@ -145,6 +145,7 @@ class SearchAgent:
                 tools=TOOLS,
                 system=system,
                 max_tokens=4096,
+                enable_cache=False,
             )
 
             client_calls = [

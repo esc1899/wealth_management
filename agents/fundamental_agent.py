@@ -151,6 +151,7 @@ class FundamentalAgent:
                 tools=[{"type": "web_search_20250305", "name": "web_search"}],
                 system=system,
                 max_tokens=1800,
+                enable_cache=False,
             )
             parsed = self._parse_verdicts(response.content or "")
 

@@ -151,6 +151,7 @@ class ConsensusGapAgent:
                 ],
                 system=system,
                 max_tokens=2500,
+                enable_cache=False,
             )
             # Extract verdict from tool calls
             parsed = [

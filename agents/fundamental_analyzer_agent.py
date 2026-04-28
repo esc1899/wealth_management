@@ -139,12 +139,14 @@ class FundamentalAnalyzerAgent:
     # Session management
     # ------------------------------------------------------------------
 
-    def start_session(self, position: PublicPosition, language: str = "de") -> AnalyzerSession:
+    def start_session(self, position: PublicPosition, language: str = "de", skill: Optional[str] = None, skill_prompt: Optional[str] = None) -> AnalyzerSession:
         """Create a new session and run the initial analysis.
 
         Args:
             position: The position to analyze
             language: Language code for LLM output (default: "de")
+            skill: Override skill name (optional)
+            skill_prompt: Override skill prompt (optional)
         """
         import uuid
         from datetime import datetime
@@ -159,8 +161,11 @@ class FundamentalAnalyzerAgent:
         )
 
         # Build initial message
-        skill_name, skill_prompt = self._resolve_skill(position)
-        initial_msg = _build_initial_message(position, skill_name, skill_prompt)
+        if skill is not None:
+            skill_name, resolved_prompt = skill, skill_prompt
+        else:
+            skill_name, resolved_prompt = self._resolve_skill(position)
+        initial_msg = _build_initial_message(position, skill_name, resolved_prompt)
 
         # Add to session and get response
         session.add_message("user", initial_msg)
@@ -215,30 +220,30 @@ class FundamentalAnalyzerAgent:
     # ------------------------------------------------------------------
 
     def _run_llm(self, session: AnalyzerSession) -> str:
-        """Execute LLM call — use standard system= kwarg convention."""
+        """Execute LLM call with web_search and caching enabled."""
         import asyncio
-        from core.llm.base import Message, Role
 
         self._llm.skill_context = "fundamental_analyzer"
 
-        # Build message list (user/assistant only, system separate)
-        messages = []
+        # Build message list in chat_with_tools format (dict, no system message in list)
+        api_messages = []
         for msg in session.messages:
-            role = Role.USER if msg["role"] == "user" else Role.ASSISTANT
-            messages.append(Message(role=role, content=msg["content"]))
+            api_messages.append({"role": msg["role"], "content": msg["content"]})
 
         # Build system prompt with language instruction
         system = BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(session.language)
 
-        # Prepend system message (both providers handle Role.SYSTEM correctly)
-        system_msg = Message(role=Role.SYSTEM, content=system)
-        response = asyncio.run(
-            self._llm.chat(
-                messages=[system_msg] + messages,
+        # Use chat_with_tools: enables web_search
+        cr = asyncio.run(
+            self._llm.chat_with_tools(
+                messages=api_messages,
+                tools=[WEB_SEARCH_TOOL],
+                system=system,
                 max_tokens=4096,
+                enable_cache=False,
             )
         )
-        return response
+        return cr.content
 
     def _resolve_skill(self, position: PublicPosition) -> Tuple[str, Optional[str]]:
         """Resolve skill context if available. Returns (skill_name, skill_prompt) where skill_name is never None."""
