@@ -31,8 +31,7 @@ VALID_VERDICTS = {"unterbewertet", "fair", "überbewertet", "unbekannt"}
 # Tools
 # ------------------------------------------------------------------
 
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search"}
-MAX_TOOL_ITERATIONS = 8
+WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 3}
 
 # ------------------------------------------------------------------
 # System prompt
