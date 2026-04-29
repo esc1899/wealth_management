@@ -339,9 +339,11 @@ def _extract_verdict(response: str) -> Optional[str]:
 
 
 def _extract_summary(response: str) -> Optional[str]:
-    """Extract a one-line summary from LLM response."""
+    """Extract a one-line summary from LLM response. Skip Markdown structural lines (---, ___, etc)."""
     lines = response.split("\n")
     for line in lines:
-        if line.strip() and len(line) < 200 and not line.startswith("#"):
-            return line.strip()
+        stripped = line.strip()
+        # Skip empty, headings, and lines that are only Markdown structural chars
+        if stripped and len(stripped) < 200 and not stripped.startswith("#") and not all(c in "-_=*~" for c in stripped):
+            return stripped
     return None
