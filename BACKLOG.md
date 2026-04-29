@@ -55,3 +55,5 @@ See CHANGELOG.md for full history of completed features and debt remediations.
 | DEBT-14 | 2026-04-12 | agentmonitor.py wired to navigation |
 | DEBT-15 | 2026-04-12 | Expired Easter egg removed |
 | DEBT-16 | 2026-04-12 | O(n) deletes replaced with batch SQL operations |
+| DEBT-18 | 2026-04-29 | FundamentalAgent consolidated into FundamentalAnalyzerAgent; deleted old agent module |
+| DEBT-19 | 2026-04-29 | Token caching infrastructure removed (enable_cache parameter, cache_control blocks) — uneconomical for web-search agents |
