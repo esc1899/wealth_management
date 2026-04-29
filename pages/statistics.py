@@ -90,9 +90,9 @@ with tab_summary:
             ).round(4)
             # Cache savings % = (cache_read_tokens × 0.9 × input_price) / total_cost × 100
             def _cache_savings_pct(r):
-                if r.get("cache_read_tokens", 0) == 0:
+                if not r.get("cache_read_tokens"):
                     return 0.0
-                cache_read = r.get("cache_read_tokens", 0)
+                cache_read = r.get("cache_read_tokens") or 0
                 model = r.get("model", "")
                 price = model_prices.get(model, {})
                 input_price = price.get("input", 0.0)

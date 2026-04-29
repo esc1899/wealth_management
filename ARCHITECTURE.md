@@ -95,7 +95,7 @@ sequenceDiagram
 | **StorycheckerAgent** | Claude | Haiku | DB-persisted | `start_session()` + `chat()` + `batch_check_all()` | Thesis validation |
 | **ConsensusGapAgent** | Claude | Sonnet | Stateless | `analyze_portfolio()` | Market vs. thesis gap |
 | **StructuralChangeAgent** | Claude | Sonnet | DB-persisted | `scan()` | Structural shifts |
-| **FundamentalAnalyzerAgent** | Claude | Haiku | In-memory | `start_session()` + `chat()` | Deep valuation analysis |
+| **FundamentalAnalyzerAgent** | Claude | Haiku | DB-persisted | `start_session()` + `chat()` + `analyze_portfolio()` | Deep valuation analysis |
 | **WealthSnapshotAgent** | — | — | Stateless | `take_snapshot()` | Portfolio history |
 
 ---
@@ -111,6 +111,7 @@ sequenceDiagram
 | **ResearchRepository** | Research chat sessions | `research_sessions`, `research_messages` |
 | **SearchRepository** | Investment search sessions | `search_sessions`, `search_messages` |
 | **StorycheckerRepository** | Story validation sessions | `storychecker_sessions`, `storychecker_messages` |
+| **FundamentalAnalyzerRepository** | Valuation analysis sessions | `fundamental_analyzer_sessions`, `fundamental_analyzer_messages` |
 | **PositionAnalysesRepository** | Verdicts (storychecker/consensus_gap/fundamental) | `position_analyses` |
 | **StructuralScansRepository** | Structural change scan runs | `structural_scan_runs`, `structural_scan_messages` |
 | **WealthSnapshotRepository** | Historical portfolio snapshots | `wealth_snapshots` |
@@ -171,6 +172,32 @@ repo.add(PositionAnalysis(
 # Retrieve latest for portfolio
 verdicts = repo.get_latest_bulk(position_ids=[...], agent="storychecker")
 # returns Dict[position_id, PositionAnalysis]
+```
+
+### 4. Session Persistence Pattern (Architektur-Guard)
+
+**Rule**: If an agent supports multi-turn chat (chat history + follow-up messages):
+→ Sessions **MUST** be persisted to DB, not stored in-memory `Dict`
+
+**Implementation**: Follow StorycheckerAgent/FundamentalAnalyzerAgent pattern:
+1. Create session repository with tables: `<agent>_sessions` + `<agent>_messages`
+2. `start_session()` → `repo.create_session()` + `repo.add_message()`
+3. `chat()` → `repo.get_messages()` + LLM call + `repo.add_message()`
+4. `list_sessions()` → `repo.list_sessions(limit)`
+
+**Why**: In-memory sessions are lost after Streamlit restart. Users lose their chat history and page-load becomes slow with dangling UUIDs. DB persistence solves both.
+
+**Anti-pattern** (don't do this):
+```python
+# ❌ WRONG: in-memory Dict
+class MyAgent:
+    def __init__(self):
+        self._sessions: Dict[str, MySession] = {}
+    
+    def start_session(self):
+        session_id = str(uuid.uuid4())
+        self._sessions[session_id] = MySession(...)  # ← lost after restart
+        return session_id
 ```
 
 ---
