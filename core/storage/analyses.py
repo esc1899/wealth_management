@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from core.storage.models import PositionAnalysis
 
@@ -64,19 +64,29 @@ class PositionAnalysesRepository:
         return [self._row_to_model(r) for r in rows]
 
     def get_latest_bulk(
-        self, position_ids: list[int], agent: str
+        self, position_ids: list[int], agent: Union[str, list[str]]
     ) -> dict[int, PositionAnalysis]:
-        """Return the most recent analysis per position for a list of ids."""
+        """Return the most recent analysis per position for a list of ids.
+
+        Args:
+            position_ids: List of position IDs to fetch analyses for
+            agent: Single agent name (str) or list of agent names to match
+        """
         if not position_ids:
             return {}
-        placeholders = ",".join("?" * len(position_ids))
+
+        # Normalize agent to list
+        agents = [agent] if isinstance(agent, str) else agent
+        agent_placeholders = ",".join("?" * len(agents))
+        pos_placeholders = ",".join("?" * len(position_ids))
+
         rows = self._conn.execute(
             f"""
             SELECT * FROM position_analyses
-            WHERE agent = ? AND position_id IN ({placeholders})
+            WHERE agent IN ({agent_placeholders}) AND position_id IN ({pos_placeholders})
             ORDER BY created_at ASC
             """,
-            [agent] + list(position_ids),
+            agents + list(position_ids),
         ).fetchall()
         # Keep the last row per position_id (ORDER BY ASC → last = newest)
         result: dict[int, PositionAnalysis] = {}

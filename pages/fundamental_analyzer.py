@@ -54,7 +54,7 @@ if not positions_with_required_fields:
     st.stop()
 
 _all_ids = [p.id for p in positions_with_required_fields if p.id]
-_current_verdicts = analyses_repo.get_latest_bulk(_all_ids, agent="fundamental_analyzer")
+_current_verdicts = analyses_repo.get_latest_bulk(_all_ids, agent=["fundamental", "fundamental_analyzer"])
 _pending = [p for p in positions_with_required_fields if p.id not in _current_verdicts]
 
 # ------------------------------------------------------------------
@@ -272,7 +272,7 @@ with col_right:
                 st.markdown(f"{_icon} **{_pos.name}**")
                 if _analysis.created_at:
                     st.caption(_analysis.created_at.strftime("%d.%m.%Y %H:%M"))
-                if _analysis.summary:
+                if _analysis.summary and not all(c in "-_=*~" for c in _analysis.summary.strip()):
                     st.caption(_analysis.summary)
 
                 # Inline history expander
@@ -286,7 +286,7 @@ with col_right:
                             _icon = verdict_icon(_h.verdict or "unknown", _VERDICT_CONFIG)
                             _date_str = _h.created_at.strftime("%d.%m.%Y") if _h.created_at else "—"
                             st.markdown(f"{_icon} **{_date_str}**")
-                            if _h.summary:
+                            if _h.summary and not all(c in "-_=*~" for c in _h.summary.strip()):
                                 st.caption(_h.summary)
 
                 st.divider()

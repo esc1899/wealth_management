@@ -76,7 +76,18 @@ Analysiere diese Dimensionen (je nach Position relevant):
 - Wann wird die Bewertung gerecht?
 
 Präzise und konkret. Nutze Zahlen wenn möglich.
-Auf Follow-up-Fragen: kurz und fokussiert antworten."""
+Auf Follow-up-Fragen: kurz und fokussiert antworten.
+
+## WICHTIG: FAZIT-FORMAT
+
+Schließe IMMER mit einem klaren, einzeiligen Fazit in diesem Format:
+**Fazit: unterbewertet** (Einstiegschance)
+— oder —
+**Fazit: fair** (angemessen bewertet)
+— oder —
+**Fazit: überbewertet** (kein gutes Einstiegsniveau)
+
+Nichts anderes. Genau eines dieser drei Worte muss am Ende stehen."""
 
 
 # ------------------------------------------------------------------
@@ -330,7 +341,14 @@ def _build_initial_message(position: PublicPosition, skill_name: Optional[str], 
 
 
 def _extract_verdict(response: str) -> Optional[str]:
-    """Extract verdict from LLM response. Defaults to 'unbekannt' if no verdict found."""
+    """Extract verdict from LLM response. Looks for **Fazit: <verdict>** pattern first."""
+    # Look for mandated format: **Fazit: unterbewertet/fair/überbewertet**
+    if "**Fazit:" in response or "**fazit:" in response.lower():
+        response_lower = response.lower()
+        for verdict in VALID_VERDICTS:
+            if verdict in response_lower:
+                return verdict
+    # Fallback: simple keyword search in entire response
     response_lower = response.lower()
     for verdict in VALID_VERDICTS:
         if verdict in response_lower:
