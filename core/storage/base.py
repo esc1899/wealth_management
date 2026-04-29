@@ -409,6 +409,23 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_runs_agent ON agent_runs(agent_name)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_runs_created ON agent_runs(created_at)")
 
+    conn.execute("""CREATE TABLE IF NOT EXISTS fundamental_analyzer_sessions (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        position_id   INTEGER NOT NULL,
+        ticker        TEXT,
+        position_name TEXT NOT NULL,
+        skill_name    TEXT NOT NULL,
+        created_at    TEXT NOT NULL
+    )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS fundamental_analyzer_messages (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL REFERENCES fundamental_analyzer_sessions(id),
+        role       TEXT NOT NULL,
+        content    TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_fundamental_analyzer_messages_session ON fundamental_analyzer_messages(session_id)")
+
     # Make stability_verdict and stability_summary nullable (2026-04-23)
     # PortfolioStoryAgentV2 intentionally doesn't generate stability data
     existing_analyses = {row[1] for row in conn.execute("PRAGMA table_info(portfolio_story_analyses)")}

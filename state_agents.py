@@ -159,12 +159,20 @@ def get_structural_change_agent() -> StructuralChangeAgent:
 
 
 @st.cache_resource
+@st.cache_resource
+def get_fundamental_analyzer_repo():
+    from core.storage.fundamental_analyzer import FundamentalAnalyzerRepository
+    return FundamentalAnalyzerRepository(get_db_connection())
+
+
+@st.cache_resource
 def get_fundamental_analyzer_agent() -> FundamentalAnalyzerAgent:
     model = _get_public_agent_model("fundamental_analyzer", _DEFAULT_CLAUDE_MODEL)
     llm = _make_public_provider(model, "fundamental_analyzer")
     return FundamentalAnalyzerAgent(
         positions_repo=get_positions_repo(),
         analyses_repo=get_analyses_repo(),
+        fa_repo=get_fundamental_analyzer_repo(),
         llm=llm,
         skills_repo=get_skills_repo(),
     )

@@ -343,6 +343,28 @@ class StorycheckerMessage(BaseModel):
     created_at: datetime
 
 
+class FundamentalAnalyzerSession(BaseModel):
+    """A fundamental analysis session for in-depth position analysis."""
+
+    id: Optional[int] = None
+    position_id: int
+    ticker: Optional[str] = None
+    position_name: str
+    skill_name: str
+    created_at: datetime
+    verdict: Optional[str] = None
+
+
+class FundamentalAnalyzerMessage(BaseModel):
+    """A single message in a fundamental analyzer session."""
+
+    id: Optional[int] = None
+    session_id: int
+    role: str       # 'user' or 'assistant'
+    content: str
+    created_at: datetime
+
+
 # ---------------------------------------------------------------------------
 # News model
 # ---------------------------------------------------------------------------

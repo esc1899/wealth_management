@@ -265,7 +265,9 @@ def _run_fundamental_job(
             fund_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
         else:
             fund_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET, base_url=config.LLM_BASE_URL)
-        fund_agent = FundamentalAnalyzerAgent(positions_repo=positions_repo, analyses_repo=analyses_repo, llm=fund_llm)
+        from core.storage.fundamental_analyzer import FundamentalAnalyzerRepository
+        fund_repo = FundamentalAnalyzerRepository(get_connection())
+        fund_agent = FundamentalAnalyzerAgent(positions_repo=positions_repo, analyses_repo=analyses_repo, fa_repo=fund_repo, llm=fund_llm)
 
         job["agents"] = ["Fundamental"]
         positions = [p for p in watchlist if p.id]

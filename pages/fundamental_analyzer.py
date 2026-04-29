@@ -217,8 +217,8 @@ with col_left:
             with st.expander("📊 Letzte Analysen", expanded=False):
                 for s in past_sessions:
                     date_str = ""
-                    if s.messages and len(s.messages) > 0:
-                        date_str = " · gerade eben"
+                    if s.created_at:
+                        date_str = f" · {s.created_at.strftime('%d.%m.%Y %H:%M')}"
                     btn_label = f"📊 **{s.position_name}**{date_str}"
                     active = st.session_state.get("fa_session_id") == s.id
                     if st.button(
@@ -303,14 +303,14 @@ with col_right:
                 st.caption(f"`{session.ticker}`")
 
             messages = agent.get_messages(session_id)
-            for msg in messages:
-                if msg["role"] == "user":
+            for i, msg in enumerate(messages):
+                if msg.role == "user":
                     # Skip the initial verbose system message (first user message)
-                    if len(messages) > 1 and msg == messages[0]:
+                    if i == 0:
                         continue
-                with st.chat_message(msg["role"]):
-                    st.markdown(msg["content"])
-                    if msg["role"] == "assistant":
+                with st.chat_message(msg.role):
+                    st.markdown(msg.content)
+                    if msg.role == "assistant":
                         st.caption(t("fundamental.web_search_info"))
 
             if prompt := st.chat_input(t("fundamental.chat_placeholder")):

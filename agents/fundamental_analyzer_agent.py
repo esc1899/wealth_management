@@ -6,20 +6,19 @@ Cloud-only (ClaudeProvider). Works with portfolio and watchlist positions.
 Interactive chat interface with multi-turn conversations about valuation,
 business quality, risk assessment, competitive position, etc.
 
-Sessions are stored in memory (Streamlit session_state), verdicts in position_analyses.
+Sessions are persisted in DB, verdicts in position_analyses.
 """
 
 from __future__ import annotations
 import asyncio
 import logging
 
-import re
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple
 
-from core.llm.base import Message, Role
 from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
-from core.storage.models import PublicPosition
+from core.storage.fundamental_analyzer import FundamentalAnalyzerRepository
+from core.storage.models import PublicPosition, FundamentalAnalyzerSession, FundamentalAnalyzerMessage
 from agents.agent_language import response_language_instruction
 
 
@@ -82,32 +81,6 @@ Auf Follow-up-Fragen: kurz und fokussiert antworten."""
 
 
 # ------------------------------------------------------------------
-# Session models (in-memory, not persisted)
-# ------------------------------------------------------------------
-
-class AnalyzerSession:
-    """In-memory session for fundamental analyzer chat."""
-
-    def __init__(self, session_id: str, position_id: int, position_name: str, ticker: Optional[str], language: str = "de"):
-        self.id = session_id
-        self.position_id = position_id
-        self.position_name = position_name
-        self.ticker = ticker
-        self.language = language
-        self.messages: List[Dict[str, str]] = []
-        self.verdict: Optional[str] = None
-        self.summary: Optional[str] = None
-
-    def add_message(self, role: str, content: str):
-        """Add a message to the session."""
-        self.messages.append({"role": role, "content": content})
-
-    def to_messages_api(self) -> List[Dict[str, str]]:
-        """Convert to Claude API format."""
-        return self.messages
-
-
-# ------------------------------------------------------------------
 # Agent
 # ------------------------------------------------------------------
 
@@ -115,21 +88,22 @@ class AnalyzerSession:
 class FundamentalAnalyzerAgent:
     """
     Cloud agent for in-depth fundamental analysis of individual positions.
-    Sessions are in-memory; verdicts are persisted to position_analyses.
+    Sessions are persisted in DB; verdicts are persisted to position_analyses.
     """
 
     def __init__(
         self,
         positions_repo,
         analyses_repo: PositionAnalysesRepository,
+        fa_repo: FundamentalAnalyzerRepository,
         llm: ClaudeProvider,
         skills_repo=None,
     ) -> None:
         self._positions = positions_repo
         self._analyses = analyses_repo
+        self._fa_repo = fa_repo
         self._llm = llm
         self._skills_repo = skills_repo
-        self._sessions: Dict[str, AnalyzerSession] = {}
 
     @property
     def model(self) -> str:
@@ -139,7 +113,7 @@ class FundamentalAnalyzerAgent:
     # Session management
     # ------------------------------------------------------------------
 
-    def start_session(self, position: PublicPosition, language: str = "de", skill: Optional[str] = None, skill_prompt: Optional[str] = None) -> AnalyzerSession:
+    def start_session(self, position: PublicPosition, language: str = "de", skill: Optional[str] = None, skill_prompt: Optional[str] = None) -> FundamentalAnalyzerSession:
         """Create a new session and run the initial analysis.
 
         Args:
@@ -148,30 +122,35 @@ class FundamentalAnalyzerAgent:
             skill: Override skill name (optional)
             skill_prompt: Override skill prompt (optional)
         """
-        import uuid
-        from datetime import datetime
+        # Resolve skill context
+        if skill is not None:
+            skill_name = skill
+        else:
+            skill_name, _ = self._resolve_skill(position)
 
-        session_id = str(uuid.uuid4())[:8]
-        session = AnalyzerSession(
-            session_id=session_id,
+        # Create session in DB
+        session = self._fa_repo.create_session(
             position_id=position.id,
-            position_name=position.name,
             ticker=position.ticker,
-            language=language,
+            position_name=position.name,
+            skill_name=skill_name,
         )
 
-        # Build initial message
+        # Build initial message and run analysis
         if skill is not None:
-            skill_name, resolved_prompt = skill, skill_prompt
+            resolved_prompt = skill_prompt
         else:
-            skill_name, resolved_prompt = self._resolve_skill(position)
+            _, resolved_prompt = self._resolve_skill(position)
         initial_msg = _build_initial_message(position, skill_name, resolved_prompt)
 
-        # Add to session and get response
-        session.add_message("user", initial_msg)
-        response = self._run_llm(session)
+        # Persist user message
+        self._fa_repo.add_message(session.id, "user", initial_msg)
 
-        session.add_message("assistant", response)
+        # Get response from LLM
+        response = self._run_llm(session.id, language=language)
+
+        # Persist assistant response
+        self._fa_repo.add_message(session.id, "assistant", response)
 
         # Save verdict for tracking (always, since _extract_verdict defaults to 'unbekannt')
         verdict = _extract_verdict(response)
@@ -182,56 +161,58 @@ class FundamentalAnalyzerAgent:
             skill_name=skill_name,
             verdict=verdict,
             summary=summary,
+            session_id=session.id,
         )
-        session.verdict = verdict
-        session.summary = summary
 
-        self._sessions[session_id] = session
         return session
 
-    def get_session(self, session_id: Optional[str]) -> Optional[AnalyzerSession]:
+    def get_session(self, session_id: Optional[int]) -> Optional[FundamentalAnalyzerSession]:
         """Retrieve a session by ID."""
         if not session_id:
             return None
-        return self._sessions.get(session_id)
+        return self._fa_repo.get_session(session_id)
 
-    def list_sessions(self, limit: int = 10) -> List[AnalyzerSession]:
+    def list_sessions(self, limit: int = 10) -> List[FundamentalAnalyzerSession]:
         """List recent sessions (up to limit)."""
-        # Return sessions in reverse order (newest first)
-        return list(reversed(list(self._sessions.values())[-limit:]))
+        return self._fa_repo.list_sessions(limit=limit)
 
     # ------------------------------------------------------------------
     # Chat interface
     # ------------------------------------------------------------------
 
-    def chat(self, session_id: str, user_message: str) -> str:
+    def chat(self, session_id: int, user_message: str) -> str:
         """Send a follow-up message and get response."""
         session = self.get_session(session_id)
         if not session:
             raise ValueError(f"Session {session_id} not found")
 
-        session.add_message("user", user_message)
-        response = self._run_llm(session)
-        session.add_message("assistant", response)
+        # Persist user message
+        self._fa_repo.add_message(session_id, "user", user_message)
+
+        # Get response from LLM
+        response = self._run_llm(session_id)
+
+        # Persist assistant response
+        self._fa_repo.add_message(session_id, "assistant", response)
+
         return response
 
     # ------------------------------------------------------------------
     # LLM execution
     # ------------------------------------------------------------------
 
-    def _run_llm(self, session: AnalyzerSession) -> str:
+    def _run_llm(self, session_id: int, language: str = "de") -> str:
         """Execute LLM call with web_search and caching enabled."""
-        import asyncio
-
         self._llm.skill_context = "fundamental_analyzer"
 
-        # Build message list in chat_with_tools format (dict, no system message in list)
+        # Load all messages for this session
+        messages = self._fa_repo.get_messages(session_id)
         api_messages = []
-        for msg in session.messages:
-            api_messages.append({"role": msg["role"], "content": msg["content"]})
+        for msg in messages:
+            api_messages.append({"role": msg.role, "content": msg.content})
 
         # Build system prompt with language instruction
-        system = BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(session.language)
+        system = BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(language)
 
         # Use chat_with_tools: enables web_search
         cr = asyncio.run(
@@ -253,12 +234,9 @@ class FundamentalAnalyzerAgent:
             return skill.name, skill.prompt
         return "Standard", None
 
-    def get_messages(self, session_id: str) -> List[Dict[str, str]]:
+    def get_messages(self, session_id: int) -> List[FundamentalAnalyzerMessage]:
         """Get all messages in a session."""
-        session = self.get_session(session_id)
-        if not session:
-            return []
-        return session.messages
+        return self._fa_repo.get_messages(session_id)
 
     async def analyze_portfolio(
         self,
@@ -293,7 +271,17 @@ class FundamentalAnalyzerAgent:
                 skill_prompt=skill_prompt,
             )
             # Verdict + summary already persisted in start_session()
-            output.append((pos.id, session.verdict or "unbekannt", session.summary or ""))
+            updated_session = self.get_session(session.id)
+            if updated_session:
+                verdict = updated_session.verdict or "unbekannt"
+                summary = ""
+                # Extract summary from first message
+                messages = self.get_messages(session.id)
+                for msg in messages:
+                    if msg.role == "assistant":
+                        summary = _extract_summary(msg.content) or ""
+                        break
+                output.append((pos.id, verdict, summary))
             await asyncio.sleep(0.3)
 
         return output

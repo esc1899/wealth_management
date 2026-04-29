@@ -40,5 +40,7 @@ CHANGELOG.md
 .vscode/
 .idea/
 
-# Private Notizen
+# Private Notizen & interne Referenzmaterialien
 .notes
+core/llm/TOKEN_COST_REVIEW.md
+core/llm/AGENT_EXPECTATIONS.md
