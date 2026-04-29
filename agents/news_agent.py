@@ -188,6 +188,5 @@ class NewsAgent:
             tools=[WEB_SEARCH_TOOL],
             system=system,
             max_tokens=4096,
-            enable_cache=False,
         )
         return response.content or "No news digest generated."

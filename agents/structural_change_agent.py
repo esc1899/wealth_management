@@ -216,7 +216,6 @@ class StructuralChangeAgent:
             tools=[WEB_SEARCH_TOOL],
             system=system,
             max_tokens=4096,
-            enable_cache=False,
         )
         reply = response.content or ""
         repo.add_message(run_id, "assistant", reply)
@@ -273,7 +272,6 @@ class StructuralChangeAgent:
                 tools=TOOLS,
                 system=system,
                 max_tokens=4000,
-                enable_cache=False,
             )
 
             client_calls = [

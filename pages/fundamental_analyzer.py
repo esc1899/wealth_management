@@ -18,7 +18,6 @@ from core.ui.verdicts import cloud_notice, verdict_icon, VERDICT_CONFIGS
 from state import (
     get_analyses_repo,
     get_fundamental_analyzer_agent,
-    get_fundamental_agent,
     get_portfolio_service,
 )
 
@@ -27,12 +26,16 @@ st.title(f"📊 {t('fundamental.title')}")
 st.caption(t("fundamental.subtitle"))
 
 agent = get_fundamental_analyzer_agent()
-batch_agent = get_fundamental_agent()
+batch_agent = agent
 analyses_repo = get_analyses_repo()
 portfolio_service = get_portfolio_service()
 cloud_notice(agent.model)
 
 _VERDICT_CONFIG = VERDICT_CONFIGS.get("fundamental_analyzer", {})
+
+from state import get_skills_repo
+_skills = get_skills_repo().get_by_area("fundamental")
+_skill_options = {s.name: s for s in _skills}
 
 with st.expander(t("fundamental.how_to_use"), expanded=False):
     st.markdown(t("fundamental.how_to_use_text"))
@@ -51,7 +54,7 @@ if not positions_with_required_fields:
     st.stop()
 
 _all_ids = [p.id for p in positions_with_required_fields if p.id]
-_current_verdicts = analyses_repo.get_latest_bulk(_all_ids, agent="fundamental")
+_current_verdicts = analyses_repo.get_latest_bulk(_all_ids, agent="fundamental_analyzer")
 _pending = [p for p in positions_with_required_fields if p.id not in _current_verdicts]
 
 # ------------------------------------------------------------------
@@ -90,44 +93,47 @@ def _run_batch_background(positions, skill_name, skill_prompt, language: str, jo
 # ------------------------------------------------------------------
 
 with st.expander(t("fundamental.batch_header"), expanded=False):
-    _only_pending = st.checkbox(
-        t("fundamental.batch_only_pending"),
-        value=True,
-        key="_fa_only_pending",
-    )
-    _target_positions = _pending if _only_pending else positions_with_required_fields
-    st.caption(
-        t("fundamental.batch_caption").format(
-            total=len(positions_with_required_fields),
-            pending=len(_pending),
+    if not _skills:
+        st.warning("Keine Skills verfügbar. Bitte Skills im Admin-Interface konfigurieren.")
+    else:
+        _only_pending = st.checkbox(
+            t("fundamental.batch_only_pending"),
+            value=True,
+            key="_fa_only_pending",
         )
-    )
-    st.write("**Bewertungs-Fokus:**")
-    _skill_prompt = st.text_input(
-        "z.B. 'Konzentriere dich auf Bewertungs-Metriken' oder 'Analysiere Geschäftsmodell'",
-        value="",
-        key="_fa_skill_prompt",
-        disabled=_BATCH["running"],
-    )
+        _target_positions = _pending if _only_pending else positions_with_required_fields
+        st.caption(
+            t("fundamental.batch_caption").format(
+                total=len(positions_with_required_fields),
+                pending=len(_pending),
+            )
+        )
+        _sel_skill_name = st.selectbox(
+            "Analysefokus",
+            options=list(_skill_options.keys()),
+            key="_fa_skill",
+            disabled=_BATCH["running"],
+        )
 
-    if st.button(
-        t("fundamental.batch_button"),
-        type="primary",
-        key="_fa_batch_run",
-        use_container_width=False,
-        disabled=_BATCH["running"] or not _target_positions,
-    ):
-        _lang = current_language()
-        _BATCH["running"] = True
-        _BATCH["done"] = False
-        _BATCH["error"] = None
-        _BATCH["last_error"] = None
-        threading.Thread(
-            target=_run_batch_background,
-            args=(_target_positions, "fundamental_batch", _skill_prompt or "Allgemeine fundamentale Analyse", _lang, _BATCH),
-            daemon=True,
-        ).start()
-        st.rerun()
+        if st.button(
+            t("fundamental.batch_button"),
+            type="primary",
+            key="_fa_batch_run",
+            use_container_width=False,
+            disabled=_BATCH["running"] or not _target_positions,
+        ):
+            _sel_skill = _skill_options[_sel_skill_name]
+            _lang = current_language()
+            _BATCH["running"] = True
+            _BATCH["done"] = False
+            _BATCH["error"] = None
+            _BATCH["last_error"] = None
+            threading.Thread(
+                target=_run_batch_background,
+                args=(_target_positions, _sel_skill.name, _sel_skill.prompt, _lang, _BATCH),
+                daemon=True,
+            ).start()
+            st.rerun()
 
 if _BATCH["running"]:
     st.info(f"⏳ {t('fundamental.batch_running')}", icon=":material/hourglass_top:")
@@ -173,64 +179,74 @@ with col_left:
         for p in positions_with_required_fields
     ]
 
-    with st.form("new_analysis_form"):
-        selected_idx = st.selectbox(
-            t("fundamental.position_label"),
-            options=range(len(positions_with_required_fields)),
-            format_func=lambda i: pos_labels[i],
-        )
-        selected_position = positions_with_required_fields[selected_idx]
+    if not _skills:
+        st.warning("Keine Skills verfügbar. Bitte Skills im Admin-Interface konfigurieren.")
+    else:
+        with st.form("new_analysis_form"):
+            selected_idx = st.selectbox(
+                t("fundamental.position_label"),
+                options=range(len(positions_with_required_fields)),
+                format_func=lambda i: pos_labels[i],
+            )
+            selected_position = positions_with_required_fields[selected_idx]
 
-        submitted = st.form_submit_button(t("fundamental.start_button"), use_container_width=True, type="primary")
+            _single_skill_name = st.selectbox(
+                "Analysefokus",
+                options=list(_skill_options.keys()),
+                key="_fa_single_skill",
+            )
 
-    # Show position details as reference
-    if selected_position:
-        with st.expander(f"📋 {selected_position.name}", expanded=False):
-            if selected_position.ticker:
-                st.caption(f"{t('fundamental.ticker_label')} {selected_position.ticker}")
-            if selected_position.asset_class:
-                st.caption(f"{t('fundamental.asset_class_label')} {selected_position.asset_class}")
-            if selected_position.anlageart:
-                st.caption(f"{t('fundamental.investment_type_label')} {selected_position.anlageart}")
-            if selected_position.story:
-                st.caption(t("fundamental.thesis_label"))
-                st.markdown(selected_position.story)
+            submitted = st.form_submit_button(t("fundamental.start_button"), use_container_width=True, type="primary")
 
-    # Past analyses
-    past_sessions = agent.list_sessions(limit=5)
-    if past_sessions:
-        with st.expander("📊 Letzte Analysen", expanded=False):
-            for s in past_sessions:
-                date_str = ""
-                if s.messages and len(s.messages) > 0:
-                    date_str = " · gerade eben"
-                btn_label = f"📊 **{s.position_name}**{date_str}"
-                active = st.session_state.get("fa_session_id") == s.id
-                if st.button(
-                    btn_label,
-                    key=f"fa_sess_{s.id}",
-                    use_container_width=True,
-                    type="primary" if active else "secondary",
-                ):
-                    st.session_state["fa_session_id"] = s.id
-                    st.rerun()
+        # Show position details as reference
+        if selected_position:
+            with st.expander(f"📋 {selected_position.name}", expanded=False):
+                if selected_position.ticker:
+                    st.caption(f"{t('fundamental.ticker_label')} {selected_position.ticker}")
+                if selected_position.asset_class:
+                    st.caption(f"{t('fundamental.asset_class_label')} {selected_position.asset_class}")
+                if selected_position.anlageart:
+                    st.caption(f"{t('fundamental.investment_type_label')} {selected_position.anlageart}")
+                if selected_position.story:
+                    st.caption(t("fundamental.thesis_label"))
+                    st.markdown(selected_position.story)
 
-    if st.session_state.get("fa_start_error"):
-        st.error(t("fundamental.start_error").format(error=st.session_state.pop('fa_start_error')))
+        # Past analyses
+        past_sessions = agent.list_sessions(limit=5)
+        if past_sessions:
+            with st.expander("📊 Letzte Analysen", expanded=False):
+                for s in past_sessions:
+                    date_str = ""
+                    if s.messages and len(s.messages) > 0:
+                        date_str = " · gerade eben"
+                    btn_label = f"📊 **{s.position_name}**{date_str}"
+                    active = st.session_state.get("fa_session_id") == s.id
+                    if st.button(
+                        btn_label,
+                        key=f"fa_sess_{s.id}",
+                        use_container_width=True,
+                        type="primary" if active else "secondary",
+                    ):
+                        st.session_state["fa_session_id"] = s.id
+                        st.rerun()
 
-    if submitted:
-        with st.spinner(t("fundamental.starting")):
-            try:
-                # Clear old session if position changed
-                current_session = agent.get_session(st.session_state.get("fa_session_id")) if st.session_state.get("fa_session_id") else None
-                if current_session and current_session.position_id != selected_position.id:
-                    st.session_state.pop("fa_session_id", None)
+        if st.session_state.get("fa_start_error"):
+            st.error(t("fundamental.start_error").format(error=st.session_state.pop('fa_start_error')))
 
-                session = agent.start_session(position=selected_position, language=current_language())
-                st.session_state["fa_session_id"] = session.id
-            except Exception as exc:
-                st.session_state["fa_start_error"] = str(exc)
-        st.rerun()
+        if submitted:
+            with st.spinner(t("fundamental.starting")):
+                try:
+                    # Clear old session if position changed
+                    current_session = agent.get_session(st.session_state.get("fa_session_id")) if st.session_state.get("fa_session_id") else None
+                    if current_session and current_session.position_id != selected_position.id:
+                        st.session_state.pop("fa_session_id", None)
+
+                    _sel_skill = _skill_options[_single_skill_name]
+                    session = agent.start_session(position=selected_position, language=current_language(), skill=_sel_skill.name, skill_prompt=_sel_skill.prompt)
+                    st.session_state["fa_session_id"] = session.id
+                except Exception as exc:
+                    st.session_state["fa_start_error"] = str(exc)
+            st.rerun()
 
 # ------------------------------------------------------------------
 # Right: chat interface + batch results

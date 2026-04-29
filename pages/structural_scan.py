@@ -15,11 +15,7 @@ import streamlit as st
 from core.i18n import t, current_language
 from core.ui.verdicts import cloud_notice
 from state import (
-    get_analysis_service,
-    get_portfolio_service,
     get_skills_repo,
-    get_storychecker_agent,
-    get_storychecker_repo,
     get_structural_change_agent,
     get_structural_scans_repo,
 )
@@ -36,8 +32,6 @@ _agent = get_structural_change_agent()
 cloud_notice(_agent._llm.model, provider="claude")
 _repo = get_structural_scans_repo()
 _skills = get_skills_repo().get_by_area("structural_scan")
-_analysis_service = get_analysis_service()
-_portfolio_service = get_portfolio_service()
 
 if not _skills:
     st.warning(t("structural_scan.no_skills"))
@@ -50,7 +44,7 @@ if not _skills:
 if "_scan_job" not in st.session_state:
     st.session_state["_scan_job"] = {
         "running": False, "done": False, "run_id": None,
-        "error": None, "last_error": None, "story_check_count": 0,
+        "error": None, "last_error": None, "proposals": [],
     }
 
 _JOB = st.session_state["_scan_job"]
@@ -58,12 +52,15 @@ _JOB = st.session_state["_scan_job"]
 if "scan_run_id" not in st.session_state:
     st.session_state["scan_run_id"] = None
 
+if "scan_proposals" not in st.session_state:
+    st.session_state["scan_proposals"] = []
 
-def _run_background(agent, storychecker, skill_name, skill_prompt, user_focus, language: str, repo, job: dict):
+
+def _run_background(agent, skill_name, skill_prompt, user_focus, language: str, repo, job: dict):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        run, _, new_candidates = loop.run_until_complete(
+        run, _, proposals = loop.run_until_complete(
             agent.start_scan(
                 skill_name=skill_name,
                 skill_prompt=skill_prompt,
@@ -72,11 +69,7 @@ def _run_background(agent, storychecker, skill_name, skill_prompt, user_focus, l
                 language=language,
             )
         )
-        story_count = 0
-        if new_candidates:
-            loop.run_until_complete(storychecker.batch_check_all(positions=new_candidates, language=language))
-            story_count = len(new_candidates)
-        job.update({"running": False, "done": True, "run_id": run.id, "error": None, "story_check_count": story_count})
+        job.update({"running": False, "done": True, "run_id": run.id, "error": None, "proposals": proposals})
     except Exception as exc:
         job.update({"running": False, "done": True, "run_id": None, "error": str(exc), "last_error": str(exc)})
     finally:
@@ -112,10 +105,10 @@ with st.expander(t("structural_scan.new_scan_header"), expanded=st.session_state
         _JOB["run_id"] = None
         _JOB["error"] = None
         _JOB["last_error"] = None
-        _JOB["story_check_count"] = 0
+        _JOB["proposals"] = []
         t_bg = threading.Thread(
             target=_run_background,
-            args=(_agent, get_storychecker_agent(), _sel_skill.name, _sel_skill.prompt, _user_focus or None, _lang, _repo, _JOB),
+            args=(_agent, _sel_skill.name, _sel_skill.prompt, _user_focus or None, _lang, _repo, _JOB),
             daemon=True,
         )
         t_bg.start()
@@ -136,9 +129,7 @@ if _JOB["done"]:
         st.error("❌ Strukturwandel-Scan fehlgeschlagen. Bitte versuchen Sie es später erneut.")
     elif _JOB["run_id"]:
         st.session_state["scan_run_id"] = _JOB["run_id"]
-        n = _JOB.get("story_check_count", 0)
-        if n:
-            st.success(f"✅ Scan abgeschlossen — {n} Kandidat(en) automatisch Story-gecheckt 🔍", icon=":material/fact_check:")
+        st.session_state["scan_proposals"] = _JOB.get("proposals", [])
     _JOB["done"] = False
     if _JOB["run_id"]:
         st.rerun()
@@ -169,25 +160,36 @@ if _active_run_id:
         st.markdown(_run.result)
         st.divider()
 
-        # ── Watchlist summary ────────────────────────────────────────
-        _candidates = [
-            p for p in _portfolio_service.get_watchlist_positions()
-            if p.notes and "Strukturwandel-Scan" in (p.notes or "")
-        ]
-        if _candidates:
-            st.success(
-                f"✅ {len(_candidates)} {t('structural_scan.candidates_added')}",
-                icon=":material/bookmark_added:",
-            )
-            _cand_ids = [c.id for c in _candidates if c.id]
-            _cand_verdicts = _analysis_service.get_verdicts(_cand_ids, "storychecker")
-            _SC_ICONS = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴", "unknown": "⚪"}
-            with st.expander(t("structural_scan.show_candidates")):
-                for c in _candidates:
-                    _sv = _cand_verdicts.get(c.id) if c.id else None
-                    _icon = _SC_ICONS.get(_sv.verdict, "⚪") if _sv else "⏳"
-                    _summary = f" — _{_sv.summary}_" if _sv and _sv.summary else (" — Story-Check ausstehend" if not _sv else "")
-                    st.markdown(f"- {_icon} **{c.name}** ({c.ticker or '—'}) · {c.asset_class}{_summary}")
+        # ── Proposal panel ───────────────────────────────────────────
+        if st.session_state["scan_proposals"]:
+            st.subheader("📋 Watchlist-Vorschläge")
+            st.caption("Claude empfiehlt diese Kandidaten — wähle aus, welche du übernehmen möchtest:")
+            for i, p in enumerate(st.session_state["scan_proposals"]):
+                st.checkbox(
+                    f"**{p['name']}** ({p['ticker']}) · {p['asset_class']}",
+                    key=f"scan_prop_{_active_run_id}_{i}",
+                )
+                if p.get("full_story"):
+                    st.caption(p["full_story"][:200])
+            if st.button("Zur Watchlist hinzufügen", type="primary", key=f"scan_add_{_active_run_id}"):
+                selected = [
+                    st.session_state["scan_proposals"][i]
+                    for i in range(len(st.session_state["scan_proposals"]))
+                    if st.session_state.get(f"scan_prop_{_active_run_id}_{i}", False)
+                ]
+                if selected:
+                    for prop in selected:
+                        try:
+                            _agent.add_from_proposal(prop)
+                        except Exception as exc:
+                            st.error(f"Error adding {prop['name']}: {exc}")
+                    st.success(f"✅ {len(selected)} Position(en) hinzugefügt!", icon=":material/bookmark_added:")
+                    st.session_state["scan_proposals"] = []
+                    st.rerun()
+                else:
+                    st.info("Bitte wähle mindestens eine Position aus.")
+
+        st.divider()
 
         # ── Follow-up chat ───────────────────────────────────────────
         st.subheader(t("structural_scan.followup_header"))
@@ -214,6 +216,7 @@ if _active_run_id:
 
         if st.button(t("structural_scan.new_scan_button"), key="_scan_new"):
             st.session_state["scan_run_id"] = None
+            st.session_state["scan_proposals"] = []
             st.rerun()
 
 # ------------------------------------------------------------------
@@ -237,4 +240,5 @@ if _history:
                 key=f"_scan_continue_{_h.id}",
             ):
                 st.session_state["scan_run_id"] = _h.id
+                st.session_state["scan_proposals"] = []
                 st.rerun()

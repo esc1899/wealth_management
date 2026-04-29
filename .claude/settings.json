@@ -162,7 +162,12 @@
       "Bash(sed -i '' '482s/run_button: \"Start story check\"/run_button: \"Start Analysis\"/' /Users/erik/Projects/wealth_management/translations/en.yaml)",
       "Bash(sed -i '' '683s/run_button: \"Analyse Portfolio\"/run_button: \"Start Analysis\"/' /Users/erik/Projects/wealth_management/translations/en.yaml)",
       "Bash(curl -s http://localhost:8501/statistics)",
-      "Bash(awk '{print $2}')"
+      "Bash(awk '{print $2}')",
+      "Bash(curl -s http://localhost:6655/fundamental_analyzer)",
+      "Bash(python -m py_compile /Users/erik/Projects/wealth_management/pages/fundamental_analyzer.py)",
+      "Bash(curl -s http://localhost:8505)",
+      "Bash(sqlite3 /Users/erik/Projects/wealth_management/wealth_management.db \"SELECT DISTINCT area FROM skills;\")",
+      "Bash(curl -s http://localhost:8506)"
     ],
     "additionalDirectories": [
       "/Users/erik",

@@ -91,7 +91,20 @@ st.divider()
 
 st.subheader(t("settings.add_skill"))
 
-AREA_OPTIONS = ["research", "stock_search", "rebalancing", "portfolio_analysis", t("settings.other_area")]
+AREA_OPTIONS = [
+    "portfolio",
+    "research",
+    "news",
+    "consensus_gap",
+    "search",
+    "fundamental",
+    "storychecker",
+    "portfolio_stability",
+    "portfolio_cash_rule",
+    "portfolio_story",
+    "watchlist_checker",
+    t("settings.other_area"),
+]
 
 with st.form("add_skill_form"):
     new_name = st.text_input(t("settings.name_label"), placeholder=t("settings.name_placeholder"))

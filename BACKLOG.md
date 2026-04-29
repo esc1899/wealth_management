@@ -28,6 +28,7 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 
 | ID | Priority | Description | Notes |
 |---|---|---|---|
+| DEBT-17 | P2 | Agent LLM Config — Explicit Thinking + Effort | Sonnet 4.6: set `thinking: {type: "adaptive", display: "summarized"}` + `output_config: {effort: "high"}` in ClaudeProvider.chat(). Currently: thinking runs implicitly, output limited by 1024-token overhead. Will reduce multi-turn loops (~50% token savings), longer answers. Investigate after next test cycle. |
 | DEBT-8 | P3 | Document `migrate_db()` inline — add comments explaining the dual init+migrate pattern | Low risk, cosmetic |
 | DEBT-13 | P3 | Tighten requirements.txt version bounds | Low urgency, no known conflicts |
 

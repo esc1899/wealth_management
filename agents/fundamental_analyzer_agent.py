@@ -240,7 +240,6 @@ class FundamentalAnalyzerAgent:
                 tools=[WEB_SEARCH_TOOL],
                 system=system,
                 max_tokens=4096,
-                enable_cache=False,
             )
         )
         return cr.content
@@ -260,6 +259,44 @@ class FundamentalAnalyzerAgent:
         if not session:
             return []
         return session.messages
+
+    async def analyze_portfolio(
+        self,
+        positions: List[PublicPosition],
+        skill_name: str,
+        skill_prompt: str,
+        language: str = "de",
+    ) -> List[Tuple[int, str, str]]:
+        """
+        Analyze all eligible positions. Returns list of (position_id, verdict, summary).
+        Verdicts are persisted in position_analyses under "fundamental_analyzer" agent.
+
+        Args:
+            positions: List of PublicPosition objects to analyze
+            skill_name: Name of the configured skill
+            skill_prompt: Custom skill prompt
+            language: Language code for LLM output (default: "de")
+        """
+        # Only positions with tickers are fundamentally analysable
+        eligible = [p for p in positions if p.ticker and p.id is not None]
+        if not eligible:
+            return []
+
+        output: List[Tuple[int, str, str]] = []
+
+        # Process one position at a time
+        for pos in eligible:
+            session = self.start_session(
+                position=pos,
+                language=language,
+                skill=skill_name,
+                skill_prompt=skill_prompt,
+            )
+            # Verdict + summary already persisted in start_session()
+            output.append((pos.id, session.verdict or "unbekannt", session.summary or ""))
+            await asyncio.sleep(0.3)
+
+        return output
 
     async def generate_analysis_proposal(self, position: PublicPosition) -> str:
         """Generate an AI proposal for deeper analysis of a position."""

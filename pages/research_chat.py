@@ -30,6 +30,9 @@ _skill_map = {s.name: s for s in research_skills}
 if "rc_session_id" not in st.session_state:
     st.session_state.rc_session_id = None
 
+if "rc_proposals" not in st.session_state:
+    st.session_state.rc_proposals = []
+
 # ------------------------------------------------------------------
 # Layout: left sidebar (sessions + new) | right chat
 # ------------------------------------------------------------------
@@ -91,7 +94,8 @@ with col_sidebar:
             )
             with st.spinner(t("research_chat.thinking")):
                 try:
-                    asyncio.run(agent.chat(session.id, initial_msg, language=current_language()))
+                    response, proposals = asyncio.run(agent.chat(session.id, initial_msg, language=current_language()))
+                    st.session_state.rc_proposals = proposals
                 except Exception as exc:
                     st.error(f"⚠️ {t('common.agent_error')}: {exc}")
             st.rerun()
@@ -113,6 +117,7 @@ with col_sidebar:
             btn_type = "primary" if active else "secondary"
             if st.button(btn_label, key=f"sess_{s.id}", use_container_width=True, type=btn_type):
                 st.session_state.rc_session_id = s.id
+                st.session_state.rc_proposals = []
                 st.rerun()
 
 # ------------------------------------------------------------------
@@ -151,6 +156,38 @@ with col_chat:
                     if role == "assistant":
                         st.caption(t("common.ai_disclaimer"))
 
+            # Render proposal panel if there are proposals
+            if st.session_state.rc_proposals:
+                st.divider()
+                st.subheader("📋 Watchlist-Vorschläge")
+                st.caption("Claude empfiehlt diese Kandidaten — wähle aus, welche du übernehmen möchtest:")
+
+                for i, p in enumerate(st.session_state.rc_proposals):
+                    st.checkbox(
+                        f"**{p['name']}** ({p['ticker']}) · {p['asset_class']}",
+                        key=f"prop_check_{session_id}_{i}",
+                    )
+                    if p.get("notes"):
+                        st.caption(p["notes"])
+
+                if st.button("Zur Watchlist hinzufügen", type="primary", key=f"add_proposals_{session_id}"):
+                    selected_proposals = [
+                        st.session_state.rc_proposals[i]
+                        for i in range(len(st.session_state.rc_proposals))
+                        if st.session_state.get(f"prop_check_{session_id}_{i}", False)
+                    ]
+                    if selected_proposals:
+                        for prop in selected_proposals:
+                            try:
+                                agent.add_from_proposal(session_id, prop)
+                            except Exception as exc:
+                                st.error(f"Error adding {prop['name']}: {exc}")
+                        st.success(f"✅ {len(selected_proposals)} Position(en) hinzugefügt!", icon=":material/bookmark_added:")
+                        st.session_state.rc_proposals = []
+                        st.rerun()
+                    else:
+                        st.info("Bitte wähle mindestens eine Position aus.")
+
             # Chat input
             if prompt := st.chat_input(t("research_chat.chat_placeholder")):
                 with st.chat_message("user"):
@@ -158,9 +195,11 @@ with col_chat:
                 with st.chat_message("assistant"):
                     with st.spinner(t("research_chat.analysing")):
                         try:
-                            response = asyncio.run(agent.chat(session_id, prompt, language=current_language()))
+                            response, proposals = asyncio.run(agent.chat(session_id, prompt, language=current_language()))
+                            st.session_state.rc_proposals = proposals
                         except Exception as exc:
                             response = f"⚠️ {t('common.agent_error')}: {exc}"
+                            st.session_state.rc_proposals = []
                     st.markdown(response)
                     st.caption(t("common.ai_disclaimer"))
                 st.rerun()

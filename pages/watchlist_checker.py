@@ -44,7 +44,7 @@ from core.storage.storychecker import StorycheckerRepository
 from core.storage.scheduled_jobs import ScheduledJobsRepository
 from agents.storychecker_agent import StorycheckerAgent
 from agents.consensus_gap_agent import ConsensusGapAgent
-from agents.fundamental_agent import FundamentalAgent
+from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
 from core.llm.claude import ClaudeProvider
 from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET, AGENT_SKILL_DEFAULTS
 
@@ -253,7 +253,7 @@ def _run_fundamental_job(
         jobs_repo = ScheduledJobsRepository(conn)
 
         # Resolve skill
-        fund_skill_name, fund_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "fundamental")
+        fund_skill_name, fund_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "fundamental_analyzer")
 
         _log_to_job(job, f"Skill resolved: '{fund_skill_name}'")
         if not fund_skill_prompt:
@@ -265,29 +265,32 @@ def _run_fundamental_job(
             fund_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
         else:
             fund_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET, base_url=config.LLM_BASE_URL)
-        fund_agent = FundamentalAgent(llm=fund_llm, analyses_repo=analyses_repo)
+        fund_agent = FundamentalAnalyzerAgent(positions_repo=positions_repo, analyses_repo=analyses_repo, llm=fund_llm)
 
         job["agents"] = ["Fundamental"]
         positions = [p for p in watchlist if p.id]
+        # Convert Position to PublicPosition (no private financial data for cloud agent)
+        from core.storage.models import PublicPosition
+        pub_positions = [PublicPosition(id=p.id, name=p.name, ticker=p.ticker, isin=p.isin, asset_class=p.asset_class, anlageart=p.anlageart, story=p.story, story_skill=p.story_skill) for p in positions]
 
         if not positions:
             _log_to_job(job, "❌ Keine Positionen mit ID in Watchlist")
             error_msg = "Keine Positionen mit ID in Watchlist"
         else:
-            _log_to_job(job, f"Running FundamentalAgent on {len(positions)} positions")
+            _log_to_job(job, f"Running FundamentalAnalyzerAgent on {len(positions)} positions")
             try:
                 results = loop.run_until_complete(
                     fund_agent.analyze_portfolio(
-                        positions=positions,
+                        positions=pub_positions,
                         skill_name=fund_skill_name,
                         skill_prompt=fund_skill_prompt,
                         language=language,
                     )
                 )
                 count = len(results) if results else len(positions)
-                _log_to_job(job, f"✅ FundamentalAgent completed: {count} analyzed")
+                _log_to_job(job, f"✅ FundamentalAnalyzerAgent completed: {count} analyzed")
             except Exception as exc:
-                error_msg = f"FundamentalAgent failed: {str(exc)}"
+                error_msg = f"FundamentalAnalyzerAgent failed: {str(exc)}"
                 _log_to_job(job, f"❌ {error_msg}")
                 raise
 
@@ -334,7 +337,7 @@ st.caption(t("watchlist_checker.watchlist_count").format(n=len(watchlist)))
 watchlist_ids = [pos.id for pos in watchlist if pos.id]
 sc_verdicts = _analysis_service.get_verdicts(watchlist_ids, "storychecker")
 cg_verdicts = _analysis_service.get_verdicts(watchlist_ids, "consensus_gap")
-fund_verdicts = _analysis_service.get_verdicts(watchlist_ids, "fundamental")
+fund_verdicts = _analysis_service.get_verdicts(watchlist_ids, "fundamental_analyzer")
 
 n_missing_sc_cg = sum(1 for pid in watchlist_ids if pid not in sc_verdicts or pid not in cg_verdicts)
 n_missing_fund = sum(1 for pid in watchlist_ids if pid not in fund_verdicts)
@@ -546,7 +549,7 @@ if st.session_state.get("_watchlist_check_result"):
     # Bulk-fetch analyses for all watchlist positions (used in expanders below)
     _all_fit_ids = [fit.position_id for fit in position_fits if fit.position_id]
     _bulk_story = _analysis_service.get_verdicts(_all_fit_ids, "storychecker") if _all_fit_ids else {}
-    _bulk_fund = _analysis_service.get_verdicts(_all_fit_ids, "fundamental") if _all_fit_ids else {}
+    _bulk_fund = _analysis_service.get_verdicts(_all_fit_ids, "fundamental_analyzer") if _all_fit_ids else {}
     _bulk_consensus = _analysis_service.get_verdicts(_all_fit_ids, "consensus_gap") if _all_fit_ids else {}
 
     # Display position fits

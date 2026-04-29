@@ -256,7 +256,7 @@ class UsageRepository:
     def get_recent_calls(self, limit: int = 50) -> list[dict]:
         """Last N LLM calls (newest first), regardless of reset filters."""
         rows = self._conn.execute(
-            """SELECT created_at, agent, skill, model, source, input_tokens, output_tokens, duration_ms
+            """SELECT created_at, agent, skill, model, source, input_tokens, output_tokens, duration_ms, cache_read_tokens, cache_write_tokens
                FROM llm_usage
                ORDER BY created_at DESC
                LIMIT ?""",
@@ -298,11 +298,10 @@ def _compute_cost(
     if cache_write_tokens is None:
         cache_write_tokens = 0
 
-    # Input tokens = regular + cache_read + cache_write
-    # Cache write tokens cost 1.25x, cache read tokens cost 0.10x, regular cost 1.0x
-    regular_input = input_tokens - cache_read_tokens - cache_write_tokens
+    # Anthropic returns input_tokens for regular (non-cached) tokens only.
+    # cache_write_tokens (1.25x) and cache_read_tokens (0.10x) are billed separately.
     cost = (
-        regular_input * input_price +
+        input_tokens * input_price +
         cache_write_tokens * input_price * 1.25 +
         cache_read_tokens * input_price * 0.10 +
         output_tokens * output_price

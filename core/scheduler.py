@@ -307,18 +307,21 @@ class AgentSchedulerService:
         logger.info("Storychecker job %s completed for %d positions", job.id, len(positions))
 
     async def _run_fundamental_job(self, job, conn) -> None:
-        from agents.fundamental_agent import FundamentalAgent
+        from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
         from core.storage.analyses import PositionAnalysesRepository
+        from core.storage.models import PublicPosition
 
         enc = build_encryption_service(self._enc_key, self._salt_path)
         model = job.model or self._default_claude_model
-        llm = self._make_scheduled_llm("fundamental", model, conn)
+        llm = self._make_scheduled_llm("fundamental_analyzer", model, conn)
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
-        agent = FundamentalAgent(llm=llm, analyses_repo=analyses_repo)
+        agent = FundamentalAnalyzerAgent(positions_repo=positions_repo, analyses_repo=analyses_repo, llm=llm)
         positions = positions_repo.get_portfolio()
+        # Convert Position to PublicPosition (no private financial data for cloud agent)
+        pub_positions = [PublicPosition(id=p.id, name=p.name, ticker=p.ticker, isin=p.isin, asset_class=p.asset_class, anlageart=p.anlageart, story=p.story, story_skill=p.story_skill) for p in positions]
         await agent.analyze_portfolio(
-            positions=positions,
+            positions=pub_positions,
             skill_name=job.skill_name,
             skill_prompt=job.skill_prompt,
             language="de",

@@ -140,8 +140,9 @@ class TestChat:
             tool_calls=[],
             stop_reason="end_turn",
         ))
-        result = await agent.chat(1, "Bewerte Apple.")
-        assert result == "Starkes Buy-Signal."
+        content, proposals = await agent.chat(1, "Bewerte Apple.")
+        assert content == "Starkes Buy-Signal."
+        assert proposals == []
 
     @pytest.mark.asyncio
     async def test_raises_if_session_not_found(self, agent, mock_research_repo):
@@ -155,7 +156,7 @@ class TestChat:
         call_kwargs = mock_llm.chat_with_tools.call_args[1]
         tools = call_kwargs["tools"]
         tool_names = [t.get("name") or t.get("type", "") for t in tools]
-        assert "add_to_watchlist" in tool_names
+        assert "propose_for_watchlist" in tool_names
         assert any("web_search" in n for n in tool_names)
 
     @pytest.mark.asyncio
@@ -182,16 +183,16 @@ class TestChat:
 
 
 # ------------------------------------------------------------------
-# Tool execution — add_to_watchlist
+# Tool execution — propose_for_watchlist
 # ------------------------------------------------------------------
 
-class TestAddToWatchlistTool:
+class TestProposeForWatchlistTool:
     @pytest.mark.asyncio
-    async def test_executes_add_to_watchlist_tool(self, agent, mock_llm, mock_positions_repo):
+    async def test_collects_proposal_without_adding(self, agent, mock_llm, mock_positions_repo):
         tool_call = ClaudeToolCall(
             id="tool_1",
-            name="add_to_watchlist",
-            input={"ticker": "AAPL", "name": "Apple Inc.", "asset_class": "Aktie", "notes": "Günstig bewertet"},
+            name="propose_for_watchlist",
+            input={"ticker": "AAPL", "name": "Apple Inc.", "asset_class": "Aktie", "notes": "Günstig bewertet", "story": "Strong growth potential"},
         )
         mock_llm.chat_with_tools = AsyncMock(side_effect=[
             ClaudeResponse(
@@ -201,27 +202,43 @@ class TestAddToWatchlistTool:
                 raw_blocks=[],
             ),
             ClaudeResponse(
-                content="Apple wurde zur Watchlist hinzugefügt.",
+                content="Ich empfehle Apple zur Watchlist.",
                 tool_calls=[],
                 stop_reason="end_turn",
             ),
         ])
-        result = await agent.chat(1, "Füge Apple zur Watchlist hinzu.")
-        mock_positions_repo.add.assert_called_once()
-        assert "Apple" in result or "Watchlist" in result
+        content, proposals = await agent.chat(1, "Analysiere Apple.")
+        mock_positions_repo.add.assert_not_called()
+        assert len(proposals) == 1
+        assert proposals[0]["ticker"] == "AAPL"
+        assert proposals[0]["name"] == "Apple Inc."
 
     @pytest.mark.asyncio
-    async def test_watchlist_entry_has_correct_source(self, agent, mock_llm, mock_positions_repo):
-        tool_call = ClaudeToolCall(
-            id="tool_1",
-            name="add_to_watchlist",
-            input={"ticker": "AAPL", "name": "Apple", "asset_class": "Aktie"},
-        )
-        mock_llm.chat_with_tools = AsyncMock(side_effect=[
-            ClaudeResponse(content="", tool_calls=[tool_call], stop_reason="tool_use", raw_blocks=[]),
-            ClaudeResponse(content="Fertig.", tool_calls=[], stop_reason="end_turn"),
-        ])
-        await agent.chat(1, "Watchlist.")
+    async def test_add_from_proposal_writes_to_watchlist(self, agent, mock_positions_repo):
+        proposal = {
+            "ticker": "AAPL",
+            "name": "Apple Inc.",
+            "asset_class": "Aktie",
+            "notes": "Günstig bewertet",
+            "story": "Strong growth",
+        }
+        agent.add_from_proposal(1, proposal)
+        mock_positions_repo.add.assert_called_once()
+        position = mock_positions_repo.add.call_args[0][0]
+        assert position.ticker == "AAPL"
+        assert position.in_watchlist is True
+        assert position.recommendation_source == "research_agent"
+
+    @pytest.mark.asyncio
+    async def test_watchlist_entry_has_correct_source(self, agent, mock_positions_repo):
+        proposal = {
+            "ticker": "AAPL",
+            "name": "Apple",
+            "asset_class": "Aktie",
+            "notes": "",
+            "story": "",
+        }
+        agent.add_from_proposal(1, proposal)
         position = mock_positions_repo.add.call_args[0][0]
         assert position.recommendation_source == "research_agent"
         assert position.strategy == "Value Investing"
@@ -229,7 +246,7 @@ class TestAddToWatchlistTool:
 
     @pytest.mark.asyncio
     async def test_llm_called_twice_for_tool_use(self, agent, mock_llm):
-        tool_call = ClaudeToolCall(id="t1", name="add_to_watchlist",
+        tool_call = ClaudeToolCall(id="t1", name="propose_for_watchlist",
                                    input={"ticker": "AAPL", "name": "Apple", "asset_class": "Aktie"})
         mock_llm.chat_with_tools = AsyncMock(side_effect=[
             ClaudeResponse(content="", tool_calls=[tool_call], stop_reason="tool_use", raw_blocks=[]),

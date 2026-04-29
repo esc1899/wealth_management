@@ -347,10 +347,14 @@ class TestStrategyWorkflows:
 
     def test_research_agent_adds_to_watchlist_with_strategy(self, research_agent, positions):
         session = research_agent.start_session("AAPL", "Value Investing")
-        research_agent._tool_add_to_watchlist(
-            session,
-            {"ticker": "AAPL", "name": "Apple Inc.", "asset_class": "Aktie", "notes": "Attraktiv"},
-        )
+        proposal = {
+            "ticker": "AAPL",
+            "name": "Apple Inc.",
+            "asset_class": "Aktie",
+            "notes": "Attraktiv",
+            "story": "",
+        }
+        research_agent.add_from_proposal(session.id, proposal)
 
         wl = positions.get_watchlist()
         assert len(wl) == 1

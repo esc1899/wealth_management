@@ -9,7 +9,6 @@ from config import config
 from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET
 from core.llm.local import OllamaProvider
 from agents.consensus_gap_agent import ConsensusGapAgent
-from agents.fundamental_agent import FundamentalAgent
 from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
 from agents.market_data_agent import MarketDataAgent
 from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
@@ -156,16 +155,6 @@ def get_structural_change_agent() -> StructuralChangeAgent:
     return StructuralChangeAgent(
         positions_repo=get_positions_repo(),
         llm=llm,
-    )
-
-
-@st.cache_resource
-def get_fundamental_agent() -> FundamentalAgent:
-    model = _get_public_agent_model("fundamental", CLAUDE_SONNET)
-    llm = _make_public_provider(model, "fundamental")
-    return FundamentalAgent(
-        llm=llm,
-        analyses_repo=get_analyses_repo(),
     )
 
 

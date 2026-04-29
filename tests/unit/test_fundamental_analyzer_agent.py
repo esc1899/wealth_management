@@ -39,7 +39,10 @@ def mock_llm():
     """Create a mock LLM provider."""
     mock = Mock()
     mock.model = "claude-sonnet-4-6"
-    mock.chat = AsyncMock(return_value="🟢 **Intakt** — Das Geschäftsmodell ist stabil")
+    # chat_with_tools returns object with .content attribute
+    mock_response = Mock()
+    mock_response.content = "🟢 **Intakt** — Das Geschäftsmodell ist stabil"
+    mock.chat_with_tools = AsyncMock(return_value=mock_response)
     return mock
 
 
@@ -129,7 +132,7 @@ def test_start_session(agent, mock_position, mock_llm):
     assert session.position_id == 1
     assert session.position_name == "Apple Inc."
     assert len(session.messages) >= 1  # At least initial message
-    assert mock_llm.chat.called
+    assert mock_llm.chat_with_tools.called
 
 
 def test_get_session(agent, mock_position, mock_llm):
@@ -181,7 +184,9 @@ def test_list_sessions_respects_limit(agent, mock_position, mock_llm):
 def test_chat(agent, mock_position, mock_llm):
     """Test sending a chat message."""
     session = agent.start_session(mock_position)
-    mock_llm.chat.return_value = "Follow-up analysis response"
+    mock_response = Mock()
+    mock_response.content = "Follow-up analysis response"
+    mock_llm.chat_with_tools.return_value = mock_response
 
     response = agent.chat(session.id, "Welche Risiken sehen Sie?")
 
@@ -270,9 +275,9 @@ def test_llm_called_with_correct_format(agent, mock_position, mock_llm):
     """Test that LLM is called with correct message format."""
     agent.start_session(mock_position)
 
-    # Check that chat was called
-    assert mock_llm.chat.called
-
-    # Get the call arguments
-    call_args = mock_llm.chat.call_args
-    assert "messages" in call_args.kwargs or len(call_args.args) > 0
+    # Check that chat_with_tools was called with web_search enabled
+    assert mock_llm.chat_with_tools.called
+    call_args = mock_llm.chat_with_tools.call_args
+    assert "messages" in call_args.kwargs
+    assert "tools" in call_args.kwargs
+    assert "system" in call_args.kwargs
