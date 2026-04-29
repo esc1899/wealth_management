@@ -212,7 +212,7 @@ with col_left:
                     st.markdown(selected_position.story)
 
         # Past analyses
-        past_sessions = agent.list_sessions(limit=5)
+        past_sessions = agent.list_sessions(limit=20)
         if past_sessions:
             with st.expander("📊 Letzte Analysen", expanded=False):
                 for s in past_sessions:
@@ -278,7 +278,7 @@ with col_right:
                 # Inline history expander
                 _history = [
                     a for a in analyses_repo.get_for_position(_pos.id, limit=20)
-                    if a.agent == "fundamental"
+                    if a.agent in {"fundamental", "fundamental_analyzer"}
                 ]
                 if len(_history) > 1:
                     with st.expander(f"{t('storychecker.verdict_history')} ({len(_history) - 1})", expanded=False):
