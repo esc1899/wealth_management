@@ -10,7 +10,7 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 
 ## In Progress
 
-*(empty)*
+(None)
 
 ---
 
@@ -25,6 +25,7 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 | FEAT-19 | P2 | [IMPR] UI Unification — Agent Pages | Unified UX for Consensus Gap + Fundamental Analyzer to match Storychecker gold standard: help expanders, batch sections with pending/total counts, 2-column layouts, current/older output splits, error handling | ✅ DONE | 2026-04-26 |
 | FEAT-20 | P2 | [BUG] Scheduler Skill Config — FundamentalAnalyzer | Root-cause analysis: Scheduler UI has no Skill field → jobs created with empty skill_name/skill_prompt. When batch runs, unclear what skill is used or if it crashes. Need: full trace through analyze_portfolio() → start_session() → _resolve_skill() to understand fallback logic. Then either: (A) add Skill field to Scheduler UI, or (B) implement smart default in analyze_portfolio(). | 🔲 TODO | 2026-05-04 |
 | FEAT-21 | P2 | [IMPR] Konsistenz Checker-History | FundamentalAnalyzer has TWO history displays: (1) "Letzte Analysen" Sessions-List (left, for chat), (2) Verdict-History per Position (right, expandable). StorycheckER + ConsensusGap have only (2). Design question: Keep dual-view for FA's multi-turn chat capability, or unify all 3 checkers? Current: (1) shows 20 sessions but unclear if multi-session-per-position displayed correctly. (2) shows 20 verdicts per position. Need: clarify display logic & ensure limit behavior consistent across all checkers. | 🔲 TODO | 2026-05-04 |
+| FEAT-22 | P2 | [FEAT] Scheduler Job Logs | Show execution history for scheduled jobs in Settings UI. User needs visibility into: (1) when job last ran, (2) if it succeeded or failed, (3) error messages if failed. Implementation: new DB table `scheduled_job_runs(id, job_id, status, started_at, completed_at, error_msg)`, ScheduledJobRunsRepository, UI under each job in settings.py with "Last run: [timestamp] [status icon] [error details]". Status quo: only `last_run` timestamp visible, no failure tracking. | 🔲 TODO | 2026-05-04 |
 
 ### Technical Debt
 
@@ -39,6 +40,12 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 ## Completed
 
 See CHANGELOG.md for full history of completed features and debt remediations.
+
+### Bugs — Completed ✅
+
+| ID | Completed | Description |
+|---|---|---|
+| BUG-1 | 2026-05-04 | Scheduler Catchup Not Running — Root cause: inverted condition in grace_period check (`<=` vs `>`). Fixed with test-first approach (7 scenarios), enhanced to run new jobs immediately, optimized to background thread. All 594 tests passing. |
 
 ### Technical Debt — Completed ✅
 
