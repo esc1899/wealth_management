@@ -43,7 +43,7 @@ def config_repo(conn):
 
 
 _PRICES = {
-    "claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.00},
+    "claude-haiku-4-5-20251001": {"input": 1.00, "output": 5.00},
     "claude-sonnet-4-6":         {"input": 3.00, "output": 15.00},
 }
 
@@ -54,7 +54,7 @@ _PRICES = {
 
 def test_compute_cost_haiku():
     cost = compute_cost(1_000_000, 0, "claude-haiku-4-5-20251001", _PRICES)
-    assert cost == pytest.approx(0.80)
+    assert cost == pytest.approx(1.00)
 
 
 def test_compute_cost_sonnet_output():
@@ -70,7 +70,7 @@ def test_compute_cost_unknown_model():
 def test_compute_cost_combined():
     # 500k input + 500k output for haiku
     cost = compute_cost(500_000, 500_000, "claude-haiku-4-5-20251001", _PRICES)
-    assert cost == pytest.approx(0.80 * 0.5 + 4.00 * 0.5)
+    assert cost == pytest.approx(1.00 * 0.5 + 5.00 * 0.5)
 
 
 # ---------------------------------------------------------------------------
@@ -153,15 +153,15 @@ def test_avg_cost_per_call_no_data(usage_repo):
 def test_avg_cost_per_call_single(usage_repo):
     usage_repo.record("news_digest", "claude-haiku-4-5-20251001", 1_000_000, 0, skill=None)
     avg = usage_repo.avg_cost_per_call("news_digest", "claude-haiku-4-5-20251001", None, _PRICES)
-    assert avg == pytest.approx(0.80)
+    assert avg == pytest.approx(1.00)
 
 
 def test_avg_cost_per_call_multiple(usage_repo):
     usage_repo.record("news_digest", "claude-haiku-4-5-20251001", 1_000_000, 0, skill=None)
     usage_repo.record("news_digest", "claude-haiku-4-5-20251001", 0, 1_000_000, skill=None)
     avg = usage_repo.avg_cost_per_call("news_digest", "claude-haiku-4-5-20251001", None, _PRICES)
-    # avg input = 500k, avg output = 500k → cost = 0.4 + 2.0 = 2.4
-    assert avg == pytest.approx(2.40)
+    # avg input = 500k, avg output = 500k → cost = 0.5 + 2.5 = 3.0
+    assert avg == pytest.approx(3.00)
 
 
 def test_avg_cost_per_call_skill_filter(usage_repo):
@@ -169,8 +169,8 @@ def test_avg_cost_per_call_skill_filter(usage_repo):
     usage_repo.record("news_digest", "claude-haiku-4-5-20251001", 2_000_000, 0, skill="Skill B")
     avg_a = usage_repo.avg_cost_per_call("news_digest", "claude-haiku-4-5-20251001", "Skill A", _PRICES)
     avg_b = usage_repo.avg_cost_per_call("news_digest", "claude-haiku-4-5-20251001", "Skill B", _PRICES)
-    assert avg_a == pytest.approx(0.80)
-    assert avg_b == pytest.approx(1.60)
+    assert avg_a == pytest.approx(1.00)
+    assert avg_b == pytest.approx(2.00)
 
 
 def test_avg_cost_after_reset(usage_repo):
@@ -220,9 +220,9 @@ def test_monthly_estimate_with_data(usage_repo):
 
     result = usage_repo.monthly_estimate([job], _PRICES, positions_repo)
     assert len(result) == 1
-    # Cost per position = $0.80 / 20 = $0.04
-    # Monthly = 30 calls × 20 positions × $0.04 = $24.00
-    assert result[0]["monthly_cost_eur"] == pytest.approx(24.00)
+    # Cost per position = $1.00 / 20 = $0.05
+    # Monthly = 30 calls × 20 positions × $0.05 = $30.00
+    assert result[0]["monthly_cost_eur"] == pytest.approx(30.00)
 
 
 def test_monthly_estimate_disabled_job_skipped(usage_repo):
@@ -243,8 +243,8 @@ def test_monthly_estimate_disabled_job_skipped(usage_repo):
 def test_get_model_prices_seeds_defaults(config_repo):
     prices = config_repo.get_model_prices()
     assert "claude-haiku-4-5-20251001" in prices
-    assert prices["claude-haiku-4-5-20251001"]["input"] == pytest.approx(0.80)
-    assert prices["claude-haiku-4-5-20251001"]["output"] == pytest.approx(4.00)
+    assert prices["claude-haiku-4-5-20251001"]["input"] == pytest.approx(1.00)
+    assert prices["claude-haiku-4-5-20251001"]["output"] == pytest.approx(5.00)
 
 
 def test_set_model_prices(config_repo):

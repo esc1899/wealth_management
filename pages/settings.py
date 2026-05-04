@@ -13,7 +13,7 @@ from core.health import Severity, check_ollama_connectivity, run_static_checks
 from core.i18n import SUPPORTED_LANGUAGES, current_language, set_language, t
 from core.llm.claude import fetch_available_models as _fetch_claude_models
 from core.storage.models import ScheduledJob
-from state import get_agent_scheduler, get_app_config_repo, get_scheduled_jobs_repo
+from state import get_agent_scheduler, get_app_config_repo, get_scheduled_jobs_repo, get_skills_repo
 
 st.set_page_config(page_title="Einstellungen", page_icon="⚙️", layout="wide")
 st.title(t("settings.title"))
@@ -331,6 +331,14 @@ _SCHEDULABLE_AGENTS = {
     "fundamental": t("settings.agent_fundamental"),
 }
 
+# Agents that support skill configuration in scheduler
+_SKILL_CAPABLE_AGENTS = {
+    "news": "news",
+    "structural_scan": "structural_scan",
+    "consensus_gap": "consensus_gap",
+    "fundamental": "fundamental",
+}
+
 st.subheader(t("settings.scheduling_header"))
 st.caption(t("settings.scheduling_caption"))
 
@@ -385,13 +393,42 @@ _FREQ_OPTIONS = ["daily", "weekly", "monthly"]
 _FREQ_LABELS = [t(f"settings.freq_{f}") for f in _FREQ_OPTIONS]
 _WEEKDAY_OPTIONS = list(range(7))
 
+# Initialize session state for agent selection
+if "_sched_new_agent" not in st.session_state:
+    st.session_state["_sched_new_agent"] = list(_SCHEDULABLE_AGENTS.keys())[0]
+
+# Agent selection (outside form, allows dynamic skill loading)
+_jf_agent_label = st.selectbox(
+    t("settings.job_agent_label"),
+    options=list(_SCHEDULABLE_AGENTS.keys()),
+    format_func=lambda k: _SCHEDULABLE_AGENTS[k],
+    key="_sched_new_agent",
+)
+
+# Skill selector (only for skill-capable agents)
+if _jf_agent_label in _SKILL_CAPABLE_AGENTS:
+    _skills_repo = get_skills_repo()
+    _skill_area = _SKILL_CAPABLE_AGENTS[_jf_agent_label]
+    _available_skills = _skills_repo.get_by_area(_skill_area)
+
+    if _available_skills:
+        _skill_options = [None] + _available_skills  # None = no skill
+        _sel_skill = st.selectbox(
+            "Skill",
+            options=_skill_options,
+            format_func=lambda s: "— kein Skill —" if s is None else f"{s.name} — {s.description or ''}",
+            key="_sched_new_skill",
+        )
+        st.session_state["_sched_new_skill_id"] = _sel_skill.id if _sel_skill else None
+    else:
+        st.info(f"Keine Skills für {_SCHEDULABLE_AGENTS[_jf_agent_label]} konfiguriert")
+        st.session_state["_sched_new_skill_id"] = None
+else:
+    st.session_state["_sched_new_skill_id"] = None
+
+st.divider()
+
 with st.form("add_job_form"):
-    _jf_agent_label = st.selectbox(
-        t("settings.job_agent_label"),
-        options=list(_SCHEDULABLE_AGENTS.keys()),
-        format_func=lambda k: _SCHEDULABLE_AGENTS[k],
-        key="_jf_agent",
-    )
     _jf_freq_label = st.selectbox(
         t("settings.job_frequency_label"),
         options=_FREQ_LABELS,
@@ -429,10 +466,20 @@ with st.form("add_job_form"):
     _jf_submitted = st.form_submit_button(t("settings.save_button"), use_container_width=True)
 
 if _jf_submitted:
+    # Read agent and skill from session state
+    _agent_key = st.session_state.get("_sched_new_agent", list(_SCHEDULABLE_AGENTS.keys())[0])
+    _skill_id = st.session_state.get("_sched_new_skill_id")
+
+    skill_name, skill_prompt = "", ""
+    if _skill_id:
+        _skill = get_skills_repo().get(_skill_id)
+        if _skill:
+            skill_name, skill_prompt = _skill.name, _skill.prompt
+
     _new_job = ScheduledJob(
-        agent_name=_jf_agent_label,
-        skill_name="",
-        skill_prompt="",
+        agent_name=_agent_key,
+        skill_name=skill_name,
+        skill_prompt=skill_prompt,
         frequency=_jf_freq,
         run_hour=int(_jf_hour),
         run_minute=int(_jf_minute),

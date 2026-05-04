@@ -64,11 +64,11 @@ class AppConfigRepository:
     # Model prices
     # ------------------------------------------------------------------
 
-    # Anthropic list prices (USD per million tokens), April 2025
+    # Anthropic list prices (USD per million tokens), May 2026
     _DEFAULT_MODEL_PRICES: dict = {
-        CLAUDE_HAIKU:   {"input": 0.80,  "output": 4.00},
+        CLAUDE_HAIKU:   {"input": 1.00,  "output": 5.00},
         CLAUDE_SONNET:  {"input": 3.00,  "output": 15.00},
-        CLAUDE_OPUS:    {"input": 15.00, "output": 75.00},
+        CLAUDE_OPUS:    {"input": 5.00,  "output": 25.00},
         # Local models are free
         "qwen3:8b":     {"input": 0.0,   "output": 0.0},
         "llama3.2":     {"input": 0.0,   "output": 0.0},
