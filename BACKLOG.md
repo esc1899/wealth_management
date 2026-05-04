@@ -23,6 +23,7 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 | FEAT-17 | P2 | [IMPR] Terminology & Chart | Rename "Investment-Typ" → "Anlageklasse" (UI only); add Sunburst chart (Anlageklasse innen, Anlageform außen) | ✅ DONE | 2026-04-20 |
 | FEAT-18 | P2 | [IMPR] Portfolio-Checker Refactor | Split monolithic PortfolioStoryAgent into modular, optional checks (CashRule, Stability, Story) — parallel to Position-Checkers pattern | ✅ DONE | 2026-04-20 |
 | FEAT-19 | P2 | [IMPR] UI Unification — Agent Pages | Unified UX for Consensus Gap + Fundamental Analyzer to match Storychecker gold standard: help expanders, batch sections with pending/total counts, 2-column layouts, current/older output splits, error handling | ✅ DONE | 2026-04-26 |
+| FEAT-20 | P2 | [BUG] Scheduler Skill Config — FundamentalAnalyzer | Root-cause analysis: Scheduler UI has no Skill field → jobs created with empty skill_name/skill_prompt. When batch runs, unclear what skill is used or if it crashes. Need: full trace through analyze_portfolio() → start_session() → _resolve_skill() to understand fallback logic. Then either: (A) add Skill field to Scheduler UI, or (B) implement smart default in analyze_portfolio(). | 🔲 TODO | 2026-05-04 |
 
 ### Technical Debt
 
