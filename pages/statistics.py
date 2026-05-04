@@ -85,7 +85,7 @@ with tab_summary:
                                   df_today["cache_read_tokens"].fillna(0) + df_today["cache_write_tokens"].fillna(0)).astype(int)
             df_today["cost"] = df_today.apply(
                 lambda r: compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
-                                      r.get("cache_read_tokens"), r.get("cache_write_tokens")),
+                                      r.get("cache_read_tokens"), r.get("cache_write_tokens"), r.get("web_search_requests")),
                 axis=1,
             ).round(4)
             # Cache savings % = (cache_read_tokens × 0.9 × input_price) / total_cost × 100
@@ -119,7 +119,7 @@ with tab_summary:
             )
             cost_today = sum(
                 compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
-                           r.get("cache_read_tokens"), r.get("cache_write_tokens"))
+                           r.get("cache_read_tokens"), r.get("cache_write_tokens"), r.get("web_search_requests"))
                 for r in today_rows
             )
             m1, m2 = st.columns(2)
@@ -137,7 +137,7 @@ with tab_summary:
             df_all["avg_per_call"] = (df_all["total"] / df_all["calls"]).round(0).astype(int)
             df_all["cost"] = df_all.apply(
                 lambda r: compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
-                                      r.get("cache_read_tokens"), r.get("cache_write_tokens")),
+                                      r.get("cache_read_tokens"), r.get("cache_write_tokens"), r.get("web_search_requests")),
                 axis=1,
             ).round(4)
             def _cache_savings_usd(r):
@@ -176,7 +176,7 @@ with tab_summary:
             total_calls = sum(r["calls"] for r in alltime_rows)
             cost_all = sum(
                 compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
-                            r.get("cache_read_tokens"), r.get("cache_write_tokens"))
+                            r.get("cache_read_tokens"), r.get("cache_write_tokens"), r.get("web_search_requests"))
                 for r in alltime_rows
             )
             total_cache_savings = sum(

@@ -20,7 +20,7 @@ def get_period_costs(usage_repo, model_prices: dict) -> dict:
     month_str = today_str[:7]  # "YYYY-MM"
 
     rows = usage_repo._conn.execute(
-        """SELECT model, input_tokens, output_tokens, date(created_at) AS day
+        """SELECT model, input_tokens, output_tokens, web_search_requests, date(created_at) AS day
            FROM llm_usage
            WHERE model NOT IN ('qwen3:8b', 'llama3.2')"""
     ).fetchall()
@@ -28,7 +28,8 @@ def get_period_costs(usage_repo, model_prices: dict) -> dict:
     cost_today = 0.0
     cost_month = 0.0
     for r in rows:
-        cost = compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices)
+        web_search = r["web_search_requests"] or 0
+        cost = compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices, web_search_requests=web_search)
         if r["day"] == today_str:
             cost_today += cost
         if r["day"].startswith(month_str):

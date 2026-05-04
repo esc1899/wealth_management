@@ -29,12 +29,13 @@ class UsageRepository:
         position_count: Optional[int] = None,
         cache_read_tokens: Optional[int] = None,
         cache_write_tokens: Optional[int] = None,
+        web_search_requests: Optional[int] = None,
     ) -> None:
         self._conn.execute(
             "INSERT INTO llm_usage"
-            " (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count, cache_read_tokens, cache_write_tokens, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count, cache_read_tokens, cache_write_tokens, datetime.utcnow().isoformat()),
+            " (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count, cache_read_tokens, cache_write_tokens, web_search_requests, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count, cache_read_tokens, cache_write_tokens, web_search_requests, datetime.utcnow().isoformat()),
         )
         self._conn.commit()
 
@@ -81,7 +82,8 @@ class UsageRepository:
                       SUM(input_tokens) AS input_tokens,
                       SUM(output_tokens) AS output_tokens,
                       SUM(cache_read_tokens) AS cache_read_tokens,
-                      SUM(cache_write_tokens) AS cache_write_tokens
+                      SUM(cache_write_tokens) AS cache_write_tokens,
+                      SUM(web_search_requests) AS web_search_requests
                FROM llm_usage lu
                WHERE date(created_at) = ?
                GROUP BY agent, skill, model, source
@@ -99,7 +101,8 @@ class UsageRepository:
                       COUNT(*) AS calls,
                       AVG(duration_ms) AS avg_duration_ms,
                       SUM(cache_read_tokens) AS cache_read_tokens,
-                      SUM(cache_write_tokens) AS cache_write_tokens
+                      SUM(cache_write_tokens) AS cache_write_tokens,
+                      SUM(web_search_requests) AS web_search_requests
                FROM llm_usage lu
                WHERE {self._RESET_FILTER}
                GROUP BY agent, skill, model, source
@@ -139,7 +142,7 @@ class UsageRepository:
         if skill:
             params.append(skill)
         rows = self._conn.execute(
-            f"""SELECT AVG(input_tokens) AS avg_in, AVG(output_tokens) AS avg_out
+            f"""SELECT AVG(input_tokens) AS avg_in, AVG(output_tokens) AS avg_out, AVG(web_search_requests) AS avg_web_search
                FROM llm_usage lu
                WHERE agent = ? AND model = ? {skill_filter}
                  AND {self._RESET_FILTER}""",
@@ -147,7 +150,8 @@ class UsageRepository:
         ).fetchone()
         if not rows or rows["avg_in"] is None:
             return 0.0
-        return _compute_cost(rows["avg_in"], rows["avg_out"], model, model_prices)
+        avg_web_search = rows["avg_web_search"] or 0
+        return _compute_cost(rows["avg_in"], rows["avg_out"], model, model_prices, web_search_requests=avg_web_search)
 
     def avg_cost_per_position(
         self,
@@ -173,7 +177,8 @@ class UsageRepository:
         rows_with_positions = self._conn.execute(
             f"""SELECT AVG(input_tokens) AS avg_in,
                        AVG(output_tokens) AS avg_out,
-                       AVG(CAST(NULLIF(position_count, 0) AS FLOAT)) AS avg_positions
+                       AVG(CAST(NULLIF(position_count, 0) AS FLOAT)) AS avg_positions,
+                       AVG(web_search_requests) AS avg_web_search
                 FROM llm_usage lu
                 WHERE agent = ? AND model = ? {skill_filter}
                   AND position_count IS NOT NULL
@@ -182,11 +187,13 @@ class UsageRepository:
         ).fetchone()
 
         if rows_with_positions and rows_with_positions["avg_positions"]:
+            avg_web_search = rows_with_positions["avg_web_search"] or 0
             cost_per_call = _compute_cost(
                 rows_with_positions["avg_in"],
                 rows_with_positions["avg_out"],
                 model,
                 model_prices,
+                web_search_requests=avg_web_search,
             )
             return cost_per_call / rows_with_positions["avg_positions"]
 
@@ -256,7 +263,7 @@ class UsageRepository:
     def get_recent_calls(self, limit: int = 50) -> list[dict]:
         """Last N LLM calls (newest first), regardless of reset filters."""
         rows = self._conn.execute(
-            """SELECT created_at, agent, skill, model, source, input_tokens, output_tokens, duration_ms, cache_read_tokens, cache_write_tokens
+            """SELECT created_at, agent, skill, model, source, input_tokens, output_tokens, duration_ms, cache_read_tokens, cache_write_tokens, web_search_requests
                FROM llm_usage
                ORDER BY created_at DESC
                LIMIT ?""",
@@ -276,9 +283,10 @@ def compute_cost(
     model_prices: dict,
     cache_read_tokens: Optional[float] = None,
     cache_write_tokens: Optional[float] = None,
+    web_search_requests: Optional[float] = None,
 ) -> float:
     """Cost in EUR/USD (same unit as prices dict) for given token counts."""
-    return _compute_cost(input_tokens, output_tokens, model, model_prices, cache_read_tokens, cache_write_tokens)
+    return _compute_cost(input_tokens, output_tokens, model, model_prices, cache_read_tokens, cache_write_tokens, web_search_requests)
 
 
 def _compute_cost(
@@ -288,6 +296,7 @@ def _compute_cost(
     model_prices: dict,
     cache_read_tokens: Optional[float] = None,
     cache_write_tokens: Optional[float] = None,
+    web_search_requests: Optional[float] = None,
 ) -> float:
     price = model_prices.get(model, {})
     input_price = price.get("input", 0.0)
@@ -297,13 +306,17 @@ def _compute_cost(
         cache_read_tokens = 0
     if cache_write_tokens is None:
         cache_write_tokens = 0
+    if web_search_requests is None:
+        web_search_requests = 0
 
     # Anthropic returns input_tokens for regular (non-cached) tokens only.
     # cache_write_tokens (1.25x) and cache_read_tokens (0.10x) are billed separately.
+    # Web search requests: $10 per 1000 requests = $0.01 per request
     cost = (
         input_tokens * input_price +
         cache_write_tokens * input_price * 1.25 +
         cache_read_tokens * input_price * 0.10 +
         output_tokens * output_price
     ) / 1_000_000
+    cost += web_search_requests * 0.01
     return cost

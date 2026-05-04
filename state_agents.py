@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 def get_portfolio_agent() -> PortfolioAgent:
     model = _get_agent_model("portfolio", "ollama", _DEFAULT_OLLAMA_MODEL)
     llm = OllamaProvider(host=config.OLLAMA_HOST, model=model, num_ctx=config.OLLAMA_NUM_CTX)
-    llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None: get_usage_repo().record("portfolio_chat", model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write)
+    llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: get_usage_repo().record("portfolio_chat", model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
     fetcher = MarketDataFetcher(
         rate_limiter=RateLimiter(calls_per_second=config.RATE_LIMIT_RPS)
     )

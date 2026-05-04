@@ -59,6 +59,7 @@ class ClaudeResponse:
     tool_calls: List[ClaudeToolCall] = field(default_factory=list)
     stop_reason: str = "end_turn"
     raw_blocks: List[Any] = field(default_factory=list)  # raw SDK content blocks
+    web_search_requests: int = 0            # web search calls made (Tavily or server-side)
 
     @property
     def has_tool_calls(self) -> bool:
@@ -182,6 +183,7 @@ class ClaudeProvider(LLMProvider):
         total_output = 0
         total_cache_read = 0
         total_cache_write = 0
+        total_web_search = 0
 
         # Loop to handle Tavily tool calls (max 10 iterations as safety net)
         for _ in range(10):
@@ -216,6 +218,7 @@ class ClaudeProvider(LLMProvider):
 
                 if web_calls:
                     # Execute searches and inject results
+                    total_web_search += len(web_calls)
                     kwargs["messages"].append(
                         {"role": "assistant", "content": list(response.content)}
                     )
@@ -261,12 +264,13 @@ class ClaudeProvider(LLMProvider):
 
         _duration_ms = int((time.monotonic() - _t0) * 1000)
         if self.on_usage:
-            self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count, total_cache_read, total_cache_write)
+            self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count, total_cache_read, total_cache_write, total_web_search)
         return ClaudeResponse(
             content=content_text,
             tool_calls=tool_calls,
             stop_reason=response.stop_reason,
             raw_blocks=list(response.content),
+            web_search_requests=total_web_search,
         )
 
     @property

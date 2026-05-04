@@ -21,7 +21,7 @@ class Message:
     content: str
 
 
-UsageCallback = Callable[[int, int, Optional[str], Optional[int], Optional[int], Optional[int], Optional[int]], None]  # (input_tokens, output_tokens, skill, duration_ms, position_count, cache_read_tokens, cache_write_tokens)
+UsageCallback = Callable[[int, int, Optional[str], Optional[int], Optional[int], Optional[int], Optional[int], Optional[int]], None]  # (input_tokens, output_tokens, skill, duration_ms, position_count, cache_read_tokens, cache_write_tokens, web_search_requests)
 
 
 class LLMProvider(ABC):
