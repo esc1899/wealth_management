@@ -69,11 +69,16 @@ class AgentSchedulerService:
         self._scheduler.start()
         self._reload_jobs()
         logger.info("AgentSchedulerService started")
-        # Catch up any missed jobs (e.g., if app was offline) — synchronous for visibility
-        try:
-            asyncio.run(self._catchup_missed_jobs())
-        except Exception:
-            logger.exception("Catchup of missed jobs failed")
+        # Catch up any missed jobs in background (don't block app startup)
+        import threading
+        def _run_catchup():
+            try:
+                asyncio.run(self._catchup_missed_jobs())
+            except Exception:
+                logger.exception("Catchup of missed jobs failed")
+
+        thread = threading.Thread(target=_run_catchup, daemon=True)
+        thread.start()
 
     def reload_jobs(self) -> None:
         """Call after DB changes to re-sync APScheduler with stored jobs."""
