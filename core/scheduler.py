@@ -262,7 +262,7 @@ class AgentSchedulerService:
         llm = self._make_scheduled_llm("news_digest", model, conn)
         agent = NewsAgent(llm=llm)
 
-        positions = positions_repo.get_portfolio()
+        positions = [p for p in positions_repo.get_portfolio() if not p.analysis_excluded]
         tickers = [p.ticker for p in positions if p.ticker]
         if not tickers:
             logger.info("News job %s: no tickers in portfolio, skipping", job.id)
@@ -325,8 +325,7 @@ class AgentSchedulerService:
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         agent = ConsensusGapAgent(llm=llm, analyses_repo=analyses_repo)
-        # Include both portfolio and watchlist, but require story (investment thesis)
-        positions = [p for p in positions_repo.get_all() if p.story]
+        positions = [p for p in positions_repo.get_portfolio() if p.story and not p.analysis_excluded]
         if not positions:
             logger.info("Consensus gap job %s: no positions with story, skipping", job.id)
             return
@@ -358,7 +357,7 @@ class AgentSchedulerService:
             llm=llm,
             skills_repo=skills_repo,
         )
-        positions = [p for p in positions_repo.get_all() if p.story]
+        positions = [p for p in positions_repo.get_portfolio() if p.story and not p.analysis_excluded]
         if not positions:
             logger.info("Storychecker job %s: no positions with story, skipping", job.id)
             return
@@ -378,8 +377,7 @@ class AgentSchedulerService:
         analyses_repo = PositionAnalysesRepository(conn)
         fa_repo = FundamentalAnalyzerRepository(conn)
         agent = FundamentalAnalyzerAgent(positions_repo=positions_repo, analyses_repo=analyses_repo, fa_repo=fa_repo, llm=llm)
-        # Include both portfolio and watchlist, but require ticker (for web_search)
-        positions = [p for p in positions_repo.get_all() if p.ticker]
+        positions = [p for p in positions_repo.get_portfolio() if p.ticker and not p.analysis_excluded]
         if not positions:
             logger.info("Fundamental job %s: no positions with ticker, skipping", job.id)
             return
