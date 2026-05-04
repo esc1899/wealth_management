@@ -363,6 +363,7 @@ class AgentSchedulerService:
     async def _run_fundamental_job(self, job, conn) -> None:
         from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
         from core.storage.analyses import PositionAnalysesRepository
+        from core.storage.fundamental_analyzer import FundamentalAnalyzerRepository
         from core.storage.models import PublicPosition
 
         enc = build_encryption_service(self._enc_key, self._salt_path)
@@ -370,7 +371,8 @@ class AgentSchedulerService:
         llm = self._make_scheduled_llm("fundamental_analyzer", model, conn)
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
-        agent = FundamentalAnalyzerAgent(positions_repo=positions_repo, analyses_repo=analyses_repo, llm=llm)
+        fa_repo = FundamentalAnalyzerRepository(conn)
+        agent = FundamentalAnalyzerAgent(positions_repo=positions_repo, analyses_repo=analyses_repo, fa_repo=fa_repo, llm=llm)
         # Include both portfolio and watchlist, but require ticker (for web_search)
         positions = [p for p in positions_repo.get_all() if p.ticker]
         if not positions:
