@@ -6,7 +6,7 @@ No encryption: session metadata (ticker, skill names) is not sensitive.
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
 from core.storage.models import FundamentalAnalyzerMessage, FundamentalAnalyzerSession
@@ -80,6 +80,22 @@ class FundamentalAnalyzerRepository:
             "DELETE FROM fundamental_analyzer_sessions WHERE id = ?", (session_id,)
         )
         self._conn.commit()
+
+    def cleanup_old_sessions(self, days: int = 365) -> int:
+        """Delete sessions and messages older than `days` days. Returns number of sessions deleted."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        old_ids = [
+            r[0] for r in self._conn.execute(
+                "SELECT id FROM fundamental_analyzer_sessions WHERE created_at < ?", (cutoff,)
+            ).fetchall()
+        ]
+        if not old_ids:
+            return 0
+        placeholders = ",".join("?" * len(old_ids))
+        self._conn.execute(f"DELETE FROM fundamental_analyzer_messages WHERE session_id IN ({placeholders})", old_ids)
+        self._conn.execute(f"DELETE FROM fundamental_analyzer_sessions WHERE id IN ({placeholders})", old_ids)
+        self._conn.commit()
+        return len(old_ids)
 
     # ------------------------------------------------------------------
     # Messages

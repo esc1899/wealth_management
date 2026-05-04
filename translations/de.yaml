@@ -673,6 +673,8 @@ fundamental:
   batch_running: "Claude analysiert alle Positionen …"
   batch_done: "Positionen analysiert"
   batch_errors: "Fehler dabei"
+  current_results: "Aktuelle Ergebnisse"
+  full_analysis: "📄 Vollständige Analyse"
 
 consensus_gap:
   title: "Konsens-Lücken-Analyse"

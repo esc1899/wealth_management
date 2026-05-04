@@ -31,63 +31,21 @@ VALID_VERDICTS = {"unterbewertet", "fair", "überbewertet", "unbekannt"}
 # Tools
 # ------------------------------------------------------------------
 
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 3}
+WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 5}
 
 # ------------------------------------------------------------------
 # System prompt
 # ------------------------------------------------------------------
 
-BASE_SYSTEM_PROMPT = """Du bist ein erfahrener Fundamental-Analyst mit 20+ Jahren Erfahrung.
+BASE_SYSTEM_PROMPT = """Du bist ein erfahrener Fundamental-Analyst.
 
-Deine Aufgabe: Analysiere einzelne Investitionen tiefgehend — nicht nur oberflächlich.
+Analysiere die Position tiefgehend. Nutze web_search für aktuelle Daten.
 
-Nutze bei Bedarf web_search für:
-- Aktuelle Finanzkennzahlen (KGV, KBV, EBITDA, Renditen)
-- Management-Qualität und Strategie
-- Competitive advantages / Moats
-- Industrietrends und Risiken
-- Bewertungsvergleiche mit Peers
+Beginne deine Antwort IMMER mit:
+**ZUSAMMENFASSUNG:** [1 Satz — die wichtigste Kernaussage]
 
-Analysiere diese Dimensionen (je nach Position relevant):
-
-### 1. GESCHÄFTSMODELL & STRATEGIE
-- Kerngeschäft und Umsatztreiber
-- Profitabilität (Marge, ROIC)
-- Management-Quality: Track Record, Incentives
-
-### 2. BEWERTUNG
-- KGV, EV/EBITDA, andere Multiples vs. historisch und Peers
-- Fair Value — DCF-basiert oder Multiple-Ansatz
-- Sicherheitsmarge / Margin of Safety
-
-### 3. WACHSTUM & POTENZIAL
-- Historisches Wachstum vs. Erwartungen
-- TAM (Total Addressable Market) Expansion
-- Emerging Opportunities
-
-### 4. RISIKEN
-- Finanzielle Risiken (Verschuldung, Cashflow)
-- Operative Risiken (Konkurrenz, Regulierung, Technologie)
-- Makro-Risiken (Rezession, Währung, Inflation)
-- Klumpenrisiken (Kunden, Lieferanten, Märkte)
-
-### 5. KATALYSATOREN & ZEITHORIZONT
-- Was könnte sich in den nächsten 1–3 Jahren ändern?
-- Wann wird die Bewertung gerecht?
-
-Präzise und konkret. Nutze Zahlen wenn möglich.
-Auf Follow-up-Fragen: kurz und fokussiert antworten.
-
-## WICHTIG: FAZIT-FORMAT
-
-Schließe IMMER mit einem klaren, einzeiligen Fazit in diesem Format:
-**Fazit: unterbewertet** (Einstiegschance)
-— oder —
-**Fazit: fair** (angemessen bewertet)
-— oder —
-**Fazit: überbewertet** (kein gutes Einstiegsniveau)
-
-Nichts anderes. Genau eines dieser drei Worte muss am Ende stehen."""
+Dann die Analyse. Schließe ab mit genau einem:
+**Fazit: unterbewertet** oder **Fazit: fair** oder **Fazit: überbewertet**"""
 
 
 # ------------------------------------------------------------------
@@ -230,7 +188,7 @@ class FundamentalAnalyzerAgent:
                 messages=api_messages,
                 tools=[WEB_SEARCH_TOOL],
                 system=system,
-                max_tokens=4096,
+                max_tokens=1500,
             )
         )
         return cr.content
@@ -293,6 +251,9 @@ class FundamentalAnalyzerAgent:
                         break
                 output.append((pos.id, verdict, summary))
             await asyncio.sleep(0.3)
+
+        # Cleanup: remove sessions older than 365 days
+        self._fa_repo.cleanup_old_sessions(days=365)
 
         return output
 
@@ -357,11 +318,17 @@ def _extract_verdict(response: str) -> Optional[str]:
 
 
 def _extract_summary(response: str) -> Optional[str]:
-    """Extract a one-line summary from LLM response. Skip Markdown structural lines (---, ___, etc)."""
+    """Extract one-line summary from LLM response. Looks for **ZUSAMMENFASSUNG:** marker first."""
     lines = response.split("\n")
+    # Primary: Look for explicit **ZUSAMMENFASSUNG:** marker
     for line in lines:
         stripped = line.strip()
-        # Skip empty, headings, and lines that are only Markdown structural chars
+        if stripped.startswith("**ZUSAMMENFASSUNG:**"):
+            summary = stripped.removeprefix("**ZUSAMMENFASSUNG:**").strip()
+            return summary if summary else None
+    # Fallback: First non-Markdown line (backward compat)
+    for line in lines:
+        stripped = line.strip()
         if stripped and len(stripped) < 200 and not stripped.startswith("#") and not all(c in "-_=*~" for c in stripped):
             return stripped
     return None

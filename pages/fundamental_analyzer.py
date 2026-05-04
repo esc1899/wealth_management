@@ -258,7 +258,7 @@ with col_right:
     if session_id is None:
         # Show batch results if available
         if _current_verdicts:
-            st.subheader("Aktuelle Ergebnisse")
+            st.subheader(t("fundamental.current_results"))
             _verdicts_with_pos = [
                 (_p, _current_verdicts[_p.id])
                 for _p in positions_with_required_fields
@@ -269,11 +269,23 @@ with col_right:
             for _pos, _analysis in _verdicts_with_pos:
                 _verdict = _analysis.verdict or "unknown"
                 _icon = verdict_icon(_verdict, _VERDICT_CONFIG)
-                st.markdown(f"{_icon} **{_pos.name}**")
+
+                # Header: Icon + Name
+                st.markdown(f"### {_icon} {_pos.name}")
                 if _analysis.created_at:
                     st.caption(_analysis.created_at.strftime("%d.%m.%Y %H:%M"))
+
+                # Summary as teaser (1 line)
                 if _analysis.summary and not all(c in "-_=*~" for c in _analysis.summary.strip()):
                     st.caption(_analysis.summary)
+
+                # Full analysis from session (first assistant message)
+                if _analysis.session_id:
+                    messages = agent.get_messages(_analysis.session_id)
+                    assistant_msgs = [m for m in messages if m.role == "assistant"]
+                    if assistant_msgs:
+                        with st.expander(t("fundamental.full_analysis"), expanded=True):
+                            st.markdown(assistant_msgs[0].content)
 
                 # Inline history expander
                 _history = [
@@ -283,9 +295,9 @@ with col_right:
                 if len(_history) > 1:
                     with st.expander(f"{t('storychecker.verdict_history')} ({len(_history) - 1})", expanded=False):
                         for _h in _history[1:]:
-                            _icon = verdict_icon(_h.verdict or "unknown", _VERDICT_CONFIG)
+                            _icon_h = verdict_icon(_h.verdict or "unknown", _VERDICT_CONFIG)
                             _date_str = _h.created_at.strftime("%d.%m.%Y") if _h.created_at else "—"
-                            st.markdown(f"{_icon} **{_date_str}**")
+                            st.markdown(f"{_icon_h} **{_date_str}**")
                             if _h.summary and not all(c in "-_=*~" for c in _h.summary.strip()):
                                 st.caption(_h.summary)
 
