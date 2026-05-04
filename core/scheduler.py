@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timedelta
 from typing import Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -68,6 +69,11 @@ class AgentSchedulerService:
         self._scheduler.start()
         self._reload_jobs()
         logger.info("AgentSchedulerService started")
+        # Catch up any missed jobs (e.g., if app was offline) — synchronous for visibility
+        try:
+            asyncio.run(self._catchup_missed_jobs())
+        except Exception:
+            logger.exception("Catchup of missed jobs failed")
 
     def reload_jobs(self) -> None:
         """Call after DB changes to re-sync APScheduler with stored jobs."""
@@ -164,6 +170,49 @@ class AgentSchedulerService:
                 return
             await self._dispatch_agent(job, conn)
             jobs_repo.update_last_run(job_id)
+        finally:
+            conn.close()
+
+    async def _catchup_missed_jobs(self) -> None:
+        """Check if any scheduled jobs are overdue and run them if within grace period."""
+        conn = self._open_conn()
+        try:
+            jobs_repo = ScheduledJobsRepository(conn)
+            enabled_jobs = jobs_repo.get_enabled()
+            logger.info("Catchup: checking %d enabled jobs", len(enabled_jobs))
+
+            for job in enabled_jobs:
+                # Use last_run if available, otherwise use created_at (for newly created jobs)
+                reference_time = job.last_run or job.created_at
+                if not reference_time:
+                    logger.warning("Catchup: job %s has no reference_time, skipping", job.id)
+                    continue  # No reference time at all, skip
+
+                now = datetime.now()
+                time_since = now - reference_time
+
+                # Determine grace period based on frequency
+                grace_period = None
+                if job.frequency == "monthly":
+                    grace_period = timedelta(days=7)  # Monthly jobs: catch up within 1 week
+                elif job.frequency == "weekly":
+                    grace_period = timedelta(days=3)  # Weekly jobs: catch up within 3 days
+                # Daily jobs: no catch-up (should run every day)
+
+                logger.info("Catchup: job %s (%s) — age: %.1f hours, grace_period: %s",
+                           job.id, job.agent_name, time_since.total_seconds() / 3600,
+                           f"{grace_period.days}d" if grace_period else "none")
+
+                if grace_period and time_since > grace_period:
+                    logger.info(
+                        "Catchup: %s job %s is %.1f hours overdue (grace period: %d days)",
+                        job.frequency, job.id, time_since.total_seconds() / 3600,
+                        grace_period.days
+                    )
+                    try:
+                        await self._execute_job(job.id)
+                    except Exception:
+                        logger.exception("Catchup job %s failed", job.id)
         finally:
             conn.close()
 
@@ -270,14 +319,18 @@ class AgentSchedulerService:
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         agent = ConsensusGapAgent(llm=llm, analyses_repo=analyses_repo)
-        positions = positions_repo.get_portfolio()
+        # Include both portfolio and watchlist, but require story (investment thesis)
+        positions = [p for p in positions_repo.get_all() if p.story]
+        if not positions:
+            logger.info("Consensus gap job %s: no positions with story, skipping", job.id)
+            return
         await agent.analyze_portfolio(
             positions=positions,
             skill_name=job.skill_name,
             skill_prompt=job.skill_prompt,
             language="de",
         )
-        logger.info("Consensus gap job %s completed", job.id)
+        logger.info("Consensus gap job %s completed for %d positions", job.id, len(positions))
 
     async def _run_storychecker_job(self, job, conn) -> None:
         from agents.storychecker_agent import StorycheckerAgent
@@ -317,7 +370,11 @@ class AgentSchedulerService:
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         agent = FundamentalAnalyzerAgent(positions_repo=positions_repo, analyses_repo=analyses_repo, llm=llm)
-        positions = positions_repo.get_portfolio()
+        # Include both portfolio and watchlist, but require ticker (for web_search)
+        positions = [p for p in positions_repo.get_all() if p.ticker]
+        if not positions:
+            logger.info("Fundamental job %s: no positions with ticker, skipping", job.id)
+            return
         # Convert Position to PublicPosition (no private financial data for cloud agent)
         pub_positions = [PublicPosition(id=p.id, name=p.name, ticker=p.ticker, isin=p.isin, asset_class=p.asset_class, anlageart=p.anlageart, story=p.story, story_skill=p.story_skill) for p in positions]
         await agent.analyze_portfolio(
