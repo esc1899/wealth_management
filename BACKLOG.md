@@ -47,6 +47,7 @@ See CHANGELOG.md for full history of completed features and debt remediations.
 | ID | Completed | Description |
 |---|---|---|
 | BUG-1 | 2026-05-04 | Scheduler Catchup Not Running — Root cause: inverted condition in grace_period check (`<=` vs `>`). Fixed with test-first approach (7 scenarios), enhanced to run new jobs immediately, optimized to background thread. All 594 tests passing. |
+| BUG-2 | 2026-05-04 | Scheduled Batch Jobs — Watchlist + analysis_excluded Ignored — Two issues: (A) Consensus Gap, Storychecker, Fundamental were including watchlist-only positions (should be portfolio only); (B) all 6 agents ignored analysis_excluded field. Both fixed with position filtering in scheduler + agent. Added 7 integration tests. 601 tests passing. |
 
 ### Technical Debt — Completed ✅
 
