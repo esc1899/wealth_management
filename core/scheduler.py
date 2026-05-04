@@ -203,16 +203,17 @@ class AgentSchedulerService:
                            job.id, job.agent_name, time_since.total_seconds() / 3600,
                            f"{grace_period.days}d" if grace_period else "none")
 
-                if grace_period and time_since > grace_period:
-                    logger.info(
-                        "Catchup: %s job %s is %.1f hours overdue (grace period: %d days)",
-                        job.frequency, job.id, time_since.total_seconds() / 3600,
-                        grace_period.days
-                    )
-                    try:
-                        await self._execute_job(job.id)
-                    except Exception:
-                        logger.exception("Catchup job %s failed", job.id)
+                if grace_period:
+                    # New jobs (never run before) are always caught up immediately
+                    should_catchup = job.last_run is None or time_since > grace_period
+
+                    if should_catchup:
+                        reason = "new job (never run)" if job.last_run is None else f"overdue (grace period: {grace_period.days}d)"
+                        logger.info("Catchup: %s job %s (%s)", job.frequency, job.id, reason)
+                        try:
+                            await self._execute_job(job.id)
+                        except Exception:
+                            logger.exception("Catchup job %s failed", job.id)
         finally:
             conn.close()
 

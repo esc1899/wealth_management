@@ -85,10 +85,10 @@ async def test_catchup_runs_overdue_monthly_job():
 
 
 @pytest.mark.asyncio
-async def test_catchup_skips_fresh_monthly_job():
-    """Job created 2 hours ago (last_run=NULL) must NOT be caught up.
+async def test_catchup_runs_new_job_immediately():
+    """Job with last_run=NULL (never run) must be caught up immediately.
 
-    Grace period is 7 days, so time_since=2h <= 7d → should NOT run.
+    New jobs are always caught up regardless of age.
     """
     scheduler = AgentSchedulerService(
         db_path=":memory:",
@@ -112,6 +112,50 @@ async def test_catchup_skips_fresh_monthly_job():
         enabled=True,
         last_run=None,
         created_at=datetime.now() - timedelta(hours=2),
+    )
+    mock_jobs_repo.get_enabled.return_value = [job]
+
+    execute_job_calls = []
+    async def mock_execute_job(job_id):
+        execute_job_calls.append(job_id)
+
+    scheduler._execute_job = mock_execute_job
+
+    with patch("core.scheduler.ScheduledJobsRepository", return_value=mock_jobs_repo):
+        await scheduler._catchup_missed_jobs()
+
+    assert len(execute_job_calls) == 1
+    assert execute_job_calls[0] == 2
+
+
+@pytest.mark.asyncio
+async def test_catchup_skips_fresh_existing_job():
+    """Existing job run 2 hours ago (last_run != NULL) must NOT be caught up.
+
+    Grace period is 7 days, so time_since=2h < 7d → should NOT run.
+    """
+    scheduler = AgentSchedulerService(
+        db_path=":memory:",
+        encryption_key="test-key",
+        anthropic_api_key="test-api",
+        default_claude_model="claude-haiku-4-5-20251001",
+    )
+
+    mock_conn = MagicMock()
+    scheduler._open_conn = Mock(return_value=mock_conn)
+
+    mock_jobs_repo = Mock()
+    job = ScheduledJob(
+        id=2,
+        agent_name="news",
+        skill_name="",
+        skill_prompt="",
+        frequency="monthly",
+        run_hour=8,
+        run_minute=0,
+        enabled=True,
+        last_run=datetime.now() - timedelta(hours=2),  # Ran 2 hours ago
+        created_at=datetime.now() - timedelta(days=30),
     )
     mock_jobs_repo.get_enabled.return_value = [job]
 
