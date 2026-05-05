@@ -393,6 +393,7 @@ class PositionAnalysis(BaseModel):
     verdict: Optional[str] = None   # 'intact', 'gemischt', 'gefaehrdet', 'unknown'
     summary: Optional[str] = None   # one-sentence summary
     session_id: Optional[int] = None  # reference to agent session
+    analysis_text: Optional[str] = None  # full analysis text (e.g. for consensus_gap)
     created_at: datetime
 
 

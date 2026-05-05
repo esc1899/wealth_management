@@ -211,25 +211,6 @@ with col_left:
                     st.caption(t("fundamental.thesis_label"))
                     st.markdown(selected_position.story)
 
-        # Past analyses
-        past_sessions = agent.list_sessions(limit=20)
-        if past_sessions:
-            with st.expander("📊 Letzte Analysen", expanded=False):
-                for s in past_sessions:
-                    date_str = ""
-                    if s.created_at:
-                        date_str = f" · {s.created_at.strftime('%d.%m.%Y %H:%M')}"
-                    btn_label = f"📊 **{s.position_name}**{date_str}"
-                    active = st.session_state.get("fa_session_id") == s.id
-                    if st.button(
-                        btn_label,
-                        key=f"fa_sess_{s.id}",
-                        use_container_width=True,
-                        type="primary" if active else "secondary",
-                    ):
-                        st.session_state["fa_session_id"] = s.id
-                        st.rerun()
-
         if st.session_state.get("fa_start_error"):
             st.error(t("fundamental.start_error").format(error=st.session_state.pop('fa_start_error')))
 

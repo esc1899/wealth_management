@@ -181,6 +181,7 @@ class ConsensusGapAgent:
                         skill_name=skill_name,
                         verdict=verdict,
                         summary=summary,
+                        analysis_text=analysis,
                     )
                     results.append((pos_id, verdict, summary))
 

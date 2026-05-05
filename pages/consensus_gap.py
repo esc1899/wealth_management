@@ -268,6 +268,11 @@ with col_right:
             if _a.summary:
                 st.caption(_a.summary)
 
+            # Full analysis text from consensus_gap
+            if _a.analysis_text:
+                with st.expander("▼ Vollständige Analyse", expanded=True):
+                    st.markdown(_a.analysis_text)
+
             # Inline history expander
             _history = [
                 a for a in _analyses_repo.get_for_position(_p.id, limit=20)

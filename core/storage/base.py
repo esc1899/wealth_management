@@ -363,6 +363,10 @@ def migrate_db(conn: sqlite3.Connection) -> None:
             "ALTER TABLE skills ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0"
         )
 
+    existing_analyses = {row[1] for row in conn.execute("PRAGMA table_info(position_analyses)")}
+    if "analysis_text" not in existing_analyses:
+        conn.execute("ALTER TABLE position_analyses ADD COLUMN analysis_text TEXT")
+
     existing_usage = {row[1] for row in conn.execute("PRAGMA table_info(llm_usage)")}
     if "skill" not in existing_usage:
         conn.execute("ALTER TABLE llm_usage ADD COLUMN skill TEXT")

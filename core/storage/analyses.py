@@ -27,16 +27,17 @@ class PositionAnalysesRepository:
         verdict: Optional[str],
         summary: Optional[str],
         session_id: Optional[int] = None,
+        analysis_text: Optional[str] = None,
     ) -> PositionAnalysis:
         """Insert a new analysis record and return it."""
         now = datetime.now(timezone.utc)
         cur = self._conn.execute(
             """
             INSERT INTO position_analyses
-                (position_id, agent, skill_name, verdict, summary, session_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (position_id, agent, skill_name, verdict, summary, session_id, analysis_text, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (position_id, agent, skill_name, verdict, summary, session_id, now.isoformat()),
+            (position_id, agent, skill_name, verdict, summary, session_id, analysis_text, now.isoformat()),
         )
         self._conn.commit()
         return PositionAnalysis(
@@ -47,6 +48,7 @@ class PositionAnalysesRepository:
             verdict=verdict,
             summary=summary,
             session_id=session_id,
+            analysis_text=analysis_text,
             created_at=now,
         )
 

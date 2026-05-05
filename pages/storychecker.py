@@ -179,18 +179,6 @@ with col_left:
                 if selected_position.story_skill:
                     st.caption(f"{t('storychecker.skill_caption')}: {selected_position.story_skill}")
 
-        # Verdict history for selected position
-        past_analyses = analyses_repo.get_for_position(selected_position.id, limit=5)
-        if past_analyses:
-            with st.expander(t("storychecker.verdict_history"), expanded=False):
-                for a in past_analyses:
-                    icon = verdict_icon(a.verdict or "unknown", _VERDICT_CONFIG)
-                    date_str = a.created_at.strftime("%d.%m.%Y")
-                    skill_label = f" · {a.skill_name}" if a.skill_name else ""
-                    st.markdown(f"{icon} **{date_str}**{skill_label}")
-                    if a.summary:
-                        st.caption(a.summary)
-
         if st.session_state.get("sc_start_error"):
             error_details = st.session_state.pop('sc_start_error')
             logger = logging.getLogger(__name__)
@@ -210,28 +198,6 @@ with col_left:
                 except Exception as exc:
                     st.session_state["sc_start_error"] = str(exc)
             st.rerun()
-
-    st.divider()
-    st.subheader(t("storychecker.past_checks"))
-
-    sessions = agent.list_sessions(limit=30)
-    if not sessions:
-        st.info(t("storychecker.no_checks"))
-    else:
-        for s in sessions:
-            icon = verdict_icon(s.verdict or "", _VERDICT_CONFIG)
-            date_str = s.created_at.strftime("%d.%m. %H:%M")
-            skill_part = f" · {s.skill_name}" if s.skill_name else ""
-            btn_label = f"{icon} **{s.position_name}**  \n{date_str}{skill_part}"
-            active = st.session_state.get("sc_session_id") == s.id
-            if st.button(
-                btn_label,
-                key=f"sc_sess_{s.id}",
-                use_container_width=True,
-                type="primary" if active else "secondary",
-            ):
-                st.session_state["sc_session_id"] = s.id
-                st.rerun()
 
 # ------------------------------------------------------------------
 # Right: chat interface
@@ -256,6 +222,14 @@ with col_right:
                     st.caption(_a.created_at.strftime("%d.%m.%Y %H:%M"))
                 if _a.summary:
                     st.caption(_a.summary)
+
+                # Full analysis text from session
+                if _a.session_id:
+                    _messages = agent.get_messages(_a.session_id)
+                    _assistant_msgs = [m for m in _messages if m.role == "assistant"]
+                    if _assistant_msgs:
+                        with st.expander("▼ Vollständige Analyse", expanded=True):
+                            st.markdown(_assistant_msgs[0].content)
 
                 # Inline history expander
                 _history = [
