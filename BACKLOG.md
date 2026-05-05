@@ -36,7 +36,6 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 
 | ID | Priority | Description | Notes |
 |---|---|---|---|
-| DEBT-17 | P2 | Agent LLM Config — Explicit Thinking + Effort | Sonnet 4.6: set `thinking: {type: "adaptive", display: "summarized"}` + `output_config: {effort: "high"}` in ClaudeProvider.chat(). Currently: thinking runs implicitly, output limited by 1024-token overhead. Will reduce multi-turn loops (~50% token savings), longer answers. Investigate after next test cycle. |
 | DEBT-8 | P3 | Document `migrate_db()` inline — add comments explaining the dual init+migrate pattern | Low risk, cosmetic |
 | DEBT-13 | P3 | Tighten requirements.txt version bounds | Low urgency, no known conflicts |
 
@@ -74,3 +73,4 @@ See CHANGELOG.md for full history of completed features and debt remediations.
 | DEBT-16 | 2026-04-12 | O(n) deletes replaced with batch SQL operations |
 | DEBT-18 | 2026-04-29 | FundamentalAgent consolidated into FundamentalAnalyzerAgent; deleted old agent module |
 | DEBT-19 | 2026-04-29 | Token caching infrastructure removed (enable_cache parameter, cache_control blocks) — uneconomical for web-search agents |
+| DEBT-17 | 2026-05-05 | Agent LLM Config — Extended Thinking with UI Toggles (SearchAgent + StructuralChangeAgent). Per-call enable_thinking parameter via UI toggles. Users can A/B test thinking cost/quality in real usage. Thinking only active for Sonnet/Opus. |
