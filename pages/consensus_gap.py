@@ -268,8 +268,14 @@ with col_right:
             if _a.summary:
                 st.caption(_a.summary)
 
-            # Full analysis text from consensus_gap
-            if _a.analysis_text:
+            # Full analysis text — session_id (new) or analysis_text fallback (old records)
+            if _a.session_id:
+                _msgs = _agent.get_messages(_a.session_id)
+                _assistant = [m for m in _msgs if m.role == "assistant"]
+                if _assistant:
+                    with st.expander("▼ Vollständige Analyse", expanded=True):
+                        st.markdown(_assistant[0].content)
+            elif _a.analysis_text:
                 with st.expander("▼ Vollständige Analyse", expanded=True):
                     st.markdown(_a.analysis_text)
 

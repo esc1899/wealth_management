@@ -365,6 +365,28 @@ class FundamentalAnalyzerMessage(BaseModel):
     created_at: datetime
 
 
+class ConsensusGapSession(BaseModel):
+    """A consensus gap analysis session for measuring the gap between thesis and consensus."""
+
+    id: Optional[int] = None
+    position_id: int
+    ticker: Optional[str] = None
+    position_name: str
+    skill_name: str
+    created_at: datetime
+    verdict: Optional[str] = None
+
+
+class ConsensusGapMessage(BaseModel):
+    """A single message in a consensus gap session."""
+
+    id: Optional[int] = None
+    session_id: int
+    role: str       # 'user' or 'assistant'
+    content: str
+    created_at: datetime
+
+
 # ---------------------------------------------------------------------------
 # News model
 # ---------------------------------------------------------------------------

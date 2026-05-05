@@ -12,13 +12,14 @@ Verdict values:
   schließt   — gap closing: market catching up → 🟡 consider trimming
   eingeholt  — consensus has caught up: thesis fully priced in → 🔴 review / consider selling
 
-Storage: reuses position_analyses table (agent='consensus_gap').
+Storage: consensus_gap_sessions + consensus_gap_messages (like SC/FA pattern),
+referenced from position_analyses (agent='consensus_gap', session_id).
 
 Flow:
-  1. For each portfolio position with a story, build a prompt
-  2. One Claude call per batch (passes all positions at once)
+  1. For each portfolio position with a story, create a session
+  2. One Claude call per position with web_search tool
   3. Parse verdicts from structured output
-  4. Store in position_analyses
+  4. Store full LLM response as assistant message, persist in position_analyses with session_id
 """
 
 from __future__ import annotations
@@ -31,7 +32,8 @@ logger = logging.getLogger(__name__)
 
 from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
-from core.storage.models import PublicPosition
+from core.storage.consensus_gap import ConsensusGapRepository
+from core.storage.models import PublicPosition, ConsensusGapMessage
 from agents.agent_language import response_language_with_fixed_codes
 
 AGENT_NAME = "consensus_gap"
@@ -97,14 +99,20 @@ class ConsensusGapAgent:
         self,
         llm: ClaudeProvider,
         analyses_repo: PositionAnalysesRepository,
+        cg_repo: ConsensusGapRepository,
     ):
         self._llm = llm
         self._analyses_repo = analyses_repo
+        self._cg_repo = cg_repo
 
     @property
     def model(self) -> str:
         """Return the LLM model name."""
         return self._llm.model
+
+    def get_messages(self, session_id: int) -> list[ConsensusGapMessage]:
+        """Retrieve all messages from a consensus gap session."""
+        return self._cg_repo.get_messages(session_id)
 
     # ------------------------------------------------------------------
     # Public API
@@ -143,6 +151,17 @@ class ConsensusGapAgent:
             user_msg = (
                 f"Analysiere diese Portfolio-Position auf ihre Konsens-Lücke.\n\n{positions_text}"
             )
+
+            # Create session for this position
+            session = self._cg_repo.create_session(
+                position_id=pos.id,
+                ticker=pos.ticker,
+                position_name=pos.name,
+                skill_name=skill_name,
+            )
+            # Save user message
+            self._cg_repo.add_message(session.id, "user", user_msg)
+
             response = await self._llm.chat_with_tools(
                 messages=[{"role": "user", "content": user_msg}],
                 tools=[
@@ -167,6 +186,10 @@ class ConsensusGapAgent:
             if not parsed:
                 logger.warning("consensus_gap: no verdict for position %d (%s)", pos.id or 0, pos.name)
             else:
+                # Save assistant message (response.content with fallback to analysis field)
+                assistant_content = response.content.strip() or parsed[0][3]  # fallback to analysis field
+                self._cg_repo.add_message(session.id, "assistant", assistant_content)
+
                 # Persist immediately after each position
                 for pos_id_str, verdict, summary, analysis in parsed:
                     try:
@@ -181,7 +204,7 @@ class ConsensusGapAgent:
                         skill_name=skill_name,
                         verdict=verdict,
                         summary=summary,
-                        analysis_text=analysis,
+                        session_id=session.id,
                     )
                     results.append((pos_id, verdict, summary))
 

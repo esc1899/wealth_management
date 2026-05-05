@@ -179,12 +179,19 @@ def get_fundamental_analyzer_agent() -> FundamentalAnalyzerAgent:
 
 
 @st.cache_resource
+def get_consensus_gap_repo():
+    from core.storage.consensus_gap import ConsensusGapRepository
+    return ConsensusGapRepository(get_db_connection())
+
+
+@st.cache_resource
 def get_consensus_gap_agent() -> ConsensusGapAgent:
     model = _get_public_agent_model("consensus_gap", CLAUDE_SONNET)
     llm = _make_public_provider(model, "consensus_gap")
     return ConsensusGapAgent(
         llm=llm,
         analyses_repo=get_analyses_repo(),
+        cg_repo=get_consensus_gap_repo(),
     )
 
 
