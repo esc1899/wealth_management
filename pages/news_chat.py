@@ -29,6 +29,12 @@ tickers = list(ticker_map.keys())
 if "nc_run_id" not in st.session_state:
     st.session_state.nc_run_id = None
 
+# Auto-load: neuester Run, falls noch keiner aktiv
+if st.session_state.nc_run_id is None:
+    _latest = news_repo.list_runs(limit=1)
+    if _latest:
+        st.session_state.nc_run_id = _latest[0].id
+
 # ------------------------------------------------------------------
 # Helper: render digest as expandable sections
 # ------------------------------------------------------------------
@@ -81,7 +87,7 @@ def _delete_run_and_rerun(run_id: int):
 # Layout: left narrow | right wide
 # ------------------------------------------------------------------
 
-col_left, col_right = st.columns([0.8, 2.2], gap="medium")
+col_left, col_right = st.columns([0.8, 2.2])
 
 # ------------------------------------------------------------------
 # Left: new digest form + compact past runs list
@@ -133,30 +139,6 @@ with col_left:
                 except Exception as exc:
                     st.error(f"⚠️ {t('common.agent_error')}: {exc}")
             st.rerun()
-
-    st.divider()
-    st.subheader(t("news_chat.past_runs"))
-
-    past_runs = news_repo.list_runs(limit=30)
-    if not past_runs:
-        st.info(t("news_chat.no_runs"))
-    else:
-        for run in past_runs:
-            date_str = run.created_at.strftime("%d.%m.%Y")
-            ticker_count = len(run.tickers.split(", ")) if run.tickers else 0
-            active = st.session_state.nc_run_id == run.id
-            col_btn, col_del = st.columns([5, 1])
-            label = f"{date_str} · {run.skill_name} · {ticker_count}"
-            if col_btn.button(
-                label,
-                key=f"nc_run_{run.id}",
-                use_container_width=True,
-                type="primary" if active else "secondary",
-            ):
-                st.session_state.nc_run_id = run.id
-                st.rerun()
-            if col_del.button("🗑", key=f"nc_del_{run.id}"):
-                _delete_run_and_rerun(run.id)
 
 # ------------------------------------------------------------------
 # Right: current result (digest + history) + follow-up chat
