@@ -14,12 +14,14 @@ from core.llm.claude import ClaudeResponse, ClaudeToolCall
 from core.storage.models import Position
 
 
-def make_agent(analyses_repo=None):
-    """Create agent with mocked LLM and analyses_repo."""
+def make_agent(analyses_repo=None, cg_repo=None):
+    """Create agent with mocked LLM and repos."""
     llm = MagicMock()
     if analyses_repo is None:
         analyses_repo = MagicMock()
-    return ConsensusGapAgent(llm=llm, analyses_repo=analyses_repo)
+    if cg_repo is None:
+        cg_repo = MagicMock()
+    return ConsensusGapAgent(llm=llm, analyses_repo=analyses_repo, cg_repo=cg_repo)
 
 
 def make_test_position(pos_id: int, name: str, story: str = "Test thesis") -> Position:

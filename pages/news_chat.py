@@ -67,22 +67,33 @@ def _render_digest(result: str):
 
 
 # ------------------------------------------------------------------
-# Layout: left sidebar | right chat
+# Helper: delete run helper function (für Inline-History Delete)
 # ------------------------------------------------------------------
 
-col_sidebar, col_chat = st.columns([1, 2])
+def _delete_run_and_rerun(run_id: int):
+    """Delete a news run and reset session state if needed."""
+    news_repo.delete_run(run_id)
+    if st.session_state.nc_run_id == run_id:
+        st.session_state.nc_run_id = None
+    st.rerun()
 
 # ------------------------------------------------------------------
-# Left: new digest form + past runs
+# Layout: left narrow | right wide
 # ------------------------------------------------------------------
 
-with col_sidebar:
+col_left, col_right = st.columns([0.8, 2.2], gap="medium")
+
+# ------------------------------------------------------------------
+# Left: new digest form + compact past runs list
+# ------------------------------------------------------------------
+
+with col_left:
     st.subheader(t("news_chat.new_run"))
 
     if not tickers:
         st.warning(t("news_chat.empty_portfolio"))
     else:
-        st.caption(f"{t('news_chat.positions_found')}: {', '.join(tickers)}")
+        st.caption(f"{len(tickers)} {t('news_chat.history_tickers')}")
 
         news_skills = get_skills_repo().get_by_area("news")
 
@@ -131,11 +142,11 @@ with col_sidebar:
         st.info(t("news_chat.no_runs"))
     else:
         for run in past_runs:
-            date_str = run.created_at.strftime("%d.%m.%Y %H:%M")
+            date_str = run.created_at.strftime("%d.%m.%Y")
             ticker_count = len(run.tickers.split(", ")) if run.tickers else 0
-            label = f"**{run.skill_name}**  \n{date_str} · {ticker_count} {t('news_chat.history_tickers')}"
             active = st.session_state.nc_run_id == run.id
             col_btn, col_del = st.columns([5, 1])
+            label = f"{date_str} · {run.skill_name} · {ticker_count}"
             if col_btn.button(
                 label,
                 key=f"nc_run_{run.id}",
@@ -145,16 +156,13 @@ with col_sidebar:
                 st.session_state.nc_run_id = run.id
                 st.rerun()
             if col_del.button("🗑", key=f"nc_del_{run.id}"):
-                news_repo.delete_run(run.id)
-                if st.session_state.nc_run_id == run.id:
-                    st.session_state.nc_run_id = None
-                st.rerun()
+                _delete_run_and_rerun(run.id)
 
 # ------------------------------------------------------------------
-# Right: chat interface
+# Right: current result (digest + history) + follow-up chat
 # ------------------------------------------------------------------
 
-with col_chat:
+with col_right:
     run_id = st.session_state.nc_run_id
 
     if run_id is None:
@@ -165,22 +173,58 @@ with col_chat:
             st.warning(t("news_chat.run_not_found"))
             st.session_state.nc_run_id = None
         else:
-            st.markdown(f"### {run.skill_name}")
+            ticker_count = len(run.tickers.split(", ")) if run.tickers else 0
+
+            # Header
+            st.markdown(f"### 📰 {run.skill_name}")
             st.caption(
                 f"{run.created_at.strftime('%d.%m.%Y %H:%M')} · "
-                f"{run.tickers}"
+                f"{ticker_count} {t('news_chat.history_tickers')}"
             )
 
             messages = news_repo.get_messages(run_id)
 
-            for i, msg in enumerate(messages):
+            # Full-Text Digest (from messages[1], analog to agent_messages pattern)
+            digest_text = messages[1].content if len(messages) > 1 else run.result
+            with st.expander("▼ " + t("storychecker.full_analysis"), expanded=True):
+                _render_digest(digest_text)
+
+            # Older runs (inline history)
+            all_runs = news_repo.list_runs(limit=30)
+            older_runs = [r for r in all_runs if r.id != run_id]
+            if older_runs:
+                with st.expander(
+                    f"{t('storychecker.verdict_history')} ({len(older_runs)})",
+                    expanded=False,
+                ):
+                    for older_run in older_runs:
+                        older_ticker_count = (
+                            len(older_run.tickers.split(", "))
+                            if older_run.tickers
+                            else 0
+                        )
+                        older_date = older_run.created_at.strftime("%d.%m.%Y")
+                        col_btn, col_del = st.columns([5, 1])
+                        if col_btn.button(
+                            f"{older_date} · {older_run.skill_name} · {older_ticker_count}",
+                            key=f"nc_older_{older_run.id}",
+                            use_container_width=True,
+                        ):
+                            st.session_state.nc_run_id = older_run.id
+                            st.rerun()
+                        if col_del.button(
+                            "🗑", key=f"nc_del_older_{older_run.id}"
+                        ):
+                            _delete_run_and_rerun(older_run.id)
+
+            st.divider()
+
+            # Follow-up chat (skip initial user message + digest)
+            followup_messages = messages[2:] if len(messages) > 2 else []
+            for msg in followup_messages:
                 role = "user" if msg.role == "user" else "assistant"
                 with st.chat_message(role):
-                    # First assistant message = the digest → render with expanders
-                    if role == "assistant" and i == 1:
-                        _render_digest(msg.content)
-                    else:
-                        st.markdown(msg.content)
+                    st.markdown(msg.content)
                     if role == "assistant":
                         st.caption(t("common.ai_disclaimer"))
 
