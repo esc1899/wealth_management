@@ -118,6 +118,7 @@ pg = st.navigation({
         st.Page("pages/positionen.py",     title=t("nav.positions"),   icon=":material/edit_note:"),
         st.Page("pages/marktdaten.py",     title=t("nav.market_data"), icon=":material/trending_up:"),
         st.Page("pages/analyse.py",        title=t("nav.analysis"),    icon=":material/bar_chart:"),
+        st.Page("pages/position_dashboard.py", title="Position", icon=":material/person_search:"),
     ],
     _assistant_group: _assistant_pages,
     t("nav.group_research"): [

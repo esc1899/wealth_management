@@ -127,28 +127,6 @@ else:
 st.divider()
 
 # ------------------------------------------------------------------
-# Price history
-# ------------------------------------------------------------------
-st.subheader(t("analysis.price_history"))
-
-symbols = [v.symbol for v in valuations]
-selected = st.selectbox(t("analysis.select_symbol"), symbols)
-
-if selected:
-    history = agent.get_historical(selected, days=365)
-    if history:
-        col_date = t("common.date")
-        col_price = t("market_data.price_col")
-        df_hist = pd.DataFrame([{col_date: h.date, col_price: h.close_eur} for h in history])
-        fig_hist = px.line(df_hist, x=col_date, y=col_price, title=f"{selected} — letztes Jahr")
-        fig_hist.update_layout(margin=dict(t=40))
-        st.plotly_chart(fig_hist, use_container_width=True)
-    else:
-        st.info(t("analysis.no_history"))
-
-st.divider()
-
-# ------------------------------------------------------------------
 # Portfolio allocation — Sunburst with positions outer ring
 # ------------------------------------------------------------------
 st.subheader(t("analysis.weight_by_position"))

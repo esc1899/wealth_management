@@ -108,6 +108,12 @@ class TestPageLoadability:
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 
+    def test_position_dashboard_page_loads(self):
+        """Position Dashboard page should load without exceptions."""
+        at = AppTest.from_file("pages/position_dashboard.py")
+        at.run()
+        assert not at.exception, f"Page threw exception: {at.exception}"
+
     def test_news_chat_page_loads(self):
         """News Digest page should load without exceptions."""
         at = AppTest.from_file("pages/news_chat.py")
