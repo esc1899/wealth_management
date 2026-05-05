@@ -280,6 +280,78 @@ async def chat_with_tools(messages, tools, ...) -> ProviderResponse
 - Colors + icons defined per agent in VERDICT_CONFIGS dict
 - Older tests shown collapsible per position
 
+### Position-Analysis Agents Pattern (FEAT-22)
+
+**Scope**: Agents that analyze individual portfolio positions and store verdicts: StorycheckerAgent, ConsensusGapAgent, FundamentalAnalyzerAgent.
+
+**Unified Data Model:**
+```
+position_analyses table:
+├─ position_id: which position was analyzed
+├─ agent: "storychecker" | "consensus_gap" | "fundamental_analyzer"
+├─ verdict: agent-specific enum (e.g., "intact" / "wächst" / "unterbewertet")
+├─ summary: 1-sentence summary of verdict
+├─ skill_name: which skill was used (optional, for filtering/history)
+├─ session_id: reference to agent-specific session table (optional; for multi-turn chat or full-text retrieval)
+├─ analysis_text: full analysis details (optional; for agents without sessions, e.g., consensus_gap)
+└─ created_at: when analysis was created
+```
+
+**Unified UI Pattern** (right-side results panel per position):
+```
+{verdict_icon} **Position Name**
+`Ticker` · Datum · Skill Name
+
+Summary (1 Satz)
+
+▼ Vollständige Analyse [expandable, default open]
+  {Retrieved via: session_id → agent_messages table, OR analysis_text field}
+
+▼ Ältere Analysen (N) [expandable, default collapsed]
+  {verdict_icon} **Datum** · Skill Name
+  Summary
+```
+
+**Implementation Checklist for New Position-Analysis Agent:**
+
+1. **Agent Class** (`agents/<name>_agent.py`):
+   - `analyze_portfolio(positions, skill_name, skill_prompt, language)` → async batch method
+   - Call `analyses_repo.save(position_id, agent=<name>, verdict, summary, [session_id], [analysis_text])`
+   - If multi-turn chat needed: create session table + StorycheckerAgent-style repository
+
+2. **Data Storage** (`position_analyses` table):
+   - verdict: enum or string; use fixed codes (not localized) for consistency
+   - summary: 1 sentence; can be extracted from LLM output or computed
+   - session_id (optional): if agent has multi-turn chat, store session reference
+   - analysis_text (optional): full response text (if no session table)
+
+3. **Page** (`pages/<name>.py`):
+   - Batch section: "Only Pending" checkbox, Skill selector, "Run All" button (background thread)
+   - Current Results (right panel):
+     ```python
+     _verdicts = analyses_repo.get_latest_bulk(position_ids, agent="<name>")
+     for _pos, _a in _verdicts.items():
+         st.markdown(f"{verdict_icon(_a.verdict)} **{_pos.name}**")
+         st.caption(_a.summary)
+         # Full-text expander
+         if _a.session_id:
+             messages = agent.get_messages(_a.session_id)
+             with st.expander("▼ Vollständige Analyse", expanded=True):
+                 st.markdown(messages[0].content)
+         elif _a.analysis_text:
+             with st.expander("▼ Vollständige Analyse", expanded=True):
+                 st.markdown(_a.analysis_text)
+     ```
+   - History (inline expander): `analyses_repo.get_for_position(pos_id, limit=20)`
+   - **No left-side session navigation** (pages are cleaner when all history is on the right)
+
+4. **Verdict Config** (`core/ui/verdicts.py`):
+   - Add `VERDICT_CONFIGS["<agent_name>"]` dict with verdict → (icon, color) mapping
+
+5. **Tests** (`tests/`):
+   - Integration test: agent stores verdict + summary correctly
+   - Smoke test: page loads without exceptions (`pytest tests/integration/test_db_schema_migration.py`)
+
 ---
 
 ## Configuration Files
