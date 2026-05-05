@@ -123,7 +123,7 @@ class SearchAgent:
             skill_prompt=skill_prompt,
         )
 
-    async def chat(self, session_id: int, user_message: str) -> tuple[str, list[dict]]:
+    async def chat(self, session_id: int, user_message: str, enable_thinking: bool = False) -> tuple[str, list[dict]]:
         """Send a user message in an existing session and return the assistant reply + proposals."""
         session = self._search.get_session(session_id)
         if session is None:
@@ -145,6 +145,7 @@ class SearchAgent:
                 tools=TOOLS,
                 system=system,
                 max_tokens=4096,
+                enable_thinking=enable_thinking,
             )
 
             client_calls = [

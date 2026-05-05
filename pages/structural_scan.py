@@ -56,7 +56,7 @@ if "scan_proposals" not in st.session_state:
     st.session_state["scan_proposals"] = []
 
 
-def _run_background(agent, skill_name, skill_prompt, user_focus, language: str, repo, job: dict):
+def _run_background(agent, skill_name, skill_prompt, user_focus, language: str, repo, job: dict, enable_thinking: bool = False):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -67,6 +67,7 @@ def _run_background(agent, skill_name, skill_prompt, user_focus, language: str, 
                 user_focus=user_focus,
                 repo=repo,
                 language=language,
+                enable_thinking=enable_thinking,
             )
         )
         job.update({"running": False, "done": True, "run_id": run.id, "error": None, "proposals": proposals})
@@ -98,6 +99,16 @@ with st.expander(t("structural_scan.new_scan_header"), expanded=st.session_state
         disabled=_JOB["running"],
     )
 
+    from core.constants import CLAUDE_SONNET, CLAUDE_OPUS
+    _supports_thinking = _agent._llm.model in {CLAUDE_SONNET, CLAUDE_OPUS}
+    _use_thinking = st.toggle(
+        "Extended Thinking",
+        value=False,
+        disabled=not _supports_thinking,
+        help="Adaptive thinking — bessere Query-Planung, mehr Tokens",
+        key="_scan_extended_thinking",
+    )
+
     if st.button(t("structural_scan.start_button"), type="primary", key="_scan_start", disabled=_JOB["running"]):
         _lang = current_language()
         _JOB["running"] = True
@@ -108,7 +119,7 @@ with st.expander(t("structural_scan.new_scan_header"), expanded=st.session_state
         _JOB["proposals"] = []
         t_bg = threading.Thread(
             target=_run_background,
-            args=(_agent, _sel_skill.name, _sel_skill.prompt, _user_focus or None, _lang, _repo, _JOB),
+            args=(_agent, _sel_skill.name, _sel_skill.prompt, _user_focus or None, _lang, _repo, _JOB, _use_thinking),
             daemon=True,
         )
         t_bg.start()
@@ -204,11 +215,13 @@ if _active_run_id:
                 st.markdown(_followup)
             with st.chat_message("assistant"):
                 with st.spinner("…"):
+                    _use_thinking_followup = st.session_state.get("_scan_extended_thinking", False)
                     _reply = asyncio.run(
                         _agent.chat(
                             run_id=_active_run_id,
                             user_message=_followup,
                             repo=_repo,
+                            enable_thinking=_use_thinking_followup,
                         )
                     )
                 st.markdown(_reply)

@@ -127,7 +127,7 @@ def get_news_agent() -> NewsAgent:
 @st.cache_resource
 def get_search_agent() -> SearchAgent:
     model = _get_public_agent_model("search", CLAUDE_SONNET)
-    llm = _make_public_provider(model, "investment_search", enable_thinking=True)
+    llm = _make_public_provider(model, "investment_search")
     return SearchAgent(
         positions_repo=get_positions_repo(),
         search_repo=get_search_repo(),
@@ -151,7 +151,7 @@ def get_storychecker_agent() -> StorycheckerAgent:
 @st.cache_resource
 def get_structural_change_agent() -> StructuralChangeAgent:
     model = _get_public_agent_model("structural_scan", CLAUDE_SONNET)
-    llm = _make_public_provider(model, "structural_scan", enable_thinking=True)
+    llm = _make_public_provider(model, "structural_scan")
     return StructuralChangeAgent(
         positions_repo=get_positions_repo(),
         llm=llm,

@@ -141,6 +141,7 @@ class StructuralChangeAgent:
         user_focus: Optional[str],
         repo: StructuralScansRepository,
         language: str = "de",
+        enable_thinking: bool = False,
     ) -> Tuple[StructuralScanRun, str, List[dict]]:
         """
         Run a structural change scan. Saves the run + messages.
@@ -173,7 +174,7 @@ class StructuralChangeAgent:
         all_positions = [p for p in self._positions.get_portfolio() if not p.analysis_excluded]
         self._llm.position_count = len(all_positions) if all_positions else 1
         api_messages: list[dict] = [{"role": "user", "content": user_msg}]
-        report = await self._run_agentic_loop(api_messages, system)
+        report = await self._run_agentic_loop(api_messages, system, enable_thinking=enable_thinking)
 
         run = repo.save_run(
             skill_name=skill_name,
@@ -190,6 +191,7 @@ class StructuralChangeAgent:
         user_message: str,
         repo: StructuralScansRepository,
         language: str = "de",
+        enable_thinking: bool = False,
     ) -> str:
         """Follow-up conversation after a scan.
 
@@ -216,6 +218,7 @@ class StructuralChangeAgent:
             tools=[WEB_SEARCH_TOOL],
             system=system,
             max_tokens=4096,
+            enable_thinking=enable_thinking,
         )
         reply = response.content or ""
         repo.add_message(run_id, "assistant", reply)
@@ -263,6 +266,7 @@ class StructuralChangeAgent:
         self,
         api_messages: list[dict],
         system: str,
+        enable_thinking: bool = False,
     ) -> str:
         """Run Claude with tools until no more client tool calls remain."""
         response: Optional[ClaudeResponse] = None
@@ -272,6 +276,7 @@ class StructuralChangeAgent:
                 tools=TOOLS,
                 system=system,
                 max_tokens=4000,
+                enable_thinking=enable_thinking,
             )
 
             client_calls = [

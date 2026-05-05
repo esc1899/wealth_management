@@ -63,6 +63,16 @@ with col_sidebar:
                 height=120,
             ).strip()
 
+        from core.constants import CLAUDE_SONNET, CLAUDE_OPUS
+        _supports_thinking = agent.model in {CLAUDE_SONNET, CLAUDE_OPUS}
+        use_thinking = st.toggle(
+            "Extended Thinking",
+            value=False,
+            disabled=not _supports_thinking,
+            help="Adaptive thinking — bessere Query-Planung, mehr Tokens",
+            key="sc_extended_thinking",
+        )
+
         submitted = st.form_submit_button(
             t("search_chat.start_button"), use_container_width=True
         )
@@ -94,7 +104,7 @@ with col_sidebar:
             )
             with st.spinner(t("search_chat.thinking")):
                 try:
-                    response, proposals = asyncio.run(agent.chat(session.id, initial_msg))
+                    response, proposals = asyncio.run(agent.chat(session.id, initial_msg, enable_thinking=use_thinking))
                     st.session_state.sc_proposals = proposals
                 except Exception as exc:
                     st.error(f"⚠️ {t('common.agent_error')}: {exc}")
@@ -190,7 +200,8 @@ with col_chat:
                 with st.chat_message("assistant"):
                     with st.spinner(t("search_chat.searching")):
                         try:
-                            response, proposals = asyncio.run(agent.chat(session_id, prompt))
+                            _use_thinking = st.session_state.get("sc_extended_thinking", False)
+                            response, proposals = asyncio.run(agent.chat(session_id, prompt, enable_thinking=_use_thinking))
                             st.session_state.sc_proposals = proposals
                         except Exception as exc:
                             response = f"⚠️ {t('common.agent_error')}: {exc}"
