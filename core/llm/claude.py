@@ -92,12 +92,13 @@ class ClaudeProvider(LLMProvider):
     Only used for agents explicitly configured to use Claude.
     """
 
-    def __init__(self, api_key: str = "", model: str = DEFAULT_MODEL, base_url: str = ""):
+    def __init__(self, api_key: str = "", model: str = DEFAULT_MODEL, base_url: str = "", enable_thinking: bool = False):
         kwargs = {"api_key": api_key}
         if base_url:
             kwargs["base_url"] = base_url
         self._client = anthropic.AsyncAnthropic(**kwargs)
         self._model = model
+        self._enable_thinking = enable_thinking
 
     async def chat(
         self,
@@ -177,6 +178,8 @@ class ClaudeProvider(LLMProvider):
         # effort: "high" reduces thinking token overhead; Haiku does not support effort
         if self._model in {CLAUDE_SONNET, CLAUDE_OPUS}:
             kwargs["output_config"] = {"effort": "high"}
+            if self._enable_thinking:
+                kwargs["thinking"] = {"type": "adaptive", "display": "summarized"}
 
         _t0 = time.monotonic()
         total_input = 0

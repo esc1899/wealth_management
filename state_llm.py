@@ -9,12 +9,13 @@ from core.llm.local import OllamaProvider
 from state_repos import get_usage_repo, get_app_config_repo
 
 
-def _make_claude_provider(model: str, agent_name: str) -> ClaudeProvider:
+def _make_claude_provider(model: str, agent_name: str, enable_thinking: bool = False) -> ClaudeProvider:
     """Create and wire up a Claude provider with usage tracking."""
     provider = ClaudeProvider(
         api_key=config.LLM_API_KEY,
         model=model,
         base_url=config.LLM_BASE_URL,
+        enable_thinking=enable_thinking,
     )
     provider.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
     return provider
@@ -32,11 +33,11 @@ def _make_openai_provider(model: str, agent_name: str) -> "OpenAICompatibleProvi
     return provider
 
 
-def _make_public_provider(model: str, agent_name: str) -> LLMProvider:
+def _make_public_provider(model: str, agent_name: str, enable_thinking: bool = False) -> LLMProvider:
     """Return either OpenAI-compatible or Claude provider based on active config."""
     if config.OPENAI_BASE_URL:
         return _make_openai_provider(model, agent_name)
-    return _make_claude_provider(model, agent_name)
+    return _make_claude_provider(model, agent_name, enable_thinking=enable_thinking)
 
 
 def _get_public_agent_model(agent_key: str, default: str) -> str:
