@@ -146,9 +146,21 @@ position_display = {
     for p in portfolio_positions
 }
 
+# Pre-selection from Portfolio Story deeplink (via session_state)
+preselect_id = st.session_state.pop("pd_preselect_position_id", None)
+position_keys = list(position_display.keys())
+
+default_index = 0
+if preselect_id is not None:
+    for i, p in enumerate(portfolio_positions):
+        if p.id == preselect_id:
+            default_index = i
+            break
+
 selected_display = st.selectbox(
     t("position_dashboard.select_position"),
-    list(position_display.keys()),
+    position_keys,
+    index=default_index,
 )
 
 if not selected_display:

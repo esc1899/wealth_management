@@ -19,7 +19,7 @@ from config import config
 from core.currency import symbol
 from core.i18n import t
 from core.storage.models import PortfolioStory
-from core.ui.verdicts import cloud_notice
+from core.ui.verdicts import cloud_notice, verdict_badge, VERDICT_CONFIGS
 from state import (
     get_analysis_service,
     get_app_config_repo,
@@ -43,6 +43,49 @@ def _verdict_icon(verdict: str) -> str:
         "unknown": "⚪",
     }
     return mapping.get(verdict.lower(), "⚪")
+
+
+def _verdict_badge_compact(v, config_key: str) -> str:
+    """Render verdict as badge for inline display, or '⚪ —' if None."""
+    if v is None:
+        return "⚪ —"
+    return verdict_badge(v.verdict, VERDICT_CONFIGS[config_key])
+
+
+def _render_position_details_expander(all_verdicts_by_agent, all_positions):
+    """Render the Positions-Details expander with buttons + badges."""
+    with st.expander(t("portfolio_story.position_details_label")):
+        sc_verdicts = all_verdicts_by_agent.get("storychecker", {})
+        cg_verdicts = all_verdicts_by_agent.get("consensus_gap", {})
+        fa_verdicts = all_verdicts_by_agent.get("fundamental_analyzer", {})
+
+        for p in all_positions:
+            if not p.id or not p.ticker:
+                continue
+
+            sc_v = sc_verdicts.get(p.id)
+            cg_v = cg_verdicts.get(p.id)
+            fa_v = fa_verdicts.get(p.id)
+
+            icon = _verdict_icon(sc_v.verdict if sc_v else "unknown")
+
+            # Position name as button → deeplink to Position Dashboard
+            if st.button(f"{icon} {p.name} ({p.ticker})", key=f"ps_pos_{p.id}"):
+                st.session_state["pd_preselect_position_id"] = p.id
+                st.switch_page("pages/position_dashboard.py")
+
+            # Storychecker summary (existing behaviour)
+            if sc_v and sc_v.summary:
+                st.caption(sc_v.summary)
+
+            # Three inline badges
+            badges = (
+                f"SC: {_verdict_badge_compact(sc_v, 'storychecker')} &nbsp;&nbsp; "
+                f"CG: {_verdict_badge_compact(cg_v, 'consensus_gap')} &nbsp;&nbsp; "
+                f"FA: {_verdict_badge_compact(fa_v, 'fundamental_analyzer')}"
+            )
+            st.markdown(f"<small>{badges}</small>", unsafe_allow_html=True)
+            st.divider()
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -164,9 +207,9 @@ _analysis_service = get_analysis_service()
 valuations_list = market_agent.get_portfolio_valuation() if market_agent else []
 all_positions = _portfolio_service.get_portfolio_positions()
 
-# Compute verdicts for all positions
+# Compute verdicts for all positions (all 3 agents at once)
 all_ids = [p.id for p in all_positions if p.id]
-all_verdicts = _analysis_service.get_verdicts(all_ids, "storychecker") if all_ids else {}
+all_verdicts_by_agent = _analysis_service.get_all_verdicts(all_ids) if all_ids else {}
 
 # ──────────────────────────────────────────────────────────────────────
 # Section 1: Define / Update Portfolio Story
@@ -369,9 +412,10 @@ if st.button(t("portfolio_story.run_button"), type="primary", use_container_widt
             portfolio_snapshot += t("portfolio_story.empty_portfolio") + "\n"
 
         verdict_lines = []
+        sc_verdicts_for_job = all_verdicts_by_agent.get("storychecker", {})
         for p in all_positions:
-            if p.id and p.id in all_verdicts:
-                v = all_verdicts[p.id]
+            if p.id and p.id in sc_verdicts_for_job:
+                v = sc_verdicts_for_job[p.id]
                 icon = {
                     "intact": "🟢",
                     "gemischt": "🟡",
@@ -437,20 +481,7 @@ if "_ps_result" in st.session_state:
         st.markdown(result.full_text)
 
     # Positions-Story-Details expandable
-    with st.expander(t("portfolio_story.position_details_label")):
-        for p in all_positions:
-            if p.id and p.id in all_verdicts:
-                v = all_verdicts[p.id]
-                icon = {
-                    "intact": "🟢",
-                    "gemischt": "🟡",
-                    "gefaehrdet": "🔴",
-                }.get(v.verdict, "⚪")
-                st.markdown(f"**{icon} {p.name}** ({p.ticker})")
-                if v.summary:
-                    st.caption(v.summary)
-            elif p.story and p.ticker:
-                st.markdown(f"**⚪ {p.name}** ({p.ticker}) — {t('portfolio_story.check_pending_label')}")
+    _render_position_details_expander(all_verdicts_by_agent, all_positions)
 
 # Latest saved analysis (if available)
 elif latest_analysis:
@@ -470,6 +501,9 @@ elif latest_analysis:
 
     with st.expander(t("portfolio_story.full_analysis_label")):
         st.markdown(latest_analysis.full_text)
+
+    # Positions-Story-Details expandable (also show for saved analysis)
+    _render_position_details_expander(all_verdicts_by_agent, all_positions)
 else:
     st.info(t("portfolio_story.no_analysis"))
 
