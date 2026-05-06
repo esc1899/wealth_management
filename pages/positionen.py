@@ -850,7 +850,7 @@ def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
         t("positionen.col_name"), t("positionen.col_ticker"),
         t("positionen.col_isin"), t("positionen.col_asset_class"),
         t("positionen.col_quantity"), t("positionen.col_unit"),
-        "Akt. Wert", "Div.-Rendite", "Exkl.", "⚠️ Overr.", "", "", "",
+        "Akt. Wert", "Div.-Rendite", "Exkl.", "Overr.", "", "", "",
     ]):
         col.markdown(f"**{label}**")
 
