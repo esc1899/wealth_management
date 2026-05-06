@@ -207,6 +207,9 @@ class ClaudeProvider(LLMProvider):
             total_output += response.usage.output_tokens
             total_cache_read += getattr(response.usage, 'cache_read_input_tokens', 0) or 0
             total_cache_write += getattr(response.usage, 'cache_creation_input_tokens', 0) or 0
+            # Anthropic built-in web_search: count from server_tool_use usage field
+            _stu = getattr(response.usage, 'server_tool_use', None)
+            total_web_search += getattr(_stu, 'web_search_requests', 0) or 0
 
             # Collect web_search tool calls if Tavily is active
             if tavily_key and response.stop_reason == "tool_use":
