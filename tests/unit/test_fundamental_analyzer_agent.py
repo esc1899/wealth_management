@@ -296,7 +296,7 @@ def test_build_initial_message(mock_position):
     assert "Apple Inc." in msg
     assert "AAPL" in msg
     assert "Aktie" in msg
-    assert "Tech leader" in msg  # From story
+    assert "Einzelaktie" in msg  # From anlageart
     assert "web_search" in msg.lower() or "daten" in msg.lower()
 
 

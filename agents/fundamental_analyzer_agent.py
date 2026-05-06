@@ -195,7 +195,7 @@ class FundamentalAnalyzerAgent:
                 messages=api_messages,
                 tools=[WEB_SEARCH_TOOL],
                 system=system,
-                max_tokens=2500,
+                max_tokens=3000,
             )
         )
         return cr.content
@@ -210,7 +210,7 @@ class FundamentalAnalyzerAgent:
             messages=api_messages,
             tools=[WEB_SEARCH_TOOL],
             system=system,
-            max_tokens=2500,
+            max_tokens=3000,
         )
         return cr.content
 
@@ -339,9 +339,6 @@ def _build_initial_message(position: PublicPosition, skill_name: Optional[str], 
     msg += f"**Anlageklasse:** {position.asset_class}\n"
     if position.anlageart:
         msg += f"**Anlage-Art:** {position.anlageart}\n"
-
-    if position.story:
-        msg += f"\n**Investment-These:**\n{position.story}\n"
 
     if skill_name and skill_prompt:
         msg += f"\n**Fokus-Bereich ({skill_name}):**\n{skill_prompt}\n"
