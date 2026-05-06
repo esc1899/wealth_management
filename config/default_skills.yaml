@@ -162,41 +162,35 @@ skills:
   # Skills for the FundamentalAgent (Cloud ☁️, Claude API + web search).
 
   fundamental:
-    - name: "Fundamentalbewertung Standard"
-      description: "KGV, KBV, EV/EBITDA, DCF — klassische Multiples-Bewertung"
+    - name: "Langfrist-Investor"
+      description: "10+ Jahres-Horizont — Moat, konservative Bewertung, strukturelle Risiken"
       prompt: |
-        Führe eine vollständige Fundamentalanalyse durch.
+        Nimm die Perspektive eines langfristigen Investors mit 10+ Jahre Haltedauer ein.
+        - Gewichte Geschäftsmodell und Moat stärker als kurzfristige Kursziele
+        - Bewertung: konservativ — lieber Margin of Safety als optimistischen DCF
+        - Wachstum: nur strukturelles, nachhaltiges Wachstum zählt; ignoriere Einmaleffekte
+        - Risiken: betone strukturelle und regulatorische Risiken, nicht kurzfristige Volatilität
+        - Dividende: Kontinuität und Wachstum wichtiger als aktuelle Rendite
 
-        Priorität der Methoden (je nach Datenverfügbarkeit):
-        1. KGV-Bewertung: Aktuelles KGV vs. 5-Jahres-Schnitt und Sektor-Median
-        2. EV/EBITDA: Unternehmenswert relativ zu operativem Ergebnis vs. Peers
-        3. Vereinfachter DCF: Analyst-Consensus für Umsatz-/Gewinnwachstum 3–5 Jahre,
-           Diskontierungssatz 9%, Terminal Growth 2.5%
-        4. Analystenkursziele: Consensus-Kursziel vs. aktueller Kurs (Upside/Downside %)
-        5. PEG-Ratio: KGV / Gewinnwachstum — unter 1 gilt als potenziell unterbewertet
-
-        Interpretation:
-        - Mehrere Methoden müssen dieselbe Richtung zeigen → erst dann klares Urteil
-        - Zweifelhafte Datenlage → "unbekannt" statt spekulativem Urteil
-        - Wachstumsaktien: höheres KGV akzeptabel wenn PEG und DCF stimmen
-
-    - name: "Dividendenbewertung"
-      description: "Für Dividendenaktien: Rendite, Ausschüttungsquote, Dividend DCF"
+    - name: "Wachstums-Aktie"
+      description: "Wachstumsdynamik, TAM, Skalierbarkeit — höhere Multiples akzeptabel"
       prompt: |
-        Fokus auf Dividendenqualität und Dividenden-basierte Bewertung.
+        Analysiere aus der Perspektive eines wachstumsorientierten Investors.
+        - Wachstum: Priorisiere Umsatzwachstum, Margenentwicklung und TAM — das ist die Kernfrage
+        - Bewertung: Höhere Multiples sind akzeptabel wenn Wachstum und Skalierbarkeit es rechtfertigen
+        - Geschäftsmodell: Betone Netzwerkeffekte, Skalierbarkeit, Kundenbindung
+        - Risiken: Fokus auf Wettbewerbs- und Disruptions-Risiken, nicht auf Bewertungsrisiken
+        - Dividende: Nachrangig — Reinvestition in Wachstum ist bevorzugt
 
-        Analysiere:
-        1. Aktuelle Dividendenrendite vs. historischer Durchschnitt (5 Jahre) und Sektor
-        2. Ausschüttungsquote (Payout Ratio) — über 80% ist ein Warnsignal
-        3. Dividendenwachstum: Compound Annual Growth Rate (CAGR) der letzten 5 Jahre
-        4. Free Cash Flow Coverage: Kann die Dividende aus FCF gedeckt werden?
-        5. Dividend Discount Model (DDM): Vereinfacht — D₁ / (r - g) mit r=9%, g=Dividend CAGR
-        6. Debt/Equity: Zu viel Schulden gefährden Dividendenkontinuität
-
-        Urteil:
-        - "unterbewertet": Rendite historisch hoch + FCF-Deckung gut + DDM zeigt Upside
-        - "überbewertet": Rendite historisch niedrig + Payout Ratio hoch + DDM zeigt Downside
-        - "unbekannt": Unregelmäßige oder keine Dividende
+    - name: "Dividenden-Fokus"
+      description: "Dividendenqualität und -kontinuität — Einkommen und Ausschüttungssicherheit"
+      prompt: |
+        Analysiere aus der Perspektive eines einkommensorientierten Investors.
+        - Dividende: Das ist die Kernsektion — gehe tiefer: FCF-Deckung, Payout Ratio, Wachstumshistorie
+        - Bewertung: Dividendenrendite im historischen Vergleich ist zentral; ergänze durch DDM wenn möglich
+        - Geschäftsmodell: Betone Defensivität und Cashflow-Stabilität
+        - Wachstum: Nachrangig — stabile, vorhersehbare Erträge wichtiger als hohes Wachstum
+        - Risiken: Betone Risiken für die Dividendenkontinuität (Verschuldung, Payout-Druck)
 
   # ── Story Checker ───────────────────────────────────────────────────────────
   # Anlage-Ideen for the StorycheckerAgent (Cloud ☁️, Claude API + web search).

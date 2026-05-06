@@ -41,10 +41,25 @@ BASE_SYSTEM_PROMPT = """Du bist ein erfahrener Fundamental-Analyst.
 
 Analysiere die Position tiefgehend. Nutze web_search für aktuelle Daten.
 
-Beginne deine Antwort IMMER mit:
+Antworte IMMER in diesem Format:
+
 **ZUSAMMENFASSUNG:** [1 Satz — die wichtigste Kernaussage]
 
-Dann die Analyse. Schließe ab mit genau einem:
+## Geschäftsmodell & Wettbewerbsposition
+[2–3 Sätze: Geschäftsmodell, Moats, Wettbewerbsvorteile]
+
+## Bewertung
+[2–3 Sätze: KGV, Fair Value, Margin of Safety]
+
+## Wachstum & Potenzial
+[2–3 Sätze: Umsatzwachstum, Margen, Katalysatoren]
+
+## Dividende & Ausschüttungen
+[1–2 Sätze: Rendite, Payout Ratio, Historie — oder "zahlt keine Dividende"]
+
+## Risiken
+[2–3 Sätze: Die wichtigsten Risiken]
+
 **Fazit: unterbewertet** oder **Fazit: fair** oder **Fazit: überbewertet**"""
 
 
@@ -188,7 +203,7 @@ class FundamentalAnalyzerAgent:
                 messages=api_messages,
                 tools=[WEB_SEARCH_TOOL],
                 system=system,
-                max_tokens=1500,
+                max_tokens=2500,
             )
         )
         return cr.content
