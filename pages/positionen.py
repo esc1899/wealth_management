@@ -850,7 +850,7 @@ def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
         t("positionen.col_name"), t("positionen.col_ticker"),
         t("positionen.col_isin"), t("positionen.col_asset_class"),
         t("positionen.col_quantity"), t("positionen.col_unit"),
-        "Akt. Wert", "Div.-Rendite", "🔬 Analys.", "⚠️ Overr.", "", "", "",
+        "Akt. Wert", "Div.-Rendite", "Exkl.", "⚠️ Overr.", "", "", "",
     ]):
         col.markdown(f"**{label}**")
 
@@ -892,7 +892,7 @@ def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
         cols[7].write(div_yield or "—")
 
         # analysis_excluded indicator
-        cols[8].write("🔬" if pos.analysis_excluded else "—")
+        cols[8].write("✖" if pos.analysis_excluded else "—")
 
         # Manual override indicator
         extra = pos.extra_data or {}
