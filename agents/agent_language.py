@@ -1,5 +1,17 @@
 """Language instruction helpers for agent system prompts."""
 
+from datetime import date
+
+
+def current_date_context() -> str:
+    """Return a date-anchoring prefix for web-search agent system prompts.
+
+    Prevents the LLM from treating cached knowledge as current and ensures
+    web searches are filtered to recent data.
+    """
+    today = date.today().strftime("%B %d, %Y")
+    return f"Today is {today}. When searching, focus on the last 90 days unless the user specifies otherwise.\n\n"
+
 
 def response_language_instruction(language: str) -> str:
     """Return a language instruction for the system prompt.

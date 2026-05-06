@@ -8,6 +8,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Agent Optimierungen (Sonnet-Umstieg) — 2026-05-06
+
+**Temporale Verankerung — alle 7 Web-Search-Agents**
+- Neue Hilfsfunktion `current_date_context()` in `agents/agent_language.py`
+- Injiziert aktuelles Datum + "Fokus auf letzte 90 Tage" in System-Prompts
+- Verhindert veraltete Web-Suchen ohne Zeitfilter und Halluzinationen über "aktuelle" Daten
+- Betrifft: ConsensusGapAgent, StorycheckerAgent, FundamentalAnalyzerAgent, NewsAgent, ResearchAgent, SearchAgent, StructuralChangeAgent
+
+**Iterations-Limits auf Sonnet kalibriert**
+- `StructuralChangeAgent`: `MAX_TOOL_ITERATIONS` 20 → 10 (Sonnet konvergiert in 5–7 Client-Tool-Calls)
+- `StorycheckerAgent`: `MAX_TOOL_ITERATIONS` 8 → 5 (Sonnet braucht weniger Iterationen für gezielte Web-Suchen)
+
+**NewsAgent — dynamische Web-Search-Limits**
+- Toter Constant `MAX_TOOL_ITERATIONS = 15` entfernt (war nie eingebunden, ClaudeProvider hat intern `range(10)`)
+- `max_uses = max(4, len(tickers) * 2)` — proportional zur Portfolio-Größe, nicht hardcoded
+
+**FundamentalAnalyzerAgent — Tool-basiertes Verdict**
+- Neues Tool `SUBMIT_FA_VERDICT_TOOL` (analog ConsensusGapAgent): strukturiertes Verdict + Summary via Tool-Call
+- `_extract_verdict_from_tools()` + `_extract_summary_from_tools()` als primäre Extraktion
+- Regex-Fallback (`_extract_verdict`, `_extract_summary`) bleibt als Backup — Belt-and-Suspenders
+- `_run_llm()` / `_run_llm_async()` returnieren jetzt `ClaudeResponse` statt `str`; alle Caller aktualisiert
+
+**FundamentalAnalyzerAgent — Asset-Class-spezifische Prompts**
+- `_SYSTEM_PROMPT_AKTIE`: Geschäftsmodell/KGV/Wachstum/Dividende/Risiken (wie bisher)
+- `_SYSTEM_PROMPT_FONDS`: Anlagestrategie/Kosten (TER, Tracking Error)/Marktbewertung/Klumpen/Marktposition
+- ETFs und Fonds (`Aktienfonds`, `Immobilienfonds`) erhalten Fonds-Prompt; alle anderen Aktie-Prompt
+- `_build_system_prompt(asset_class, language, include_verdict_tool)` als zentraler Builder
+
+**ResearchAgent — Prompt-Vereinfachung**
+- 7 Abschnitte → 5: Kurzfazit / Fundamentaldaten / Chancen & Risiken / Analystenmeinungen & Kursziele / Bewertung
+- `max_tokens` 4096 → 3000 (strukturierter Output braucht weniger Platz)
+
 ### Bug Fixes + Performance — 2026-05-06
 
 **FA + CG Batch Parallelization**

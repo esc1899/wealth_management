@@ -20,10 +20,10 @@ import logging
 
 from typing import Optional, Tuple
 
-from core.llm.base import Message, Role
 from core.llm.claude import ClaudeProvider
 from core.storage.models import NewsRun
 from core.storage.news import NewsRepository
+from agents.agent_language import current_date_context
 
 
 logger = logging.getLogger(__name__)
@@ -57,11 +57,8 @@ If asked about a position not in the digest, say so clearly.
 ## News Digest
 {digest}"""
 
-# Server-side web search — Anthropic executes this, no client handling needed
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search"}
-
-# Allow enough iterations for multiple tickers
-MAX_TOOL_ITERATIONS = 15
+# Server-side web search — max_uses is set dynamically per call based on ticker count
+_WEB_SEARCH_BASE = {"type": "web_search_20250305", "name": "web_search"}
 
 
 class NewsAgent:
@@ -171,9 +168,12 @@ class NewsAgent:
             return "No positions found. Add positions in Portfolio Chat first."
 
         names = ticker_names or {}
-        system = BASE_SYSTEM_PROMPT
+        system = current_date_context() + BASE_SYSTEM_PROMPT
         if skill_prompt:
             system += f"\n\n## Filter Strategy: {skill_name}\n{skill_prompt}"
+
+        # 2 searches per ticker, min 4 — keeps costs proportional to portfolio size
+        web_search_tool = {**_WEB_SEARCH_BASE, "max_uses": max(4, len(tickers) * 2)}
 
         position_lines = "\n".join(
             f"- **{t}** ({names.get(t, t)})" for t in tickers
@@ -185,7 +185,7 @@ class NewsAgent:
 
         response = await self._llm.chat_with_tools(
             messages=[{"role": "user", "content": user_message}],
-            tools=[WEB_SEARCH_TOOL],
+            tools=[web_search_tool],
             system=system,
             max_tokens=4096,
         )

@@ -21,6 +21,7 @@ from core.llm.claude import ClaudeProvider, ClaudeResponse, ClaudeToolCall
 from core.storage.models import Position, SearchSession
 from core.storage.positions import PositionsRepository
 from core.storage.search import SearchRepository
+from agents.agent_language import current_date_context
 
 
 logger = logging.getLogger(__name__)
@@ -132,7 +133,7 @@ class SearchAgent:
         self._session_proposals[session_id] = []
         self._current_session_id = session_id
 
-        system = BASE_SYSTEM_PROMPT + "\n\n## Screening Strategy\n" + session.skill_prompt
+        system = current_date_context() + BASE_SYSTEM_PROMPT + "\n\n## Screening Strategy\n" + session.skill_prompt
 
         api_messages = self._build_api_messages(session_id)
         api_messages.append({"role": "user", "content": user_message})

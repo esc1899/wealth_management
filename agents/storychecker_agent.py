@@ -24,7 +24,7 @@ from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.models import Position, StorycheckerSession
 from core.storage.storychecker import StorycheckerRepository
-from agents.agent_language import response_language_instruction
+from agents.agent_language import response_language_instruction, current_date_context
 
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # Server-side web search — Anthropic executes this, no client handling needed
 WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search"}
 
-MAX_TOOL_ITERATIONS = 8
+MAX_TOOL_ITERATIONS = 5
 
 # ------------------------------------------------------------------
 # System prompt
@@ -290,7 +290,7 @@ Schreibe nur die These selbst, keine Einleitung oder Überschrift."""
 
     async def _run_llm_async(self, session_id: int, api_messages: list[dict], language: str = "de") -> str:
         messages = list(api_messages)
-        system_prompt = BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(language)
+        system_prompt = current_date_context() + BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(language)
         for _ in range(MAX_TOOL_ITERATIONS):
             response = await self._llm.chat_with_tools(
                 messages=messages,

@@ -34,7 +34,7 @@ from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.consensus_gap import ConsensusGapRepository
 from core.storage.models import PublicPosition, ConsensusGapMessage
-from agents.agent_language import response_language_with_fixed_codes
+from agents.agent_language import response_language_with_fixed_codes, current_date_context
 
 AGENT_NAME = "consensus_gap"
 
@@ -136,7 +136,7 @@ class ConsensusGapAgent:
 
         self._llm.skill_context = skill_name
         self._llm.position_count = len(eligible)
-        system = ANALYSIS_SYSTEM_PROMPT + "\n" + response_language_with_fixed_codes(language, ["wächst", "stabil", "schließt", "eingeholt"])
+        system = current_date_context() + ANALYSIS_SYSTEM_PROMPT + "\n" + response_language_with_fixed_codes(language, ["wächst", "stabil", "schließt", "eingeholt"])
         system += f"\n\n## Strategie-Skill\n{skill_prompt}"
 
         semaphore = asyncio.Semaphore(3)

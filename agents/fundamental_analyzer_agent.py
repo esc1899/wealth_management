@@ -19,7 +19,7 @@ from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.fundamental_analyzer import FundamentalAnalyzerRepository
 from core.storage.models import PublicPosition, FundamentalAnalyzerSession, FundamentalAnalyzerMessage
-from agents.agent_language import response_language_instruction
+from agents.agent_language import response_language_instruction, current_date_context
 
 
 logger = logging.getLogger(__name__)
@@ -27,17 +27,40 @@ AGENT_NAME = "fundamental_analyzer"
 
 VALID_VERDICTS = {"unterbewertet", "fair", "überbewertet", "unbekannt"}
 
+# Asset classes treated as funds/ETFs (different analysis dimensions than single stocks)
+_FUND_ASSET_CLASSES = {"Aktienfonds", "Immobilienfonds"}
+
 # ------------------------------------------------------------------
 # Tools
 # ------------------------------------------------------------------
 
 WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 5}
 
+SUBMIT_FA_VERDICT_TOOL = {
+    "name": "submit_fa_verdict",
+    "description": "Submit the fundamental analysis verdict and one-line summary after completing the written analysis.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "verdict": {
+                "type": "string",
+                "enum": ["unterbewertet", "fair", "überbewertet", "unbekannt"],
+                "description": "Valuation verdict",
+            },
+            "summary": {
+                "type": "string",
+                "description": "One sentence — the single most important finding in plain language",
+            },
+        },
+        "required": ["verdict", "summary"],
+    },
+}
+
 # ------------------------------------------------------------------
-# System prompt
+# System prompts (asset-class specific)
 # ------------------------------------------------------------------
 
-BASE_SYSTEM_PROMPT = """Du bist ein erfahrener Fundamental-Analyst.
+_SYSTEM_PROMPT_AKTIE = """Du bist ein erfahrener Fundamental-Analyst für Einzeltitel.
 
 Analysiere die Position tiefgehend. Nutze web_search für aktuelle Daten.
 
@@ -58,9 +81,42 @@ Antworte IMMER in diesem Format:
 [1–2 Sätze: Rendite, Payout Ratio, Historie — oder "zahlt keine Dividende"]
 
 ## Risiken
-[2–3 Sätze: Die wichtigsten Risiken]
+[2–3 Sätze: Die wichtigsten Risiken]"""
 
-**Fazit: unterbewertet** oder **Fazit: fair** oder **Fazit: überbewertet**"""
+_SYSTEM_PROMPT_FONDS = """Du bist ein erfahrener ETF- und Fondsanalyst.
+
+Analysiere diesen Fonds tiefgehend. Nutze web_search für aktuelle Daten.
+
+Antworte IMMER in diesem Format:
+
+**ZUSAMMENFASSUNG:** [1 Satz — die wichtigste Kernaussage]
+
+## Anlagestrategie & Index
+[2–3 Sätze: Anlageuniversum, Replikationsmethode, Besonderheiten des Index]
+
+## Kosten & Effizienz
+[2–3 Sätze: TER, Tracking Error vs Benchmark, Performance-Vergleich]
+
+## Marktbewertung
+[2–3 Sätze: Bewertung des zugrundeliegenden Markts/Index — KGV, historischer Vergleich]
+
+## Risiken & Klumpen
+[2–3 Sätze: Top-Positionen/Sektorkonzentration, Währungsrisiko, spezifische Risiken]
+
+## Marktposition
+[1–2 Sätze: AUM-Größe, Emittent-Stabilität, Liquidität]"""
+
+_VERDICT_TOOL_INSTRUCTION = "\n\nNach der geschriebenen Analyse: Rufe submit_fa_verdict auf mit Verdict und Ein-Satz-Zusammenfassung."
+
+
+def _build_system_prompt(asset_class: str, language: str, include_verdict_tool: bool = False) -> str:
+    """Build asset-class-specific system prompt with optional verdict tool instruction."""
+    base = _SYSTEM_PROMPT_FONDS if asset_class in _FUND_ASSET_CLASSES else _SYSTEM_PROMPT_AKTIE
+    system = current_date_context() + base
+    if include_verdict_tool:
+        system += _VERDICT_TOOL_INSTRUCTION
+    system += "\n" + response_language_instruction(language)
+    return system
 
 
 # ------------------------------------------------------------------
@@ -97,47 +153,29 @@ class FundamentalAnalyzerAgent:
     # ------------------------------------------------------------------
 
     def start_session(self, position: PublicPosition, language: str = "de", skill: Optional[str] = None, skill_prompt: Optional[str] = None) -> FundamentalAnalyzerSession:
-        """Create a new session and run the initial analysis.
-
-        Args:
-            position: The position to analyze
-            language: Language code for LLM output (default: "de")
-            skill: Override skill name (optional)
-            skill_prompt: Override skill prompt (optional)
-        """
-        # Resolve skill context
+        """Create a new session and run the initial analysis."""
         if skill is not None:
             skill_name = skill
+            resolved_prompt = skill_prompt
         else:
-            skill_name, _ = self._resolve_skill(position)
+            skill_name, resolved_prompt = self._resolve_skill(position)
 
-        # Create session in DB
         session = self._fa_repo.create_session(
             position_id=position.id,
             ticker=position.ticker,
             position_name=position.name,
             skill_name=skill_name,
         )
-
-        # Build initial message and run analysis
-        if skill is not None:
-            resolved_prompt = skill_prompt
-        else:
-            _, resolved_prompt = self._resolve_skill(position)
         initial_msg = _build_initial_message(position, skill_name, resolved_prompt)
-
-        # Persist user message
         self._fa_repo.add_message(session.id, "user", initial_msg)
 
-        # Get response from LLM
-        response = self._run_llm(session.id, language=language)
+        system = _build_system_prompt(position.asset_class, language, include_verdict_tool=True)
+        cr = self._run_llm(session.id, language=language, system=system,
+                           tools=[WEB_SEARCH_TOOL, SUBMIT_FA_VERDICT_TOOL])
+        self._fa_repo.add_message(session.id, "assistant", cr.content)
 
-        # Persist assistant response
-        self._fa_repo.add_message(session.id, "assistant", response)
-
-        # Save verdict for tracking (always, since _extract_verdict defaults to 'unbekannt')
-        verdict = _extract_verdict(response)
-        summary = _extract_summary(response)
+        verdict = _extract_verdict_from_tools(cr.tool_calls) or _extract_verdict(cr.content)
+        summary = _extract_summary_from_tools(cr.tool_calls) or _extract_summary(cr.content)
         self._analyses.save(
             position_id=position.id,
             agent="fundamental_analyzer",
@@ -146,7 +184,6 @@ class FundamentalAnalyzerAgent:
             summary=summary,
             session_id=session.id,
         )
-
         return session
 
     def get_session(self, session_id: Optional[int]) -> Optional[FundamentalAnalyzerSession]:
@@ -169,50 +206,50 @@ class FundamentalAnalyzerAgent:
         if not session:
             raise ValueError(f"Session {session_id} not found")
 
-        # Persist user message
         self._fa_repo.add_message(session_id, "user", user_message)
-
-        # Get response from LLM
-        response = self._run_llm(session_id)
-
-        # Persist assistant response
-        self._fa_repo.add_message(session_id, "assistant", response)
-
-        return response
+        cr = self._run_llm(session_id)
+        self._fa_repo.add_message(session_id, "assistant", cr.content)
+        return cr.content
 
     # ------------------------------------------------------------------
     # LLM execution
     # ------------------------------------------------------------------
 
-    def _run_llm(self, session_id: int, language: str = "de") -> str:
-        """Execute LLM call (sync, for single-session UI use)."""
+    def _run_llm(self, session_id: int, language: str = "de",
+                 system: Optional[str] = None, tools: Optional[list] = None):
+        """Execute LLM call (sync). Returns ClaudeResponse."""
         self._llm.skill_context = "fundamental_analyzer"
         messages = self._fa_repo.get_messages(session_id)
         api_messages = [{"role": m.role, "content": m.content} for m in messages]
-        system = BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(language)
-        cr = asyncio.run(
+        if system is None:
+            system = _build_system_prompt("Aktie", language)
+        if tools is None:
+            tools = [WEB_SEARCH_TOOL]
+        return asyncio.run(
             self._llm.chat_with_tools(
                 messages=api_messages,
-                tools=[WEB_SEARCH_TOOL],
+                tools=tools,
                 system=system,
                 max_tokens=3000,
             )
         )
-        return cr.content
 
-    async def _run_llm_async(self, session_id: int, language: str = "de") -> str:
-        """Async version of _run_llm — for use in batch operations."""
+    async def _run_llm_async(self, session_id: int, language: str = "de",
+                              system: Optional[str] = None, tools: Optional[list] = None):
+        """Async version of _run_llm. Returns ClaudeResponse."""
         self._llm.skill_context = "fundamental_analyzer"
         messages = self._fa_repo.get_messages(session_id)
         api_messages = [{"role": m.role, "content": m.content} for m in messages]
-        system = BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(language)
-        cr = await self._llm.chat_with_tools(
+        if system is None:
+            system = _build_system_prompt("Aktie", language)
+        if tools is None:
+            tools = [WEB_SEARCH_TOOL]
+        return await self._llm.chat_with_tools(
             messages=api_messages,
-            tools=[WEB_SEARCH_TOOL],
+            tools=tools,
             system=system,
             max_tokens=3000,
         )
-        return cr.content
 
     async def start_session_async(
         self,
@@ -240,11 +277,13 @@ class FundamentalAnalyzerAgent:
         initial_msg = _build_initial_message(position, skill_name, resolved_prompt)
         self._fa_repo.add_message(session.id, "user", initial_msg)
 
-        response = await self._run_llm_async(session.id, language=language)
-        self._fa_repo.add_message(session.id, "assistant", response)
+        system = _build_system_prompt(position.asset_class, language, include_verdict_tool=True)
+        cr = await self._run_llm_async(session.id, language=language, system=system,
+                                        tools=[WEB_SEARCH_TOOL, SUBMIT_FA_VERDICT_TOOL])
+        self._fa_repo.add_message(session.id, "assistant", cr.content)
 
-        verdict = _extract_verdict(response)
-        summary = _extract_summary(response) or ""
+        verdict = _extract_verdict_from_tools(cr.tool_calls) or _extract_verdict(cr.content)
+        summary = _extract_summary_from_tools(cr.tool_calls) or _extract_summary(cr.content) or ""
         self._analyses.save(
             position_id=position.id,
             agent="fundamental_analyzer",
@@ -345,6 +384,25 @@ def _build_initial_message(position: PublicPosition, skill_name: Optional[str], 
 
     msg += "\nStarte mit einer strukturierten Analyse dieser Position. Nutze web_search um aktuelle Daten zu finden."
     return msg
+
+
+def _extract_verdict_from_tools(tool_calls) -> Optional[str]:
+    """Extract verdict from submit_fa_verdict tool call. Returns None if not found."""
+    for tc in tool_calls:
+        if tc.name == "submit_fa_verdict":
+            v = tc.input.get("verdict", "").lower()
+            if v in VALID_VERDICTS:
+                return v
+    return None
+
+
+def _extract_summary_from_tools(tool_calls) -> Optional[str]:
+    """Extract summary from submit_fa_verdict tool call. Returns None if not found."""
+    for tc in tool_calls:
+        if tc.name == "submit_fa_verdict":
+            s = tc.input.get("summary", "").strip()
+            return s if s else None
+    return None
 
 
 def _extract_verdict(response: str) -> Optional[str]:

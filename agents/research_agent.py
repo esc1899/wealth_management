@@ -22,7 +22,7 @@ from core.storage.models import Position, ResearchSession
 from core.storage.positions import PositionsRepository
 from core.storage.research import ResearchRepository
 from core.strategy_config import StrategyConfig, StrategyRegistry
-from agents.agent_language import response_language_instruction
+from agents.agent_language import response_language_instruction, current_date_context
 
 
 logger = logging.getLogger(__name__)
@@ -31,23 +31,21 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 
 BASE_SYSTEM_PROMPT = """Du bist ein erfahrener Investment-Research-Analyst.
-Der Nutzer möchte eine Aktie analysieren und bewerten.
+Nutze web_search für aktuelle Fundamentaldaten, Nachrichten und Analystenmeinungen.
 
-Vorgehen:
-1. Suche im Web nach aktuellen Informationen zur Aktie (Fundamentaldaten, Nachrichten, Analystenmeinungen)
-2. Analysiere die gefundenen Informationen gemäß der unten definierten Analysestrategie
-3. Gib eine ausführliche, strukturierte Bewertung mit folgenden Abschnitten:
-   - **Kurzfazit** (2-3 Sätze Zusammenfassung)
-   - **Fundamentaldaten** (KGV, KBV, Umsatz/Gewinnwachstum, Margen, Verschuldung)
-   - **Wachstumsperspektiven** (Markt, Produkte, Strategie)
-   - **Stärken**
-   - **Risiken**
-   - **Analystenmeinungen & Kursziele**
-   - **Bewertung gemäß Strategie** (konkrete Einschätzung mit Begründung)
+Antworte strukturiert in diesen 5 Abschnitten:
 
-Wenn die Aktie als investitionswürdig bewertet ist, verwende das Vorschlag-Tool propose_for_watchlist zur Empfehlung. Der Nutzer wird die Vorschläge review und entscheiden, welche zur Watchlist hinzugefügt werden sollen.
+**Kurzfazit** — 2–3 Sätze Kernaussage
 
-Sei konkret und belege deine Aussagen mit Zahlen wenn möglich."""
+**Fundamentaldaten** — KGV, KBV, Umsatz-/Gewinnwachstum, Margen, Verschuldung (mit Zahlen)
+
+**Chancen & Risiken** — Je 2–3 Punkte, konkret und belegt
+
+**Analystenmeinungen & Kursziele** — Konsens-Rating, Kursziel-Range, abweichende Meinungen
+
+**Bewertung** — Einschätzung gemäß der Analysestrategie unten; konkrete Empfehlung
+
+Wenn investitionswürdig: propose_for_watchlist aufrufen. Der Nutzer bestätigt die Aufnahme."""
 
 # ------------------------------------------------------------------
 # Tool definitions
@@ -172,7 +170,7 @@ class ResearchAgent:
 
         # Build system prompt = base + strategy focus + language
         self._llm.skill_context = session.strategy_name
-        system = BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(language) + "\n\n## Analysestrategie\n" + session.strategy_prompt
+        system = current_date_context() + BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(language) + "\n\n## Analysestrategie\n" + session.strategy_prompt
 
         # Load history before adding new message, then append manually
         api_messages = self._build_api_messages(session_id)
@@ -187,7 +185,7 @@ class ResearchAgent:
                 messages=api_messages,
                 tools=TOOLS,
                 system=system,
-                max_tokens=4096,
+                max_tokens=3000,
             )
 
             client_calls = [

@@ -40,6 +40,7 @@ def mock_llm():
     mock.model = "claude-sonnet-4-6"
     mock_response = Mock()
     mock_response.content = "🟢 **Intakt** — Das Geschäftsmodell ist stabil"
+    mock_response.tool_calls = []
     mock.chat_with_tools = AsyncMock(return_value=mock_response)
     return mock
 
