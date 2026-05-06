@@ -22,6 +22,7 @@ from state import (
     get_news_repo,
     get_storychecker_agent,
     get_fundamental_analyzer_agent,
+    get_consensus_gap_agent,
 )
 
 st.set_page_config(
@@ -220,6 +221,7 @@ fa_verdict = analysis_service.get_verdict(
 
 # Get agents for full-text retrieval
 sc_agent = get_storychecker_agent()
+cg_agent = get_consensus_gap_agent()
 fa_agent = get_fundamental_analyzer_agent()
 
 # Render 3 checker cards in columns
@@ -230,7 +232,7 @@ with col1:
         "Storychecker",
         sc_verdict,
         VERDICT_CONFIGS["storychecker"],
-        lambda: sc_agent.get_messages(sc_verdict.session_id)[0].content
+        lambda: sc_agent.get_messages(sc_verdict.session_id)[-1].content
         if sc_verdict and sc_verdict.session_id
         else None,
     )
@@ -240,7 +242,9 @@ with col2:
         "Consensus Gap",
         cg_verdict,
         VERDICT_CONFIGS["consensus_gap"],
-        lambda: cg_verdict.analysis_text if cg_verdict and cg_verdict.analysis_text else None,
+        lambda: cg_agent.get_messages(cg_verdict.session_id)[-1].content
+        if cg_verdict and cg_verdict.session_id
+        else None,
     )
 
 with col3:
@@ -248,7 +252,7 @@ with col3:
         "Fundamental Analyzer",
         fa_verdict,
         VERDICT_CONFIGS["fundamental_analyzer"],
-        lambda: fa_agent.get_messages(fa_verdict.session_id)[0].content
+        lambda: fa_agent.get_messages(fa_verdict.session_id)[-1].content
         if fa_verdict and fa_verdict.session_id
         else None,
     )
