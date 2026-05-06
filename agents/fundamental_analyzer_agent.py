@@ -185,19 +185,11 @@ class FundamentalAnalyzerAgent:
     # ------------------------------------------------------------------
 
     def _run_llm(self, session_id: int, language: str = "de") -> str:
-        """Execute LLM call with web_search and caching enabled."""
+        """Execute LLM call (sync, for single-session UI use)."""
         self._llm.skill_context = "fundamental_analyzer"
-
-        # Load all messages for this session
         messages = self._fa_repo.get_messages(session_id)
-        api_messages = []
-        for msg in messages:
-            api_messages.append({"role": msg.role, "content": msg.content})
-
-        # Build system prompt with language instruction
+        api_messages = [{"role": m.role, "content": m.content} for m in messages]
         system = BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(language)
-
-        # Use chat_with_tools: enables web_search
         cr = asyncio.run(
             self._llm.chat_with_tools(
                 messages=api_messages,
@@ -207,6 +199,61 @@ class FundamentalAnalyzerAgent:
             )
         )
         return cr.content
+
+    async def _run_llm_async(self, session_id: int, language: str = "de") -> str:
+        """Async version of _run_llm — for use in batch operations."""
+        self._llm.skill_context = "fundamental_analyzer"
+        messages = self._fa_repo.get_messages(session_id)
+        api_messages = [{"role": m.role, "content": m.content} for m in messages]
+        system = BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(language)
+        cr = await self._llm.chat_with_tools(
+            messages=api_messages,
+            tools=[WEB_SEARCH_TOOL],
+            system=system,
+            max_tokens=2500,
+        )
+        return cr.content
+
+    async def start_session_async(
+        self,
+        position: PublicPosition,
+        language: str = "de",
+        skill: Optional[str] = None,
+        skill_prompt: Optional[str] = None,
+    ) -> Tuple[FundamentalAnalyzerSession, str, str]:
+        """Async version of start_session — for use in analyze_portfolio.
+
+        Returns (session, verdict, summary).
+        """
+        if skill is not None:
+            skill_name = skill
+            resolved_prompt = skill_prompt
+        else:
+            skill_name, resolved_prompt = self._resolve_skill(position)
+
+        session = self._fa_repo.create_session(
+            position_id=position.id,
+            ticker=position.ticker,
+            position_name=position.name,
+            skill_name=skill_name,
+        )
+        initial_msg = _build_initial_message(position, skill_name, resolved_prompt)
+        self._fa_repo.add_message(session.id, "user", initial_msg)
+
+        response = await self._run_llm_async(session.id, language=language)
+        self._fa_repo.add_message(session.id, "assistant", response)
+
+        verdict = _extract_verdict(response)
+        summary = _extract_summary(response) or ""
+        self._analyses.save(
+            position_id=position.id,
+            agent="fundamental_analyzer",
+            skill_name=skill_name,
+            verdict=verdict,
+            summary=summary,
+            session_id=session.id,
+        )
+        return session, verdict, summary
 
     def _resolve_skill(self, position: PublicPosition) -> Tuple[str, Optional[str]]:
         """Resolve skill context if available. Returns (skill_name, skill_prompt) where skill_name is never None."""
@@ -229,47 +276,34 @@ class FundamentalAnalyzerAgent:
         language: str = "de",
     ) -> List[Tuple[int, str, str]]:
         """
-        Analyze all eligible positions. Returns list of (position_id, verdict, summary).
+        Analyze all eligible positions in parallel (up to 3 concurrent).
+        Returns list of (position_id, verdict, summary).
         Verdicts are persisted in position_analyses under "fundamental_analyzer" agent.
-
-        Args:
-            positions: List of PublicPosition objects to analyze
-            skill_name: Name of the configured skill
-            skill_prompt: Custom skill prompt
-            language: Language code for LLM output (default: "de")
         """
-        # Only positions with tickers are fundamentally analysable
         eligible = [p for p in positions if p.ticker and p.id is not None]
         if not eligible:
             return []
 
-        output: List[Tuple[int, str, str]] = []
+        semaphore = asyncio.Semaphore(3)
 
-        # Process one position at a time
-        for pos in eligible:
-            session = self.start_session(
-                position=pos,
-                language=language,
-                skill=skill_name,
-                skill_prompt=skill_prompt,
-            )
-            # Verdict + summary already persisted in start_session()
-            updated_session = self.get_session(session.id)
-            if updated_session:
-                verdict = updated_session.verdict or "unbekannt"
-                summary = ""
-                # Extract summary from first message
-                messages = self.get_messages(session.id)
-                for msg in messages:
-                    if msg.role == "assistant":
-                        summary = _extract_summary(msg.content) or ""
-                        break
-                output.append((pos.id, verdict, summary))
-            await asyncio.sleep(0.3)
+        async def _analyze_one(pos: PublicPosition) -> Optional[Tuple[int, str, str]]:
+            async with semaphore:
+                try:
+                    _, verdict, summary = await self.start_session_async(
+                        position=pos,
+                        language=language,
+                        skill=skill_name,
+                        skill_prompt=skill_prompt,
+                    )
+                    return (pos.id, verdict, summary)
+                except Exception as exc:
+                    logger.warning("FA analyze_portfolio: error for %s: %s", pos.name, exc)
+                    return None
 
-        # Cleanup: remove sessions older than 365 days
+        raw = await asyncio.gather(*[_analyze_one(pos) for pos in eligible])
+        output = [r for r in raw if r is not None]
+
         self._fa_repo.cleanup_old_sessions(days=365)
-
         return output
 
     async def generate_analysis_proposal(self, position: PublicPosition) -> str:
