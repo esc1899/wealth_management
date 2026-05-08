@@ -23,6 +23,7 @@ common:
   refresh: "Jetzt aktualisieren"
   ai_disclaimer: "⚠️ KI-generiert – keine Anlageberatung"
   agent_error: "Fehler beim Agenten-Aufruf"
+  legend_header: "Legende"
 
 nav:
   dashboard: "Dashboard"
@@ -500,6 +501,7 @@ storychecker:
   batch_running: "Story-Checks laufen im Hintergrund…"
   batch_done: "Positionen geprüft"
   batch_errors: "Fehler"
+  full_analysis: "📄 Vollständige Analyse"
 
 positionen:
   title: "Positionen verwalten"
@@ -785,6 +787,7 @@ portfolio_story:
   last_analysis_label: "**Letzte gespeicherte Analyse:**"
   no_analysis: "Noch keine Analyse vorhanden. Klick auf 'Portfolio Story-Check ausführen' um zu starten."
   ai_comment_section: "💬 KI-Kommentar"
+  ai_comment_spinner: "Generiere KI-Kommentar..."
 
 watchlist_checker:
   title: "📋 Watchlist Checker"
@@ -822,3 +825,14 @@ watchlist_checker:
   metadata_label: "**Agent Metadata**"
   dividend_label: ", Dividende/Ausschüttung: {val} (Quelle: {source})"
   stability_label: "Stabilität:"
+  empty_portfolio: "Portfolio ist leer."
+
+fundamental_analyzer:
+  verdict_unter: "Unterbewertet"
+  verdict_fair: "Fair bewertet"
+  verdict_ueber: "Überbewertet"
+
+position_dashboard:
+  no_positions: "Keine Portfolio-Positionen vorhanden."
+  select_position: "Position wählen"
+  no_ticker: "Kein Ticker für diese Position hinterlegt — Kursverlauf nicht verfügbar."

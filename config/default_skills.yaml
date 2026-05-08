@@ -158,6 +158,64 @@ skills:
         - Themes: ESG, Technology, Emerging Markets, Global — as requested by the user
         Output: ranked list with ticker/ISIN, name, TER, 1y/3y/5y performance, AUM, theme match
 
+    - name: "Lindy Effect Scanner"
+      description: "Finds companies with Lindy properties — long track record, crisis-tested, boring & durable"
+      prompt: |
+        Screen for companies with strong Lindy properties: the longer a business has survived and
+        compounded, the more likely it is to keep doing so.
+
+        Search criteria:
+        1. **Age + Growth**: Companies founded >50 years ago that are still growing revenues or earnings
+        2. **Crisis survivors**: Business models that remained profitable through 2008 and 2020
+           (check: did they cut dividends? Did earnings go negative? How quickly did they recover?)
+        3. **Boring durability**: "Unexciting" businesses — consumer staples, industrials, specialty
+           chemicals, infrastructure — with consistent dividends for 20+ years
+        4. **Lindy Score** (qualitative): estimate Alter × Konsistenz
+           - Alter: years since founding (or years of continuous profitability)
+           - Konsistenz: dividend/earnings consistency score (uninterrupted = high, cuts = low)
+
+        For each candidate provide:
+        - Ticker, name, sector, country, founding year
+        - Dividend history: years of continuous payments, last cut (if any)
+        - Crisis performance: 2008 and 2020 EPS/dividend behaviour
+        - Lindy verdict: `stark` (50+ years, both crises survived, no dividend cut) /
+          `moderat` (30–50 years or minor crisis disruption) / `schwach` (<30 years or major cut)
+
+        No buy or sell recommendations — discovery only.
+        Focus: long-term investors who value proven durability over growth narratives.
+
+    - name: "Narrative Shift Detector"
+      description: "Detects if the story around a company has fundamentally shifted in media and analyst coverage"
+      prompt: |
+        Analyze how the narrative around the requested company has evolved over the past 12–18 months.
+
+        Step 1 — Current narrative (last 3 months):
+        Search for recent news, analyst upgrades/downgrades, earnings call summaries.
+        Identify: dominant themes, tone (bullish/bearish/neutral), key concerns and catalysts mentioned.
+
+        Step 2 — Historical narrative (12–18 months ago):
+        Search for older coverage to reconstruct what the story was then.
+        Identify: what investors were excited about, what risks were being discussed, how analysts framed it.
+
+        Step 3 — Delta analysis:
+        Compare then vs. now:
+        - Have the dominant themes changed? (e.g., "AI play" → "commoditized product")
+        - Has tone shifted? (e.g., growth story → value trap framing)
+        - Are there new risks that weren't discussed before?
+        - Have analyst upgrade/downgrade reasons changed qualitatively?
+
+        Output: Narrative Timeline
+        - "12–18 months ago": [1–2 sentence narrative summary]
+        - "Today": [1–2 sentence narrative summary]
+        - "Key shifts": bullet list of what changed and what stayed the same
+        - Verdict: `positiver_shift` / `stabil` / `negativer_shift` / `pivot`
+          - `positiver_shift`: story has meaningfully improved vs. prior narrative
+          - `stabil`: core thesis unchanged, no material narrative drift
+          - `negativer_shift`: story has deteriorated or key thesis is now challenged
+          - `pivot`: fundamental category change in how the company is framed
+
+        No buy or sell recommendations. Narrative awareness only.
+
   # ── Fundamentalwert-Analyse ─────────────────────────────────────────────────
   # Skills for the FundamentalAgent (Cloud ☁️, Claude API + web search).
 
@@ -191,6 +249,40 @@ skills:
         - Geschäftsmodell: Betone Defensivität und Cashflow-Stabilität
         - Wachstum: Nachrangig — stabile, vorhersehbare Erträge wichtiger als hohes Wachstum
         - Risiken: Betone Risiken für die Dividendenkontinuität (Verschuldung, Payout-Druck)
+
+    - name: "Capital Allocator Quality"
+      description: "Evaluates management as capital allocators — buybacks, M&A track record, insider ownership, communication"
+      prompt: |
+        Evaluate the quality of this company's management as capital allocators — not the business
+        itself, but the decisions they make with shareholder capital.
+
+        Assess four areas:
+
+        1. **Buyback discipline**: Have buybacks been executed at sensible prices (below intrinsic value)?
+           Or did the company buy back heavily at peaks and stop at troughs?
+           Look for: timing of buybacks vs. historical price, total capital returned, buyback yield trend.
+
+        2. **M&A track record**: Did past acquisitions create or destroy value?
+           Look for: major deals in the last 10 years, post-acquisition outcomes (synergies realized?
+           goodwill write-downs? integration failures?), price paid vs. results delivered.
+
+        3. **Insider ownership & incentives**: Do insiders have real skin in the game?
+           Look for: CEO/CFO/founder ownership %, recent insider buying or selling patterns,
+           compensation structure (does it incentivize long-term value creation or short-term metrics?).
+
+        4. **Communication quality**: Do they say what they do and do what they say?
+           Look for: guidance accuracy over 3–5 years, alignment between stated strategy and actual
+           capital allocation decisions, candor about mistakes or setbacks in earnings calls.
+
+        Output: Capital Allocator Scorecard
+        - One concise paragraph per area with supporting evidence
+        - Overall verdict: `exzellent` / `solide` / `fragwürdig` / `destruktiv`
+          - `exzellent`: consistently good decisions, aligned incentives, honest communication
+          - `solide`: mostly good, minor inconsistencies or gaps in evidence
+          - `fragwürdig`: mixed track record, misaligned incentives, or questionable decisions
+          - `destruktiv`: value-destroying decisions, empire building, or misleading communication
+
+        No buy or sell recommendations. Management quality transparency only.
 
   # ── Story Checker ───────────────────────────────────────────────────────────
   # Anlage-Ideen for the StorycheckerAgent (Cloud ☁️, Claude API + web search).

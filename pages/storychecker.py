@@ -9,7 +9,7 @@ Uses built-in web search to find current news before assessing the thesis.
 import asyncio
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import streamlit as st
 
@@ -214,7 +214,7 @@ with col_right:
                 for _p in positions_with_story
                 if _p.id in _sc_existing
             ]
-            _verdicts_with_pos.sort(key=lambda x: x[1].created_at or datetime.min, reverse=True)
+            _verdicts_with_pos.sort(key=lambda x: x[1].created_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
             for _p, _a in _verdicts_with_pos:
                 _icon = verdict_icon(_a.verdict or "unknown", _VERDICT_CONFIG)
                 st.markdown(f"{_icon} **{_p.name}**")

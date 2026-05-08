@@ -23,6 +23,7 @@ common:
   refresh: "Refresh Now"
   ai_disclaimer: "⚠️ AI-generated – not financial advice"
   agent_error: "Agent call failed"
+  legend_header: "Legend"
 
 nav:
   dashboard: "Dashboard"
@@ -499,6 +500,7 @@ storychecker:
   batch_running: "Story checks running in background…"
   batch_done: "positions checked"
   batch_errors: "errors"
+  full_analysis: "📄 Full Analysis"
 
 positionen:
   title: "Manage Positions"
@@ -785,6 +787,7 @@ portfolio_story:
   last_analysis_label: "**Last Saved Analysis:**"
   no_analysis: "No analysis yet. Click 'Run Portfolio Story Check' to start."
   ai_comment_section: "💬 AI Comment"
+  ai_comment_spinner: "Generating AI comment..."
 
 watchlist_checker:
   title: "📋 Watchlist Checker"
@@ -822,3 +825,14 @@ watchlist_checker:
   metadata_label: "**Agent Metadata**"
   dividend_label: ", Dividend/Distribution: {val} (Source: {source})"
   stability_label: "Stability:"
+  empty_portfolio: "Portfolio is empty."
+
+fundamental_analyzer:
+  verdict_unter: "Undervalued"
+  verdict_fair: "Fair Value"
+  verdict_ueber: "Overvalued"
+
+position_dashboard:
+  no_positions: "No portfolio positions available."
+  select_position: "Select position"
+  no_ticker: "No ticker set for this position — price history not available."
