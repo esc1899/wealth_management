@@ -1,5 +1,5 @@
 """
-Repository factories — all 17 repository singletons.
+Repository factories — all 18 repository singletons.
 """
 
 import streamlit as st
@@ -22,6 +22,7 @@ from core.storage.usage import UsageRepository
 from core.storage.watchlist_checker_repo import WatchlistCheckerRepository
 from core.storage.wealth_snapshots import WealthSnapshotRepository
 from core.storage.dividend_snapshots import DividendSnapshotRepository
+from core.storage.cowork import CoworkRepository
 
 
 @st.cache_resource
@@ -139,3 +140,8 @@ def get_portfolio_story_repo() -> PortfolioStoryRepository:
 @st.cache_resource
 def get_agent_runs_repo() -> AgentRunsRepository:
     return AgentRunsRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_cowork_repo() -> CoworkRepository:
+    return CoworkRepository(get_db_connection())

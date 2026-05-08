@@ -1,5 +1,52 @@
 # Arbeitsweise in diesem Projekt
 
+## 🚨 Kritische Architektur-Invarianten — immer gültig, nie brechen
+
+Diese Regeln gelten für **jede** Änderung, unabhängig vom Task. Bei Unsicherheit: ARCHITECTURE.md lesen.
+
+### 1. Privacy-Grenze: Local vs. Cloud LLM
+
+**Sensitive Portfolio-Daten verlassen niemals das lokale System.**
+
+| Provider | Agents | Darf sehen |
+|---|---|---|
+| **Ollama (lokal 🔒)** | PortfolioAgent, PortfolioStoryAgent, WatchlistCheckerAgent, MarketDataAgent | Alles — Positionen, Namen, Stories, Zahlen |
+| **Claude API (Cloud ☁️)** | ResearchAgent, NewsAgent, SearchAgent, StorycheckerAgent, ConsensusGapAgent, StructuralChangeAgent, FundamentalAnalyzerAgent, WealthSnapshotAgent | Nur öffentliche Daten (Ticker, Marktdaten, News) |
+
+→ Neuer Agent mit Portfolio-Zugriff? → **muss Ollama sein**
+→ Neuer Cloud-Agent? → **kein Zugriff auf Positionen/Stories/Namen**
+
+### 2. Zweisprachigkeit (i18n)
+
+Die App ist **Deutsch/Englisch** schaltbar. Gilt für jeden neuen Code:
+
+- Agents: `language: str = "de"` Parameter auf allen Analyse-Methoden — dynamisch via `agent_language.py`
+- Pages: `current_language()` vor Background-Thread-Spawn captern (session_state nicht thread-safe)
+- Verdict-Codes bleiben **immer Deutsch** (`unterbewertet`, `intact`, `wächst`, …) — das sind DB-Identifier, keine UI-Texte
+- Hardcodierte deutsche UI-Labels sind **technische Schulden**, keine neue einführen
+
+### 3. Session-Persistenz für Chat-Agents
+
+Multi-turn Agents → **immer DB-Persistenz**, niemals in-memory Dict.
+Muster: `start_session()` → `repo.create_session()`, `chat()` → `repo.get_messages()` + `repo.add_message()`
+Referenz-Implementierung: StorycheckerAgent / FundamentalAnalyzerAgent
+
+### 4. Verschlüsselte Felder
+
+Position-Namen, Stories, Notes, extra_data (JSON) sind **Fernet-verschlüsselt** in der DB.
+Nie direkt als Plaintext schreiben — immer über das Repository-Layer.
+
+### 5. Neue Agents: Checkliste
+
+Vor dem ersten Commit prüfen:
+- [ ] Richtiger Provider (Ollama vs. Cloud)? Privacy-Grenze beachtet?
+- [ ] `language` Parameter vorhanden?
+- [ ] Session-Persistenz (wenn Chat)? DB-Repo erstellt?
+- [ ] `state.py` Factory-Funktion ergänzt?
+- [ ] Tests: Unit + Integration + Page Smoke?
+
+---
+
 ## 📍 Dokumentations-Struktur (Single Source of Truth)
 
 Damit zukünftige Sessions alles finden:

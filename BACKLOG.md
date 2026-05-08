@@ -30,11 +30,46 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 | FEAT-28 | P2 | [FEAT] Lindy Effect Scanner — Search Skill | Neuer Search-Skill "Lindy Effect Scanner" im SearchAgent (kein neuer Agent nötig). Findet Unternehmen mit Lindy-Eigenschaften: >50 Jahre alt + noch wachsend, Krisen 2008+2020 überlebt, "Boring" businesses mit 20+ Jahren Dividendenhistorie. Output: Kandidaten-Report mit Lindy-Verdict (`stark`/`moderat`/`schwach`). Kein Kauf-/Verkauf-Rat, nur Entdeckung. Implementierung: Eintrag in `default_skills.yaml` search-Bereich + `seed_new_skills("search")` in state_repos.py. | ✅ DONE | 2026-05-07 |
 | FEAT-29 | P2 | [FEAT] Capital Allocator Quality Agent | Bewertet die Qualität des Managements als Kapitalallokator — nicht das Unternehmen selbst. Prüft: (1) Historische Entscheidungen: Buybacks zu welchen Preisen, M&A-Track-Record, Dividendenpolitik; (2) Insider-Ownership + Anreizstrukturen; (3) Kommunikation: Sagen sie was sie tun und tun sie was sie sagen? Output: "Capital Allocator Scorecard" pro Position. Kein Kauf-/Verkauf-Rat, nur Transparenz über Management-Qualität. Tools: web_search für Earnings-Calls, Proxy Statements, historische Entscheidungen. Verdict: `exzellent` / `solide` / `fragwürdig` / `destruktiv`. Implementiert als FundamentalAnalyzer-Skill (kein neuer Agent). | ✅ DONE | 2026-05-07 |
 | FEAT-30 | P2 | [FEAT] Narrative Shift Detector Agent | Erkennt wenn sich die "Story" um ein Unternehmen in Medien/Analysten-Berichten fundamental ändert — bevor sich das im Kurs zeigt. Vergleicht aktuelle Berichterstattung mit historischem Narrativ. Sucht nach: (1) Tonalitäts-Shifts (z.B. "Growth" → "Value"), (2) neue Themen die vorher nie erwähnt wurden, (3) Analyst-Upgrades/Downgrades mit neuer Begründung. Output: "Narrative Timeline" — wie hat sich die Story über 6–12 Monate verändert? Kein Kauf-/Verkauf-Rat, nur Bewusstmachung. Tools: web_search für News-Archiv, Analysten-Reports. Verdict: `positiver_shift` / `stabil` / `negativer_shift` / `pivot`. Implementiert als SearchAgent-Skill (kein neuer Agent). | ✅ DONE | 2026-05-07 |
+| FEAT-32 | P1 | [FEAT] Cowork Research Ingest — UX-Klärung & Dialog-Completion | Fundament + UX vollständig. Proposal Panel (Checkbox-Pattern wie Search Chat), kein Auto-Import, Idempotenz-Fix. 680 Tests. | ✅ DONE | 2026-05-08 |
 | FEAT-31 | P3 | [FEAT] Capital Allocator Quality — Eigener Checker Agent | Prüfen ob Capital Allocator Quality als vollständiger Checker-Agent gebaut werden soll (analog FA/SC/CG). Aktuell als FA-Skill implementiert (FEAT-29), aber Skill-Verdicts (`exzellent`/`solide`/`fragwürdig`/`destruktiv`) passen nicht zum FA-Verdict-System (`unterbewertet`/`fair`/`überbewertet`). Eigener Checker hätte: eigenes DB-Schema, eigene Seite, Batch-Support, korrektes Verdict-System. Entscheidung: Lohnt sich der Aufwand (ca. FA-Komplexität) oder reicht der FA-Skill als Annäherung? | 🔲 TODO | |
 | FEAT-24 | P2 | [FEAT] Scheduler Job Logs | Show execution history for scheduled jobs in Settings UI. User needs visibility into: (1) when job last ran, (2) if it succeeded or failed, (3) error messages if failed. Implementation: new DB table `scheduled_job_runs(id, job_id, status, started_at, completed_at, error_msg)`, ScheduledJobRunsRepository, UI under each job in settings.py with "Last run: [timestamp] [status icon] [error details]". Status quo: only `last_run` timestamp visible, no failure tracking. | 🔲 TODO | 2026-05-04 |
 | FEAT-25 | P2 | [FEAT] Position-Analysis Dashboard | Single-page aggregation of all verdicts for a portfolio position: Storychecker + Consensus Gap + Fundamental Analyzer + Kursverlauf + News Digest (ticker section extraction). Portfolio-positions only. Dropdown selector + 3-column checker cards (badge + summary + expandable full-text) + news section (parses last digest, no new LLM call). Reusable components: _render_checker_card(), _extract_ticker_section(). 627 tests passing. | ✅ DONE | 2026-05-05 |
 | FEAT-27 | P3 | [IMPR] Portfolio Story Integration — Position Verdict Rows | Portfolio Story "Positions-Details" expander: position buttons (clickable → Position Dashboard deeplink) + SC/CG/FA badges inline per position. Helper: `_render_position_details_expander()` reusable for both new and saved analyses. No agent context change. 627 tests passing. | ✅ DONE | 2026-05-05 |
 | FEAT-26 | P2 | [IMPR] ConsensusGap Sessions — Full-Text Persistence | CG Agent now creates sessions per position (like SC/FA): stores full LLM response in consensus_gap_messages, references via position_analyses.session_id. Backward compat: old analysis_text records display via fallback. New tables: consensus_gap_sessions, consensus_gap_messages. New repo: ConsensusGapRepository. Updated agent + page + state factories. 25 unit tests. Full-Text retrieval unified across all 3 checkers. Verified: single position, batch, scheduler all work. | ✅ DONE | 2026-05-05 |
+
+### FEAT-32 — Cowork Research Ingest: Abgeschlossen ✅
+
+#### Gesamte Implementierung (Sessions 2026-05-08)
+
+| Komponente | Datei | Status |
+|---|---|---|
+| Parser (YAML-Frontmatter → Domain-Objekte, Validation) | `core/cowork/parser.py` | ✅ |
+| Importer (Status-Routing, Dedup, Archivierung, Idempotenz) | `core/cowork/importer.py` | ✅ |
+| File-Watcher (watchdog, 500ms Debounce) | `core/cowork/watcher.py` | ✅ |
+| DB-Tabellen (`cowork_research_entries`, `cowork_watchlist_suggestions`) | `core/storage/base.py` | ✅ |
+| Repository | `core/storage/cowork.py` | ✅ |
+| UI (Inbox + Proposal Panel + History) | `pages/cowork_inbox.py` | ✅ |
+| Navigation (unter Research), watchdog in requirements.txt | `app.py`, `requirements.txt` | ✅ |
+| Tests (28 Parser-Unit, 25 Importer-Integration, Fixture) | `tests/` | ✅ 53 Tests |
+| Konfiguration (COWORK_*) | `config.py` | ✅ |
+
+#### Dialog-Flow (implementiert)
+
+1. Externes AI-Tool schreibt `.md`-Datei in `~/wealth-research/outbox/`
+2. Watcher (500ms Debounce) oder App-Start-Scan erkennt die Datei
+3. Importer parst, speichert Entry + Kandidaten als `pending`, archiviert Datei → Entry bleibt `ready_for_import`
+4. User öffnet Research Inbox → Eintrag im Tab "Offen" sichtbar
+5. Checkbox-Panel: `add`-Kandidaten vorselektiert, `watch`-Kandidaten unchecked
+6. User wählt, klickt "Zur Watchlist hinzufügen" → ausgewählte als Positionen angelegt, Entry `imported`
+7. Tab "Importiert" zeigt History (accepted/rejected pro Entry)
+
+#### Offene technische Schulden
+
+- `cowork_inbox.py` hat keine i18n-Nutzung (alle Strings hardcoded DE) — `t("cowork.*")`-Keys sind definiert aber nicht angebunden
+- Kein Smoke-Test für `pages/cowork_inbox.py`
+- `get_cowork_watcher()` in `state_agents.py` hat doppeltes `@st.cache_resource` (Zeile ~161/162) — prüfen
+
+---
 
 ### Technical Debt
 

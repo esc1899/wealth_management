@@ -8,6 +8,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### FEAT-32 — Cowork Research Ingest (vollständig) — 2026-05-08
+
+**Neues Feature: KI-Research-Dateien aus externem Tool in Watchlist importieren.**
+
+Pipeline: `.md`-Datei in `~/wealth-research/outbox/` → Parser → Importer → DB → UI-Bestätigung → Watchlist
+
+**Kernkomponenten (neu):**
+- `core/cowork/parser.py` — YAML-Frontmatter-Parser mit strikter Validierung (enums, required fields), `ParsedResearch` + `WatchlistCandidate` Dataclasses
+- `core/cowork/importer.py` — Status-Routing (`draft` / `ready_for_import` / `imported` / `failed`), Watchlist-Dedup, atomare Archivierung, Idempotenz per `research_id`
+- `core/cowork/watcher.py` — watchdog (FSEvents/inotify), 500ms Debounce, Initial-Scan beim App-Start
+- `core/storage/cowork.py` — `CoworkRepository` für `cowork_research_entries` + `cowork_watchlist_suggestions`
+- `pages/cowork_inbox.py` — Inbox (Offen/Importiert Tabs), Proposal Panel (Checkbox-Pattern wie Search Chat), History
+
+**Dialog-Flow:**
+1. Datei kommt in Outbox → Watcher verarbeitet → Entry `ready_for_import` + Kandidaten `pending` in DB
+2. Datei wird archiviert (`outbox/archive/`), invalide nach `outbox/.invalid/`
+3. User öffnet Inbox → Checkbox-Panel: `add`-Kandidaten vorselektiert, `watch`-Kandidaten unchecked
+4. User bestätigt → Positionen angelegt, Entry `imported`
+
+**Design-Entscheidungen:**
+- Kein Auto-Accept: User bestätigt immer via Checkbox-Panel (mindestens ein Klick)
+- `add` vs `watch` = visuelle Vorauswahl, kein Unterschied im finalen Flow
+- Idempotenz: `ready_for_import`- und `imported`-Einträge werden beim erneuten Einlesen übersprungen
+- `draft`-Status: nur Anzeige im Research-Text, keine Kandidaten-Verarbeitung
+
+**Tests:** 53 Cowork-Tests (28 Parser-Unit + 25 Importer-Integration), 680 gesamt
+
+---
+
 ### Agent Optimierungen (Sonnet-Umstieg) — 2026-05-06
 
 **Temporale Verankerung — alle 7 Web-Search-Agents**

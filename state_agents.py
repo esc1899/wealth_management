@@ -248,3 +248,25 @@ def get_watchlist_checker_agent() -> WatchlistCheckerAgent:
         wc_repo=get_watchlist_checker_repo(),
         agent_runs_repo=get_agent_runs_repo(),
     )
+
+
+@st.cache_resource
+def get_cowork_watcher():
+    """Return a started CoworkWatcher singleton (starts background thread + initial scan)."""
+    from core.cowork.importer import CoworkImporter
+    from core.cowork.watcher import CoworkWatcher
+    from state_repos import get_cowork_repo
+
+    if not config.COWORK_WATCH_ENABLED:
+        return None
+
+    importer = CoworkImporter(
+        cowork_repo=get_cowork_repo(),
+        positions_repo=get_positions_repo(),
+        outbox_path=config.COWORK_OUTBOX_PATH,
+        archive_subfolder=config.COWORK_ARCHIVE_SUBFOLDER,
+        auto_import_ready=config.COWORK_AUTO_IMPORT_READY,
+    )
+    watcher = CoworkWatcher(importer)
+    watcher.start()
+    return watcher

@@ -12,7 +12,7 @@ nest_asyncio.apply()
 # Database and encryption
 from state_db import get_db_connection, get_encryption_service
 
-# Repositories (17 total)
+# Repositories (18 total)
 from state_repos import (
     get_positions_repo,
     get_market_repo,
@@ -31,6 +31,7 @@ from state_repos import (
     get_wealth_snapshot_repo,
     get_portfolio_story_repo,
     get_agent_runs_repo,
+    get_cowork_repo,
 )
 
 # Agents (15 total)
@@ -48,6 +49,7 @@ from state_agents import (
     get_wealth_snapshot_agent,
     get_portfolio_story_agent,
     get_watchlist_checker_agent,
+    get_cowork_watcher,
 )
 
 # Services
@@ -79,6 +81,7 @@ __all__ = [
     "get_wealth_snapshot_repo",
     "get_portfolio_story_repo",
     "get_agent_runs_repo",
+    "get_cowork_repo",
     "get_portfolio_agent",
     "get_market_agent",
     "get_research_agent",
@@ -92,6 +95,7 @@ __all__ = [
     "get_wealth_snapshot_agent",
     "get_portfolio_story_agent",
     "get_watchlist_checker_agent",
+    "get_cowork_watcher",
     "get_position_story_service",
     "get_portfolio_comment_model",
     "get_portfolio_comment_service",

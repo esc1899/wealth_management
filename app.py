@@ -67,11 +67,12 @@ if config.DEMO_MODE:
 # Initialise critical shared resources on first load
 # Other agents are lazy-loaded when pages access them via @st.cache_resource
 from state import (  # noqa: E402
-    get_portfolio_agent, get_market_agent, get_agent_scheduler,
+    get_portfolio_agent, get_market_agent, get_agent_scheduler, get_cowork_watcher,
 )
 get_portfolio_agent()  # Portfolio Chat critical path
 get_market_agent()      # Price auto-fetch scheduler
 get_agent_scheduler()   # Scheduled cloud jobs runner
+get_cowork_watcher()    # Research Ingest file watcher + initial scan
 
 @st.dialog("Disclaimer & Privacy Notice", width="large")
 def _legal_dialog():
@@ -127,6 +128,7 @@ pg = st.navigation({
         st.Page("pages/search_chat.py",     title=t("nav.search_chat"),      icon=":material/manage_search:"),
         st.Page("pages/storychecker.py",    title=t("nav.storychecker"),     icon=":material/fact_check:"),
         st.Page("pages/fundamental_analyzer.py", title="Fundamental Analyzer", icon=":material/calculate:"),
+        st.Page("pages/cowork_inbox.py",    title="Research Inbox",          icon=":material/inbox:"),
     ],
     t("nav.group_claude_strategy"): [
         st.Page("pages/structural_scan.py", title=t("nav.structural_scan"),  icon=":material/radar:"),

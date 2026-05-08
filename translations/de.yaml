@@ -49,6 +49,7 @@ nav:
   wealth_history: "Vermögenshistorie"
   group_system: "System ⚙️"
   statistics: "Statistiken"
+  cowork_inbox: "Research Inbox"
 
 
 investment_types:
@@ -836,3 +837,29 @@ position_dashboard:
   no_positions: "Keine Portfolio-Positionen vorhanden."
   select_position: "Position wählen"
   no_ticker: "Kein Ticker für diese Position hinterlegt — Kursverlauf nicht verfügbar."
+
+cowork:
+  page_title: "Research Inbox"
+  page_caption: "KI-generiertes Research aus dem Cowork-Outbox-Ordner. Alle Einträge sind AI Research — keine Anlageberatung."
+  tab_inbox: "📥 Inbox"
+  tab_queue: "🔍 Suggestion Queue"
+  filter_label: "Filter"
+  filter_all: "Alle"
+  no_entries: "Keine Research-Einträge vorhanden."
+  select_entry: "← Einen Eintrag auswählen."
+  entry_not_found: "Eintrag nicht gefunden."
+  candidates_header: "Kandidaten ({n})"
+  body_expander: "📄 Research-Text"
+  sources_header: "Quellen:"
+  failure_header: "Fehler:"
+  mark_ready_btn: "🚀 Als ready_for_import markieren"
+  mark_ready_success: "Status auf ready_for_import gesetzt."
+  import_btn: "📥 Jetzt importieren"
+  import_success: "Importiert: {added} add, {queued} watch, {skipped} skip, {deduped} bereits in Watchlist"
+  import_failed: "Import fehlgeschlagen: {reason}"
+  import_no_file: "Kein Dateipfad gespeichert — Import nicht möglich."
+  accept_btn: "✅ Accept"
+  reject_btn: "❌ Reject"
+  accepted_success: "✅ {ticker} zur Watchlist hinzugefügt."
+  queue_subtitle: "Kandidaten mit suggested_action: watch — manuell Accept oder Reject."
+  queue_empty: "Keine offenen Watch-Kandidaten."
