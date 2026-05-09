@@ -84,10 +84,23 @@ class CoworkImporter:
     # Public API
     # ------------------------------------------------------------------
 
+    _MAX_FILE_BYTES = 1 * 1024 * 1024  # 1 MB
+
     def process_file(self, file_path: str) -> ImportResult:
         """Parse, store, and process a single .md research file."""
         path = Path(file_path)
         logger.info("Processing research file: %s", path.name)
+
+        # Reject oversized files before reading into RAM
+        try:
+            file_size = path.stat().st_size
+        except OSError as exc:
+            return self._handle_parse_failure(path, f"Cannot stat file: {exc}")
+        if file_size > self._MAX_FILE_BYTES:
+            return self._handle_parse_failure(
+                path,
+                f"File too large ({file_size:,} bytes > {self._MAX_FILE_BYTES:,} bytes limit)",
+            )
 
         # Idempotency: check if already processed by research_id (need to parse first)
         # We handle this after parse below.
@@ -243,7 +256,7 @@ class CoworkImporter:
 
     def _get_existing_watchlist_tickers(self) -> set:
         try:
-            positions = self._positions.list_watchlist()
+            positions = self._positions.get_watchlist()
             return {
                 (p.ticker.upper(), (p.extra_data or {}).get("exchange", "").upper())
                 for p in positions

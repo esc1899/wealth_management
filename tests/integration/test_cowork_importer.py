@@ -267,7 +267,7 @@ class TestImporterWithFixture:
         existing = MagicMock()
         existing.ticker = "AAPL"
         existing.extra_data = {"exchange": "NASDAQ"}
-        mock_positions_repo.list_watchlist.return_value = [existing]
+        mock_positions_repo.get_watchlist.return_value = [existing]
 
         imp = CoworkImporter(
             cowork_repo=cowork_repo,

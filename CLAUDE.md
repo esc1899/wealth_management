@@ -1,5 +1,19 @@
 # Arbeitsweise in diesem Projekt
 
+## 🔒 Dieses Projekt ist öffentlich auf GitHub
+
+**Security ist nicht optional.** Jede Änderung am Code kann von beliebigen Personen gelesen und ausgeführt werden. Das bedeutet konkret:
+
+- Keine Secrets, API-Keys oder Encryption-Keys in den Code oder in Git-History committen
+- User-Input (Datei-Inhalte, Formularfelder, externe Daten) niemals ungefiltert in SQL, Markdown, Shell oder Subprozesse einbauen
+- Neue Input-Quellen (Files, APIs, Websockets) sofort auf Injection-Vektoren prüfen: URL-Protokolle, Pfad-Traversal, Dateigröße
+- Bei `st.markdown()`: kein `unsafe_allow_html=True` ohne explizite Prüfung; keine f-Strings mit User-Daten
+- Alle Abhängigkeiten (requirements.txt) auf bekannte CVEs prüfen bevor sie hinzukommen
+
+**Bisherige Security Reviews:** 2026-04-24 (Red Team, alle HIGH/MEDIUM fixes), 2026-05-09 (Cowork ingest: URL-Injection, Markdown-Injection, Dateigrößen-Limit)
+
+---
+
 ## 🚨 Kritische Architektur-Invarianten — immer gültig, nie brechen
 
 Diese Regeln gelten für **jede** Änderung, unabhängig vom Task. Bei Unsicherheit: ARCHITECTURE.md lesen.

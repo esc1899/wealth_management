@@ -138,3 +138,15 @@ class TestPageLoadability:
         at = AppTest.from_file("pages/settings.py")
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
+
+    def test_cowork_inbox_loads(self):
+        """Cowork Research Inbox page should load without exceptions."""
+        at = AppTest.from_file("pages/cowork_inbox.py")
+        at.run()
+        assert not at.exception, f"Page threw exception: {at.exception}"
+
+    def test_cowork_setup_loads(self):
+        """Cowork Setup page should load without exceptions."""
+        at = AppTest.from_file("pages/cowork_setup.py")
+        at.run()
+        assert not at.exception, f"Page threw exception: {at.exception}"

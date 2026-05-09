@@ -40,6 +40,7 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Investment Search** — screen for new opportunities; investment thesis saved automatically to watchlist
 - **Story Checker** — validates investment theses against current news and fundamentals (Claude API)
 - **Fundamental Analyzer** — in-depth fundamental analysis of individual positions with multi-turn chat (cloud, Claude)
+- **Research Inbox** — ingest AI-generated research from an external Claude Project; file watcher detects new `.md` files in `~/wealth-research/outbox/`, parses YAML frontmatter, and presents watchlist candidates for one-click review and import
 
 ### Claude Strategy (cloud, Claude Sonnet + web search)
 - **Structural Change Scanner** — identifies irreversible market shifts not yet priced by consensus; adds candidates directly to watchlist
@@ -86,6 +87,9 @@ The app has eleven agents with different characteristics: stateful vs. stateless
 
 ### Agentic loops and tool use
 The Structural Change Scanner runs an agentic loop: Claude decides when to call `web_search` and when to call the custom `add_structural_candidate` tool to populate your watchlist — no user interaction needed. Compare this to the simpler Research Chat (single call) to understand the cost/quality trade-off.
+
+### File-based AI ingest pipeline (Research Inbox)
+The Research Inbox shows a different integration pattern: instead of calling an AI API from inside the app, you run research in an external Claude Project and the app ingests the results as structured `.md` files. Learn how to define a strict YAML contract that an LLM must follow, how to watch a filesystem directory for changes using `watchdog`, how to parse and validate AI output with confidence (rejecting malformed files to `.invalid/`), and how to design a human-in-the-loop review step before AI suggestions reach your data. The Security section of the inbox code also demonstrates input sanitization for an AI-generated file source: URL protocol validation, markdown injection prevention, and file size limits.
 
 ### Tracking costs and controlling spending
 The Statistics page gives an indication of what each agent call costs in USD, broken down by agent, skill, and model. Configurable daily and monthly alert thresholds warn you before spending gets out of hand. The monthly forecast extrapolates from actual average token usage of your scheduled jobs — so you see the projected bill before it arrives. Learn what makes one agent 10× more expensive than another (hint: agentic loops with web search vs. a single-shot call), and how to use this to choose the right model for each task.
@@ -140,6 +144,8 @@ Copy `.env.example` to `.env` and fill in your values.
 | `MARKET_DATA_FETCH_HOUR` | Optional | Hour (0–23) for automatic price refresh, default `18` |
 | `LOG_LEVEL` | Optional | Logging level: DEBUG, INFO (default), WARNING, ERROR, CRITICAL |
 | `BASE_CURRENCY` | Optional | Currency for display: EUR (default), CHF, GBP, USD, JPY |
+| `COWORK_OUTBOX_PATH` | Optional | Path to Research Inbox outbox directory. Default: `~/wealth-research/outbox` |
+| `COWORK_WATCH_ENABLED` | Optional | Set to `false` to disable the file watcher (files scanned on startup only). Default: `true` |
 
 *`LLM_API_KEY` is required for Research Chat, News Digest, Investment Search, Story Checker, Fundamental Analyzer, Structural Change Scanner, Consensus Gap Analysis — unless `OPENAI_BASE_URL` is configured, in which case `OPENAI_API_KEY` is used instead.
 

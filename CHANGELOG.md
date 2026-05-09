@@ -8,6 +8,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Cowork Bugfixes + UX-Polish + UI-Kleinigkeiten — 2026-05-09
+
+**Cowork Watcher — `on_moved` fehlte (kritischer Bug)**
+- `core/cowork/watcher.py`: `on_moved(event)` Handler ergänzt — atomares Rename `.tmp/` → `outbox/` wurde als `FileMovedEvent` gemeldet und still ignoriert; neue Dateien erschienen dadurch nie im Inbox
+- `core/cowork/importer.py`: `list_watchlist()` → `get_watchlist()` — falscher Methodenname ließ Dedup-Check immer leer laufen; alle Kandidaten erschienen als neu
+
+**Cowork Inbox — Multi-Add Bug**
+- `pages/cowork_inbox.py`: Storychecker-Calls aus der Kandidaten-Loop herausgezogen; `st.spinner()` mid-loop unterbrach Streamlit und verhinderte dass mehr als 1 Position pro Klick gespeichert wurde
+
+**Cowork Inbox — UX-Verbesserungen**
+- Bereits-in-Watchlist-Kandidaten werden im Proposal Panel als durchgestrichener Text mit `✅ bereits in Watchlist` angezeigt statt als angehakte Checkbox
+- "🔄 Jetzt scannen"-Button im Header als manueller Fallback (wenn App beim Schreiben der Datei nicht lief)
+- Warnung + direkter `➕ <Ticker> hinzufügen`-Button wenn `primary_ticker` nicht in `watchlist_candidates` (Regel-11-Verletzung durch KI)
+
+**Cowork Setup — System Prompt Regel 11**
+- `pages/cowork_setup.py`: Neue Regel: Bei `type: stock_analysis` muss `primary.ticker` zwingend als erster Eintrag in `watchlist_candidates` erscheinen — verhindert dass KI den Hauptkandidaten weglässt
+
+**Positionen/Watchlist — Spalte "Seit"**
+- `pages/positionen.py`: Neue Spalte "Seit" (Format `DD.MM.YY`) nach Ticker in beiden Tabellen (Portfolio + Watchlist) — zeigt `added_date` als kompaktes Datum
+
+**Navigation**
+- `app.py`: "Position" → "Positionsanalyse" (klarere Bezeichnung)
+
+**Security + Docs**
+- `CLAUDE.md`: Prominenter Security-Block am Anfang (Projekt ist öffentlich auf GitHub)
+- `README.md`: Research Inbox in Features + "Was du lernst"-Sektion + Konfigurationsvariablen
+- `pages/cowork_setup.py`: Neue Seite (Workflow-Diagram, Status-Logik, Setup-Schritte, System Prompt zum Kopieren, Beispiel-Datei)
+- 2 neue Smoke Tests für cowork_inbox und cowork_setup
+
+**Tests:** 682 gesamt (alle grün)
+
+---
+
 ### FEAT-32 — Cowork Research Ingest (vollständig) — 2026-05-08
 
 **Neues Feature: KI-Research-Dateien aus externem Tool in Watchlist importieren.**

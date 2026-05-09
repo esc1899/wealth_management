@@ -19,7 +19,7 @@ from pathlib import Path
 
 from typing import Optional
 
-from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileModifiedEvent
+from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileModifiedEvent, FileMovedEvent
 from watchdog.observers import Observer
 
 from core.cowork.importer import CoworkImporter
@@ -44,6 +44,11 @@ class _ResearchEventHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if not event.is_directory:
             self._schedule(event.src_path)
+
+    def on_moved(self, event):
+        # Catches atomic rename from .tmp/ into outbox/ (the prescribed write pattern)
+        if not event.is_directory:
+            self._schedule(event.dest_path)
 
     def _schedule(self, path: str) -> None:
         p = Path(path)

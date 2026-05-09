@@ -119,7 +119,7 @@ pg = st.navigation({
         st.Page("pages/positionen.py",     title=t("nav.positions"),   icon=":material/edit_note:"),
         st.Page("pages/marktdaten.py",     title=t("nav.market_data"), icon=":material/trending_up:"),
         st.Page("pages/analyse.py",        title=t("nav.analysis"),    icon=":material/bar_chart:"),
-        st.Page("pages/position_dashboard.py", title="Position", icon=":material/person_search:"),
+        st.Page("pages/position_dashboard.py", title="Positionsanalyse", icon=":material/person_search:"),
     ],
     _assistant_group: _assistant_pages,
     t("nav.group_research"): [
@@ -138,6 +138,7 @@ pg = st.navigation({
         st.Page("pages/statistics.py",      title=t("nav.statistics"),       icon=":material/bar_chart:"),
         st.Page("pages/skills.py",          title="Skills",                  icon=":material/psychology:"),
         st.Page("pages/settings.py",        title=t("nav.settings"),         icon=":material/settings:"),
+        st.Page("pages/cowork_setup.py",    title="Cowork Setup",            icon=":material/settings_suggest:"),
     ],
 })
 
