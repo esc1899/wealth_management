@@ -22,7 +22,7 @@ from core.storage.base import build_encryption_service, get_connection, init_db,
 from core.storage.models import ScheduledJob
 from core.storage.news import NewsRepository
 from core.storage.positions import PositionsRepository
-from core.storage.scheduled_jobs import ScheduledJobsRepository
+from core.storage.scheduled_jobs import ScheduledJobsRepository, ScheduledJobRunsRepository
 from core.storage.usage import UsageRepository
 
 logger = logging.getLogger(__name__)
@@ -101,14 +101,19 @@ class AgentSchedulerService:
         conn = self._open_conn()
         try:
             jobs_repo = ScheduledJobsRepository(conn)
+            runs_repo = ScheduledJobRunsRepository(conn)
             job = jobs_repo.get(job_id)
             if not job:
                 return
-            await self._dispatch_agent(job, conn)
-            jobs_repo.update_last_run(job_id)
-        except Exception as exc:
-            logger.exception("Job force-run %s failed: %s", job_id, exc)
-            raise
+            run = runs_repo.create(job_id, source="manual")
+            try:
+                await self._dispatch_agent(job, conn)
+                jobs_repo.update_last_run(job_id)
+                runs_repo.complete(run.id)
+            except Exception as exc:
+                runs_repo.fail(run.id, str(exc))
+                logger.exception("Job force-run %s failed: %s", job_id, exc)
+                raise
         finally:
             conn.close()
 
@@ -151,6 +156,14 @@ class AgentSchedulerService:
                 minute=job.run_minute,
                 timezone=self._timezone,
             )
+        elif job.frequency == "yearly":
+            return CronTrigger(
+                month=job.run_month or 1,
+                day=job.run_day or 1,
+                hour=job.run_hour,
+                minute=job.run_minute,
+                timezone=self._timezone,
+            )
         else:  # monthly
             return CronTrigger(
                 day=job.run_day or 1,
@@ -166,15 +179,22 @@ class AgentSchedulerService:
         except Exception:
             logger.exception("Scheduled job %s failed", job_id)
 
-    async def _execute_job(self, job_id: int) -> None:
+    async def _execute_job(self, job_id: int, source: str = "scheduled") -> None:
         conn = self._open_conn()
         try:
             jobs_repo = ScheduledJobsRepository(conn)
+            runs_repo = ScheduledJobRunsRepository(conn)
             job = jobs_repo.get(job_id)
             if not job or not job.enabled:
                 return
-            await self._dispatch_agent(job, conn)
-            jobs_repo.update_last_run(job_id)
+            run = runs_repo.create(job_id, source=source)
+            try:
+                await self._dispatch_agent(job, conn)
+                jobs_repo.update_last_run(job_id)
+                runs_repo.complete(run.id)
+            except Exception as exc:
+                runs_repo.fail(run.id, str(exc))
+                raise
         finally:
             conn.close()
 
@@ -198,7 +218,9 @@ class AgentSchedulerService:
 
                 # Determine grace period based on frequency
                 grace_period = None
-                if job.frequency == "monthly":
+                if job.frequency == "yearly":
+                    grace_period = timedelta(days=30)  # Yearly jobs: catch up within 1 month
+                elif job.frequency == "monthly":
                     grace_period = timedelta(days=7)  # Monthly jobs: catch up within 1 week
                 elif job.frequency == "weekly":
                     grace_period = timedelta(days=3)  # Weekly jobs: catch up within 3 days
@@ -216,7 +238,7 @@ class AgentSchedulerService:
                         reason = "new job (never run)" if job.last_run is None else f"overdue (grace period: {grace_period.days}d)"
                         logger.info("Catchup: %s job %s (%s)", job.frequency, job.id, reason)
                         try:
-                            await self._execute_job(job.id)
+                            await self._execute_job(job.id, source="catchup")
                         except Exception:
                             logger.exception("Catchup job %s failed", job.id)
         finally:
@@ -235,6 +257,10 @@ class AgentSchedulerService:
             await self._run_fundamental_job(job, conn)
         elif job.agent_name == "wealth_snapshot":
             await self._run_wealth_snapshot_job(job, conn)
+        elif job.agent_name == "monthly_digest":
+            await self._run_monthly_digest_job(job, conn)
+        elif job.agent_name == "yearly_digest":
+            await self._run_yearly_digest_job(job, conn)
         else:
             logger.warning("Unknown agent_name '%s' in job %s", job.agent_name, job.id)
 
@@ -428,6 +454,105 @@ class AgentSchedulerService:
             f"{snapshot.total_eur:,.0f}",
             int(snapshot.coverage_pct),
         )
+
+    async def _run_monthly_digest_job(self, job: ScheduledJob, conn) -> None:
+        """Generate and persist the monthly portfolio digest (no LLM required)."""
+        from datetime import date as dateobj
+        from core.monthly_digest_generator import generate_monthly_digest
+        from core.storage.analyses import PositionAnalysesRepository
+        from core.storage.app_config import AppConfigRepository
+        from core.storage.market_data import MarketDataRepository
+        from core.storage.monthly_digest import MonthlyDigestRepository
+
+        enc = build_encryption_service(self._enc_key, self._salt_path)
+        positions_repo = PositionsRepository(conn, enc)
+        market_repo = MarketDataRepository(conn)
+        analyses_repo = PositionAnalysesRepository(conn)
+        app_config_repo = AppConfigRepository(conn)
+        digest_repo = MonthlyDigestRepository(conn)
+
+        from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
+        fetcher = MarketDataFetcher(rate_limiter=RateLimiter(calls_per_second=1))
+        market_data_agent = MarketDataAgent(
+            positions_repo=positions_repo,
+            market_repo=market_repo,
+            fetcher=fetcher,
+            db_path=self._db_path,
+            encryption_key=self._enc_key,
+        )
+        valuations = market_data_agent.get_portfolio_valuation()
+
+        today = dateobj.today()
+        # If job is scheduled on day 1 (monthly close-of-month digest), use the previous month.
+        # Otherwise (e.g. last day of month), use the current month.
+        if job.run_day == 1 and today.day <= 3:
+            # Running on/near 1st of month → generate previous month's digest
+            if today.month == 1:
+                year, month = today.year - 1, 12
+            else:
+                year, month = today.year, today.month - 1
+        else:
+            year, month = today.year, today.month
+        month_key = f"{year:04d}-{month:02d}"
+
+        body = generate_monthly_digest(
+            valuations=valuations,
+            analyses_repo=analyses_repo,
+            app_config_repo=app_config_repo,
+            year=year,
+            month=month,
+            market_repo=market_repo,
+        )
+        digest_repo.save(month_key, body)
+        logger.info("Monthly digest job %s completed for %s", job.id, month_key)
+
+    async def _run_yearly_digest_job(self, job: ScheduledJob, conn) -> None:
+        """Generate and persist the yearly portfolio digest (no LLM required)."""
+        from datetime import date as dateobj
+        from core.yearly_digest_generator import generate_yearly_digest
+        from core.storage.analyses import PositionAnalysesRepository
+        from core.storage.app_config import AppConfigRepository
+        from core.storage.market_data import MarketDataRepository
+        from core.storage.monthly_digest import MonthlyDigestRepository
+        from core.storage.yearly_digest import YearlyDigestRepository
+
+        enc = build_encryption_service(self._enc_key, self._salt_path)
+        positions_repo = PositionsRepository(conn, enc)
+        market_repo = MarketDataRepository(conn)
+        analyses_repo = PositionAnalysesRepository(conn)
+        app_config_repo = AppConfigRepository(conn)
+        digest_repo = YearlyDigestRepository(conn)
+        monthly_digest_repo = MonthlyDigestRepository(conn)
+
+        from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
+        fetcher = MarketDataFetcher(rate_limiter=RateLimiter(calls_per_second=1))
+        market_data_agent = MarketDataAgent(
+            positions_repo=positions_repo,
+            market_repo=market_repo,
+            fetcher=fetcher,
+            db_path=self._db_path,
+            encryption_key=self._enc_key,
+        )
+        valuations = market_data_agent.get_portfolio_valuation()
+
+        today = dateobj.today()
+        # If job is scheduled on Jan 1 (yearly close digest), use the previous year.
+        if job.run_month == 1 and job.run_day == 1 and today.month == 1 and today.day <= 3:
+            target_year = today.year - 1
+        else:
+            target_year = today.year
+        year_key = str(target_year)
+
+        body = generate_yearly_digest(
+            valuations=valuations,
+            analyses_repo=analyses_repo,
+            app_config_repo=app_config_repo,
+            year=target_year,
+            market_repo=market_repo,
+            monthly_digest_repo=monthly_digest_repo,
+        )
+        digest_repo.save(year_key, body)
+        logger.info("Yearly digest job %s completed for %s", job.id, year_key)
 
     def _open_conn(self):
         conn = get_connection(self._db_path)

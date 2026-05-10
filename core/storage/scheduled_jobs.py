@@ -1,12 +1,12 @@
 """
-ScheduledJobsRepository — CRUD for the scheduled_jobs table.
+ScheduledJobsRepository + ScheduledJobRunsRepository — CRUD for scheduler tables.
 """
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
-from core.storage.models import ScheduledJob
+from core.storage.models import ScheduledJob, ScheduledJobRun
 
 
 class ScheduledJobsRepository:
@@ -18,14 +18,14 @@ class ScheduledJobsRepository:
             """
             INSERT INTO scheduled_jobs (
                 agent_name, skill_name, skill_prompt,
-                frequency, run_hour, run_minute, run_weekday, run_day,
+                frequency, run_hour, run_minute, run_weekday, run_day, run_month,
                 model, enabled
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job.agent_name, job.skill_name, job.skill_prompt,
                 job.frequency, job.run_hour, job.run_minute,
-                job.run_weekday, job.run_day,
+                job.run_weekday, job.run_day, job.run_month,
                 job.model, 1 if job.enabled else 0,
             ),
         )
@@ -72,7 +72,8 @@ class ScheduledJobsRepository:
         self._conn.commit()
         return cursor.rowcount > 0
 
-    def _deserialize(self, row: sqlite3.Row) -> ScheduledJob:
+    @staticmethod
+    def _deserialize(row: sqlite3.Row) -> ScheduledJob:
         keys = row.keys()
         return ScheduledJob(
             id=row["id"],
@@ -84,6 +85,7 @@ class ScheduledJobsRepository:
             run_minute=row["run_minute"],
             run_weekday=row["run_weekday"],
             run_day=row["run_day"],
+            run_month=row["run_month"] if "run_month" in keys else None,
             model=row["model"] if "model" in keys else None,
             enabled=bool(row["enabled"]),
             last_run=(
@@ -96,4 +98,62 @@ class ScheduledJobsRepository:
                 if "created_at" in keys and row["created_at"]
                 else None
             ),
+        )
+
+
+class ScheduledJobRunsRepository:
+    """Persists execution history for scheduled jobs."""
+
+    def __init__(self, conn: sqlite3.Connection):
+        self._conn = conn
+
+    def create(self, job_id: int, source: str = "scheduled") -> ScheduledJobRun:
+        now = datetime.now(timezone.utc)
+        cur = self._conn.execute(
+            "INSERT INTO scheduled_job_runs (job_id, source, status, started_at) VALUES (?, ?, 'running', ?)",
+            (job_id, source, now.isoformat()),
+        )
+        self._conn.commit()
+        return ScheduledJobRun(id=cur.lastrowid, job_id=job_id, source=source, started_at=now)
+
+    def complete(self, run_id: int) -> None:
+        now = datetime.now(timezone.utc)
+        self._conn.execute(
+            "UPDATE scheduled_job_runs SET status = 'success', completed_at = ? WHERE id = ?",
+            (now.isoformat(), run_id),
+        )
+        self._conn.commit()
+
+    def fail(self, run_id: int, error_msg: str) -> None:
+        now = datetime.now(timezone.utc)
+        self._conn.execute(
+            "UPDATE scheduled_job_runs SET status = 'failed', completed_at = ?, error_msg = ? WHERE id = ?",
+            (now.isoformat(), error_msg[:500], run_id),
+        )
+        self._conn.commit()
+
+    def get_for_job(self, job_id: int, limit: int = 10) -> List[ScheduledJobRun]:
+        rows = self._conn.execute(
+            "SELECT * FROM scheduled_job_runs WHERE job_id = ? ORDER BY started_at DESC LIMIT ?",
+            (job_id, limit),
+        ).fetchall()
+        return [self._row_to_model(r) for r in rows]
+
+    def get_recent(self, limit: int = 50) -> List[ScheduledJobRun]:
+        rows = self._conn.execute(
+            "SELECT * FROM scheduled_job_runs ORDER BY started_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [self._row_to_model(r) for r in rows]
+
+    @staticmethod
+    def _row_to_model(row: sqlite3.Row) -> ScheduledJobRun:
+        return ScheduledJobRun(
+            id=row["id"],
+            job_id=row["job_id"],
+            source=row["source"],
+            status=row["status"],
+            started_at=datetime.fromisoformat(row["started_at"]),
+            completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None,
+            error_msg=row["error_msg"],
         )

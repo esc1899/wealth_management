@@ -72,7 +72,7 @@ async def test_catchup_runs_overdue_monthly_job():
 
     # Mock _execute_job to track calls
     execute_job_calls = []
-    async def mock_execute_job(job_id):
+    async def mock_execute_job(job_id, source="scheduled"):
         execute_job_calls.append(job_id)
 
     scheduler._execute_job = mock_execute_job
@@ -116,7 +116,7 @@ async def test_catchup_runs_new_job_immediately():
     mock_jobs_repo.get_enabled.return_value = [job]
 
     execute_job_calls = []
-    async def mock_execute_job(job_id):
+    async def mock_execute_job(job_id, source="scheduled"):
         execute_job_calls.append(job_id)
 
     scheduler._execute_job = mock_execute_job
@@ -160,7 +160,7 @@ async def test_catchup_skips_fresh_existing_job():
     mock_jobs_repo.get_enabled.return_value = [job]
 
     execute_job_calls = []
-    async def mock_execute_job(job_id):
+    async def mock_execute_job(job_id, source="scheduled"):
         execute_job_calls.append(job_id)
 
     scheduler._execute_job = mock_execute_job
@@ -200,7 +200,7 @@ async def test_catchup_skips_daily_jobs():
     mock_jobs_repo.get_enabled.return_value = [job]
 
     execute_job_calls = []
-    async def mock_execute_job(job_id):
+    async def mock_execute_job(job_id, source="scheduled"):
         execute_job_calls.append(job_id)
 
     scheduler._execute_job = mock_execute_job
@@ -240,7 +240,7 @@ async def test_catchup_runs_overdue_weekly_job():
     mock_jobs_repo.get_enabled.return_value = [job]
 
     execute_job_calls = []
-    async def mock_execute_job(job_id):
+    async def mock_execute_job(job_id, source="scheduled"):
         execute_job_calls.append(job_id)
 
     scheduler._execute_job = mock_execute_job
@@ -281,7 +281,7 @@ async def test_catchup_skips_recent_weekly_job():
     mock_jobs_repo.get_enabled.return_value = [job]
 
     execute_job_calls = []
-    async def mock_execute_job(job_id):
+    async def mock_execute_job(job_id, source="scheduled"):
         execute_job_calls.append(job_id)
 
     scheduler._execute_job = mock_execute_job
@@ -321,7 +321,7 @@ async def test_catchup_handles_no_reference_time():
     mock_jobs_repo.get_enabled.return_value = [job]
 
     execute_job_calls = []
-    async def mock_execute_job(job_id):
+    async def mock_execute_job(job_id, source="scheduled"):
         execute_job_calls.append(job_id)
 
     scheduler._execute_job = mock_execute_job

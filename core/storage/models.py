@@ -522,11 +522,12 @@ class ScheduledJob(BaseModel):
     agent_name: str          # e.g. 'news'
     skill_name: str
     skill_prompt: str
-    frequency: str           # 'daily', 'weekly', 'monthly'
+    frequency: str           # 'daily', 'weekly', 'monthly', 'yearly'
     run_hour: int = 8
     run_minute: int = 0
     run_weekday: Optional[int] = None   # 0=Mon … 6=Sun (weekly jobs)
-    run_day: Optional[int] = None       # 1–28 (monthly jobs)
+    run_day: Optional[int] = None       # 1–28 (monthly/yearly jobs)
+    run_month: Optional[int] = None     # 1–12 (yearly jobs)
     model: Optional[str] = None         # Claude model; None = use app default
     enabled: bool = True
     last_run: Optional[datetime] = None
@@ -628,6 +629,18 @@ class WatchlistCheckerAnalysis(BaseModel):
     skill_name: Optional[str] = None           # z.B. "Josef's Regel"
     model: Optional[str] = None                # z.B. "qwen3:8b"
     created_at: datetime
+
+
+class ScheduledJobRun(BaseModel):
+    """A single execution record for a scheduled job."""
+
+    id: Optional[int] = None
+    job_id: int
+    source: str = "scheduled"       # 'scheduled', 'manual', 'catchup'
+    status: str = "running"         # 'running', 'success', 'failed'
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    error_msg: Optional[str] = None
 
 
 # Constants for position fit roles

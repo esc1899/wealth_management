@@ -358,6 +358,16 @@ def init_db(conn: sqlite3.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_cowork_suggestions_research ON cowork_watchlist_suggestions(research_id)",
         "CREATE INDEX IF NOT EXISTS idx_cowork_suggestions_status ON cowork_watchlist_suggestions(status)",
         "CREATE INDEX IF NOT EXISTS idx_cowork_suggestions_ticker ON cowork_watchlist_suggestions(ticker)",
+        """CREATE TABLE IF NOT EXISTS scheduled_job_runs (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id       INTEGER NOT NULL REFERENCES scheduled_jobs(id) ON DELETE CASCADE,
+            source       TEXT NOT NULL DEFAULT 'scheduled',
+            status       TEXT NOT NULL DEFAULT 'running',
+            started_at   TEXT NOT NULL,
+            completed_at TEXT,
+            error_msg    TEXT
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_scheduled_job_runs_job ON scheduled_job_runs(job_id)",
     ]:
         conn.execute(stmt)
     conn.commit()
@@ -524,6 +534,24 @@ def migrate_db(conn: sqlite3.Connection) -> None:
                 conn.execute("ALTER TABLE portfolio_story_analyses_new RENAME TO portfolio_story_analyses")
         except Exception:
             pass  # Table might not exist yet or migration already applied
+
+    conn.execute("""CREATE TABLE IF NOT EXISTS monthly_digests (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        month         TEXT NOT NULL UNIQUE,
+        body_markdown TEXT NOT NULL,
+        generated_at  TEXT NOT NULL
+    )""")
+
+    conn.execute("""CREATE TABLE IF NOT EXISTS yearly_digests (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        year          TEXT NOT NULL UNIQUE,
+        body_markdown TEXT NOT NULL,
+        generated_at  TEXT NOT NULL
+    )""")
+
+    existing_jobs = {row[1] for row in conn.execute("PRAGMA table_info(scheduled_jobs)")}
+    if "run_month" not in existing_jobs:
+        conn.execute("ALTER TABLE scheduled_jobs ADD COLUMN run_month INTEGER")
 
     conn.commit()
 

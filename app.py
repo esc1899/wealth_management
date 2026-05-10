@@ -137,6 +137,7 @@ pg = st.navigation({
     t("nav.group_system"): [
         st.Page("pages/statistics.py",      title=t("nav.statistics"),       icon=":material/bar_chart:"),
         st.Page("pages/skills.py",          title="Skills",                  icon=":material/psychology:"),
+        st.Page("pages/scheduler.py",       title="Scheduler",               icon=":material/schedule:"),
         st.Page("pages/settings.py",        title=t("nav.settings"),         icon=":material/settings:"),
         st.Page("pages/cowork_setup.py",    title="Cowork Setup",            icon=":material/settings_suggest:"),
     ],

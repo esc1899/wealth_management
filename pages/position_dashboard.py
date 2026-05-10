@@ -12,6 +12,9 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+_POSITIVE_VERDICTS = frozenset({"intact", "wächst", "unterbewertet"})
+_NEGATIVE_VERDICTS = frozenset({"gefährdet", "eingeholt", "überbewertet"})
+
 from core.currency import symbol
 from core.i18n import t
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge
@@ -81,6 +84,58 @@ def _render_checker_card(title: str, verdict_obj, config, full_text_fn):
     if full_text:
         with st.expander("▼ Vollständige Analyse"):
             st.markdown(full_text)
+
+
+def _render_confluence_score(sc_v, cg_v, fa_v) -> None:
+    """Compact one-line confluence summary above the 3 checker cards."""
+    def _sentiment(v):
+        if v is None:
+            return "none"
+        if v in _POSITIVE_VERDICTS:
+            return "positive"
+        if v in _NEGATIVE_VERDICTS:
+            return "negative"
+        return "neutral"
+
+    verdicts = [
+        sc_v.verdict if sc_v else None,
+        cg_v.verdict if cg_v else None,
+        fa_v.verdict if fa_v else None,
+    ]
+    present = [(v, _sentiment(v)) for v in verdicts if v is not None]
+    n = len(present)
+
+    if n == 0:
+        st.caption("Research Confluence: ⚪ Keine Daten")
+        return
+
+    pos = sum(1 for _, s in present if s == "positive")
+    neg = sum(1 for _, s in present if s == "negative")
+
+    if pos == n:
+        icon, label = "🟢", "Starker Konsens"
+        detail = f"{pos}/{n} bullisch"
+    elif neg == n:
+        icon, label = "🔴", "Starker Konsens"
+        detail = f"{neg}/{n} bearish"
+    elif pos >= 2 and neg == 0:
+        icon, label = "🟢", "Überwiegend positiv"
+        detail = f"{pos}/{n} bullisch"
+    elif neg >= 2 and pos == 0:
+        icon, label = "🔴", "Überwiegend negativ"
+        detail = f"{neg}/{n} bearish"
+    elif pos > neg:
+        icon, label = "🟡", "Leicht positiv"
+        detail = f"{pos}/{n} bullisch"
+    elif neg > pos:
+        icon, label = "🟠", "Leicht negativ"
+        detail = f"{neg}/{n} bearish"
+    else:
+        icon, label = "⚪", "Gemischt"
+        detail = "Keine klare Tendenz"
+
+    data_note = f" _({n}/3 analysiert)_" if n < 3 else ""
+    st.markdown(f"**Research Confluence:** {icon} {label} — {detail}{data_note}")
 
 
 def _extract_ticker_section(digest: str, ticker: str) -> Optional[str]:
@@ -223,6 +278,11 @@ fa_verdict = analysis_service.get_verdict(
 sc_agent = get_storychecker_agent()
 cg_agent = get_consensus_gap_agent()
 fa_agent = get_fundamental_analyzer_agent()
+
+# Confluence summary
+_render_confluence_score(sc_verdict, cg_verdict, fa_verdict)
+
+st.write("")
 
 # Render 3 checker cards in columns
 col1, col2, col3 = st.columns(3)

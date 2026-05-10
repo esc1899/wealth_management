@@ -8,6 +8,98 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### FEAT-37 — Jahresanalyse Block auf der Analyse-Seite — 2026-05-10
+
+**Jahresanalyse — exakt analog zur Monatsanalyse, unter dem Monatsdigest**
+
+**Attribution**
+- `core/yearly_attribution.py` (neu): `compute_yearly_attribution()` + `AttributionYearRow` Dataclass
+- Datenbasis: erster verfügbarer Schlusskurs in `historical_prices` im Januar des gewählten Jahres vs. `current_value_eur`
+- Unit-Konvertierung identisch mit Tag/Monat: `unit == "g"` → `(price / 31.1035) * quantity`
+- Alle drei Zeiträume (Tag/Monat/Jahr) sind vollständig konsistent: gleiche End-Wert-Quelle (`current_value_eur`), gleiche Gold-Konvention
+
+**Jahresdigest**
+- `core/storage/base.py`: Neue Tabelle `yearly_digests(id, year TEXT UNIQUE "2026", body_markdown, generated_at)` + `run_month`-Spalte in `scheduled_jobs` via `migrate_db()`
+- `core/storage/models.py`: `ScheduledJob.run_month: Optional[int]` + `"yearly"` in frequency
+- `core/storage/scheduled_jobs.py`: INSERT + `_deserialize` um `run_month` erweitert
+- `core/storage/yearly_digest.py` (neu): `YearlyDigestRepository` (get/save UPSERT/get_recent)
+- `core/yearly_digest_generator.py` (neu): 4 Sektionen: (1) Performance-Summary mit Top-5-Performern, (2) Checker-Verdicts des Jahres (SC/FA/CG), (3) Monatsübersicht (welche Monatsdiegests existieren), (4) Makro-Snapshot
+- `core/scheduler.py`: `"yearly"` CronTrigger (month/day), Catchup-Grace-Period 30 Tage, Dispatch-Case `agent_name == "yearly_digest"` → `_run_yearly_digest_job()`; bei `run_month=1, run_day=1` wird automatisch das Vorjahr generiert
+- `translations/de.yaml` + `en.yaml`: `freq_yearly: "Jährlich"` / `"Yearly"`
+- `state_repos.py` / `state.py`: `get_yearly_digest_repo()` Factory + Re-Export
+
+**UI in `pages/analyse.py`**
+- Jahr-Selectbox (5 Jahre rückwärts, Default = laufendes Jahr mit `(laufend)`), Gesamt-Metric YTD, Bar-Chart, Tabelle, Digest-Expander mit "Jetzt generieren"-Button
+
+**Scheduler-Seite**
+- `pages/scheduler.py`: `yearly_digest`-Job wird beim ersten Page-Load automatisch geseedet (jährlich, 1. Januar, 06:00) als ⚙️ System-Job
+- `"yearly"` in `_FREQ_OPTIONS` + `_SYSTEM_AGENT_NAMES`; Form zeigt Monat+Tag-Inputs für jährliche Jobs; Label zeigt `DD.MM.` für yearly-Jobs
+
+**Tests:** 722 gesamt (alle grün) — neue Tests: `test_yearly_attribution.py` (7 inkl. Gold-Gramm), `test_yearly_digest.py` (10)
+
+---
+
+### FEAT-34/35/36 — Monatsanalyse Block auf der Analyse-Seite — 2026-05-10
+
+**FEAT-35 — Makro-Kontext Chips**
+- `core/macro_context.py` (neu): fetcht VIX (`^VIX`), EUR/USD (`USDEUR=X` → invertiert), Gold Spot (`XAUUSD=X` × `USDEUR=X`), DAX-Tageschange (`^GDAXI`) via yfinance — kein LLM, kein Kosten
+- Cache in `app_config` (Key `"macro_context"`) mit 4h TTL; bei Fetch-Fehler wird staler Cache zurückgegeben
+- `pages/analyse.py`: 4 `st.metric`-Chips oberhalb der Tagesanalyse; Timestamp der letzten Aktualisierung als Caption
+- Gold-Konvertierung: `XAUUSD=X` (USD/troy_oz) × `USDEUR=X` — identisch mit bestehendem `market_data_fetcher`-Muster (multiplizieren, nicht dividieren)
+
+**FEAT-34 — Monatliche Performance-Attribution**
+- `core/monthly_attribution.py` (neu): `compute_monthly_attribution()` + `AttributionMonthRow` Dataclass
+- Datenbasis: `historical_prices` (erster Schlusskurs im Monat) vs. `current_value_eur` (aktuell)
+- Unit-Konvertierung identisch mit `market_data_agent.py`: `unit == "g"` → `(price / 31.1035) * quantity` — behebt Gold-Rechenfehler für Positionen in Gramm und Unzen
+- `pages/analyse.py`: Monat-Selectbox (12 Monate rückwärts, Default = aktueller Monat mit `(laufend)`-Suffix), Gesamt-Metric, Bar-Chart (Beitrag €, rot/grün), Tabelle mit allen Feldern; laufender Monat wird als MTD gekennzeichnet
+
+**FEAT-36 — Monatsdigest**
+- `core/storage/base.py`: Neue Tabelle `monthly_digests(id, month TEXT UNIQUE "2026-05", body_markdown, generated_at)` via `migrate_db()`
+- `core/storage/monthly_digest.py` (neu): `MonthlyDigestRepository` (get/save mit UPSERT/get_recent)
+- `core/monthly_digest_generator.py` (neu): deterministischer Markdown-Generator — 3 Sektionen: (1) Performance-Summary mit Top-Performern, (2) Checker-Verdicts aus `position_analyses` für den Monat (SC/FA/CG), (3) Makro-Snapshot aus `app_config`
+- `core/scheduler.py`: Neuer Dispatch-Case `agent_name == "monthly_digest"` → `_run_monthly_digest_job()`; bei `run_day == 1` wird automatisch der Vormonat generiert (Scheduler läuft 1. des Monats = erzeugt Digest für vergangenen Monat)
+- `pages/analyse.py`: Expander "📋 Monatsdigest" unterhalb der Monatsanalyse; beim laufenden Monat erklärender Hinweis ("Scheduler generiert am Monatsende"); Buttons "Jetzt generieren" / "Neu generieren"
+- `pages/scheduler.py`: `monthly_digest`-Job wird beim ersten Page-Load automatisch geseedet (monatlich, 1. des Monats, 06:00); erscheint als ⚙️ System-Job ohne Delete-Button; Run-History über `scheduled_job_runs` wie alle anderen Jobs
+- `state_repos.py` / `state.py`: `get_monthly_digest_repo()` Factory + Re-Export
+
+**Tests:** 705 gesamt (alle grün) — neue Tests: `test_macro_context.py` (5), `test_monthly_attribution.py` (7 inkl. Gold-Gramm-Konvertierungstest), `test_monthly_digest.py` (9)
+
+---
+
+### Confluence Score + Scheduler-Seite (FEAT-24) — 2026-05-10
+
+**Confluence Score — Positionsanalyse**
+- `pages/position_dashboard.py`: Neue Zeile `Research Confluence: 🟢/🟡/🔴 Label — Detail` direkt über den 3 Checker-Cards
+- Sentiment-Mapping: SC `intact` / CG `wächst` / FA `unterbewertet` = positiv; `gefährdet`/`eingeholt`/`überbewertet` = negativ; Rest = neutral
+- Zeigt `(N/3 analysiert)` wenn weniger als 3 Checker gelaufen sind; `⚪ Keine Daten` wenn kein Checker vorhanden
+
+**FEAT-24 — Neue Scheduler-Seite (System-Bereich)**
+- `pages/scheduler.py`: Neuer Menüpunkt "Scheduler" unter System — vollständige Job-Verwaltung (vorher in settings.py)
+- Jeder Job-Card hat expandierbare `▼ Ausführungshistorie` (letzte 10 Runs: ✅/❌/⏳, Datum, Quelle, Dauer, Fehlertext)
+- `core/storage/base.py`: Neue Tabelle `scheduled_job_runs(id, job_id, source, status, started_at, completed_at, error_msg)` in `init_db()`
+- `core/storage/scheduled_jobs.py`: Neues `ScheduledJobRunsRepository` (create/complete/fail/get_for_job/get_recent)
+- `core/storage/models.py`: Neues `ScheduledJobRun`-Model
+- `core/scheduler.py`: Jeder Job-Run wird automatisch geloggt — `_execute_job(source=)`, `_execute_job_force` (source="manual"), Catchup (source="catchup")
+- `state_repos.py` / `state.py`: `get_scheduled_job_runs_repo()` Factory + Re-Export
+- `pages/settings.py`: Scheduler-Sektion entfernt
+
+**CLAUDE.md — Verbesserungen**
+- Neuer `## Commands`-Block: pytest, Einzeltest-Syntax, streamlit run, Restart
+- State Layer Tabelle (5 state_*.py Module)
+- DB Migrations Hinweis (core/storage/base.py)
+- "Adding a New Page" Checkliste
+- Required Environment Variables
+
+**Backlog — 4 neue Features eingetragen**
+- FEAT-33: Cowork Outbox — Rückkanal
+- FEAT-34: Performance Attribution
+- FEAT-35: Macro Context Overlay
+- FEAT-36: Monatlicher Portfolio-Digest
+
+**Tests:** 682 gesamt (alle grün)
+
+---
+
 ### Cowork Bugfixes + UX-Polish + UI-Kleinigkeiten — 2026-05-09
 
 **Cowork Watcher — `on_moved` fehlte (kritischer Bug)**

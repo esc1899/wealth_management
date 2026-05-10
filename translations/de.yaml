@@ -352,6 +352,7 @@ settings:
   freq_daily: "Täglich"
   freq_weekly: "Wöchentlich"
   freq_monthly: "Monatlich"
+  freq_yearly: "Jährlich"
   weekday_mon: "Montag"
   weekday_tue: "Dienstag"
   weekday_wed: "Mittwoch"

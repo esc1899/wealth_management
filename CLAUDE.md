@@ -1,3 +1,69 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+# Run all tests (coverage enabled by default via pytest.ini)
+pytest tests/
+
+# Run a single test file or specific test
+pytest tests/unit/test_xyz.py
+pytest tests/unit/test_xyz.py::TestClass::test_method
+
+# Run unit tests only (fast)
+pytest tests/unit/
+
+# Run integration tests only (use real SQLite :memory:, slower)
+pytest tests/integration/
+
+# Start the app (development)
+streamlit run app.py
+
+# Start on the fixed Dock-app port
+streamlit run app.py --server.port 6655
+
+# Restart after DB-schema or agent-signature changes
+kill $(pgrep -f "streamlit run") && streamlit run app.py
+```
+
+---
+
+## State Layer — 5-Module DI Factory
+
+`state.py` is a re-export facade. All singletons live in the four implementation modules:
+
+| Module | Responsibility |
+|---|---|
+| `state_db.py` | `get_db_connection()` — one SQLite connection + runs `migrate_db()` once at startup |
+| `state_repos.py` | 18 `@st.cache_resource` repository singletons |
+| `state_agents.py` | 14 `@st.cache_resource` agent singletons |
+| `state_services.py` | 5 service singletons (AnalysisService, PortfolioService, …) |
+
+Pages always import from `state`, never from `state_agents` / `state_repos` directly.
+
+## DB Migrations
+
+All schema changes go into the single `migrate_db()` function in `core/storage/base.py`. It runs once per process start via `state_db.py`. After any schema change: **restart Streamlit** (cached connection won't re-run migrations).
+
+## Adding a New Page
+
+1. Create `pages/<name>.py`
+2. Add `st.Page(...)` entry in the correct section dict inside `app.py`'s `st.navigation()` call
+3. Add a smoke test in `tests/unit/` (AppTest pattern, see existing smoke tests)
+
+## Required Environment Variables
+
+```
+ENCRYPTION_KEY=<Fernet key>   # required — generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+ANTHROPIC_API_KEY=<key>       # required for all cloud agents
+APP_PASSWORD=<password>       # optional — enables login gate
+DEMO_MODE=true                # optional — switches DB to data/demo.db
+```
+
+---
+
 # Arbeitsweise in diesem Projekt
 
 ## 🔒 Dieses Projekt ist öffentlich auf GitHub

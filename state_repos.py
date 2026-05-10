@@ -13,7 +13,7 @@ from core.storage.news import NewsRepository
 from core.storage.portfolio_story import PortfolioStoryRepository
 from core.storage.positions import PositionsRepository
 from core.storage.research import ResearchRepository
-from core.storage.scheduled_jobs import ScheduledJobsRepository
+from core.storage.scheduled_jobs import ScheduledJobsRepository, ScheduledJobRunsRepository
 from core.storage.search import SearchRepository
 from core.storage.skills import SkillsRepository
 from core.storage.storychecker import StorycheckerRepository
@@ -23,6 +23,8 @@ from core.storage.watchlist_checker_repo import WatchlistCheckerRepository
 from core.storage.wealth_snapshots import WealthSnapshotRepository
 from core.storage.dividend_snapshots import DividendSnapshotRepository
 from core.storage.cowork import CoworkRepository
+from core.storage.monthly_digest import MonthlyDigestRepository
+from core.storage.yearly_digest import YearlyDigestRepository
 
 
 @st.cache_resource
@@ -113,6 +115,11 @@ def get_scheduled_jobs_repo() -> ScheduledJobsRepository:
 
 
 @st.cache_resource
+def get_scheduled_job_runs_repo() -> ScheduledJobRunsRepository:
+    return ScheduledJobRunsRepository(get_db_connection())
+
+
+@st.cache_resource
 def get_structural_scans_repo() -> StructuralScansRepository:
     return StructuralScansRepository(get_db_connection())
 
@@ -145,3 +152,13 @@ def get_agent_runs_repo() -> AgentRunsRepository:
 @st.cache_resource
 def get_cowork_repo() -> CoworkRepository:
     return CoworkRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_monthly_digest_repo() -> MonthlyDigestRepository:
+    return MonthlyDigestRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_yearly_digest_repo() -> YearlyDigestRepository:
+    return YearlyDigestRepository(get_db_connection())

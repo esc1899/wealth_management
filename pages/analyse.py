@@ -2,8 +2,9 @@
 Analysis — performance charts, historical prices, allocation.
 """
 
+import calendar
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import pandas as pd
@@ -12,7 +13,16 @@ import streamlit as st
 
 from core.currency import symbol
 from core.i18n import t
-from state import get_market_agent, get_portfolio_service
+from core.macro_context import load_or_refresh_macro
+from core.monthly_attribution import compute_monthly_attribution
+from core.monthly_digest_generator import generate_monthly_digest
+from core.yearly_attribution import compute_yearly_attribution
+from core.yearly_digest_generator import generate_yearly_digest
+from state import (
+    get_market_agent, get_market_repo, get_portfolio_service,
+    get_app_config_repo, get_analyses_repo, get_monthly_digest_repo,
+    get_yearly_digest_repo,
+)
 
 st.set_page_config(page_title="Analyse", page_icon="🔍", layout="wide")
 st.title(f"🔍 {t('analysis.title')}")
@@ -46,6 +56,48 @@ with col_refresh:
         st.rerun()
 
 valuations = agent.get_portfolio_valuation()
+
+# ------------------------------------------------------------------
+# FEAT-35: Makro-Kontext Chips
+# ------------------------------------------------------------------
+_app_config_repo = get_app_config_repo()
+_macro = load_or_refresh_macro(_app_config_repo)
+
+with st.container():
+    m1, m2, m3, m4 = st.columns(4)
+    if _macro:
+        m1.metric(
+            "VIX",
+            f"{_macro.vix:.1f}" if _macro.vix is not None else "—",
+            help="CBOE Volatility Index — Maß für Markt-Unsicherheit",
+        )
+        m2.metric(
+            "EUR/USD",
+            f"{_macro.eur_usd:.3f}" if _macro.eur_usd is not None else "—",
+        )
+        m3.metric(
+            "Gold (€/oz)",
+            f"{_macro.gold_eur:,.0f}" if _macro.gold_eur is not None else "—",
+        )
+        if _macro.dax_change_pct is not None:
+            m4.metric(
+                "DAX (heute)",
+                f"{_macro.dax_change_pct:+.1f}%",
+                delta=_macro.dax_change_pct,
+                delta_color="normal",
+            )
+        else:
+            m4.metric("DAX (heute)", "—")
+        try:
+            _ts = datetime.fromisoformat(_macro.fetched_at)
+            st.caption(f"Makro-Daten: Stand {_ts.strftime('%d.%m.%Y %H:%M')} UTC")
+        except Exception:
+            pass
+    else:
+        m1.metric("VIX", "—")
+        m2.metric("EUR/USD", "—")
+        m3.metric("Gold (€/oz)", "—")
+        m4.metric("DAX (heute)", "—")
 
 if not valuations:
     st.info(t("analysis.portfolio_empty"))
@@ -92,6 +144,252 @@ if day_rows:
     st.plotly_chart(fig_day, use_container_width=True)
 else:
     st.info(t("analysis.no_day_pnl"))
+
+st.divider()
+
+# ------------------------------------------------------------------
+# FEAT-34: Monatsanalyse — Performance-Attribution
+# ------------------------------------------------------------------
+_today = date.today()
+_month_options = []
+for _i in range(12):
+    _y = _today.year if _today.month - _i > 0 else _today.year - 1
+    _m = (_today.month - _i - 1) % 12 + 1
+    _month_options.append((_y, _m))
+
+_MONTH_NAMES_DE = {
+    1: "Januar", 2: "Februar", 3: "März", 4: "April",
+    5: "Mai", 6: "Juni", 7: "Juli", 8: "August",
+    9: "September", 10: "Oktober", 11: "November", 12: "Dezember",
+}
+_month_labels = [
+    f"{_MONTH_NAMES_DE[m]} {y}{' (laufend)' if (y, m) == (_today.year, _today.month) else ''}"
+    for y, m in _month_options
+]
+_sel_idx = st.selectbox(
+    "Monatsanalyse",
+    range(len(_month_options)),
+    format_func=lambda i: _month_labels[i],
+    key="monthly_analysis_month",
+    label_visibility="collapsed",
+)
+_sel_year, _sel_month = _month_options[_sel_idx]
+_is_current_month = (_sel_year, _sel_month) == (_today.year, _today.month)
+_month_label = f"{_MONTH_NAMES_DE[_sel_month]} {_sel_year}"
+
+st.subheader(f"📅 Monatsanalyse {_month_label}")
+if _is_current_month:
+    st.caption(f"Monat-bisher (MTD) — Vergleich {_MONTH_NAMES_DE[_sel_month]} 1 bis heute")
+
+_market_repo = get_market_repo()
+_attribution = compute_monthly_attribution(valuations, _market_repo, _sel_year, _sel_month)
+
+if _attribution:
+    _rows_with_data = [r for r in _attribution if r.delta_pct is not None]
+
+    # Summary metric
+    _total_contrib = sum(r.contribution_eur for r in _attribution)
+    _total_start = sum(
+        (r.start_price_eur * r.quantity)
+        for r in _attribution
+        if r.start_price_eur and r.quantity
+    )
+    _total_pct = (_total_contrib / _total_start * 100) if _total_start > 0 else None
+    _sign = "+" if _total_contrib >= 0 else ""
+    _pct_str = f"{_total_pct:+.1f}%" if _total_pct is not None else "n/a"
+    st.caption(
+        f"**Portfolio gesamt {_month_label}: {_pct_str} ({_sign}{symbol()}{_total_contrib:,.0f})**"
+        .replace(",", "X").replace(".", ",").replace("X", ".")
+    )
+
+    if _rows_with_data:
+        _df_attr = pd.DataFrame([
+            {"Symbol": r.symbol, "Beitrag (€)": r.contribution_eur}
+            for r in _rows_with_data
+        ]).sort_values("Beitrag (€)")
+        _fig_attr = px.bar(
+            _df_attr, x="Symbol", y="Beitrag (€)",
+            color="Beitrag (€)",
+            color_continuous_scale=["red", "lightgrey", "green"],
+            color_continuous_midpoint=0,
+            text=_df_attr["Beitrag (€)"].apply(lambda v: f"{v:+,.0f}€".replace(",", "X").replace(".", ",").replace("X", ".")),
+        )
+        _fig_attr.update_traces(textposition="outside")
+        _fig_attr.update_layout(coloraxis_showscale=False, margin=dict(t=20))
+        st.plotly_chart(_fig_attr, use_container_width=True)
+
+    # Table
+    _table_rows = []
+    for r in _attribution:
+        _table_rows.append({
+            "Symbol": r.symbol,
+            "Klasse": t(f"investment_types.{r.investment_type}") if r.investment_type else r.investment_type,
+            "Monatsstart (€)": f"{r.start_price_eur:,.2f}" if r.start_price_eur else "—",
+            "Aktuell (€)": f"{r.end_price_eur:,.2f}" if r.end_price_eur else "—",
+            "∆ Monat": f"{r.delta_pct:+.1f}%" if r.delta_pct is not None else "—",
+            "Gewichtung": f"{r.weight_pct:.1f}%",
+            "Beitrag (€)": f"{r.contribution_eur:+,.0f}" if r.contribution_eur != 0 else "0",
+        })
+    st.dataframe(pd.DataFrame(_table_rows), use_container_width=True, hide_index=True)
+    st.caption("Monatsstart = erster verfügbarer Schlusskurs im Monat aus historical_prices.")
+else:
+    st.info(f"Keine historischen Preisdaten für {_month_label} verfügbar. Preishistorie muss geladen sein.")
+
+st.divider()
+
+# ------------------------------------------------------------------
+# FEAT-36: Monatsdigest
+# ------------------------------------------------------------------
+_digest_repo = get_monthly_digest_repo()
+_analyses_repo = get_analyses_repo()
+_digest_key = f"{_sel_year:04d}-{_sel_month:02d}"
+
+with st.expander(f"📋 Monatsdigest {_month_label}", expanded=False):
+    _digest = _digest_repo.get(_digest_key)
+    if _digest:
+        st.markdown(_digest.body_markdown)
+        st.caption(f"Generiert: {_digest.generated_at.strftime('%d.%m.%Y %H:%M')} UTC")
+        if st.button("🔄 Digest neu generieren", key="regen_digest"):
+            _md = generate_monthly_digest(
+                valuations, _analyses_repo, _app_config_repo,
+                _sel_year, _sel_month, market_repo=_market_repo,
+            )
+            _digest_repo.save(_digest_key, _md)
+            st.rerun()
+    else:
+        if _is_current_month:
+            st.info(
+                f"Kein Digest für {_month_label} (laufender Monat). "
+                "Der Scheduler generiert den Digest automatisch am Monatsende. "
+                "Jetzt generieren zeigt den Stand von heute."
+            )
+        else:
+            st.info(f"Noch kein Digest für {_month_label}.")
+        if st.button("✨ Digest jetzt generieren", key="gen_digest"):
+            with st.spinner("Generiere Digest..."):
+                _md = generate_monthly_digest(
+                    valuations, _analyses_repo, _app_config_repo,
+                    _sel_year, _sel_month, market_repo=_market_repo,
+                )
+            _digest_repo.save(_digest_key, _md)
+            st.rerun()
+
+st.divider()
+
+# ------------------------------------------------------------------
+# FEAT-37: Jahresanalyse — Performance-Attribution
+# ------------------------------------------------------------------
+_year_options = list(range(_today.year, _today.year - 5, -1))
+_year_labels = [
+    f"{y}{' (laufend)' if y == _today.year else ''}"
+    for y in _year_options
+]
+_sel_year_idx = st.selectbox(
+    "Jahresanalyse",
+    range(len(_year_options)),
+    format_func=lambda i: _year_labels[i],
+    key="yearly_analysis_year",
+    label_visibility="collapsed",
+)
+_sel_year_val = _year_options[_sel_year_idx]
+_is_current_year = _sel_year_val == _today.year
+_year_label = str(_sel_year_val)
+
+st.subheader(f"📆 Jahresanalyse {_year_label}")
+if _is_current_year:
+    st.caption(f"Jahr-bisher (YTD) — Vergleich 1. Januar bis heute")
+
+_year_attribution = compute_yearly_attribution(valuations, _market_repo, _sel_year_val)
+
+if _year_attribution:
+    _year_rows_with_data = [r for r in _year_attribution if r.delta_pct is not None]
+
+    _year_total_contrib = sum(r.contribution_eur for r in _year_attribution)
+    _year_rows_for_pct = [r for r in _year_rows_with_data if r.delta_pct]
+    _year_total_start = sum(
+        r.contribution_eur / (r.delta_pct / 100)
+        for r in _year_rows_for_pct
+        if r.delta_pct != 0
+    )
+    _year_total_pct = (_year_total_contrib / _year_total_start * 100) if _year_total_start > 0 else None
+    _year_sign = "+" if _year_total_contrib >= 0 else ""
+    _year_pct_str = f"{_year_total_pct:+.1f}%" if _year_total_pct is not None else "n/a"
+    st.caption(
+        f"**Portfolio gesamt {_year_label}: {_year_pct_str} ({_year_sign}{symbol()}{_year_total_contrib:,.0f})**"
+        .replace(",", "X").replace(".", ",").replace("X", ".")
+    )
+
+    if _year_rows_with_data:
+        _df_year_attr = pd.DataFrame([
+            {"Symbol": r.symbol, "Beitrag (€)": r.contribution_eur}
+            for r in _year_rows_with_data
+        ]).sort_values("Beitrag (€)")
+        _fig_year_attr = px.bar(
+            _df_year_attr, x="Symbol", y="Beitrag (€)",
+            color="Beitrag (€)",
+            color_continuous_scale=["red", "lightgrey", "green"],
+            color_continuous_midpoint=0,
+            text=_df_year_attr["Beitrag (€)"].apply(lambda v: f"{v:+,.0f}€".replace(",", "X").replace(".", ",").replace("X", ".")),
+        )
+        _fig_year_attr.update_traces(textposition="outside")
+        _fig_year_attr.update_layout(coloraxis_showscale=False, margin=dict(t=20))
+        st.plotly_chart(_fig_year_attr, use_container_width=True)
+
+    _year_table_rows = []
+    for r in _year_attribution:
+        _year_table_rows.append({
+            "Symbol": r.symbol,
+            "Klasse": t(f"investment_types.{r.investment_type}") if r.investment_type else r.investment_type,
+            "Jahresstart (€)": f"{r.start_price_eur:,.2f}" if r.start_price_eur else "—",
+            "Aktuell (€)": f"{r.end_price_eur:,.2f}" if r.end_price_eur else "—",
+            "∆ Jahr": f"{r.delta_pct:+.1f}%" if r.delta_pct is not None else "—",
+            "Gewichtung": f"{r.weight_pct:.1f}%",
+            "Beitrag (€)": f"{r.contribution_eur:+,.0f}" if r.contribution_eur != 0 else "0",
+        })
+    st.dataframe(pd.DataFrame(_year_table_rows), use_container_width=True, hide_index=True)
+    st.caption("Jahresstart = erster verfügbarer Schlusskurs im Januar aus historical_prices.")
+else:
+    st.info(f"Keine historischen Preisdaten für {_year_label} verfügbar. Preishistorie muss geladen sein.")
+
+st.divider()
+
+# ------------------------------------------------------------------
+# FEAT-37: Jahresdigest
+# ------------------------------------------------------------------
+_yearly_digest_repo = get_yearly_digest_repo()
+_year_digest_key = _year_label  # "2026"
+
+with st.expander(f"📋 Jahresdigest {_year_label}", expanded=False):
+    _year_digest = _yearly_digest_repo.get(_year_digest_key)
+    if _year_digest:
+        st.markdown(_year_digest.body_markdown)
+        st.caption(f"Generiert: {_year_digest.generated_at.strftime('%d.%m.%Y %H:%M')} UTC")
+        if st.button("🔄 Digest neu generieren", key="regen_year_digest"):
+            _year_md = generate_yearly_digest(
+                valuations, _analyses_repo, _app_config_repo,
+                _sel_year_val, market_repo=_market_repo,
+                monthly_digest_repo=_digest_repo,
+            )
+            _yearly_digest_repo.save(_year_digest_key, _year_md)
+            st.rerun()
+    else:
+        if _is_current_year:
+            st.info(
+                f"Kein Digest für {_year_label} (laufendes Jahr). "
+                "Der Scheduler generiert den Digest automatisch am Jahresende. "
+                "Jetzt generieren zeigt den Stand von heute."
+            )
+        else:
+            st.info(f"Noch kein Digest für {_year_label}.")
+        if st.button("✨ Digest jetzt generieren", key="gen_year_digest"):
+            with st.spinner("Generiere Jahresdigest..."):
+                _year_md = generate_yearly_digest(
+                    valuations, _analyses_repo, _app_config_repo,
+                    _sel_year_val, market_repo=_market_repo,
+                    monthly_digest_repo=_digest_repo,
+                )
+            _yearly_digest_repo.save(_year_digest_key, _year_md)
+            st.rerun()
 
 st.divider()
 

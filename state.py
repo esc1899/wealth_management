@@ -25,6 +25,7 @@ from state_repos import (
     get_storychecker_repo,
     get_analyses_repo,
     get_scheduled_jobs_repo,
+    get_scheduled_job_runs_repo,
     get_structural_scans_repo,
     get_dividend_snapshot_repo,
     get_watchlist_checker_repo,
@@ -32,6 +33,8 @@ from state_repos import (
     get_portfolio_story_repo,
     get_agent_runs_repo,
     get_cowork_repo,
+    get_monthly_digest_repo,
+    get_yearly_digest_repo,
 )
 
 # Agents (15 total)
@@ -75,6 +78,7 @@ __all__ = [
     "get_storychecker_repo",
     "get_analyses_repo",
     "get_scheduled_jobs_repo",
+    "get_scheduled_job_runs_repo",
     "get_structural_scans_repo",
     "get_dividend_snapshot_repo",
     "get_watchlist_checker_repo",
@@ -82,6 +86,8 @@ __all__ = [
     "get_portfolio_story_repo",
     "get_agent_runs_repo",
     "get_cowork_repo",
+    "get_monthly_digest_repo",
+    "get_yearly_digest_repo",
     "get_portfolio_agent",
     "get_market_agent",
     "get_research_agent",
