@@ -1,10 +1,11 @@
 """
 Watchlist Checker — evaluates which watchlist positions fit into the portfolio.
 
-Cleanroom Neuimplementierung (2026-04-14):
-- Two separate background jobs: Story+Consensus (Button 1) & Fundamental (Button 2)
-- Thread-local DB connections (not Streamlit singletons)
-- Skill resolution from scheduled jobs or defaults
+FEAT-40 Cockpit Refactor (2026-05-11):
+- Section 1: Status-Matrix (alle Kandidaten × alle 4 Sub-Checks + WC-Fit)
+- Section 2: Main WatchlistCheckerAgent run (Ollama, lokal)
+- Section 3: Ergebnisse (vereinfachte Position-Cards, kein 4-Spalten-Expander)
+- One-Click "Alle fehlenden Checks ausführen" Button
 """
 
 import asyncio
@@ -14,7 +15,10 @@ import os
 import threading
 import time
 import streamlit as st
+from dataclasses import dataclass as _dataclass
 from datetime import datetime
+
+import pandas as pd
 
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon, cloud_notice
 from core.i18n import t, current_language
@@ -34,10 +38,12 @@ from state import (
     get_skills_repo,
     get_watchlist_checker_repo,
     get_market_agent,
+    get_positions_repo,
 )
 from core.services.portfolio_comment_service import get_style_by_id
 from config import config
 from core.storage.base import get_connection, init_db, migrate_db, build_encryption_service
+from core.storage.app_config import AppConfigRepository
 from core.storage.positions import PositionsRepository
 from core.storage.analyses import PositionAnalysesRepository
 from core.storage.storychecker import StorycheckerRepository
@@ -45,11 +51,64 @@ from core.storage.scheduled_jobs import ScheduledJobsRepository
 from agents.storychecker_agent import StorycheckerAgent
 from agents.consensus_gap_agent import ConsensusGapAgent
 from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
+from agents.capital_allocator_agent import CapitalAllocatorAgent
 from core.llm.claude import ClaudeProvider
 from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET, AGENT_SKILL_DEFAULTS
+from core.storage.usage import UsageRepository
 
 
 logger = logging.getLogger(__name__)
+
+
+# ------------------------------------------------------------------
+# Helpers: Display normalization
+# ------------------------------------------------------------------
+
+@_dataclass
+class _DisplayFit:
+    """Normalized fit object for display."""
+    position_id: int
+    verdict: str
+    summary: str
+
+
+def _normalize_result(result):
+    """Convert WatchlistCheckerAnalysis or WatchlistCheckResult to normalized form."""
+    if hasattr(result, 'position_fits') and result.position_fits:
+        return result, result.position_fits
+    if hasattr(result, 'position_fits_json') and result.position_fits_json:
+        try:
+            fits_data = json.loads(result.position_fits_json)
+            position_fits = [_DisplayFit(**fit) for fit in fits_data]
+            return result, position_fits
+        except Exception as e:
+            logger.warning(f"Failed to deserialize position_fits_json: {e}")
+            return result, []
+    return result, []
+
+
+def _fmt_verdict(v, config_key: str) -> str:
+    """Format a verdict object as 'emoji verdict' or '⚪ —' if missing."""
+    if v and v.verdict:
+        icon = verdict_icon(v.verdict, VERDICT_CONFIGS[config_key])
+        return f"{icon} {v.verdict}"
+    return "⚪ —"
+
+
+# ------------------------------------------------------------------
+# Helper: Model resolution from a background-thread DB connection
+# ------------------------------------------------------------------
+
+def _resolve_model_from_conn(conn, agent_key: str, default: str) -> str:
+    """Read per-agent model from app_config using the thread-local DB connection."""
+    model_type = "openai" if config.OPENAI_BASE_URL else "claude"
+    app_cfg = AppConfigRepository(conn)
+    return (
+        app_cfg.get(f"model_{model_type}_{agent_key}")
+        or app_cfg.get(f"model_{model_type}")
+        or config.LLM_DEFAULT_MODEL
+        or default
+    )
 
 
 # ------------------------------------------------------------------
@@ -57,15 +116,14 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 
 def _log_to_job(job: dict, msg: str) -> None:
-    """Add message to job logs for UI display."""
     if "logs" not in job:
         job["logs"] = []
     job["logs"].append(msg)
-    logger.info(msg)  # Also log to stderr for CLI access
+    logger.info(msg)
 
 
 # ------------------------------------------------------------------
-# Helper: Skill Resolution (Modul-Level)
+# Helper: Skill Resolution
 # ------------------------------------------------------------------
 
 def _resolve_skill(
@@ -73,16 +131,6 @@ def _resolve_skill(
     skills_repo,
     agent_name: str,
 ) -> tuple[str, str]:
-    """
-    Resolve skill_name and skill_prompt for an agent from scheduled jobs or defaults.
-
-    Priority:
-    1. First enabled scheduled job for this agent_name
-    2. Default skill from AGENT_SKILL_DEFAULTS
-    3. "Standard" as fallback
-
-    Returns: (skill_name, skill_prompt)
-    """
     try:
         for job in jobs_repo.get_all():
             if job.agent_name == agent_name and job.enabled:
@@ -95,119 +143,109 @@ def _resolve_skill(
                 return skill_name, skill_prompt
     except Exception as exc:
         logger.warning(f"Error resolving skill for {agent_name}: {exc}")
-
-    # Default if no scheduled job found
     default_skill = AGENT_SKILL_DEFAULTS.get(agent_name, "Standard")
     return default_skill, ""
 
 
 # ------------------------------------------------------------------
-# Background Job 1: StorycheckerAgent + ConsensusGapAgent
+# Background Job 1a: StorycheckerAgent
 # ------------------------------------------------------------------
 
-def _run_storychecker_consensus_job(
-    watchlist: list,
-    agents_to_run: list[str],  # ["storychecker", "consensus_gap"]
+def _run_storychecker_job(
+    positions: list,
     language: str,
     job: dict,
     db_path: str,
     enc_key: str,
     api_key: str,
 ) -> None:
-    """
-    Run Story Checker and Consensus Gap agents in background.
-    Thread-local connection and repos.
-    """
     conn = None
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     count = 0
-    error_msg = None
-
     try:
-        # Create fresh thread-local connection
         conn = get_connection(db_path)
         init_db(conn)
         migrate_db(conn)
-
-        # Build repos with thread-safe connection
         salt_path = os.path.join(os.path.dirname(os.path.abspath(db_path)), "salt.bin")
         enc = build_encryption_service(enc_key, salt_path)
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         storychecker_repo = StorycheckerRepository(conn)
-        skills_repo = get_skills_repo()  # Read-only for skill resolution
+        skills_repo = get_skills_repo()
         jobs_repo = ScheduledJobsRepository(conn)
-
-        watchlist_positions = [p for p in watchlist if p.id]
-        _log_to_job(job, f"SC+CG job: {len(watchlist_positions)} positions, agents: {agents_to_run}")
-
-        # StorycheckerAgent
-        if "storychecker" in agents_to_run:
-            job["agents"] = ["Story Checker"]
-            sc_skill_name, sc_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "storychecker")
-            if config.OPENAI_BASE_URL:
-                from core.llm.openai_compatible import OpenAICompatibleProvider
-                sc_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
-            else:
-                sc_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_HAIKU, base_url=config.LLM_BASE_URL)
-            sc_llm.skill_context = sc_skill_name
-            sc_agent = StorycheckerAgent(
-                positions_repo=positions_repo,
-                storychecker_repo=storychecker_repo,
-                analyses_repo=analyses_repo,
-                llm=sc_llm,
-                skills_repo=skills_repo,
-            )
-            try:
-                _log_to_job(job, f"Running StorycheckerAgent with skill '{sc_skill_name}'")
-                results = loop.run_until_complete(sc_agent.batch_check_all(positions=watchlist_positions, language=language))
-                sc_count = sum(1 for _, err in results if err is None)
-                count += sc_count
-                _log_to_job(job, f"StorycheckerAgent: {sc_count}/{len(watchlist_positions)} analyses completed")
-            except Exception as exc:
-                logger.exception("StorycheckerAgent failed")
-                error_msg = f"StorycheckerAgent: {str(exc)}"
-                _log_to_job(job, f"❌ StorycheckerAgent failed: {error_msg}")
-                job["error"] = error_msg
-
-        # ConsensusGapAgent
-        if "consensus_gap" in agents_to_run:
-            if "agents" not in job or not job["agents"]:
-                job["agents"] = []
-            if "Story Checker" not in job["agents"]:
-                job["agents"].append("Konsens-Lücken")
-            else:
-                job["agents"] = ["Story Checker", "Konsens-Lücken"]
-
-            cg_skill_name, cg_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "consensus_gap")
-            if config.OPENAI_BASE_URL:
-                from core.llm.openai_compatible import OpenAICompatibleProvider
-                cg_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
-            else:
-                cg_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET, base_url=config.LLM_BASE_URL)
-            cg_agent = ConsensusGapAgent(llm=cg_llm, analyses_repo=analyses_repo)
-            try:
-                _log_to_job(job, f"Running ConsensusGapAgent with skill '{cg_skill_name}'")
-                loop.run_until_complete(
-                    cg_agent.analyze_portfolio(watchlist_positions, cg_skill_name, cg_skill_prompt, language=language)
-                )
-                cg_count = len(watchlist_positions)
-                count += cg_count
-                _log_to_job(job, f"ConsensusGapAgent: {cg_count} analyses completed")
-            except Exception as exc:
-                logger.exception("ConsensusGapAgent failed")
-                error_msg = f"ConsensusGapAgent: {str(exc)}"
-                _log_to_job(job, f"❌ ConsensusGapAgent failed: {error_msg}")
-                job["error"] = error_msg
-
-        job.update({"running": False, "done": True, "count": count, "error": error_msg})
-
+        _usage_repo = UsageRepository(conn)
+        job["agents"] = ["Story Checker"]
+        skill_name, _ = _resolve_skill(jobs_repo, skills_repo, "storychecker")
+        _sc_model = _resolve_model_from_conn(conn, "storychecker", CLAUDE_HAIKU)
+        if config.OPENAI_BASE_URL:
+            from core.llm.openai_compatible import OpenAICompatibleProvider
+            llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
+        else:
+            llm = ClaudeProvider(api_key=api_key, model=_sc_model, base_url=config.LLM_BASE_URL)
+        llm.skill_context = skill_name
+        llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None, _m=llm.model, _r=_usage_repo: _r.record("storychecker", _m, i, o, skill=skill, source="manual", duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
+        agent = StorycheckerAgent(positions_repo=positions_repo, storychecker_repo=storychecker_repo, analyses_repo=analyses_repo, llm=llm, skills_repo=skills_repo)
+        pos_valid = [p for p in positions if p.id]
+        _log_to_job(job, f"StorycheckerAgent: {len(pos_valid)} positions")
+        results = loop.run_until_complete(agent.batch_check_all(positions=pos_valid, language=language))
+        count = sum(1 for _, err in results if err is None)
+        _log_to_job(job, f"StorycheckerAgent: {count}/{len(pos_valid)} completed")
+        job.update({"running": False, "done": True, "count": count, "error": None})
     except Exception as exc:
-        error_msg = str(exc)
-        logger.exception("Background SC+CG job failed")
-        job.update({"running": False, "done": True, "count": count, "error": error_msg})
+        logger.exception("StorycheckerAgent job failed")
+        job.update({"running": False, "done": True, "count": count, "error": str(exc)})
+    finally:
+        loop.close()
+        if conn:
+            conn.close()
 
+
+# ------------------------------------------------------------------
+# Background Job 1b: ConsensusGapAgent
+# ------------------------------------------------------------------
+
+def _run_consensus_gap_job(
+    positions: list,
+    language: str,
+    job: dict,
+    db_path: str,
+    enc_key: str,
+    api_key: str,
+) -> None:
+    from core.storage.consensus_gap import ConsensusGapRepository
+    conn = None
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    count = 0
+    try:
+        conn = get_connection(db_path)
+        init_db(conn)
+        migrate_db(conn)
+        analyses_repo = PositionAnalysesRepository(conn)
+        cg_repo = ConsensusGapRepository(conn)
+        skills_repo = get_skills_repo()
+        jobs_repo = ScheduledJobsRepository(conn)
+        _usage_repo = UsageRepository(conn)
+        job["agents"] = ["Konsens-Lücken"]
+        skill_name, skill_prompt = _resolve_skill(jobs_repo, skills_repo, "consensus_gap")
+        _cg_model = _resolve_model_from_conn(conn, "consensus_gap", CLAUDE_SONNET)
+        if config.OPENAI_BASE_URL:
+            from core.llm.openai_compatible import OpenAICompatibleProvider
+            llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
+        else:
+            llm = ClaudeProvider(api_key=api_key, model=_cg_model, base_url=config.LLM_BASE_URL)
+        llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None, _m=llm.model, _r=_usage_repo: _r.record("consensus_gap", _m, i, o, skill=skill, source="manual", duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
+        agent = ConsensusGapAgent(llm=llm, analyses_repo=analyses_repo, cg_repo=cg_repo)
+        pos_valid = [p for p in positions if p.id]
+        _log_to_job(job, f"ConsensusGapAgent: {len(pos_valid)} positions")
+        loop.run_until_complete(agent.analyze_portfolio(pos_valid, skill_name, skill_prompt, language=language))
+        count = len(pos_valid)
+        _log_to_job(job, f"ConsensusGapAgent: {count} completed")
+        job.update({"running": False, "done": True, "count": count, "error": None})
+    except Exception as exc:
+        logger.exception("ConsensusGapAgent job failed")
+        job.update({"running": False, "done": True, "count": count, "error": str(exc)})
     finally:
         loop.close()
         if conn:
@@ -226,10 +264,6 @@ def _run_fundamental_job(
     enc_key: str,
     api_key: str,
 ) -> None:
-    """
-    Run Fundamental Agent in background (matches Scheduler pattern).
-    Thread-local connection and repos.
-    """
     from core.storage.analyses import PositionAnalysesRepository
 
     conn = None
@@ -239,45 +273,41 @@ def _run_fundamental_job(
     error_msg = None
 
     try:
-        # Create fresh thread-local connection
         conn = get_connection(db_path)
         init_db(conn)
         migrate_db(conn)
 
-        # Build repos with thread-safe connection
         salt_path = os.path.join(os.path.dirname(os.path.abspath(db_path)), "salt.bin")
         enc = build_encryption_service(enc_key, salt_path)
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
-        skills_repo = get_skills_repo()  # Read-only for skill resolution
+        skills_repo = get_skills_repo()
         jobs_repo = ScheduledJobsRepository(conn)
 
-        # Resolve skill
         fund_skill_name, fund_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "fundamental_analyzer")
-
         _log_to_job(job, f"Skill resolved: '{fund_skill_name}'")
-        if not fund_skill_prompt:
-            _log_to_job(job, "⚠️ No skill prompt found, using empty")
 
-        # Create agent with thread-safe repos (same as Scheduler does)
+        _usage_repo = UsageRepository(conn)
+        _fa_model = _resolve_model_from_conn(conn, "fundamental_analyzer", CLAUDE_HAIKU)
+
         if config.OPENAI_BASE_URL:
             from core.llm.openai_compatible import OpenAICompatibleProvider
             fund_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
         else:
-            fund_llm = ClaudeProvider(api_key=api_key, model=CLAUDE_SONNET, base_url=config.LLM_BASE_URL)
+            fund_llm = ClaudeProvider(api_key=api_key, model=_fa_model, base_url=config.LLM_BASE_URL)
+        fund_llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None, _m=fund_llm.model, _r=_usage_repo: _r.record("fundamental_analyzer", _m, i, o, skill=skill, source="manual", duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
         from core.storage.fundamental_analyzer import FundamentalAnalyzerRepository
-        fund_repo = FundamentalAnalyzerRepository(get_connection())
+        fund_repo = FundamentalAnalyzerRepository(conn)
         fund_agent = FundamentalAnalyzerAgent(positions_repo=positions_repo, analyses_repo=analyses_repo, fa_repo=fund_repo, llm=fund_llm)
 
         job["agents"] = ["Fundamental"]
         positions = [p for p in watchlist if p.id]
-        # Convert Position to PublicPosition (no private financial data for cloud agent)
         from core.storage.models import PublicPosition
         pub_positions = [PublicPosition(id=p.id, name=p.name, ticker=p.ticker, isin=p.isin, asset_class=p.asset_class, anlageart=p.anlageart, story=p.story, story_skill=p.story_skill) for p in positions]
 
         if not positions:
-            _log_to_job(job, "❌ Keine Positionen mit ID in Watchlist")
             error_msg = "Keine Positionen mit ID in Watchlist"
+            _log_to_job(job, f"❌ {error_msg}")
         else:
             _log_to_job(job, f"Running FundamentalAnalyzerAgent on {len(positions)} positions")
             try:
@@ -302,7 +332,88 @@ def _run_fundamental_job(
         error_msg = str(exc)
         logger.exception("Background Fundamental job failed")
         job.update({"running": False, "done": True, "count": count, "error": error_msg})
+    finally:
+        loop.close()
+        if conn:
+            conn.close()
 
+
+# ------------------------------------------------------------------
+# Background Job 3: CapitalAllocatorAgent
+# ------------------------------------------------------------------
+
+def _run_capital_allocator_job(
+    watchlist: list,
+    language: str,
+    job: dict,
+    db_path: str,
+    enc_key: str,
+    api_key: str,
+) -> None:
+    conn = None
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    count = 0
+    error_msg = None
+
+    try:
+        conn = get_connection(db_path)
+        init_db(conn)
+        migrate_db(conn)
+
+        analyses_repo = PositionAnalysesRepository(conn)
+        skills_repo = get_skills_repo()
+        jobs_repo = ScheduledJobsRepository(conn)
+
+        ca_skill_name, ca_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "capital_allocator")
+        _log_to_job(job, f"Skill resolved: '{ca_skill_name}'")
+
+        _usage_repo = UsageRepository(conn)
+        _ca_model = _resolve_model_from_conn(conn, "capital_allocator", CLAUDE_SONNET)
+
+        if config.OPENAI_BASE_URL:
+            from core.llm.openai_compatible import OpenAICompatibleProvider
+            ca_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
+        else:
+            ca_llm = ClaudeProvider(api_key=api_key, model=_ca_model, base_url=config.LLM_BASE_URL)
+        ca_llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None, _m=ca_llm.model, _r=_usage_repo: _r.record("capital_allocator", _m, i, o, skill=skill, source="manual", duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
+
+        from core.storage.capital_allocator import CapitalAllocatorRepository
+        ca_repo = CapitalAllocatorRepository(conn)
+        ca_agent = CapitalAllocatorAgent(llm=ca_llm, analyses_repo=analyses_repo, ca_repo=ca_repo)
+
+        job["agents"] = ["Kapitalallokator"]
+        positions = [p for p in watchlist if p.id]
+        from core.storage.models import PublicPosition
+        pub_positions = [PublicPosition(id=p.id, name=p.name, ticker=p.ticker, isin=p.isin, asset_class=p.asset_class, anlageart=p.anlageart, story=p.story, story_skill=p.story_skill) for p in positions]
+
+        if not positions:
+            error_msg = "Keine Positionen mit ID in Watchlist"
+            _log_to_job(job, f"❌ {error_msg}")
+        else:
+            _log_to_job(job, f"Running CapitalAllocatorAgent on {len(positions)} positions")
+            try:
+                results = loop.run_until_complete(
+                    ca_agent.analyze_portfolio(
+                        positions=pub_positions,
+                        skill_name=ca_skill_name,
+                        skill_prompt=ca_skill_prompt,
+                        language=language,
+                    )
+                )
+                count = len(results) if results else len(positions)
+                _log_to_job(job, f"✅ CapitalAllocatorAgent completed: {count} analyzed")
+            except Exception as exc:
+                error_msg = f"CapitalAllocatorAgent failed: {str(exc)}"
+                _log_to_job(job, f"❌ {error_msg}")
+                raise
+
+        job.update({"running": False, "done": True, "count": count, "error": error_msg})
+
+    except Exception as exc:
+        error_msg = str(exc)
+        logger.exception("Background Capital Allocator job failed")
+        job.update({"running": False, "done": True, "count": count, "error": error_msg})
     finally:
         loop.close()
         if conn:
@@ -310,22 +421,22 @@ def _run_fundamental_job(
 
 
 # ─────────────────────────────────────────────────────────────────────
+# Page Header
+# ─────────────────────────────────────────────────────────────────────
 
 st.title(f"📋 {t('watchlist_checker.title')}")
 st.caption(t("watchlist_checker.subtitle"))
 
 # ─────────────────────────────────────────────────────────────────────
-# Section 1: Run Watchlist Check
+# Init: Services + Data
 # ─────────────────────────────────────────────────────────────────────
-
-st.subheader(t("watchlist_checker.check_section"))
 
 _portfolio_service = get_portfolio_service()
 _analysis_service = get_analysis_service()
 portfolio_story_repo = get_portfolio_story_repo()
 agent = get_watchlist_checker_agent()
 agent_runs_repo = get_agent_runs_repo()
-cloud_notice(agent.model, provider="ollama")
+wc_repo = get_watchlist_checker_repo()
 
 watchlist = _portfolio_service.get_watchlist_positions()
 
@@ -335,89 +446,174 @@ if not watchlist:
 
 st.caption(t("watchlist_checker.watchlist_count").format(n=len(watchlist)))
 
-# Ermittle offene Checks — analog Portfolio Story
+# Pre-fetch all sub-check verdicts
 watchlist_ids = [pos.id for pos in watchlist if pos.id]
 sc_verdicts = _analysis_service.get_verdicts(watchlist_ids, "storychecker")
 cg_verdicts = _analysis_service.get_verdicts(watchlist_ids, "consensus_gap")
 fund_verdicts = _analysis_service.get_verdicts(watchlist_ids, "fundamental_analyzer")
+ca_verdicts = _analysis_service.get_verdicts(watchlist_ids, "capital_allocator")
 
-n_missing_sc_cg = sum(1 for pid in watchlist_ids if pid not in sc_verdicts or pid not in cg_verdicts)
+# Pre-load WC fits for matrix WC-Fit column
+_latest_wc_result = wc_repo.get_latest_analysis()
+_wc_fits: dict[int, _DisplayFit] = {}
+if _latest_wc_result:
+    _, _fits_list = _normalize_result(_latest_wc_result)
+    _wc_fits = {f.position_id: f for f in _fits_list}
+
+# Missing counts
+n_missing_sc = sum(1 for pid in watchlist_ids if pid not in sc_verdicts)
+n_missing_cg = sum(1 for pid in watchlist_ids if pid not in cg_verdicts)
 n_missing_fund = sum(1 for pid in watchlist_ids if pid not in fund_verdicts)
+n_missing_ca = sum(1 for pid in watchlist_ids if pid not in ca_verdicts)
+n_total_missing = n_missing_sc + n_missing_cg + n_missing_fund + n_missing_ca
 
-# Timestamps
-latest_sc_ts = max((v.created_at for v in sc_verdicts.values() if v and hasattr(v, 'created_at') and v.created_at), default=None)
-latest_fund_ts = max((v.created_at for v in fund_verdicts.values() if v and hasattr(v, 'created_at') and v.created_at), default=None)
-sc_ts_str = t("watchlist_checker.ts_last_run").format(ts=latest_sc_ts.strftime('%d.%m. %H:%M')) if latest_sc_ts else t("watchlist_checker.ts_never")
-fund_ts_str = t("watchlist_checker.ts_last_run").format(ts=latest_fund_ts.strftime('%d.%m. %H:%M')) if latest_fund_ts else t("watchlist_checker.ts_never")
+# Post-run success toast (set by cockpit button, shown after st.rerun())
+if cockpit_msg := st.session_state.pop("_cockpit_done_msg", None):
+    st.success(cockpit_msg)
+if cockpit_errors := st.session_state.pop("_cockpit_errors", None):
+    for _err in cockpit_errors:
+        st.error(f"❌ {_err}")
 
-# Info-Meldungen
-if n_missing_sc_cg > 0:
-    st.info(t("watchlist_checker.pending_story_info").format(n=n_missing_sc_cg, total=len(watchlist_ids), ts=sc_ts_str))
-if n_missing_fund > 0:
-    st.info(t("watchlist_checker.pending_fund_info").format(n=n_missing_fund, total=len(watchlist_ids), ts=fund_ts_str))
+# ─────────────────────────────────────────────────────────────────────
+# Section 1: Status-Matrix (NEU, FEAT-40)
+# ─────────────────────────────────────────────────────────────────────
 
-# Checkboxen für Pre-Checks
-run_sc_cg_checks = st.checkbox(
-    t("watchlist_checker.run_story_checkbox"),
-    value=False,
-    key="_wc_run_sc_cg",
-    disabled=n_missing_sc_cg == 0,
+st.subheader(t("watchlist_checker.cockpit_section"))
+
+# Build matrix
+matrix_rows = []
+for pos in watchlist:
+    if not pos.id:
+        continue
+    wc_fit = _wc_fits.get(pos.id)
+    matrix_rows.append({
+        "name": pos.name,
+        "ticker": pos.ticker or "—",
+        "sc": _fmt_verdict(sc_verdicts.get(pos.id), "storychecker"),
+        "fa": _fmt_verdict(fund_verdicts.get(pos.id), "fundamental_analyzer"),
+        "cg": _fmt_verdict(cg_verdicts.get(pos.id), "consensus_gap"),
+        "ca": _fmt_verdict(ca_verdicts.get(pos.id), "capital_allocator"),
+        "wc": (_fmt_verdict(wc_fit, "watchlist_checker") if wc_fit else "⚪ —"),
+    })
+
+_matrix_selection = st.dataframe(
+    pd.DataFrame(matrix_rows),
+    use_container_width=True,
+    hide_index=True,
+    on_select="rerun",
+    selection_mode="single-row",
+    column_config={
+        "name": st.column_config.TextColumn("Position", width="medium"),
+        "ticker": st.column_config.TextColumn("Ticker", width="small"),
+        "sc": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_sc"), width="medium"),
+        "fa": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_fa"), width="medium"),
+        "cg": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_cg"), width="medium"),
+        "ca": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_ca"), width="medium"),
+        "wc": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_wc"), width="medium"),
+    },
 )
-run_fund_checks = st.checkbox(
-    t("watchlist_checker.run_fund_checkbox"),
-    value=False,
-    key="_wc_run_fund",
-    disabled=n_missing_fund == 0,
-)
+
+# Delete dialog for selected position
+@st.dialog(t("watchlist_checker.delete_confirm_title"))
+def _show_delete_dialog(pos_id: int, pos_name: str) -> None:
+    st.warning(t("watchlist_checker.delete_confirm_warning").format(name=pos_name))
+    col_yes, col_no = st.columns(2)
+    if col_yes.button(t("watchlist_checker.delete_confirm_yes"), type="primary", use_container_width=True):
+        get_positions_repo().delete(pos_id)
+        st.toast(t("watchlist_checker.delete_done"), icon="🗑️")
+        st.rerun()
+    if col_no.button(t("watchlist_checker.delete_confirm_no"), use_container_width=True):
+        st.rerun()
+
+
+if del_pending := st.session_state.pop("_wc_delete_pending", None):
+    _show_delete_dialog(del_pending["id"], del_pending["name"])
+
+# Navigation für ausgewählte Zeile
+_selected_rows = _matrix_selection.selection.rows if _matrix_selection.selection else []
+_valid_positions = [p for p in watchlist if p.id]
+if _selected_rows and _selected_rows[0] < len(_valid_positions):
+    _sel_pos = _valid_positions[_selected_rows[0]]
+    _nav_col1, _nav_col2, _nav_spacer = st.columns([1, 1, 3])
+    with _nav_col1:
+        if st.button(t("watchlist_analysis.nav_button"), key="nav_to_wla_btn", use_container_width=True):
+            st.session_state["wla_preselect_pos_id"] = _sel_pos.id
+            st.switch_page("pages/watchlist_analysis.py")
+    with _nav_col2:
+        if st.button(t("watchlist_checker.delete_button"), key="nav_delete_btn", use_container_width=True):
+            st.session_state["_wc_delete_pending"] = {"id": _sel_pos.id, "name": _sel_pos.name}
+            st.rerun()
+
+# One-click button
+if n_total_missing > 0:
+    n_incomplete_positions = sum(
+        1 for pid in watchlist_ids
+        if pid not in sc_verdicts or pid not in cg_verdicts
+        or pid not in fund_verdicts or pid not in ca_verdicts
+    )
+    st.caption(t("watchlist_checker.cockpit_missing_summary").format(
+        n=n_total_missing,
+        positions=n_incomplete_positions,
+    ))
+
+    if st.button(t("watchlist_checker.cockpit_run_all_missing"), key="cockpit_run_all_btn"):
+        _lang = current_language()
+        total_done = 0
+        _errors: list[str] = []
+
+        def _run_job(target, positions, spinner_text, label, *extra_args):
+            _job = {"running": True, "done": False, "count": 0, "error": None, "logs": []}
+            threading.Thread(target=target, args=(positions, _lang, _job, config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY) + extra_args, daemon=True).start()
+            with st.spinner(spinner_text):
+                while _job["running"]:
+                    time.sleep(1)
+            if _job["error"]:
+                _errors.append(f"{label}: {_job['error']}")
+                return 0
+            return _job["count"]
+
+        if n_missing_sc > 0:
+            _missing_sc = [p for p in watchlist if p.id and p.id not in sc_verdicts]
+            total_done += _run_job(_run_storychecker_job, _missing_sc,
+                t("watchlist_checker.running_story_spinner").format(n=len(_missing_sc)), "Story Checker")
+
+        if n_missing_cg > 0:
+            _missing_cg = [p for p in watchlist if p.id and p.id not in cg_verdicts]
+            total_done += _run_job(_run_consensus_gap_job, _missing_cg,
+                t("watchlist_checker.running_consensus_spinner").format(n=len(_missing_cg)), "Konsens-Lücken")
+
+        if n_missing_fund > 0:
+            _missing_fa = [p for p in watchlist if p.id and p.id not in fund_verdicts]
+            total_done += _run_job(_run_fundamental_job, _missing_fa,
+                t("watchlist_checker.running_fund_spinner").format(n=len(_missing_fa)), "Fundamental")
+
+        if n_missing_ca > 0:
+            _missing_ca = [p for p in watchlist if p.id and p.id not in ca_verdicts]
+            total_done += _run_job(_run_capital_allocator_job, _missing_ca,
+                t("capital_allocator.running_spinner").format(n=len(_missing_ca)), "Capital Allocator")
+
+        if _errors:
+            st.session_state["_cockpit_errors"] = _errors
+        st.session_state["_cockpit_done_msg"] = t("watchlist_checker.cockpit_done").format(n=total_done)
+        st.rerun()
+else:
+    st.success(t("watchlist_checker.cockpit_all_complete"))
+
+# ─────────────────────────────────────────────────────────────────────
+# Section 2: Watchlist prüfen (Main WatchlistCheckerAgent, Ollama)
+# ─────────────────────────────────────────────────────────────────────
+
+st.divider()
+st.subheader(t("watchlist_checker.check_section"))
+cloud_notice(agent.model, provider="ollama")
 
 if st.button(t("watchlist_checker.run_button"), key="check_watchlist_btn"):
     _lang = current_language()
 
-    # Pre-Check 1: Story + Konsens (blocking, nur offene)
-    if run_sc_cg_checks and n_missing_sc_cg > 0:
-        _missing_sc_cg = [p for p in watchlist if p.id and (p.id not in sc_verdicts or p.id not in cg_verdicts)]
-        _job = {"running": True, "done": False, "count": 0, "error": None, "logs": []}
-        agents_to_run = ["storychecker", "consensus_gap"]
-        threading.Thread(
-            target=_run_storychecker_consensus_job,
-            args=(_missing_sc_cg, agents_to_run, _lang, _job,
-                  config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY),
-            daemon=True,
-        ).start()
-        with st.spinner(t("watchlist_checker.running_story_spinner").format(n=len(_missing_sc_cg))):
-            while _job["running"]:
-                time.sleep(1)
-        if _job["error"]:
-            st.error(f"❌ {_job['error']}")
-        else:
-            st.success(t("watchlist_checker.story_checks_done").format(n=_job['count']))
-
-    # Pre-Check 2: Fundamental (blocking, nur offene)
-    if run_fund_checks and n_missing_fund > 0:
-        _missing_fund = [p for p in watchlist if p.id and p.id not in fund_verdicts]
-        _fund_job = {"running": True, "done": False, "count": 0, "error": None, "logs": []}
-        threading.Thread(
-            target=_run_fundamental_job,
-            args=(_missing_fund, _lang, _fund_job,
-                  config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY),
-            daemon=True,
-        ).start()
-        with st.spinner(t("watchlist_checker.running_fund_spinner").format(n=len(_missing_fund))):
-            while _fund_job["running"]:
-                time.sleep(1)
-        if _fund_job["error"]:
-            st.error(f"❌ {_fund_job['error']}")
-        else:
-            st.success(t("watchlist_checker.fund_checks_done").format(n=_fund_job['count']))
-
-    # Hauptcheck
     with st.spinner(t("watchlist_checker.checking_spinner")):
-        # Build complete context (analog to Portfolio Story)
-        # Use anonymized allocation snapshot (no private values/quantities)
         from collections import Counter
         portfolio = _portfolio_service.get_portfolio_positions()
 
-        # Portfolio allocation snapshot (anonymized - no values)
         portfolio_snapshot = "## Portfolio Allocation (Josef's Regel)\n"
         if portfolio:
             counts = Counter(p.asset_class for p in portfolio if p.asset_class)
@@ -428,7 +624,6 @@ if st.button(t("watchlist_checker.run_button"), key="check_watchlist_btn"):
         else:
             portfolio_snapshot += t("watchlist_checker.empty_portfolio") + "\n"
 
-        # Complete story analysis context with full_text
         story_analysis_text = None
         story_analysis = portfolio_story_repo.get_latest_analysis()
         if story_analysis:
@@ -442,7 +637,6 @@ Full Analysis:
 {story_analysis.full_text}
 """
 
-        # Run check
         try:
             result = asyncio.run(
                 agent.check_watchlist(
@@ -453,7 +647,6 @@ Full Analysis:
                     language=_lang,
                 )
             )
-
             st.success(t("watchlist_checker.check_done"))
             st.session_state["_watchlist_check_result"] = result
 
@@ -461,50 +654,13 @@ Full Analysis:
             st.error(t("watchlist_checker.error").format(error=str(e)))
 
 # ─────────────────────────────────────────────────────────────────────
-# Section 2: Display Results (persistent from DB)
+# Section 3: Ergebnisse
 # ─────────────────────────────────────────────────────────────────────
 
-from dataclasses import dataclass as _dataclass
-
-@_dataclass
-class _DisplayFit:
-    """Normalized fit object for display."""
-    position_id: int
-    verdict: str
-    summary: str
-
-
-def _normalize_result(result):
-    """Convert WatchlistCheckerAnalysis or WatchlistCheckResult to normalized form."""
-    # If it has position_fits directly (fresh from agent), return as-is
-    if hasattr(result, 'position_fits') and result.position_fits:
-        return result, result.position_fits
-
-    # If it has position_fits_json (from DB), deserialize
-    if hasattr(result, 'position_fits_json') and result.position_fits_json:
-        try:
-            fits_data = json.loads(result.position_fits_json)
-            position_fits = [_DisplayFit(**fit) for fit in fits_data]
-            return result, position_fits
-        except Exception as e:
-            logger.warning(f"Failed to deserialize position_fits_json: {e}")
-            return result, []
-
-    return result, []
-
-
-wc_repo = get_watchlist_checker_repo()
-
-# Try to load from session_state first, else from DB
+# Load result from session_state or DB
 if not st.session_state.get("_watchlist_check_result"):
-    latest_analysis = wc_repo.get_latest_analysis()
-    if latest_analysis:
-        # Reconstruct result from DB (for display purposes)
-        st.session_state["_watchlist_check_result"] = latest_analysis
-    else:
-        latest_analysis = None
-else:
-    latest_analysis = st.session_state.get("_watchlist_check_result")
+    if _latest_wc_result:
+        st.session_state["_watchlist_check_result"] = _latest_wc_result
 
 if st.session_state.get("_watchlist_check_result"):
     st.divider()
@@ -513,15 +669,10 @@ if st.session_state.get("_watchlist_check_result"):
     result = st.session_state["_watchlist_check_result"]
     result, position_fits = _normalize_result(result)
 
-    # Summary shown via AI comment below (not redundant with verdict counts)
-
-    # Parse fit_counts if stored in DB (JSON string)
+    # Fit-counts summary
     if hasattr(result, 'fit_counts'):
         try:
-            if isinstance(result.fit_counts, str):
-                fit_counts = json.loads(result.fit_counts)
-            else:
-                fit_counts = result.fit_counts or {}
+            fit_counts = json.loads(result.fit_counts) if isinstance(result.fit_counts, str) else (result.fit_counts or {})
         except (json.JSONDecodeError, ValueError):
             fit_counts = {
                 "sehr_passend": sum(1 for f in position_fits if f.verdict == "sehr_passend"),
@@ -539,93 +690,34 @@ if st.session_state.get("_watchlist_check_result"):
 
     _wc_config = VERDICT_CONFIGS["watchlist_checker"]
     st.markdown(
-        f"{verdict_icon('sehr_passend', _wc_config)} {t('watchlist_checker.very_fitting')}: {fit_counts.get('sehr_passend', 0)} | "
-        f"{verdict_icon('passend', _wc_config)} {t('watchlist_checker.fitting')}: {fit_counts.get('passend', 0)} | "
-        f"{verdict_icon('neutral', _wc_config)} {t('watchlist_checker.neutral')}: {fit_counts.get('neutral', 0)} | "
-        f"{verdict_icon('nicht_passend', _wc_config)} {t('watchlist_checker.not_fitting')}: {fit_counts.get('nicht_passend', 0)}"
+        f"{verdict_icon('sehr_passend', _wc_config)} {t('watchlist_checker.very_fitting')} {fit_counts.get('sehr_passend', 0)} | "
+        f"{verdict_icon('passend', _wc_config)} {t('watchlist_checker.fitting')} {fit_counts.get('passend', 0)} | "
+        f"{verdict_icon('neutral', _wc_config)} {t('watchlist_checker.neutral')} {fit_counts.get('neutral', 0)} | "
+        f"{verdict_icon('nicht_passend', _wc_config)} {t('watchlist_checker.not_fitting')} {fit_counts.get('nicht_passend', 0)}"
     )
 
     st.divider()
     st.markdown(t("watchlist_checker.position_details_header"))
 
-    # Bulk-fetch analyses for all watchlist positions (used in expanders below)
-    _all_fit_ids = [fit.position_id for fit in position_fits if fit.position_id]
-    _bulk_story = _analysis_service.get_verdicts(_all_fit_ids, "storychecker") if _all_fit_ids else {}
-    _bulk_fund = _analysis_service.get_verdicts(_all_fit_ids, "fundamental_analyzer") if _all_fit_ids else {}
-    _bulk_consensus = _analysis_service.get_verdicts(_all_fit_ids, "consensus_gap") if _all_fit_ids else {}
-
-    # Display position fits
+    # Simplified position-fit cards (sub-check details are visible in matrix above)
     for fit in position_fits:
         pos = next((p for p in watchlist if p.id == fit.position_id), None)
         if pos:
             with st.container(border=True):
                 col1, col2 = st.columns([3, 1])
-
                 with col1:
-                    # Verdict emoji
-                    _wc_config = VERDICT_CONFIGS["watchlist_checker"]
                     verdict_emoji = verdict_icon(fit.verdict, _wc_config)
                     st.markdown(f"**{verdict_emoji} {pos.name}** ({pos.ticker})")
                     st.caption(fit.summary)
-
                 with col2:
                     st.metric("Fit", fit.verdict.replace("_", " ").title())
 
-                # Position details (Story, Fundamental Analysis, Consensus Gap)
-                with st.expander(t("watchlist_checker.position_details_label")):
-                    detail_cols = st.columns(3)
-
-                    # Story Analysis (pre-fetched in bulk above)
-                    with detail_cols[0]:
-                        st.caption("**Story Checker**")
-                        latest_story = _bulk_story.get(pos.id) if pos.id in _bulk_story else None
-                        if latest_story and latest_story.verdict:
-                            _sc_config = VERDICT_CONFIGS["storychecker"]
-                            _icon = verdict_icon(latest_story.verdict, _sc_config)
-                            st.markdown(f"{_icon} {latest_story.verdict}")
-                            if latest_story.summary:
-                                st.caption(latest_story.summary)
-                        else:
-                            st.caption(t("watchlist_checker.not_analyzed"))
-
-                    # Fundamental Analysis (pre-fetched in bulk above)
-                    with detail_cols[1]:
-                        st.caption("**Fundamentalwert**")
-                        latest_fund = _bulk_fund.get(pos.id) if pos.id in _bulk_fund else None
-                        if latest_fund and latest_fund.verdict:
-                            verdict = latest_fund.verdict
-                            _fa_config = VERDICT_CONFIGS["fundamental_analyzer"]
-                            _icon = verdict_icon(verdict, _fa_config)
-                            st.markdown(f"{_icon} {verdict or 'unbekannt'}")
-                            if latest_fund.summary:
-                                st.caption(latest_fund.summary)
-                        else:
-                            st.caption("⚪ Noch nicht analysiert")
-
-                    # Consensus Gap (pre-fetched in bulk above)
-                    with detail_cols[2]:
-                        st.caption("**Konsens-Lücke**")
-                        latest_consensus = _bulk_consensus.get(pos.id) if pos.id in _bulk_consensus else None
-                        if latest_consensus and latest_consensus.verdict:
-                            verdict = latest_consensus.verdict
-                            _cg_config = VERDICT_CONFIGS["consensus_gap"]
-                            _icon = verdict_icon(verdict, _cg_config)
-                            st.markdown(f"{_icon} {verdict or 'unbekannt'}")
-                            if latest_consensus.summary:
-                                st.caption(latest_consensus.summary)
-                        else:
-                            st.caption(t("watchlist_checker.not_analyzed"))
-
-    # --- KI-Kommentar (Auto-generated, cached) --
-
-    from core.services.portfolio_comment_service import get_style_by_id
+    # KI-Kommentar
     import hashlib
-
     _comment_style_id = get_app_config_repo().get("comment_style") or "humorvoll"
     _comment_style = get_style_by_id(_comment_style_id)
     comment_service = get_portfolio_comment_service(get_portfolio_comment_model())
 
-    # Cache by context + style hash (regenerate only if input changes)
     full_text = result.full_text if hasattr(result, 'full_text') else ""
     _ctx = f"Watchlist-Check Ergebnis:\n{full_text}"
     _ctx_hash = hashlib.md5((_ctx + _comment_style_id).encode()).hexdigest()
@@ -647,8 +739,6 @@ if st.session_state.get("_watchlist_check_result"):
             st.caption(f"{_comment_style['emoji']} **{_comment_style['name']}**")
             st.markdown(st.session_state["_watchlist_comment"])
 
-    # --- Details (Metadata + Full Analysis) --
-
     st.divider()
     with st.expander(t("watchlist_checker.full_analysis_label")):
         st.caption(t("watchlist_checker.full_llm_label"))
@@ -664,5 +754,5 @@ if st.session_state.get("_watchlist_check_result"):
             with col2:
                 st.metric("Model", latest_run["model"])
             with col3:
-                st.metric("Timestamp", latest_run["created_at"][:10])  # Just date
+                st.metric("Timestamp", latest_run["created_at"][:10])
             st.caption(f"Context: {latest_run['context_summary']}")
