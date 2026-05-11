@@ -7,7 +7,7 @@ import logging
 import os
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional, Callable
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -57,6 +57,8 @@ class PortfolioValuation:
     annual_dividend_eur: Optional[float] = None  # calculated: rate_eur × quantity
     dividend_yield_pct: Optional[float] = None   # from dividend_data or extra_data
     dividend_source: Optional[str] = None        # "yfinance", "festgeld", "anleihe", None
+    purchase_date: Optional[date] = None
+    analysis_excluded: bool = False
 
 
 class MarketDataAgent:
@@ -256,6 +258,8 @@ class MarketDataAgent:
                     annual_dividend_eur=annual_dividend_eur,
                     dividend_yield_pct=dividend_yield_pct,
                     dividend_source=dividend_source,
+                    purchase_date=pos.purchase_date,
+                    analysis_excluded=pos.analysis_excluded,
                 ))
                 continue
 
@@ -344,6 +348,8 @@ class MarketDataAgent:
                 annual_dividend_eur=annual_dividend_eur,
                 dividend_yield_pct=dividend_yield_pct,
                 dividend_source=dividend_source,
+                purchase_date=pos.purchase_date,
+                analysis_excluded=pos.analysis_excluded,
             ))
 
         return valuations

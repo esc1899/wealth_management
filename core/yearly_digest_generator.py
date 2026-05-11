@@ -105,6 +105,10 @@ def generate_yearly_digest(
             l_parts = [f"{r.symbol} {r.delta_pct:+.1f}%" for r in losers if r.contribution_eur < 0]
             if l_parts:
                 lines.append(f"**Schwächste Beiträge:** {', '.join(l_parts)}")
+
+        total_div = sum(r.dividend_contribution_eur for r in attribution_rows)
+        if total_div > 0:
+            lines.append(f"**Geschätzte Dividenden:** +{total_div:,.0f}€ _(aktuelle Jahresdividende, keine tatsächlichen Zahlungen)_")
         lines.append("")
     else:
         lines += ["_Keine historischen Preisdaten für dieses Jahr verfügbar._", ""]

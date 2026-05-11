@@ -57,6 +57,12 @@ with col_refresh:
 
 valuations = agent.get_portfolio_valuation()
 
+_excluded_count = sum(
+    1 for v in valuations
+    if v.in_portfolio and getattr(v, "analysis_excluded", False)
+    and v.current_value_eur and v.current_value_eur > 0
+)
+
 # ------------------------------------------------------------------
 # FEAT-35: Makro-Kontext Chips
 # ------------------------------------------------------------------
@@ -180,6 +186,8 @@ _month_label = f"{_MONTH_NAMES_DE[_sel_month]} {_sel_year}"
 st.subheader(f"📅 Monatsanalyse {_month_label}")
 if _is_current_month:
     st.caption(f"Monat-bisher (MTD) — Vergleich {_MONTH_NAMES_DE[_sel_month]} 1 bis heute")
+if _excluded_count:
+    st.caption(f"ℹ️ {_excluded_count} Position{'en' if _excluded_count != 1 else ''} von der Analyse ausgeschlossen — Gesamtvermögen in der Vermögenshistorie kann abweichen.")
 
 _market_repo = get_market_repo()
 _attribution = compute_monthly_attribution(valuations, _market_repo, _sel_year, _sel_month)
@@ -220,8 +228,9 @@ if _attribution:
 
     # Table
     _table_rows = []
+    _has_dividends_month = any(r.dividend_contribution_eur > 0 for r in _attribution)
     for r in _attribution:
-        _table_rows.append({
+        row = {
             "Symbol": r.symbol,
             "Klasse": t(f"investment_types.{r.investment_type}") if r.investment_type else r.investment_type,
             "Monatsstart (€)": f"{r.start_price_eur:,.2f}" if r.start_price_eur else "—",
@@ -229,9 +238,15 @@ if _attribution:
             "∆ Monat": f"{r.delta_pct:+.1f}%" if r.delta_pct is not None else "—",
             "Gewichtung": f"{r.weight_pct:.1f}%",
             "Beitrag (€)": f"{r.contribution_eur:+,.0f}" if r.contribution_eur != 0 else "0",
-        })
+        }
+        if _has_dividends_month:
+            row["Div. (€)*"] = f"+{r.dividend_contribution_eur:,.0f}" if r.dividend_contribution_eur > 0 else "—"
+        _table_rows.append(row)
     st.dataframe(pd.DataFrame(_table_rows), use_container_width=True, hide_index=True)
-    st.caption("Monatsstart = erster verfügbarer Schlusskurs im Monat aus historical_prices.")
+    _month_captions = ["Monatsstart = erster verfügbarer Schlusskurs im Monat aus historical_prices."]
+    if _has_dividends_month:
+        _month_captions.append("* Div. = geschätzte Dividende (Jahresdividende ÷ 12, aktuelle Rate — keine tatsächlichen Zahlungen).")
+    st.caption(" ".join(_month_captions))
 else:
     st.info(f"Keine historischen Preisdaten für {_month_label} verfügbar. Preishistorie muss geladen sein.")
 
@@ -298,6 +313,8 @@ _year_label = str(_sel_year_val)
 st.subheader(f"📆 Jahresanalyse {_year_label}")
 if _is_current_year:
     st.caption(f"Jahr-bisher (YTD) — Vergleich 1. Januar bis heute")
+if _excluded_count:
+    st.caption(f"ℹ️ {_excluded_count} Position{'en' if _excluded_count != 1 else ''} von der Analyse ausgeschlossen — Gesamtvermögen in der Vermögenshistorie kann abweichen.")
 
 _year_attribution = compute_yearly_attribution(valuations, _market_repo, _sel_year_val)
 
@@ -336,8 +353,9 @@ if _year_attribution:
         st.plotly_chart(_fig_year_attr, use_container_width=True)
 
     _year_table_rows = []
+    _has_dividends_year = any(r.dividend_contribution_eur > 0 for r in _year_attribution)
     for r in _year_attribution:
-        _year_table_rows.append({
+        row = {
             "Symbol": r.symbol,
             "Klasse": t(f"investment_types.{r.investment_type}") if r.investment_type else r.investment_type,
             "Jahresstart (€)": f"{r.start_price_eur:,.2f}" if r.start_price_eur else "—",
@@ -345,9 +363,15 @@ if _year_attribution:
             "∆ Jahr": f"{r.delta_pct:+.1f}%" if r.delta_pct is not None else "—",
             "Gewichtung": f"{r.weight_pct:.1f}%",
             "Beitrag (€)": f"{r.contribution_eur:+,.0f}" if r.contribution_eur != 0 else "0",
-        })
+        }
+        if _has_dividends_year:
+            row["Div. (€)*"] = f"+{r.dividend_contribution_eur:,.0f}" if r.dividend_contribution_eur > 0 else "—"
+        _year_table_rows.append(row)
     st.dataframe(pd.DataFrame(_year_table_rows), use_container_width=True, hide_index=True)
-    st.caption("Jahresstart = erster verfügbarer Schlusskurs im Januar aus historical_prices.")
+    _year_captions = ["Jahresstart = erster verfügbarer Schlusskurs im Januar aus historical_prices."]
+    if _has_dividends_year:
+        _year_captions.append("* Div. = geschätzte Jahresdividende (aktuelle Rate — keine tatsächlichen Zahlungen).")
+    st.caption(" ".join(_year_captions))
 else:
     st.info(f"Keine historischen Preisdaten für {_year_label} verfügbar. Preishistorie muss geladen sein.")
 

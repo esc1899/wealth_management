@@ -31,6 +31,7 @@ class AttributionMonthRow:
     weight_pct: float                  # position weight in portfolio at end of period
     contribution_eur: float            # absolute €-gain/loss (unit-converted)
     contribution_pct: float            # contribution_eur / total_portfolio_start_value * 100
+    dividend_contribution_eur: float = 0.0  # estimated: annual_dividend_eur / 12
 
 
 def compute_monthly_attribution(
@@ -49,9 +50,13 @@ def compute_monthly_attribution(
       unit="g"  → price is EUR/troy_oz, value = (price / 31.1035) * quantity_grams
       otherwise → value = price * quantity
 
+    Purchase-date correction: if a position was bought after the month started,
+    cost_basis_eur replaces the historical start price to avoid distorted returns.
+
     Positions without historical data are included with delta=None, contribution=0.
     """
-    month_start = date(year, month, 1).isoformat()
+    period_start = date(year, month, 1)
+    month_start = period_start.isoformat()
     month_end = date(year, month, calendar.monthrange(year, month)[1]).isoformat()
 
     portfolio_vals = [
@@ -68,20 +73,26 @@ def compute_monthly_attribution(
     # First pass: compute total start value for contribution_pct denominator
     total_start_value = 0.0
     for v in portfolio_vals:
-        start_price = _get_month_start_price(market_repo, v.symbol, month_start, month_end)
-        sv = _to_start_value(start_price, v.quantity, getattr(v, "unit", None))
+        sv = _get_start_value_monthly(market_repo, v, month_start, month_end, period_start)
         if sv:
             total_start_value += sv
 
     # Second pass: build rows
     rows: List[AttributionMonthRow] = []
     for v in portfolio_vals:
-        start_price = _get_month_start_price(market_repo, v.symbol, month_start, month_end)
         unit = getattr(v, "unit", None) or ""
         qty = v.quantity
         end_val = v.current_value_eur   # already correctly unit-converted by market_data_agent
 
-        start_val = _to_start_value(start_price, qty, unit)
+        purchase_date = getattr(v, "purchase_date", None)
+        bought_mid_period = isinstance(purchase_date, date) and purchase_date > period_start
+
+        if bought_mid_period and getattr(v, "cost_basis_eur", None):
+            start_val = v.cost_basis_eur
+            start_price = None
+        else:
+            start_price = _get_month_start_price(market_repo, v.symbol, month_start, month_end)
+            start_val = _to_start_value(start_price, qty, unit)
 
         delta_pct: Optional[float] = None
         contribution_eur = 0.0
@@ -91,6 +102,9 @@ def compute_monthly_attribution(
 
         weight_pct = (v.current_value_eur / total_end_value * 100) if total_end_value > 0 else 0.0
         contribution_pct = (contribution_eur / total_start_value * 100) if total_start_value > 0 else 0.0
+
+        annual_div = getattr(v, "annual_dividend_eur", None)
+        dividend_contribution_eur = (annual_div / 12) if isinstance(annual_div, (int, float)) and annual_div > 0 else 0.0
 
         rows.append(AttributionMonthRow(
             symbol=v.symbol,
@@ -103,10 +117,20 @@ def compute_monthly_attribution(
             weight_pct=weight_pct,
             contribution_eur=contribution_eur,
             contribution_pct=contribution_pct,
+            dividend_contribution_eur=dividend_contribution_eur,
         ))
 
     rows.sort(key=lambda r: r.contribution_eur, reverse=True)
     return rows
+
+
+def _get_start_value_monthly(market_repo, v, month_start: str, month_end: str, period_start: date) -> Optional[float]:
+    """Return start value for a valuation, using cost_basis_eur for mid-period purchases."""
+    purchase_date = getattr(v, "purchase_date", None)
+    if isinstance(purchase_date, date) and purchase_date > period_start:
+        return getattr(v, "cost_basis_eur", None)
+    start_price = _get_month_start_price(market_repo, v.symbol, month_start, month_end)
+    return _to_start_value(start_price, v.quantity, getattr(v, "unit", None))
 
 
 def _to_start_value(

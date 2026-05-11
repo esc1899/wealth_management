@@ -13,7 +13,7 @@ import pytest
 from core.monthly_attribution import compute_monthly_attribution, AttributionMonthRow
 
 
-def _make_valuation(symbol, investment_type="Wertpapiere", current_price=100.0, quantity=10.0, current_value=None, in_portfolio=True, unit="Stk"):
+def _make_valuation(symbol, investment_type="Wertpapiere", current_price=100.0, quantity=10.0, current_value=None, in_portfolio=True, unit="Stk", purchase_date=None, cost_basis_eur=None, annual_dividend_eur=None):
     v = MagicMock()
     v.symbol = symbol
     v.investment_type = investment_type
@@ -23,6 +23,9 @@ def _make_valuation(symbol, investment_type="Wertpapiere", current_price=100.0, 
     v.current_value_eur = current_value if current_value is not None else (current_price * quantity if current_price and quantity else None)
     v.in_portfolio = in_portfolio
     v.analysis_excluded = False
+    v.purchase_date = purchase_date
+    v.cost_basis_eur = cost_basis_eur if cost_basis_eur is not None else (current_price * quantity if current_price and quantity else None)
+    v.annual_dividend_eur = annual_dividend_eur
     return v
 
 
@@ -130,3 +133,53 @@ class TestComputeMonthlyAttribution:
         # contribution = 3100 - 3000 = 100 EUR (not 3100-3000)*31.1035 !)
         assert r.contribution_eur == pytest.approx(100.0, abs=0.01)
         assert r.delta_pct == pytest.approx(100.0 / 3000.0 * 100, abs=0.01)  # ~3.33%
+
+    def test_purchase_mid_month_uses_cost_basis(self):
+        """Position bought on May 15 → cost_basis replaces Jan start price."""
+        vals = [_make_valuation(
+            "NEW",
+            current_price=120.0,
+            quantity=10.0,
+            current_value=1200.0,
+            purchase_date=date(2026, 5, 15),
+            cost_basis_eur=1000.0,
+        )]
+        market_repo = _make_market_repo({"NEW": 50.0})  # wrong historical price — must be ignored
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        assert len(rows) == 1
+        r = rows[0]
+        assert r.contribution_eur == pytest.approx(200.0)   # 1200 - 1000
+        assert r.delta_pct == pytest.approx(20.0)            # 200/1000 * 100
+        assert r.start_price_eur is None                     # no historical price used
+
+    def test_purchase_before_month_uses_historical(self):
+        """Position bought before the month → normal historical lookup."""
+        vals = [_make_valuation(
+            "OLD",
+            current_price=110.0,
+            quantity=10.0,
+            current_value=1100.0,
+            purchase_date=date(2026, 4, 1),
+            cost_basis_eur=800.0,
+        )]
+        market_repo = _make_market_repo({"OLD": 100.0})
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        assert len(rows) == 1
+        r = rows[0]
+        assert r.contribution_eur == pytest.approx(100.0)   # 1100 - 1000 (historical)
+        assert r.start_price_eur == pytest.approx(100.0)
+
+    def test_dividend_contribution_monthly(self):
+        """annual_dividend_eur / 12 is stored in dividend_contribution_eur."""
+        vals = [_make_valuation("DIV", current_price=110.0, quantity=10.0, annual_dividend_eur=120.0)]
+        market_repo = _make_market_repo({"DIV": 100.0})
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        assert len(rows) == 1
+        assert rows[0].dividend_contribution_eur == pytest.approx(10.0)  # 120 / 12
+
+    def test_no_dividend_gives_zero(self):
+        """Positions without dividend data get dividend_contribution_eur = 0."""
+        vals = [_make_valuation("NODIV", current_price=110.0, quantity=10.0, annual_dividend_eur=None)]
+        market_repo = _make_market_repo({"NODIV": 100.0})
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        assert rows[0].dividend_contribution_eur == 0.0
