@@ -8,6 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### FEAT-38/39 — Attribution: Kaufdatum-Korrektur + geschätzte Dividenden — 2026-05-11
+
+**FEAT-38 — Kaufdatum-Korrektur in Monats- und Jahresanalyse**
+- `agents/market_data_agent.py`: `analysis_excluded: bool = False` + `purchase_date: Optional[date]` zu `PortfolioValuation` ergänzt; beide `valuations.append()`-Aufrufe (manual + ticker) befüllen die neuen Felder aus `pos`
+- Bisheriger Bug: `analysis_excluded` war nie in `PortfolioValuation` übertragen worden → `getattr(v, "analysis_excluded", False)` gab immer `False` zurück → ausgeschlossene Positionen wurden trotzdem in Attribution einbezogen
+- `core/monthly_attribution.py` / `core/yearly_attribution.py`: neuer `_get_start_value_*()` Helper — wenn `purchase_date > period_start` (isinstance-Guard gegen MagicMock), wird `cost_basis_eur` statt historischem Startpreis verwendet
+- `pages/analyse.py`: `_excluded_count` zählt Positionen mit `analysis_excluded=True`; Caption-Hinweis unter Monats- und Jahresanalyse-Subheader wenn `_excluded_count > 0`
+
+**FEAT-39 — Geschätzte Dividenden in Attribution**
+- `core/monthly_attribution.py`: `dividend_contribution_eur: float = 0.0` in `AttributionMonthRow` — befüllt mit `annual_dividend_eur / 12` (isinstance-Guard: nur `int/float`, kein MagicMock)
+- `core/yearly_attribution.py`: `dividend_contribution_eur: float = 0.0` in `AttributionYearRow` — befüllt mit vollem `annual_dividend_eur`
+- `pages/analyse.py`: Spalte `"Div. (€)*"` erscheint nur wenn mindestens eine Position Dividendendaten hat; Fußnote erklärt Schätzungscharakter
+- `core/monthly_digest_generator.py` / `core/yearly_digest_generator.py`: Zeile `**Geschätzte Dividenden:** +X€` in Performance-Sektion wenn `total_div > 0`
+
+**Fix: Scheduler — MarketDataAgent Import + always-previous-period Logik**
+- `core/scheduler.py`: fehlender `from agents.market_data_agent import MarketDataAgent` in beiden Digest-Job-Funktionen (latenter NameError)
+- Vereinfachte Zeitraum-Logik: `run_day==1 and today.day<=3`-Heuristik entfernt → Job läuft immer am 1., generiert immer Vormonat/Vorjahr
+
+**Tests:** 730 gesamt (alle grün) — 4 neue Tests in `test_monthly_attribution.py` + `test_yearly_attribution.py` (Dividende vorhanden/nicht vorhanden)
+
 ### FEAT-37 — Jahresanalyse Block auf der Analyse-Seite — 2026-05-10
 
 **Jahresanalyse — exakt analog zur Monatsanalyse, unter dem Monatsdigest**
