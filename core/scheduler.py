@@ -472,6 +472,7 @@ class AgentSchedulerService:
         digest_repo = MonthlyDigestRepository(conn)
 
         from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
+        from agents.market_data_agent import MarketDataAgent
         fetcher = MarketDataFetcher(rate_limiter=RateLimiter(calls_per_second=1))
         market_data_agent = MarketDataAgent(
             positions_repo=positions_repo,
@@ -483,16 +484,11 @@ class AgentSchedulerService:
         valuations = market_data_agent.get_portfolio_valuation()
 
         today = dateobj.today()
-        # If job is scheduled on day 1 (monthly close-of-month digest), use the previous month.
-        # Otherwise (e.g. last day of month), use the current month.
-        if job.run_day == 1 and today.day <= 3:
-            # Running on/near 1st of month → generate previous month's digest
-            if today.month == 1:
-                year, month = today.year - 1, 12
-            else:
-                year, month = today.year, today.month - 1
+        # Always summarise the closed (previous) month — this job runs on day 1.
+        if today.month == 1:
+            year, month = today.year - 1, 12
         else:
-            year, month = today.year, today.month
+            year, month = today.year, today.month - 1
         month_key = f"{year:04d}-{month:02d}"
 
         body = generate_monthly_digest(
@@ -525,6 +521,7 @@ class AgentSchedulerService:
         monthly_digest_repo = MonthlyDigestRepository(conn)
 
         from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
+        from agents.market_data_agent import MarketDataAgent
         fetcher = MarketDataFetcher(rate_limiter=RateLimiter(calls_per_second=1))
         market_data_agent = MarketDataAgent(
             positions_repo=positions_repo,
@@ -536,11 +533,8 @@ class AgentSchedulerService:
         valuations = market_data_agent.get_portfolio_valuation()
 
         today = dateobj.today()
-        # If job is scheduled on Jan 1 (yearly close digest), use the previous year.
-        if job.run_month == 1 and job.run_day == 1 and today.month == 1 and today.day <= 3:
-            target_year = today.year - 1
-        else:
-            target_year = today.year
+        # Always summarise the closed (previous) year — this job runs on Jan 1.
+        target_year = today.year - 1
         year_key = str(target_year)
 
         body = generate_yearly_digest(
