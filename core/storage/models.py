@@ -387,6 +387,28 @@ class ConsensusGapMessage(BaseModel):
     created_at: datetime
 
 
+class CapitalAllocatorSession(BaseModel):
+    """A capital allocator quality analysis session."""
+
+    id: Optional[int] = None
+    position_id: int
+    ticker: Optional[str] = None
+    position_name: str
+    skill_name: str
+    created_at: datetime
+    verdict: Optional[str] = None
+
+
+class CapitalAllocatorMessage(BaseModel):
+    """A single message in a capital allocator session."""
+
+    id: Optional[int] = None
+    session_id: int
+    role: str       # 'user' or 'assistant'
+    content: str
+    created_at: datetime
+
+
 # ---------------------------------------------------------------------------
 # News model
 # ---------------------------------------------------------------------------

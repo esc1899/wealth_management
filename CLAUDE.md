@@ -30,6 +30,19 @@ kill $(pgrep -f "streamlit run") && streamlit run app.py
 
 ---
 
+## Reference Implementations
+
+When building new components, use these as canonical examples:
+
+| What to build | Reference file |
+|---|---|
+| Cloud agent — batch only (no chat) | `agents/consensus_gap_agent.py` |
+| Cloud agent — session-based chat + batch | `agents/fundamental_analyzer_agent.py` |
+| Local Ollama agent | `agents/watchlist_checker_agent.py` |
+| Repository (sessions + messages tables) | `core/storage/fundamental_analyzer.py` |
+| Analysis page (batch + inline history) | `pages/consensus_gap.py` |
+| Chat page (session nav + multi-turn) | `pages/fundamental_analyzer.py` |
+
 ## State Layer — 5-Module DI Factory
 
 `state.py` is a re-export facade. All singletons live in the four implementation modules:
@@ -37,9 +50,9 @@ kill $(pgrep -f "streamlit run") && streamlit run app.py
 | Module | Responsibility |
 |---|---|
 | `state_db.py` | `get_db_connection()` — one SQLite connection + runs `migrate_db()` once at startup |
-| `state_repos.py` | 18 `@st.cache_resource` repository singletons |
-| `state_agents.py` | 14 `@st.cache_resource` agent singletons |
-| `state_services.py` | 5 service singletons (AnalysisService, PortfolioService, …) |
+| `state_repos.py` | `@st.cache_resource` repository singletons |
+| `state_agents.py` | `@st.cache_resource` agent singletons |
+| `state_services.py` | Service singletons (AnalysisService, PortfolioService, …) |
 
 Pages always import from `state`, never from `state_agents` / `state_repos` directly.
 
@@ -76,7 +89,9 @@ DEMO_MODE=true                # optional — switches DB to data/demo.db
 - Bei `st.markdown()`: kein `unsafe_allow_html=True` ohne explizite Prüfung; keine f-Strings mit User-Daten
 - Alle Abhängigkeiten (requirements.txt) auf bekannte CVEs prüfen bevor sie hinzukommen
 
-**Bisherige Security Reviews:** 2026-04-24 (Red Team, alle HIGH/MEDIUM fixes), 2026-05-09 (Cowork ingest: URL-Injection, Markdown-Injection, Dateigrößen-Limit)
+**Bisherige Security Reviews:** 2026-04-24 (Red Team, alle HIGH/MEDIUM fixes), 2026-05-09 (Cowork ingest: URL-Injection, Markdown-Injection, Dateigrößen-Limit), 2026-05-11 (FEAT-34–39 + Sonnet-Switch: SQL-Injection, Privacy-Boundary, LLM-Prompt-Injection, XSS — alle clean)
+
+**LLM Prompt-Injection via Web Search**: Sonnet ist fähiger als Haiku und folgt komplexeren Anweisungen. Malicious web pages, die von SearchAgent/NewsAgent/StructuralChangeAgent indexiert werden, könnten versuchen, Instruktionen in die LLM-Antwort zu injizieren. Mitigation: Cloud-Agents haben keinen Schreibzugriff auf die DB (außer news_repo/analyses_repo) und sehen keine Private-Daten. Risiko ist begrenzt, aber bei neuen Web-Search-Agents auf diesen Vektor prüfen.
 
 ---
 
@@ -91,10 +106,12 @@ Diese Regeln gelten für **jede** Änderung, unabhängig vom Task. Bei Unsicherh
 | Provider | Agents | Darf sehen |
 |---|---|---|
 | **Ollama (lokal 🔒)** | PortfolioAgent, PortfolioStoryAgent, WatchlistCheckerAgent, MarketDataAgent | Alles — Positionen, Namen, Stories, Zahlen |
-| **Claude API (Cloud ☁️)** | ResearchAgent, NewsAgent, SearchAgent, StorycheckerAgent, ConsensusGapAgent, StructuralChangeAgent, FundamentalAnalyzerAgent, WealthSnapshotAgent | Nur öffentliche Daten (Ticker, Marktdaten, News) |
+| **Claude API (Cloud ☁️)** | ResearchAgent, NewsAgent, SearchAgent, StorycheckerAgent¹, ConsensusGapAgent, StructuralChangeAgent, FundamentalAnalyzerAgent, WealthSnapshotAgent, **CapitalAllocatorAgent** | Nur öffentliche Daten (Ticker, Marktdaten, News) |
+
+¹ **StorycheckerAgent Ausnahme**: Sendet `position.name` + `position.story` an die Claude API — bewusstes Design, da der Storychecker die Investment-These braucht um sie zu prüfen. Stories verlassen also das lokale System. Das ist ein akzeptierter Privacy-Trade-off, aber keine neue Einführung ohne explizite Zustimmung.
 
 → Neuer Agent mit Portfolio-Zugriff? → **muss Ollama sein**
-→ Neuer Cloud-Agent? → **kein Zugriff auf Positionen/Stories/Namen**
+→ Neuer Cloud-Agent? → **kein Zugriff auf Positionen/Stories/Namen** (außer StorycheckerAgent-Muster mit expliziter Begründung)
 
 ### 2. Zweisprachigkeit (i18n)
 
@@ -104,6 +121,7 @@ Die App ist **Deutsch/Englisch** schaltbar. Gilt für jeden neuen Code:
 - Pages: `current_language()` vor Background-Thread-Spawn captern (session_state nicht thread-safe)
 - Verdict-Codes bleiben **immer Deutsch** (`unterbewertet`, `intact`, `wächst`, …) — das sind DB-Identifier, keine UI-Texte
 - Hardcodierte deutsche UI-Labels sind **technische Schulden**, keine neue einführen
+- Translation-Keys: `translations/de.yaml` + `translations/en.yaml` — Zugriff via `from core.i18n import t; t("section.key")`
 
 ### 3. Session-Persistenz für Chat-Agents
 
@@ -120,9 +138,11 @@ Nie direkt als Plaintext schreiben — immer über das Repository-Layer.
 
 Vor dem ersten Commit prüfen:
 - [ ] Richtiger Provider (Ollama vs. Cloud)? Privacy-Grenze beachtet?
+- [ ] Cloud-Agent: `PublicPosition` statt `Position` verwenden (`core/storage/models.py`)
 - [ ] `language` Parameter vorhanden?
 - [ ] Session-Persistenz (wenn Chat)? DB-Repo erstellt?
 - [ ] `state.py` Factory-Funktion ergänzt?
+- [ ] Verdict-Config in `core/ui/verdicts.py` → `VERDICT_CONFIGS` dict ergänzt?
 - [ ] Tests: Unit + Integration + Page Smoke?
 
 ---

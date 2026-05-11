@@ -176,6 +176,10 @@ with col_s2:
 with col_s3:
     sel_fundamental = _public_sel("fundamental_analyzer", t("settings.agent_fundamental"))
 
+col_s4, _ = st.columns([1, 2])
+with col_s4:
+    sel_capital_allocator = _public_sel("capital_allocator", "Capital Allocator")
+
 if st.button(t("settings.save_models_button"), key="_save_models_btn", use_container_width=False):
     app_config.set("model_ollama_portfolio", sel_portfolio)
     app_config.set("model_ollama_portfolio_story", sel_portfolio_story)
@@ -187,6 +191,7 @@ if st.button(t("settings.save_models_button"), key="_save_models_btn", use_conta
     app_config.set(f"model_{_PUBLIC_TYPE}_structural_scan", sel_structural)
     app_config.set(f"model_{_PUBLIC_TYPE}_consensus_gap", sel_consensus)
     app_config.set(f"model_{_PUBLIC_TYPE}_fundamental_analyzer", sel_fundamental)
+    app_config.set(f"model_{_PUBLIC_TYPE}_capital_allocator", sel_capital_allocator)
     st.cache_resource.clear()
     st.success(t("settings.models_saved"))
 

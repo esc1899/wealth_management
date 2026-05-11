@@ -150,3 +150,15 @@ class TestPageLoadability:
         at = AppTest.from_file("pages/cowork_setup.py")
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
+
+    def test_capital_allocator_page_loads(self):
+        """Capital Allocator page should load without exceptions."""
+        at = AppTest.from_file("pages/capital_allocator.py")
+        at.run()
+        assert not at.exception, f"Page threw exception: {at.exception}"
+
+    def test_watchlist_analysis_page_loads(self):
+        """Watchlist-Analyse page should load without exceptions."""
+        at = AppTest.from_file("pages/watchlist_analysis.py")
+        at.run()
+        assert not at.exception, f"Page threw exception: {at.exception}"

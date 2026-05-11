@@ -81,7 +81,7 @@ sequenceDiagram
 
 ---
 
-## Agent Overview (12 Agents)
+## Agent Overview (13 Agents)
 
 | Agent | Provider | Model | Session Type | Primary Method | Scope |
 |-------|----------|-------|--------------|--------|-------|
@@ -93,14 +93,15 @@ sequenceDiagram
 | **NewsAgent** | Claude | Haiku | Stateless | `analyze_portfolio()` | News digest |
 | **SearchAgent** | Claude | Sonnet | DB-persisted | `start_session()` + `chat()` | Watchlist screening |
 | **StorycheckerAgent** | Claude | Haiku | DB-persisted | `start_session()` + `chat()` + `batch_check_all()` | Thesis validation |
-| **ConsensusGapAgent** | Claude | Sonnet | Stateless | `analyze_portfolio()` | Market vs. thesis gap |
+| **ConsensusGapAgent** | Claude | Sonnet | DB-persisted | `analyze_portfolio()` | Market vs. thesis gap |
 | **StructuralChangeAgent** | Claude | Sonnet | DB-persisted | `scan()` | Structural shifts |
 | **FundamentalAnalyzerAgent** | Claude | Haiku | DB-persisted | `start_session()` + `chat()` + `analyze_portfolio()` | Deep valuation analysis |
+| **CapitalAllocatorAgent** | Claude | Sonnet | DB-persisted | `analyze_portfolio()` | Management capital allocation quality — Watchlist only, on-demand |
 | **WealthSnapshotAgent** | — | — | Stateless | `take_snapshot()` | Portfolio history |
 
 ---
 
-## Storage Layer (13 Repositories)
+## Storage Layer (14 Repositories)
 
 | Repository | Purpose | Tables |
 |---|---|---|
@@ -112,7 +113,9 @@ sequenceDiagram
 | **SearchRepository** | Investment search sessions | `search_sessions`, `search_messages` |
 | **StorycheckerRepository** | Story validation sessions | `storychecker_sessions`, `storychecker_messages` |
 | **FundamentalAnalyzerRepository** | Valuation analysis sessions | `fundamental_analyzer_sessions`, `fundamental_analyzer_messages` |
-| **PositionAnalysesRepository** | Verdicts (storychecker/consensus_gap/fundamental) | `position_analyses` |
+| **ConsensusGapRepository** | Consensus gap sessions | `consensus_gap_sessions`, `consensus_gap_messages` |
+| **CapitalAllocatorRepository** | Capital allocator quality sessions | `capital_allocator_sessions`, `capital_allocator_messages` |
+| **PositionAnalysesRepository** | Verdicts for all checker agents | `position_analyses` |
 | **StructuralScansRepository** | Structural change scan runs | `structural_scan_runs`, `structural_scan_messages` |
 | **WealthSnapshotRepository** | Historical portfolio snapshots | `wealth_snapshots` |
 | **ScheduledJobsRepository** | Periodic agent runs | `scheduled_jobs` |

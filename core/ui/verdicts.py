@@ -41,6 +41,12 @@ VERDICT_CONFIGS: Dict[str, Dict[str, Tuple[str, str]]] = {
         "neutral":  ("🟡", "Neutral"),
         "schwächt": ("🔴", "Schwächt"),
     },
+    "capital_allocator": {
+        "exzellent":  ("🟢", t("capital_allocator.verdict_exzellent")),
+        "solide":     ("🟡", t("capital_allocator.verdict_solide")),
+        "fragwürdig": ("🟠", t("capital_allocator.verdict_fragwuerdig")),
+        "destruktiv": ("🔴", t("capital_allocator.verdict_destruktiv")),
+    },
 }
 
 

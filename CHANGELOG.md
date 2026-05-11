@@ -8,6 +8,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### FEAT-40 — Watchlist Cockpit: Status-Matrix + Watchlist-Analyse — 2026-05-11
+
+**Status-Matrix** (`pages/watchlist_checker.py`):
+- Neue Section 1: `st.dataframe` mit allen Watchlist-Positionen × 5 Checks (Story, Fundamental, Konsens, Allokator, Portfolio-Fit) mit Farb-Icons
+- Zähler "X Checks fehlen bei Y Positionen" mit separaten Countern pro Agent (`n_missing_sc`, `n_missing_cg`, `n_missing_fund`, `n_missing_ca`)
+- Zeilenauswahl → "🔍 Watchlist-Analyse" Button mit Pre-Selection via `wla_preselect_pos_id`
+- "▶️ Alle fehlenden Checks ausführen": 4 getrennte sequentielle Jobs, Fehler überleben `st.rerun()` via `session_state["_cockpit_errors"]`
+
+**Neue Seite: Watchlist-Analyse** (`pages/watchlist_analysis.py`):
+- Analog zu Positionsanalyse, Watchlist-only (löst L'Oréal-Bug: `position_dashboard.py` Portfolio-only → Deeplink zeigte falsche Position)
+- Kursverlauf + SC/CG/FA in 3 Spalten + CA als breite Sektion mit Volltext-Expander
+- Pre-Selection via `wla_preselect_pos_id` aus Watchlist-Matrix
+
+**Settings:** Capital Allocator Modell-Selector ergänzt (fehlte seit FEAT-31)
+
+**3 kritische Background-Job-Bugs behoben** (durch sofortiges `st.rerun()` bisher unsichtbar):
+1. **CG TypeError**: `ConsensusGapAgent()` ohne `cg_repo=ConsensusGapRepository(conn)` → 0 CG-Analysen seit FEAT-26
+2. **FA TypeError**: `FundamentalAnalyzerRepository(get_connection())` — `get_connection()` braucht `db_path` als Pflichtarg → sofortiger Fehler
+3. **SC unnötige Re-Runs**: Cockpit übergab alle CG-fehlenden Positionen auch an SC → 320k+ Token-Verschwendung
+
+**Architektur:** 4 vollständig getrennte Job-Funktionen (`_run_storychecker_job`, `_run_consensus_gap_job`, `_run_fundamental_job`, `_run_capital_allocator_job`), je eigener Spinner + eigenes Fehler-Handling.
+
+**Tests:** 2 neue Smoke-Tests, alle bestehenden grün.
+
+---
+
+### FEAT-31 — Capital Allocator Quality Agent — 2026-05-11
+
+**Neuer Cloud-Agent: CapitalAllocatorAgent** — bewertet die Qualität des Managements als Kapitalallokator. Watchlist-only, on-demand (kein Scheduler).
+
+**3 Analyse-Dimensionen:**
+1. Historische Kapitalallokations-Entscheidungen: Buybacks (zu welchen Kursniveaus?), M&A-Track-Record, Dividendenpolitik
+2. Insider-Ownership + Anreizstrukturen
+3. Kommunikations-Qualität: Guidance-Track-Record, positive/negative Überraschungen
+
+**Verdicts:** `exzellent` / `solide` / `fragwürdig` / `destruktiv`
+
+**Neue Dateien:**
+- `agents/capital_allocator_agent.py` — Agent (Sonnet + web_search, semaphore(3), submit_ca_verdict Tool)
+- `core/storage/capital_allocator.py` — Repository (sessions + messages)
+- DB-Schema: `capital_allocator_sessions` + `capital_allocator_messages` (⚠️ Streamlit-Restart erforderlich)
+
+**Watchlist Checker Integration (`pages/watchlist_checker.py`):**
+- 3. Pre-Check-Checkbox "Kapitalallokator-Qualität prüfen"
+- `_run_capital_allocator_job()` Background-Thread (analog FA-Job)
+- 4. Spalte im Position-Details-Expander (SC / FA / CG / CA)
+- `WatchlistCheckerAgent` erhält CA-Verdict als weiteren Input
+
+**Tests:** 18 neue Tests, 748 gesamt (alle grün, 70% Coverage)
+
+---
+
 ### FEAT-38/39 — Attribution: Kaufdatum-Korrektur + geschätzte Dividenden — 2026-05-11
 
 **FEAT-38 — Kaufdatum-Korrektur in Monats- und Jahresanalyse**

@@ -49,7 +49,7 @@ BASE_SYSTEM_PROMPT = """Du bist ein kritischer Portfolio-Analyst der bewertet, w
 Du erhältst:
 - Snapshot des aktuellen Portfolios (Josef's Regel, Holdings, Werte)
 - Portfolio Story und Ausrichtung (falls vorhanden)
-- Watchlist-Positionen mit Details und bekannten Verdicts (Storychecker, Fundamental, Consensus Gap)
+- Watchlist-Positionen mit Details und bekannten Verdicts (Storychecker, Fundamental, Consensus Gap, Kapitalallokator)
 
 Deine Aufgabe: Beurteile pro Watchlist-Position ob und wie gut sie ins Portfolio passt.
 Beachte:
@@ -152,7 +152,7 @@ class WatchlistCheckerAgent:
         watchlist_ids = [pos.id for pos in watchlist_positions if pos.id]
         bulk_verdicts = {}
         if watchlist_ids:
-            for agent_name in ["storychecker", "fundamental", "consensus_gap"]:
+            for agent_name in ["storychecker", "fundamental", "consensus_gap", "capital_allocator"]:
                 results = self._analyses.get_latest_bulk(watchlist_ids, agent_name)
                 for pos_id, verdict_obj in results.items():
                     if pos_id not in bulk_verdicts:

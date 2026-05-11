@@ -8,6 +8,7 @@ import streamlit as st
 from config import config
 from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET
 from core.llm.local import OllamaProvider
+from agents.capital_allocator_agent import CapitalAllocatorAgent
 from agents.consensus_gap_agent import ConsensusGapAgent
 from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
 from agents.market_data_agent import MarketDataAgent
@@ -192,6 +193,23 @@ def get_consensus_gap_agent() -> ConsensusGapAgent:
         llm=llm,
         analyses_repo=get_analyses_repo(),
         cg_repo=get_consensus_gap_repo(),
+    )
+
+
+@st.cache_resource
+def get_capital_allocator_repo():
+    from core.storage.capital_allocator import CapitalAllocatorRepository
+    return CapitalAllocatorRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_capital_allocator_agent() -> CapitalAllocatorAgent:
+    model = _get_public_agent_model("capital_allocator", CLAUDE_SONNET)
+    llm = _make_public_provider(model, "capital_allocator")
+    return CapitalAllocatorAgent(
+        llm=llm,
+        analyses_repo=get_analyses_repo(),
+        ca_repo=get_capital_allocator_repo(),
     )
 
 
