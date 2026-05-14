@@ -5,6 +5,7 @@ Centralizes VERDICT_CONFIG, badge rendering, and legend display
 to avoid duplication across pages.
 """
 
+import html
 from typing import Dict, Tuple
 
 import streamlit as st
@@ -52,7 +53,7 @@ VERDICT_CONFIGS: Dict[str, Dict[str, Tuple[str, str]]] = {
 
 def verdict_badge(verdict: str, config: Dict[str, Tuple[str, str]]) -> str:
     """Render verdict as icon + label."""
-    icon, label = config.get(verdict, ("⚪", verdict))
+    icon, label = config.get(verdict, ("⚪", html.escape(verdict)))
     return f"{icon} {label}"
 
 

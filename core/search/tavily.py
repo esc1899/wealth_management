@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import re
 from typing import Optional
+from urllib.parse import urlparse
 
 _logger = logging.getLogger(__name__)
 
@@ -64,10 +65,13 @@ def sanitize_search_result(text: str) -> str:
     return text
 
 
-def search(query: str, api_key: str, max_results: int = 5) -> str:
+def search(query: str, api_key: str, max_results: int = 5, max_content_chars: int = 1500) -> str:
     """
     Execute a Tavily search and return results as a formatted string
     suitable for injection as a tool_result into Claude's context.
+
+    max_content_chars limits each result's content to prevent token overflow when
+    many searches accumulate in a single chat_with_tools call.
     """
     from tavily import TavilyClient  # type: ignore
 
@@ -80,9 +84,13 @@ def search(query: str, api_key: str, max_results: int = 5) -> str:
 
     lines = []
     for r in results:
-        title = r.get("title", "")
-        url = r.get("url", "")
+        title = sanitize_search_result(r.get("title", ""))
+        raw_url = r.get("url", "")
+        parsed = urlparse(raw_url)
+        url = raw_url if parsed.scheme in ("https", "http") else "[URL removed]"
         content = sanitize_search_result(r.get("content", ""))
+        if len(content) > max_content_chars:
+            content = content[:max_content_chars] + "…"
         lines.append(f"**{title}**\n{url}\n{content}")
 
     return "\n\n---\n\n".join(lines)

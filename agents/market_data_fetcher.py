@@ -112,10 +112,13 @@ class MarketDataFetcher:
             if df.empty:
                 return []
 
+            raw_currency = getattr(ticker.fast_info, "currency", None) or ""
+            is_pence = raw_currency == "GBp"
             eur_rate = self._get_eur_rate(self._detect_currency(ticker))
             records = []
             for ts, row in df.iterrows():
-                close_eur = row["Close"] * eur_rate
+                close_price = row["Close"] / 100 if is_pence else row["Close"]
+                close_eur = close_price * eur_rate
                 if close_eur <= 0:
                     continue
                 records.append(

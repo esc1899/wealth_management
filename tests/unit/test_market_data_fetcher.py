@@ -284,15 +284,8 @@ class TestGBXPenceConversion:
         assert abs(results["GBP"] / results["GBp"] - 100.0) < 1.0
 
     @patch("agents.market_data_fetcher.yf.Ticker")
-    def test_historical_gbp_pence_known_limitation(self, mock_ticker_cls):
-        """
-        KNOWN BUG: fetch_historical uses _detect_currency which normalizes 'GBp' to 'GBP'
-        without the /100 pence correction.
-
-        This test documents the known limitation — it currently fails,
-        which alerts developers that historical prices for pence-denominated
-        stocks are 100x inflated. TODO: apply pence correction in historical path.
-        """
+    def test_historical_gbp_pence_conversion(self, mock_ticker_cls):
+        """fetch_historical must divide GBp (pence) prices by 100 before EUR conversion."""
         import pandas as pd
         ticker = MagicMock()
         ticker.fast_info.currency = "GBp"  # UK pence stock
@@ -305,7 +298,7 @@ class TestGBXPenceConversion:
         def side_effect(symbol):
             if symbol == "LLOY.L":
                 return ticker
-            # FX ticker for GBP
+            # FX ticker for GBP→EUR
             fx = MagicMock()
             fx.fast_info.last_price = 1.17
             fx.fast_info.currency = "EUR"
@@ -316,6 +309,5 @@ class TestGBXPenceConversion:
         history = fetcher.fetch_historical("LLOY.L")
 
         assert len(history) == 1
-        # BUG: historical price is NOT divided by 100 — it's 5000p * 1.17 = €5850
-        # instead of the correct 50 * 1.17 = €58.50. This test documents the bug.
-        assert history[0].close_eur > 1000  # inflated value documents the bug exists
+        # 5000p → £50 → £50 * 1.17 EUR/GBP = €58.50
+        assert abs(history[0].close_eur - 58.5) < 0.01

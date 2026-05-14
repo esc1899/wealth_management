@@ -160,7 +160,6 @@ def get_structural_change_agent() -> StructuralChangeAgent:
 
 
 @st.cache_resource
-@st.cache_resource
 def get_fundamental_analyzer_repo():
     from core.storage.fundamental_analyzer import FundamentalAnalyzerRepository
     return FundamentalAnalyzerRepository(get_db_connection())

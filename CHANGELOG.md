@@ -8,6 +8,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Security + Tech-Debt Fixes (SEC-2, SEC-3, DEBT-21, DEBT-22) — 2026-05-14
+
+**SEC-2 — Prompt Injection: tavily.py title + URL sanitisiert**
+- `title` wird jetzt ebenfalls durch `sanitize_search_result()` gefiltert (vorher nur `content`)
+- `url` wird auf `https://`/`http://`-Protokoll geprüft — alles andere → `[URL removed]`
+- Datei: `core/search/tavily.py`
+
+**SEC-3 — XSS in verdict_badge Fallback**
+- `verdict_badge()` escaped jetzt den rohen LLM-Verdict-String via `html.escape()` im Fallback-Pfad (wenn verdict nicht im config-Dict → kein ungefiltertes HTML in `unsafe_allow_html`)
+- Datei: `core/ui/verdicts.py`
+
+**DEBT-21 — Doppeltes `@st.cache_resource` entfernt**
+- `get_fundamental_analyzer_repo()` in `state_agents.py` hatte zwei aufeinanderfolgende `@st.cache_resource`-Dekoratoren — einer entfernt
+
+**DEBT-22 — GBp Pence Conversion Bug in `fetch_historical()` gefixt**
+- `_detect_currency()` normalisiert "GBp" → "GBP" (korrekt für FX-Rate-Lookup), aber historische Close-Preise von yfinance sind in Pence, nicht Pfund → 100× zu hohe EUR-Werte für UK-Aktien
+- Fix: Raw-Currency vor Normalisierung prüfen; wenn `"GBp"`, Close-Preise durch 100 teilen (analog zu `_fetch_single()`)
+- Test: `test_historical_gbp_pence_conversion` — vorheriger "known limitation"-Test durch echte Assertion ersetzt
+- Datei: `agents/market_data_fetcher.py`
+
+---
+
+### Refactoring — Cost-Alert Feature entfernt + Scheduler-Verbesserungen — 2026-05-14
+
+**Cost-Alert Feature vollständig entfernt:**
+- `core/cost_alert.py` gelöscht
+- `app.py`: Sidebar-Integration entfernt
+- `core/storage/app_config.py`: `get_cost_alert()`, `set_cost_alert()` entfernt
+- `core/storage/usage.py`: `avg_cost_per_position()`, `monthly_estimate()` entfernt
+- `pages/settings.py`: Cost-Alert-Settings-UI entfernt
+- `pages/statistics.py`: Cost-Alert-UI entfernt
+- `translations/de.yaml` + `en.yaml`: alle `cost_alert_*`, `monthly_*`, `alert_*` Keys entfernt
+- `tests/unit/test_cost_tracking.py`: `monthly_estimate`-Tests entfernt
+
+**Scheduler: `_previous_scheduled_fire_time()` static method** (`core/scheduler.py`)
+- Extrahiert die letzte geplante Ausführungszeit eines Jobs (monthly/yearly) — sauberere Catchup-Logik
+- Tests: `tests/unit/test_scheduler_catchup.py` erweitert
+
+**FundamentalAnalyzerAgent:** `web_search max_uses` 5 → 3 reduziert (Kostensenkung, ausreichend für die meisten Queries)
+
+---
+
 ### FEAT-40 — Watchlist Cockpit: Status-Matrix + Watchlist-Analyse — 2026-05-11
 
 **Status-Matrix** (`pages/watchlist_checker.py`):
