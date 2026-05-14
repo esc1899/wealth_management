@@ -83,7 +83,7 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 
 | ID | Priority | Description | Notes |
 |---|---|---|---|
-| SEC-1 | P1 | **Path Traversal in cowork_inbox.py** — `_write_status_to_file()` liest `entry.file_path` aus DB ohne zu prüfen ob der Pfad innerhalb des erwarteten Inbox-Verzeichnisses liegt. Fix: `path.resolve().is_relative_to(expected_inbox_dir)` Guard einbauen. | file_path kommt aus Watcher (kein direkter User-Input), aber Containment fehlt |
+| SEC-1 | P1 | **Path Traversal in cowork_inbox.py** — `_write_status_to_file()` liest `entry.file_path` aus DB ohne zu prüfen ob der Pfad innerhalb des erwarteten Inbox-Verzeichnisses liegt. Fix: `path.resolve().is_relative_to(expected_inbox_dir)` Guard einbauen. | ✅ DONE 2026-05-14 |
 | SEC-2 | P1 | **Prompt Injection — tavily.py title/url nicht sanitisiert** — Nur `content` der Suchergebnisse wird durch `sanitize_search_result()` geprüft; `title` und `url` werden ungefiltert in den LLM-Context übergeben. Fix: Sanitization auch auf `title` anwenden, URL-Protokoll prüfen (`https://` only). | ✅ DONE 2026-05-14 |
 | SEC-3 | P2 | **XSS in portfolio_story.py** — `verdict_badge()` fällt auf den rohen LLM-String zurück wenn verdict nicht im config-Dict → landet ungefiltert in `unsafe_allow_html=True` Markdown. Fix: `html.escape(verdict)` im Fallback. | ✅ DONE 2026-05-14 |
 
@@ -95,9 +95,9 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 | DEBT-13 | P3 | Tighten requirements.txt version bounds | Low urgency, no known conflicts |
 | DEBT-21 | P1 | **Doppeltes `@st.cache_resource` in state_agents.py:162-163** — `get_fundamental_analyzer_repo()` hat zwei aufeinanderfolgende `@st.cache_resource`-Dekoratoren. Double-wrapping ist ein Fehler und kann zu unerwartetem Caching-Verhalten führen. Fix: eine der beiden Annotationen entfernen. | ✅ DONE 2026-05-14 |
 | DEBT-22 | P1 | **GBp Pence Conversion Bug in fetch_historical()** — `_detect_currency()` macht `.upper()` und konvertiert GBp → GBP, fetcht dann EUR/GBP-Rate. Aber yfinance liefert historische Close-Preise für UK-Pence-Stocks in Pence, nicht Pfund. Ergebnis: `close_eur = pence × EUR/GBP = 100× zu hoch`. Fix: Vor `.upper()` auf `currency == "GBp"` prüfen, historische Closes durch 100 teilen (analog zu `_fetch_single()`). | ✅ DONE 2026-05-14 |
-| DEBT-23 | P2 | **i18n-Violations in cowork_inbox + cowork_setup** — `cowork_inbox.py:71` hat `"Aktie"` hardcoded. `cowork_setup.py` verwendet keine `t()`-Calls, alle Subheaders + Texte sind deutsches Plaintext. Translation-Keys teilweise definiert (`t("cowork.*")`), aber nicht angebunden. | Bekannte Tech-Schuld aus FEAT-32 |
-| DEBT-24 | P2 | **Fehlende Smoke-Tests für 6 neue Pages** — Seit DEBT-10 (April 2026) hinzugekommen: `capital_allocator.py`, `watchlist_analysis.py`, `cowork_inbox.py`, `cowork_setup.py`, `position_dashboard.py`, `scheduler.py`. Keine AppTest-Smoke-Tests. | Analog zu bestehenden Smoke-Tests |
-| DEBT-25 | P3 | **isinstance-Redundanz in Attribution-Code** — `isinstance(purchase_date, date) and purchase_date > period_start` in `monthly_attribution.py` + `yearly_attribution.py`. `purchase_date` ist immer `date \| None`; einfacher: `if purchase_date and purchase_date > period_start`. Kein Bugrisiko, nur Lesbarkeit. | Low Priority, kein Bugrisiko |
+| DEBT-23 | P2 | **i18n-Violations in cowork_inbox + cowork_setup** — `cowork_inbox.py:71` hat `"Aktie"` hardcoded. `cowork_setup.py` verwendet keine `t()`-Calls, alle Subheaders + Texte sind deutsches Plaintext. Translation-Keys teilweise definiert (`t("cowork.*")`), aber nicht angebunden. | ✅ DONE 2026-05-14 |
+| DEBT-24 | P2 | **Fehlende Smoke-Tests für 6 neue Pages** — Seit DEBT-10 (April 2026) hinzugekommen: `capital_allocator.py`, `watchlist_analysis.py`, `cowork_inbox.py`, `cowork_setup.py`, `position_dashboard.py`, `scheduler.py`. Keine AppTest-Smoke-Tests. | ✅ DONE 2026-05-14 |
+| DEBT-25 | P3 | **isinstance-Redundanz in Attribution-Code** — `isinstance(purchase_date, date) and purchase_date > period_start` in `monthly_attribution.py` + `yearly_attribution.py`. `purchase_date` ist immer `date \| None`; einfacher: `if purchase_date and purchase_date > period_start`. Kein Bugrisiko, nur Lesbarkeit. | ✅ DONE 2026-05-14 |
 
 ---
 
