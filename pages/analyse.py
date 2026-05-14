@@ -138,14 +138,28 @@ if day_rows:
     df_day = pd.DataFrame(day_rows).sort_values(col_day_eur)
     total_day = df_day[col_day_eur].sum()
     total_sign = "+" if total_day >= 0 else ""
-    st.caption(f"**Gesamt heute: {total_sign}{symbol()}{total_day:,.2f}**".replace(",", "X").replace(".", ",").replace("X", "."))
+    _total_prev = sum(
+        (v.current_value_eur - v.day_pnl_eur)
+        for v in valuations
+        if v.day_pnl_eur is not None and v.current_value_eur is not None
+    )
+    _day_pct_str = f"{total_day / _total_prev * 100:+.2f}% " if _total_prev else ""
+    st.caption(
+        f"**Gesamt heute: {_day_pct_str}({total_sign}{symbol()}{total_day:,.2f})**"
+        .replace(",", "X").replace(".", ",").replace("X", ".")
+    )
 
     fig_day = px.bar(
         df_day, x="Symbol", y=col_day_eur,
         color=col_day_eur,
         color_continuous_scale=["red", "lightgrey", "green"],
         color_continuous_midpoint=0,
-        text=df_day[col_day_pct].apply(lambda x: f"{x:+.2f}%" if x is not None else ""),
+        text=[
+            f"{row[col_day_pct]:+.2f}% ({'+' if row[col_day_eur] >= 0 else ''}{symbol()}{row[col_day_eur]:,.0f})"
+            .replace(",", "X").replace(".", ",").replace("X", ".")
+            if row[col_day_pct] is not None else ""
+            for _, row in df_day.iterrows()
+        ],
     )
     fig_day.update_traces(textposition="outside")
     fig_day.update_layout(coloraxis_showscale=False, margin=dict(t=20))
