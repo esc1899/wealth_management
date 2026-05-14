@@ -52,38 +52,36 @@ news_repo = get_news_repo()
 
 
 def _render_checker_card(title: str, verdict_obj, config, full_text_fn):
-    """Render a single checker card: badge + summary + details expander."""
-    if verdict_obj is None:
-        st.markdown(f"**{title}**")
-        st.markdown(
-            "_:gray[Noch nicht analysiert]_",
-            help="Kein Verdict vorhanden. Führen Sie eine Analyse auf der Seite des Checkers durch.",
-        )
-        return
+    """Render a full-width analysis card: badge + summary + details expander."""
+    with st.container():
+        if verdict_obj is None:
+            st.markdown(f"**{title}**")
+            st.markdown(
+                "_:gray[Noch nicht analysiert]_",
+                help="Kein Verdict vorhanden. Führen Sie eine Analyse auf der Seite des Checkers durch.",
+            )
+            return
 
-    # Header: title + badge
-    badge = verdict_badge(verdict_obj.verdict, config)
-    st.markdown(f"**{title}** {badge}")
+        badge = verdict_badge(verdict_obj.verdict, config)
+        title_col, date_col = st.columns([5, 1])
+        with title_col:
+            st.markdown(f"**{title}** {badge}")
+        with date_col:
+            if verdict_obj.created_at:
+                st.caption(verdict_obj.created_at.strftime("%d. %b %Y"))
 
-    # Metadata
-    if verdict_obj.created_at:
-        date_str = verdict_obj.created_at.strftime("%d. %b %Y")
-        st.caption(f"{date_str}")
+        if verdict_obj.summary:
+            st.markdown(f"_{verdict_obj.summary}_")
 
-    # Summary
-    if verdict_obj.summary:
-        st.markdown(f"_{verdict_obj.summary}_")
+        full_text = None
+        try:
+            full_text = full_text_fn()
+        except Exception as e:
+            st.warning(f"Could not retrieve full text: {e}")
 
-    # Full-text expander
-    full_text = None
-    try:
-        full_text = full_text_fn()
-    except Exception as e:
-        st.warning(f"Could not retrieve full text: {e}")
-
-    if full_text:
-        with st.expander("▼ Vollständige Analyse"):
-            st.markdown(full_text)
+        if full_text:
+            with st.expander("▼ Vollständige Analyse"):
+                st.markdown(full_text)
 
 
 def _render_confluence_score(sc_v, cg_v, fa_v) -> None:
@@ -284,38 +282,37 @@ _render_confluence_score(sc_verdict, cg_verdict, fa_verdict)
 
 st.write("")
 
-# Render 3 checker cards in columns
-col1, col2, col3 = st.columns(3)
+# Render 3 checker cards vertically (full-width)
+_render_checker_card(
+    "Storychecker",
+    sc_verdict,
+    VERDICT_CONFIGS["storychecker"],
+    lambda: sc_agent.get_messages(sc_verdict.session_id)[-1].content
+    if sc_verdict and sc_verdict.session_id
+    else None,
+)
 
-with col1:
-    _render_checker_card(
-        "Storychecker",
-        sc_verdict,
-        VERDICT_CONFIGS["storychecker"],
-        lambda: sc_agent.get_messages(sc_verdict.session_id)[-1].content
-        if sc_verdict and sc_verdict.session_id
-        else None,
-    )
+st.write("")
 
-with col2:
-    _render_checker_card(
-        "Consensus Gap",
-        cg_verdict,
-        VERDICT_CONFIGS["consensus_gap"],
-        lambda: cg_agent.get_messages(cg_verdict.session_id)[-1].content
-        if cg_verdict and cg_verdict.session_id
-        else None,
-    )
+_render_checker_card(
+    "Consensus Gap",
+    cg_verdict,
+    VERDICT_CONFIGS["consensus_gap"],
+    lambda: cg_agent.get_messages(cg_verdict.session_id)[-1].content
+    if cg_verdict and cg_verdict.session_id
+    else None,
+)
 
-with col3:
-    _render_checker_card(
-        "Fundamental Analyzer",
-        fa_verdict,
-        VERDICT_CONFIGS["fundamental_analyzer"],
-        lambda: fa_agent.get_messages(fa_verdict.session_id)[-1].content
-        if fa_verdict and fa_verdict.session_id
-        else None,
-    )
+st.write("")
+
+_render_checker_card(
+    "Fundamental Analyzer",
+    fa_verdict,
+    VERDICT_CONFIGS["fundamental_analyzer"],
+    lambda: fa_agent.get_messages(fa_verdict.session_id)[-1].content
+    if fa_verdict and fa_verdict.session_id
+    else None,
+)
 
 st.divider()
 

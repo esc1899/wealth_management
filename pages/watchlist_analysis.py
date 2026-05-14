@@ -104,27 +104,32 @@ if selected_position.ticker:
 # ------------------------------------------------------------------
 
 def _render_checker_card(title: str, verdict_obj, config, full_text_fn):
-    if verdict_obj is None:
-        st.markdown(f"**{title}**")
-        st.markdown("_:gray[Noch nicht analysiert]_")
-        return
+    with st.container():
+        if verdict_obj is None:
+            st.markdown(f"**{title}**")
+            st.markdown("_:gray[Noch nicht analysiert]_")
+            return
 
-    badge = verdict_badge(verdict_obj.verdict, config)
-    st.markdown(f"**{title}** {badge}")
-    if verdict_obj.created_at:
-        st.caption(verdict_obj.created_at.strftime("%d. %b %Y"))
-    if verdict_obj.summary:
-        st.markdown(f"_{verdict_obj.summary}_")
+        badge = verdict_badge(verdict_obj.verdict, config)
+        title_col, date_col = st.columns([5, 1])
+        with title_col:
+            st.markdown(f"**{title}** {badge}")
+        with date_col:
+            if verdict_obj.created_at:
+                st.caption(verdict_obj.created_at.strftime("%d. %b %Y"))
 
-    full_text = None
-    try:
-        full_text = full_text_fn()
-    except Exception:
-        pass
+        if verdict_obj.summary:
+            st.markdown(f"_{verdict_obj.summary}_")
 
-    if full_text:
-        with st.expander(t("capital_allocator.full_analysis"), expanded=False):
-            st.markdown(full_text)
+        full_text = None
+        try:
+            full_text = full_text_fn()
+        except Exception:
+            pass
+
+        if full_text:
+            with st.expander(t("capital_allocator.full_analysis"), expanded=False):
+                st.markdown(full_text)
 
 
 # ------------------------------------------------------------------
@@ -146,34 +151,33 @@ fa_agent = get_fundamental_analyzer_agent()
 
 st.subheader(t("watchlist_analysis.checks_header"))
 
-col1, col2, col3 = st.columns(3)
+_render_checker_card(
+    "Storychecker",
+    sc_verdict,
+    VERDICT_CONFIGS["storychecker"],
+    lambda: sc_agent.get_messages(sc_verdict.session_id)[-1].content
+    if sc_verdict and sc_verdict.session_id else None,
+)
 
-with col1:
-    _render_checker_card(
-        "Storychecker",
-        sc_verdict,
-        VERDICT_CONFIGS["storychecker"],
-        lambda: sc_agent.get_messages(sc_verdict.session_id)[-1].content
-        if sc_verdict and sc_verdict.session_id else None,
-    )
+st.write("")
 
-with col2:
-    _render_checker_card(
-        "Consensus Gap",
-        cg_verdict,
-        VERDICT_CONFIGS["consensus_gap"],
-        lambda: cg_agent.get_messages(cg_verdict.session_id)[-1].content
-        if cg_verdict and cg_verdict.session_id else None,
-    )
+_render_checker_card(
+    "Consensus Gap",
+    cg_verdict,
+    VERDICT_CONFIGS["consensus_gap"],
+    lambda: cg_agent.get_messages(cg_verdict.session_id)[-1].content
+    if cg_verdict and cg_verdict.session_id else None,
+)
 
-with col3:
-    _render_checker_card(
-        "Fundamental Analyzer",
-        fa_verdict,
-        VERDICT_CONFIGS["fundamental_analyzer"],
-        lambda: fa_agent.get_messages(fa_verdict.session_id)[-1].content
-        if fa_verdict and fa_verdict.session_id else None,
-    )
+st.write("")
+
+_render_checker_card(
+    "Fundamental Analyzer",
+    fa_verdict,
+    VERDICT_CONFIGS["fundamental_analyzer"],
+    lambda: fa_agent.get_messages(fa_verdict.session_id)[-1].content
+    if fa_verdict and fa_verdict.session_id else None,
+)
 
 st.divider()
 
