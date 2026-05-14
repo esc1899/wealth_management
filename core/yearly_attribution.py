@@ -74,7 +74,7 @@ def compute_yearly_attribution(
         end_val = v.current_value_eur
 
         purchase_date = getattr(v, "purchase_date", None)
-        bought_mid_period = isinstance(purchase_date, date) and purchase_date > period_start
+        bought_mid_period = purchase_date is not None and purchase_date > period_start
 
         if bought_mid_period and getattr(v, "cost_basis_eur", None):
             start_val = v.cost_basis_eur
@@ -93,7 +93,7 @@ def compute_yearly_attribution(
         contribution_pct = (contribution_eur / total_start_value * 100) if total_start_value > 0 else 0.0
 
         annual_div = getattr(v, "annual_dividend_eur", None)
-        dividend_contribution_eur = annual_div if isinstance(annual_div, (int, float)) and annual_div > 0 else 0.0
+        dividend_contribution_eur = annual_div if annual_div is not None and annual_div > 0 else 0.0
 
         rows.append(AttributionYearRow(
             symbol=v.symbol,
@@ -116,7 +116,7 @@ def compute_yearly_attribution(
 def _get_start_value_yearly(market_repo, v, year_start: str, year_end: str, period_start: date) -> Optional[float]:
     """Return start value for a valuation, using cost_basis_eur for mid-period purchases."""
     purchase_date = getattr(v, "purchase_date", None)
-    if isinstance(purchase_date, date) and purchase_date > period_start:
+    if purchase_date is not None and purchase_date > period_start:
         return getattr(v, "cost_basis_eur", None)
     start_price = _get_year_start_price(market_repo, v.symbol, year_start, year_end)
     return _to_start_value(start_price, v.quantity, getattr(v, "unit", None))

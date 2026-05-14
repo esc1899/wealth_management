@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 
 import streamlit as st
 
+from config import config
 from core.i18n import t
 from core.storage.cowork import ResearchEntry, WatchlistSuggestion
 from core.storage.models import Position
@@ -39,6 +40,7 @@ def _write_status_to_file(entry: ResearchEntry, new_status: str) -> None:
     """Atomically update the 'status' field in the .md frontmatter."""
     if not entry.file_path:
         return
+    allowed_root = Path(config.COWORK_OUTBOX_PATH).expanduser().resolve()
     path = Path(entry.file_path)
     if not path.exists():
         # File was archived — try outbox/archive/filename.md
@@ -47,6 +49,8 @@ def _write_status_to_file(entry: ResearchEntry, new_status: str) -> None:
             path = archive_path
         else:
             return
+    if not path.resolve().is_relative_to(allowed_root):
+        return
     try:
         with open(path, encoding="utf-8") as f:
             content = f.read()
@@ -110,16 +114,14 @@ def _render_proposal_panel(entry: ResearchEntry, candidates: list[WatchlistSugge
     importable = [c for c in pending if (c.ticker.upper(), (c.exchange or "").upper()) not in existing_tickers]
     already_present = [c for c in pending if (c.ticker.upper(), (c.exchange or "").upper()) in existing_tickers]
 
-    st.subheader(f"📋 Watchlist-Vorschläge ({len(pending)})")
-    st.caption(
-        "KI-Empfehlungen aus dem Research — wähle aus, welche du zur Watchlist hinzufügen möchtest:"
-    )
+    st.subheader(t("cowork.proposals_header").format(n=len(pending)))
+    st.caption(t("cowork.proposals_caption"))
 
     for cand in already_present:
         conviction_icon = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(cand.conviction, "⚪")
         st.markdown(
             f"✅ ~~**{cand.ticker}** · {cand.name} · `{cand.exchange}` "
-            f"{conviction_icon} {cand.conviction.title()}~~ · *bereits in Watchlist*"
+            f"{conviction_icon} {cand.conviction.title()}~~ · *{t('cowork.already_in_watchlist')}*"
         )
 
     for cand in importable:
@@ -139,19 +141,19 @@ def _render_proposal_panel(entry: ResearchEntry, candidates: list[WatchlistSugge
         price_parts = []
         if cand.price_at_research:
             curr = cand.currency or ""
-            price_parts.append(f"Kurs: {cand.price_at_research} {curr}".strip())
+            price_parts.append(f"{t('cowork.price_label')}: {cand.price_at_research} {curr}".strip())
         if cand.target_price:
             curr = cand.currency or ""
-            price_parts.append(f"Ziel: {cand.target_price} {curr}".strip())
+            price_parts.append(f"{t('cowork.target_label')}: {cand.target_price} {curr}".strip())
         if price_parts:
             st.caption(" → ".join(price_parts))
         if cand.triggers:
-            st.caption("Trigger: " + " · ".join(cand.triggers))
+            st.caption(t("cowork.trigger_label") + ": " + " · ".join(cand.triggers))
 
     st.divider()
     col_btn, col_skip = st.columns([2, 1])
     with col_btn:
-        if st.button("✅ Zur Watchlist hinzufügen", type="primary", key=f"confirm_{entry.id}",
+        if st.button(t("cowork.add_to_watchlist_btn"), type="primary", key=f"confirm_{entry.id}",
                      use_container_width=True):
             existing_tickers = {
                 (p.ticker.upper(), (p.extra_data or {}).get("exchange", "").upper())
@@ -179,13 +181,12 @@ def _render_proposal_panel(entry: ResearchEntry, candidates: list[WatchlistSugge
                     if saved.story and saved.id:
                         saved_positions.append(saved)
                 except Exception as exc:
-                    st.error(f"Fehler bei {cand.ticker}: {exc}")
+                    st.error(t("cowork.add_error").format(ticker=cand.ticker, error=exc))
                     error_count += 1
-            # Run storychecker after all positions are added to avoid mid-loop rerenders
             for saved in saved_positions:
                 try:
                     from state import get_storychecker_agent
-                    with st.spinner(f"Storychecker für {saved.ticker} läuft…"):
+                    with st.spinner(t("cowork.storychecker_running").format(ticker=saved.ticker)):
                         get_storychecker_agent().start_session(position=saved)
                 except Exception:
                     pass
@@ -194,19 +195,19 @@ def _render_proposal_panel(entry: ResearchEntry, candidates: list[WatchlistSugge
                 _write_status_to_file(entry, "imported")
                 parts = []
                 if added_count:
-                    parts.append(f"{added_count} Position(en) hinzugefügt")
+                    parts.append(t("cowork.added_positions").format(n=added_count))
                 if skipped_count:
-                    parts.append(f"{skipped_count} bereits in Watchlist")
-                st.toast("✅ " + (", ".join(parts) or "Keine Auswahl") + ".", icon="✅")
+                    parts.append(t("cowork.already_in_watchlist_count").format(n=skipped_count))
+                st.toast("✅ " + (", ".join(parts) or t("cowork.no_selection")) + ".", icon="✅")
                 st.rerun()
             else:
-                st.warning(f"⚠️ {error_count} Fehler — Fehlermeldung oben prüfen. Bitte erneut versuchen.")
+                st.warning(t("cowork.add_errors_warning").format(n=error_count))
     with col_skip:
-        if st.button("⏭ Alle überspringen", key=f"skip_all_{entry.id}", use_container_width=True):
+        if st.button(t("cowork.skip_all_btn"), key=f"skip_all_{entry.id}", use_container_width=True):
             for cand in pending:
                 cowork_repo.update_suggestion_status(cand.id, "rejected")
             cowork_repo.update_status(entry.id, "imported")
-            st.toast("⏭ Alle Kandidaten übersprungen.")
+            st.toast(t("cowork.skip_all_toast"))
             st.rerun()
 
 
@@ -214,7 +215,7 @@ def _render_imported_candidates(candidates: list[WatchlistSuggestion]) -> None:
     """Read-only view of already-reviewed candidates."""
     if not candidates:
         return
-    st.subheader(f"📋 Kandidaten ({len(candidates)})")
+    st.subheader(t("cowork.candidates_header").format(n=len(candidates)))
     for cand in candidates:
         status_icon = {"accepted": "✅", "rejected": "❌", "pending": "⏳"}.get(cand.status, "•")
         conviction_icon = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(cand.conviction, "⚪")
@@ -261,12 +262,13 @@ def _render_entry_detail(entry: ResearchEntry) -> None:
         if entry.primary_ticker.upper() not in candidate_tickers:
             col_warn, col_btn = st.columns([3, 1])
             col_warn.warning(
-                f"⚠️ **{entry.primary_ticker}** ({entry.primary_name or 'Primary'}) "
-                "ist nicht in den Watchlist-Kandidaten — die KI hat den Hauptkandidaten "
-                "weggelassen (gegen Regel 11 des System Prompts)."
+                t("cowork.primary_missing_warning").format(
+                    ticker=entry.primary_ticker,
+                    name=entry.primary_name or "Primary",
+                )
             )
             if col_btn.button(
-                f"➕ {entry.primary_ticker} hinzufügen",
+                t("cowork.add_primary_btn").format(ticker=entry.primary_ticker),
                 key=f"add_primary_{entry.id}",
                 use_container_width=True,
             ):
@@ -291,52 +293,47 @@ def _render_entry_detail(entry: ResearchEntry) -> None:
                     for p in positions_repo.get_watchlist() if p.ticker
                 }
                 if dedup_key in existing:
-                    st.toast(f"✅ {entry.primary_ticker} ist bereits in der Watchlist.")
+                    st.toast(t("cowork.primary_already_in_watchlist").format(ticker=entry.primary_ticker))
                 else:
                     try:
                         positions_repo.add(primary_pos)
-                        st.toast(f"✅ {entry.primary_ticker} zur Watchlist hinzugefügt.")
+                        st.toast(t("cowork.primary_added_toast").format(ticker=entry.primary_ticker))
                         st.rerun()
                     except Exception as exc:
-                        st.error(f"Fehler: {exc}")
+                        st.error(t("cowork.error_generic").format(error=exc))
 
     if entry.status == "draft":
-        st.info(
-            "📝 **Draft** — Research noch unvollständig oder Quellen unsicher. "
-            "Die KI hat diese Datei als unfertig markiert. "
-            "Bitte das Claude-Projekt um eine vervollständigte Version "
-            "oder öffne die Datei und ergänze die fehlenden Informationen."
-        )
+        st.info(t("cowork.draft_info"))
     elif entry.status == "ready_for_import":
         st.divider()
         _render_proposal_panel(entry, candidates)
     elif entry.status == "imported":
         st.divider()
         if any(c.status == "pending" for c in candidates):
-            st.warning("⚠️ Einige Kandidaten konnten nicht hinzugefügt werden — bitte erneut versuchen.")
+            st.warning(t("cowork.some_failed_warning"))
             _render_proposal_panel(entry, candidates)
         else:
             _render_imported_candidates(candidates)
     elif entry.status == "failed":
-        st.error(f"**Fehler:** {entry.failure_reason}")
+        st.error(f"{t('cowork.failure_header')} {entry.failure_reason}")
 
     if entry.body_markdown:
         st.divider()
-        with st.expander("📄 Research-Text", expanded=(entry.status == "draft")):
+        with st.expander(t("cowork.body_expander"), expanded=(entry.status == "draft")):
             st.markdown(entry.body_markdown)
 
     if entry.sources:
         st.divider()
-        st.markdown("**Quellen:**")
+        st.markdown(t("cowork.sources_header"))
         for src in entry.sources:
             try:
                 parsed = urlparse(str(src))
                 if parsed.scheme in ("http", "https"):
                     st.markdown(f"- [{src}]({src})")
                 else:
-                    st.markdown(f"- `{src}` *(ungültiges Protokoll)*")
+                    st.markdown(f"- `{src}` {t('cowork.invalid_protocol')}")
             except Exception:
-                st.markdown(f"- `{src}` *(ungültige URL)*")
+                st.markdown(f"- `{src}` {t('cowork.invalid_url')}")
 
 
 # ---------------------------------------------------------------------------
@@ -344,28 +341,23 @@ def _render_entry_detail(entry: ResearchEntry) -> None:
 # ---------------------------------------------------------------------------
 
 col_title, col_scan = st.columns([5, 1])
-col_title.title(":material/inbox: Research Inbox")
-col_title.caption(
-    "KI-generiertes Research aus dem Cowork-Outbox-Ordner. "
-    "Dateien mit `ready_for_import` erscheinen hier zur Überprüfung. "
-    "Alle Einträge sind **AI Research** — keine Anlageberatung."
-)
-col_title.caption("⚙️ Setup & System Prompt → **Cowork Setup** in der Navigation")
-if col_scan.button("🔄 Jetzt scannen", help="Outbox manuell nach neuen .md-Dateien scannen"):
+col_title.title(f":material/inbox: {t('cowork.page_title')}")
+col_title.caption(t("cowork.page_caption"))
+col_title.caption(t("cowork.setup_link_caption"))
+if col_scan.button(t("cowork.scan_btn"), help=t("cowork.scan_btn_help")):
     watcher = get_cowork_watcher()
     if watcher is not None:
         from core.cowork.importer import CoworkImporter
         from state import get_positions_repo as _gpr
-        from config import config as _cfg
         _importer = watcher._importer
         results = _importer.scan_outbox()
         new_count = sum(1 for r in results if r.action not in ("skipped_duplicate", "skipped_already_imported"))
-        st.toast(f"🔄 Scan abgeschlossen — {new_count} neue Datei(en) verarbeitet.")
+        st.toast(t("cowork.scan_done_toast").format(n=new_count))
         st.rerun()
     else:
-        st.warning("File Watcher ist deaktiviert (`COWORK_WATCH_ENABLED=false`).")
+        st.warning(t("cowork.watcher_disabled"))
 
-tab_inbox, tab_history = st.tabs(["📥 Inbox", "📦 Importiert"])
+tab_inbox, tab_history = st.tabs([t("cowork.tab_inbox"), t("cowork.tab_history")])
 
 # ===========================================================================
 # TAB 1: INBOX — draft + ready_for_import entries
@@ -375,23 +367,31 @@ with tab_inbox:
     col_list, col_detail = st.columns([1, 2], gap="large")
 
     with col_list:
-        st.subheader("Einträge")
+        st.subheader(t("cowork.entries_header"))
+        _filter_keys = ["open", "draft", "ready_for_import", "all"]
+        _filter_labels = {
+            "open": t("cowork.filter_open"),
+            "draft": "draft",
+            "ready_for_import": "ready_for_import",
+            "all": t("cowork.filter_all"),
+        }
         status_filter = st.selectbox(
-            "Filter",
-            ["Offen", "draft", "ready_for_import", "Alle"],
+            t("cowork.filter_label"),
+            _filter_keys,
+            format_func=lambda k: _filter_labels[k],
             key="inbox_status_filter",
         )
-        if status_filter == "Offen":
+        if status_filter == "open":
             entries = cowork_repo.list_entries(status="draft", limit=50) + \
                       cowork_repo.list_entries(status="ready_for_import", limit=50)
             entries.sort(key=lambda e: e.date, reverse=True)
-        elif status_filter == "Alle":
+        elif status_filter == "all":
             entries = cowork_repo.list_entries(limit=100)
         else:
             entries = cowork_repo.list_entries(status=status_filter, limit=100)
 
         if not entries:
-            st.info("Keine Research-Einträge vorhanden.")
+            st.info(t("cowork.no_entries"))
         else:
             for entry in entries:
                 status_icon = {
@@ -409,11 +409,11 @@ with tab_inbox:
     with col_detail:
         selected_id = st.session_state.get("cowork_selected_id")
         if not selected_id:
-            st.info("← Einen Eintrag auswählen.")
+            st.info(t("cowork.select_entry"))
         else:
             entry = cowork_repo.get_entry(selected_id)
             if not entry:
-                st.warning("Eintrag nicht gefunden.")
+                st.warning(t("cowork.entry_not_found"))
             else:
                 _render_entry_detail(entry)
 
@@ -422,19 +422,19 @@ with tab_inbox:
 # ===========================================================================
 
 with tab_history:
-    st.subheader("Importierte Research-Einträge")
+    st.subheader(t("cowork.history_header"))
     imported_entries = cowork_repo.list_entries(status="imported", limit=100)
 
     if not imported_entries:
-        st.info("Noch keine importierten Einträge.")
+        st.info(t("cowork.no_history"))
     else:
         for entry in imported_entries:
             with st.expander(f"✅ {entry.date} — {entry.research_id}", expanded=False):
-                st.caption(f"Modell: {entry.model} · Typ: {entry.type}")
+                st.caption(t("cowork.history_meta").format(model=entry.model, type=entry.type))
                 candidates = cowork_repo.list_suggestions(research_id=entry.research_id)
                 accepted = [c for c in candidates if c.status == "accepted"]
                 rejected = [c for c in candidates if c.status == "rejected"]
                 if accepted:
-                    st.markdown("**Hinzugefügt:** " + ", ".join(f"`{c.ticker}`" for c in accepted))
+                    st.markdown(t("cowork.added_label") + " " + ", ".join(f"`{c.ticker}`" for c in accepted))
                 if rejected:
-                    st.markdown("**Übersprungen:** " + ", ".join(f"`{c.ticker}`" for c in rejected))
+                    st.markdown(t("cowork.skipped_label") + " " + ", ".join(f"`{c.ticker}`" for c in rejected))

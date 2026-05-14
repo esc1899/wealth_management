@@ -78,6 +78,9 @@ def _make_valuation(symbol, current_price=100.0, quantity=10.0, in_portfolio=Tru
     v.current_value_eur = current_price * quantity
     v.in_portfolio = in_portfolio
     v.analysis_excluded = False
+    v.purchase_date = None
+    v.annual_dividend_eur = None
+    v.cost_basis_eur = None
     return v
 
 

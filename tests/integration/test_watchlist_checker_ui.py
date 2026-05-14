@@ -162,3 +162,9 @@ class TestPageLoadability:
         at = AppTest.from_file("pages/watchlist_analysis.py")
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
+
+    def test_scheduler_page_loads(self):
+        """Scheduler page should load without exceptions."""
+        at = AppTest.from_file("pages/scheduler.py")
+        at.run()
+        assert not at.exception, f"Page threw exception: {at.exception}"

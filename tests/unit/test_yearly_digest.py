@@ -75,6 +75,9 @@ class TestGenerateYearlyDigest:
         v.current_price_eur = 110.0
         v.quantity = 10.0
         v.unit = "Stk"
+        v.purchase_date = None
+        v.annual_dividend_eur = None
+        v.cost_basis_eur = None
         return v
 
     def _make_analyses_repo(self):

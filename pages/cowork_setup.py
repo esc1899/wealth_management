@@ -1,7 +1,9 @@
 """
 Cowork Setup — workflow documentation and system prompt for the Cowork Research Inbox.
+
+Intentionally German-only: the system prompt instructs the AI to produce German-language
+output, so translating this setup page would create a confusing mismatch.
 """
-# i18n-TODO: labels are hardcoded German; consistent with cowork_inbox.py convention
 
 from __future__ import annotations
 
