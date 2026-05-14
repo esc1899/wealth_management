@@ -198,8 +198,49 @@ class AgentSchedulerService:
         finally:
             conn.close()
 
-    async def _catchup_missed_jobs(self) -> None:
+    @staticmethod
+    def _previous_scheduled_fire_time(job: "ScheduledJob", now: "datetime") -> Optional["datetime"]:
+        """Return the most recent past datetime when this job was scheduled to fire.
+
+        Used by catchup to determine whether a job already ran for the current period.
+        Returns None for daily jobs (no catchup) or if the fire time can't be computed.
+        """
+        import calendar as _cal
+
+        run_hour = job.run_hour
+        run_minute = job.run_minute
+
+        if job.frequency == "monthly":
+            run_day = job.run_day or 1
+            last_day = _cal.monthrange(now.year, now.month)[1]
+            fire_this = now.replace(day=min(run_day, last_day), hour=run_hour, minute=run_minute, second=0, microsecond=0)
+            if now >= fire_this:
+                return fire_this
+            # Previous month
+            if now.month == 1:
+                py, pm = now.year - 1, 12
+            else:
+                py, pm = now.year, now.month - 1
+            last_day = _cal.monthrange(py, pm)[1]
+            return datetime(py, pm, min(run_day, last_day), run_hour, run_minute)
+
+        elif job.frequency == "yearly":
+            run_month = job.run_month or 1
+            run_day = job.run_day or 1
+            last_day = _cal.monthrange(now.year, run_month)[1]
+            fire_this = datetime(now.year, run_month, min(run_day, last_day), run_hour, run_minute)
+            if now >= fire_this:
+                return fire_this
+            py = now.year - 1
+            last_day = _cal.monthrange(py, run_month)[1]
+            return datetime(py, run_month, min(run_day, last_day), run_hour, run_minute)
+
+        return None  # daily has no catchup; weekly uses time_since logic
+
+    async def _catchup_missed_jobs(self, now: Optional[datetime] = None) -> None:
         """Check if any scheduled jobs are overdue and run them if within grace period."""
+        if now is None:
+            now = datetime.now()
         conn = self._open_conn()
         try:
             jobs_repo = ScheduledJobsRepository(conn)
@@ -207,36 +248,63 @@ class AgentSchedulerService:
             logger.info("Catchup: checking %d enabled jobs", len(enabled_jobs))
 
             for job in enabled_jobs:
-                # Use last_run if available, otherwise use created_at (for newly created jobs)
-                reference_time = job.last_run or job.created_at
-                if not reference_time:
-                    logger.warning("Catchup: job %s has no reference_time, skipping", job.id)
-                    continue  # No reference time at all, skip
+                if job.frequency == "daily":
+                    continue  # No catchup for daily jobs
 
-                now = datetime.now()
-                time_since = now - reference_time
+                # New job (never run) → always run on startup
+                if job.last_run is None:
+                    if not job.created_at:
+                        logger.warning("Catchup: job %s has no reference_time, skipping", job.id)
+                        continue
+                    logger.info("Catchup: new %s job %s (never run), running now", job.frequency, job.id)
+                    try:
+                        await self._execute_job(job.id, source="catchup")
+                    except Exception:
+                        logger.exception("Catchup job %s failed", job.id)
+                    continue
 
-                # Determine grace period based on frequency
-                grace_period = None
-                if job.frequency == "yearly":
-                    grace_period = timedelta(days=30)  # Yearly jobs: catch up within 1 month
-                elif job.frequency == "monthly":
-                    grace_period = timedelta(days=7)  # Monthly jobs: catch up within 1 week
+                if job.frequency in ("monthly", "yearly"):
+                    prev_fire = self._previous_scheduled_fire_time(job, now)
+                    if prev_fire is None:
+                        continue
+
+                    if job.last_run >= prev_fire:
+                        # Already ran for this period — skip
+                        logger.info(
+                            "Catchup: %s job %s already ran since last fire (%s → last_run %s), skipping",
+                            job.frequency, job.id,
+                            prev_fire.strftime("%Y-%m-%d %H:%M"),
+                            job.last_run.strftime("%Y-%m-%d %H:%M"),
+                        )
+                        continue
+
+                    # Missed its fire time — check grace period
+                    grace = timedelta(days=30) if job.frequency == "yearly" else timedelta(days=7)
+                    time_since_fire = now - prev_fire
+                    if time_since_fire <= grace:
+                        logger.info(
+                            "Catchup: %s job %s missed fire at %s (%.1fd ago), running",
+                            job.frequency, job.id, prev_fire.strftime("%Y-%m-%d"), time_since_fire.days,
+                        )
+                        try:
+                            await self._execute_job(job.id, source="catchup")
+                        except Exception:
+                            logger.exception("Catchup job %s failed", job.id)
+                    else:
+                        logger.info(
+                            "Catchup: %s job %s missed fire at %s but outside %dd grace, skipping",
+                            job.frequency, job.id, prev_fire.strftime("%Y-%m-%d"), grace.days,
+                        )
+
                 elif job.frequency == "weekly":
-                    grace_period = timedelta(days=3)  # Weekly jobs: catch up within 3 days
-                # Daily jobs: no catch-up (should run every day)
-
-                logger.info("Catchup: job %s (%s) — age: %.1f hours, grace_period: %s",
-                           job.id, job.agent_name, time_since.total_seconds() / 3600,
-                           f"{grace_period.days}d" if grace_period else "none")
-
-                if grace_period:
-                    # New jobs (never run before) are always caught up immediately
-                    should_catchup = job.last_run is None or time_since > grace_period
-
-                    if should_catchup:
-                        reason = "new job (never run)" if job.last_run is None else f"overdue (grace period: {grace_period.days}d)"
-                        logger.info("Catchup: %s job %s (%s)", job.frequency, job.id, reason)
+                    time_since = now - job.last_run
+                    grace = timedelta(days=3)
+                    logger.info(
+                        "Catchup: weekly job %s — %.1f hours since last run, grace %dd",
+                        job.id, time_since.total_seconds() / 3600, grace.days,
+                    )
+                    if time_since > grace:
+                        logger.info("Catchup: weekly job %s overdue, running", job.id)
                         try:
                             await self._execute_job(job.id, source="catchup")
                         except Exception:

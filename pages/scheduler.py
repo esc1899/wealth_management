@@ -74,6 +74,19 @@ if not any(j.agent_name == "yearly_digest" for j in _all_jobs_for_seed):
     _sched_repo.add(_seed_yearly)
     get_agent_scheduler().reload_jobs()
 
+if not any(j.agent_name == "wealth_snapshot" for j in _all_jobs_for_seed):
+    _seed_snapshot = ScheduledJob(
+        agent_name="wealth_snapshot",
+        skill_name="Vermögens-Snapshot",
+        skill_prompt="",
+        frequency="daily",
+        run_hour=20,
+        run_minute=0,
+        enabled=True,
+    )
+    _sched_repo.add(_seed_snapshot)
+    get_agent_scheduler().reload_jobs()
+
 _SCHEDULABLE_AGENTS = {
     "news": t("settings.agent_news"),
     "structural_scan": t("nav.structural_scan"),
@@ -125,7 +138,11 @@ else:
                     _d = _job.run_day or 1
                     _freq_label += f" ({_d:02d}.{_m:02d}.)"
                 _freq_label += f" {_job.run_hour:02d}:{_job.run_minute:02d}"
-                _job_title = _job.skill_name or _job.agent_name.capitalize()
+                _agent_label = _SCHEDULABLE_AGENTS.get(_job.agent_name, "")
+                if _agent_label and _job.skill_name and _job.skill_name != _agent_label:
+                    _job_title = f"{_agent_label} · {_job.skill_name}"
+                else:
+                    _job_title = _job.skill_name or _agent_label or _job.agent_name.capitalize()
                 if _is_system:
                     _job_title += " ⚙️"
                 st.markdown(f"**{_job_title}**")

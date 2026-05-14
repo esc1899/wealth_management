@@ -88,13 +88,3 @@ class AppConfigRepository:
     def set_model_prices(self, prices: dict) -> None:
         self.set_json("model_prices", prices)
 
-    # ------------------------------------------------------------------
-    # Cost alert limits
-    # ------------------------------------------------------------------
-
-    def get_cost_alert(self) -> dict:
-        """Return {'daily': float, 'monthly': float}. 0 = disabled."""
-        return self.get_json("cost_alert", {"daily": 0.0, "monthly": 0.0})
-
-    def set_cost_alert(self, daily: float, monthly: float) -> None:
-        self.set_json("cost_alert", {"daily": daily, "monthly": monthly})

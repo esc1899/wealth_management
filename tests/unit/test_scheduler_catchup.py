@@ -2,7 +2,7 @@
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import Mock, MagicMock, AsyncMock, patch
+from unittest.mock import Mock, MagicMock, AsyncMock, patch, call
 
 from core.scheduler import AgentSchedulerService
 from core.storage.models import ScheduledJob
@@ -290,6 +290,106 @@ async def test_catchup_skips_recent_weekly_job():
         await scheduler._catchup_missed_jobs()
 
     assert len(execute_job_calls) == 0
+
+
+# ------------------------------------------------------------------
+# Regression: monthly job re-run bug
+# ------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_catchup_skips_monthly_job_already_ran_this_month():
+    """Monthly job that already ran on its scheduled day must NOT run again mid-month.
+
+    Regression: FA ran May 1st at 07:05, app restarts May 13th — must not re-run.
+    Root cause: old logic checked `time_since > 7 days` which is always true for any
+    monthly job that ran more than a week ago.
+    """
+    scheduler = AgentSchedulerService(
+        db_path=":memory:",
+        encryption_key="test-key",
+        anthropic_api_key="test-api",
+        default_claude_model="claude-haiku-4-5-20251001",
+    )
+
+    mock_conn = MagicMock()
+    scheduler._open_conn = Mock(return_value=mock_conn)
+
+    mock_jobs_repo = Mock()
+    job = ScheduledJob(
+        id=7,
+        agent_name="fundamental",
+        skill_name="",
+        skill_prompt="",
+        frequency="monthly",
+        run_day=1,
+        run_hour=7,
+        run_minute=0,
+        enabled=True,
+        last_run=datetime(2026, 5, 1, 7, 5),   # ran on scheduled day
+        created_at=datetime(2026, 1, 1),
+    )
+    mock_jobs_repo.get_enabled.return_value = [job]
+
+    execute_job_calls = []
+
+    async def mock_execute_job(job_id, source="scheduled"):
+        execute_job_calls.append(job_id)
+
+    scheduler._execute_job = mock_execute_job
+
+    fake_now = datetime(2026, 5, 13, 10, 0)
+    with patch("core.scheduler.ScheduledJobsRepository", return_value=mock_jobs_repo):
+        await scheduler._catchup_missed_jobs(now=fake_now)
+
+    assert len(execute_job_calls) == 0, "monthly job already ran this period — must not run again"
+
+
+@pytest.mark.asyncio
+async def test_catchup_runs_monthly_job_that_missed_scheduled_day():
+    """Monthly job not yet run this month (scheduled day already passed) must be caught up.
+
+    Scenario: app was down on May 1st, restarts May 3rd — job must run.
+    """
+    scheduler = AgentSchedulerService(
+        db_path=":memory:",
+        encryption_key="test-key",
+        anthropic_api_key="test-api",
+        default_claude_model="claude-haiku-4-5-20251001",
+    )
+
+    mock_conn = MagicMock()
+    scheduler._open_conn = Mock(return_value=mock_conn)
+
+    mock_jobs_repo = Mock()
+    job = ScheduledJob(
+        id=8,
+        agent_name="fundamental",
+        skill_name="",
+        skill_prompt="",
+        frequency="monthly",
+        run_day=1,
+        run_hour=7,
+        run_minute=0,
+        enabled=True,
+        last_run=datetime(2026, 4, 1, 7, 5),   # ran in PREVIOUS month
+        created_at=datetime(2026, 1, 1),
+    )
+    mock_jobs_repo.get_enabled.return_value = [job]
+
+    execute_job_calls = []
+
+    async def mock_execute_job(job_id, source="scheduled"):
+        execute_job_calls.append(job_id)
+
+    scheduler._execute_job = mock_execute_job
+
+    fake_now = datetime(2026, 5, 3, 10, 0)   # 2 days after scheduled May 1st fire
+    with patch("core.scheduler.ScheduledJobsRepository", return_value=mock_jobs_repo):
+        await scheduler._catchup_missed_jobs(now=fake_now)
+
+    assert len(execute_job_calls) == 1, "job missed May 1st fire — must be caught up"
+    assert execute_job_calls[0] == 8
 
 
 @pytest.mark.asyncio

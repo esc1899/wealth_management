@@ -6,7 +6,6 @@ import sqlite3
 from datetime import datetime, date
 from typing import Optional
 
-from core.constants import CLAUDE_HAIKU
 
 
 class UsageRepository:
@@ -152,113 +151,6 @@ class UsageRepository:
             return 0.0
         avg_web_search = rows["avg_web_search"] or 0
         return _compute_cost(rows["avg_in"], rows["avg_out"], model, model_prices, web_search_requests=avg_web_search)
-
-    def avg_cost_per_position(
-        self,
-        agent: str,
-        model: str,
-        skill: Optional[str],
-        model_prices: dict,
-    ) -> float:
-        """
-        Average cost PER POSITION for a specific agent/model/skill combination.
-
-        Uses position_count from llm_usage table if available (real data).
-        Falls back to avg_cost_per_call if position_count not recorded.
-
-        Returns 0.0 if no data.
-        """
-        skill_filter = "AND skill = ?" if skill else "AND skill IS NULL"
-        params: list = [agent, model]
-        if skill:
-            params.append(skill)
-
-        # First try: get data from calls with position_count recorded
-        rows_with_positions = self._conn.execute(
-            f"""SELECT AVG(input_tokens) AS avg_in,
-                       AVG(output_tokens) AS avg_out,
-                       AVG(CAST(NULLIF(position_count, 0) AS FLOAT)) AS avg_positions,
-                       AVG(web_search_requests) AS avg_web_search
-                FROM llm_usage lu
-                WHERE agent = ? AND model = ? {skill_filter}
-                  AND position_count IS NOT NULL
-                  AND {self._RESET_FILTER}""",
-            params,
-        ).fetchone()
-
-        if rows_with_positions and rows_with_positions["avg_positions"]:
-            avg_web_search = rows_with_positions["avg_web_search"] or 0
-            cost_per_call = _compute_cost(
-                rows_with_positions["avg_in"],
-                rows_with_positions["avg_out"],
-                model,
-                model_prices,
-                web_search_requests=avg_web_search,
-            )
-            return cost_per_call / rows_with_positions["avg_positions"]
-
-        # Fallback: use avg_cost_per_call if no position_count data exists
-        return self.avg_cost_per_call(agent, model, skill, model_prices) / 20
-
-    def monthly_estimate(
-        self,
-        scheduled_jobs: list,
-        model_prices: dict,
-        positions_repo=None,
-    ) -> list[dict]:
-        """
-        Estimate monthly cost per scheduled job based on avg tokens per position.
-
-        scheduled_jobs: list of ScheduledJob instances
-        model_prices:   {"model_id": {"input": float, "output": float}}
-        positions_repo: PositionsRepository for counting relevant positions per job
-
-        Returns list of dicts with agent, skill_name, model, calls_per_month, avg_cost, monthly_cost.
-        """
-        _CALLS_PER_MONTH = {"daily": 30.0, "weekly": 4.33, "monthly": 1.0}
-        result = []
-
-        for job in scheduled_jobs:
-            if not job.enabled:
-                continue
-
-            model = job.model or CLAUDE_HAIKU
-            calls = _CALLS_PER_MONTH.get(job.frequency, 0.0)
-
-            # Count relevant positions for this agent
-            position_count = 1  # fallback: treat as single call if no repo
-            if positions_repo:
-                all_positions = positions_repo.get_portfolio()
-                if job.agent_name == "storychecker":
-                    position_count = len([p for p in all_positions if p.story])
-                elif job.agent_name == "news_digest":
-                    # Positions with ticker and news-eligible asset classes
-                    position_count = len([
-                        p for p in all_positions
-                        if p.ticker and p.asset_class in {"Aktie", "Aktienfonds", "Kryptowährung"}
-                    ])
-                elif job.agent_name in {"consensus_gap", "fundamental"}:
-                    position_count = len(all_positions)
-                elif job.agent_name == "structural_scan":
-                    position_count = len(all_positions)
-
-            # Cost per position (not per call)
-            cost_per_position = self.avg_cost_per_position(
-                job.agent_name, model, job.skill_name, model_prices
-            )
-
-            # Monthly cost = calls × position_count × cost_per_position
-            monthly_total = round(calls * position_count * cost_per_position, 6)
-
-            result.append({
-                "agent": job.agent_name,
-                "skill_name": job.skill_name,
-                "model": model,
-                "calls_per_month": calls,
-                "avg_cost_eur": round(cost_per_position * position_count, 6),
-                "monthly_cost_eur": monthly_total,
-            })
-        return result
 
     def get_recent_calls(self, limit: int = 50) -> list[dict]:
         """Last N LLM calls (newest first), regardless of reset filters."""

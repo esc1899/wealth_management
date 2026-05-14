@@ -1,6 +1,6 @@
 """
 Unit tests for cost tracking:
-- UsageRepository: record(skill), reset(), avg_cost_per_call(), monthly_estimate()
+- UsageRepository: record(skill), reset(), avg_cost_per_call()
 - AppConfigRepository: get_model_prices / set_model_prices
 - LLMProvider: skill_context attribute, 3-arg on_usage callback
 - compute_cost helper
@@ -178,62 +178,6 @@ def test_avg_cost_after_reset(usage_repo):
     usage_repo.reset()
     avg = usage_repo.avg_cost_per_call("news_digest", "claude-haiku-4-5-20251001", None, _PRICES)
     assert avg == 0.0
-
-
-# ---------------------------------------------------------------------------
-# UsageRepository.monthly_estimate
-# ---------------------------------------------------------------------------
-
-def test_monthly_estimate_empty(usage_repo):
-    result = usage_repo.monthly_estimate([], _PRICES)
-    assert result == []
-
-
-def test_monthly_estimate_no_usage_data(usage_repo):
-    job = MagicMock()
-    job.enabled = True
-    job.agent_name = "news_digest"
-    job.skill_name = "Standard"
-    job.model = "claude-haiku-4-5-20251001"
-    job.frequency = "daily"
-    result = usage_repo.monthly_estimate([job], _PRICES)
-    assert len(result) == 1
-    assert result[0]["monthly_cost_eur"] == 0.0
-
-
-def test_monthly_estimate_with_data(usage_repo):
-    # Record with position_count = 20 (20 positions checked in one call)
-    usage_repo.record("news_digest", "claude-haiku-4-5-20251001", 1_000_000, 0, skill="Standard", position_count=20)
-    job = MagicMock()
-    job.enabled = True
-    job.agent_name = "news_digest"
-    job.skill_name = "Standard"
-    job.model = "claude-haiku-4-5-20251001"
-    job.frequency = "daily"
-
-    # Mock positions_repo with 20 positions (news-eligible)
-    positions_repo = MagicMock()
-    pos = MagicMock()
-    pos.ticker = "TEST"
-    pos.asset_class = "Aktie"
-    positions_repo.get_portfolio.return_value = [pos] * 20
-
-    result = usage_repo.monthly_estimate([job], _PRICES, positions_repo)
-    assert len(result) == 1
-    # Cost per position = $1.00 / 20 = $0.05
-    # Monthly = 30 calls × 20 positions × $0.05 = $30.00
-    assert result[0]["monthly_cost_eur"] == pytest.approx(30.00)
-
-
-def test_monthly_estimate_disabled_job_skipped(usage_repo):
-    job = MagicMock()
-    job.enabled = False
-    job.agent_name = "news_digest"
-    job.skill_name = "Standard"
-    job.model = "claude-haiku-4-5-20251001"
-    job.frequency = "daily"
-    result = usage_repo.monthly_estimate([job], _PRICES)
-    assert result == []
 
 
 # ---------------------------------------------------------------------------

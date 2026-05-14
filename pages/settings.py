@@ -259,40 +259,6 @@ if st.button(t("settings.model_prices_save"), key="_save_prices_btn"):
 st.divider()
 
 # ------------------------------------------------------------------
-# Section: Cost alerts
-# ------------------------------------------------------------------
-
-st.subheader(t("settings.cost_alert_header"))
-st.caption(t("settings.cost_alert_caption"))
-
-_current_alert = app_config.get_cost_alert()
-_cal1, _cal2 = st.columns(2)
-_alert_daily = _cal1.number_input(
-    t("settings.cost_alert_daily_label"),
-    value=float(_current_alert.get("daily", 0.0)),
-    min_value=0.0,
-    step=0.5,
-    format="%.2f",
-    help=t("settings.cost_alert_disabled"),
-    key="_alert_daily",
-)
-_alert_monthly = _cal2.number_input(
-    t("settings.cost_alert_monthly_label"),
-    value=float(_current_alert.get("monthly", 0.0)),
-    min_value=0.0,
-    step=1.0,
-    format="%.2f",
-    help=t("settings.cost_alert_disabled"),
-    key="_alert_monthly",
-)
-
-if st.button(t("settings.cost_alert_save"), key="_save_alert_btn"):
-    app_config.set_cost_alert(_alert_daily, _alert_monthly)
-    st.success(t("settings.cost_alert_saved"))
-
-st.divider()
-
-# ------------------------------------------------------------------
 # Section: KI-Kommentarstil
 # ------------------------------------------------------------------
 

@@ -7,10 +7,9 @@ import plotly.express as px
 import streamlit as st
 from datetime import datetime
 
-from core.cost_alert import check_alerts, get_period_costs
 from core.i18n import t
 from core.storage.usage import compute_cost
-from state import get_app_config_repo, get_positions_repo, get_scheduled_jobs_repo, get_usage_repo
+from state import get_app_config_repo, get_usage_repo
 
 st.set_page_config(page_title="Statistics", page_icon="📊", layout="wide")
 st.title(f"📊 {t('statistics.title')}")
@@ -18,26 +17,7 @@ st.caption(t("statistics.subtitle"))
 
 repo = get_usage_repo()
 config_repo = get_app_config_repo()
-positions_repo = get_positions_repo()
 model_prices = config_repo.get_model_prices()
-
-# ------------------------------------------------------------------
-# Cost alerts
-# ------------------------------------------------------------------
-_limits = config_repo.get_cost_alert()
-if _limits.get("daily", 0) > 0 or _limits.get("monthly", 0) > 0:
-    _period_costs = get_period_costs(repo, model_prices)
-    for _alert in check_alerts(_period_costs, _limits):
-        if _alert["period"] == "daily":
-            st.error(
-                t("statistics.alert_daily_exceeded").format(cost=_alert["cost"], limit=_alert["limit"]),
-                icon=":material/warning:",
-            )
-        else:
-            st.error(
-                t("statistics.alert_monthly_exceeded").format(cost=_alert["cost"], limit=_alert["limit"]),
-                icon=":material/warning:",
-            )
 
 # ------------------------------------------------------------------
 # Source filter (applies to both tabs)
@@ -274,38 +254,6 @@ with tab_summary:
         )
         fig2.update_traces(textinfo="label+percent")
         st.plotly_chart(fig2, use_container_width=True)
-
-    # ------------------------------------------------------------------
-    # Monthly cost estimate
-    # ------------------------------------------------------------------
-
-    st.divider()
-    st.subheader(t("statistics.monthly_header"))
-    st.caption(t("statistics.monthly_caption"))
-
-    jobs_repo = get_scheduled_jobs_repo()
-    all_jobs = jobs_repo.get_all()
-    active_jobs = [j for j in all_jobs if j.enabled]
-
-    if not active_jobs:
-        st.info(t("statistics.monthly_no_jobs"))
-    else:
-        monthly_rows = repo.monthly_estimate(active_jobs, model_prices, positions_repo)
-        if monthly_rows:
-            df_monthly = pd.DataFrame(monthly_rows)
-            df_monthly = df_monthly.rename(columns={
-                "agent":             t("statistics.col_agent"),
-                "skill_name":        t("statistics.col_skill"),
-                "model":             t("statistics.col_model"),
-                "calls_per_month":   t("statistics.col_monthly_calls"),
-                "avg_cost_eur":      t("statistics.col_monthly_avg"),
-                "monthly_cost_eur":  t("statistics.col_monthly_total"),
-            })
-            st.dataframe(df_monthly, use_container_width=True, hide_index=True)
-            total_monthly = sum(r["monthly_cost_eur"] for r in monthly_rows)
-            st.metric(t("statistics.monthly_total"), f"${total_monthly:.4f}")
-        else:
-            st.info(t("statistics.monthly_no_jobs"))
 
 # ------------------------------------------------------------------
 # Tab 2: Recent calls

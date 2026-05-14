@@ -34,7 +34,7 @@ _FUND_ASSET_CLASSES = {"Aktienfonds", "Immobilienfonds"}
 # Tools
 # ------------------------------------------------------------------
 
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 5}
+WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 3}
 
 SUBMIT_FA_VERDICT_TOOL = {
     "name": "submit_fa_verdict",
