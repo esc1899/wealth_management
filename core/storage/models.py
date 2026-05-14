@@ -87,6 +87,7 @@ class PriceRecord(BaseModel):
     price_original: float
     exchange_rate: float
     fetched_at: datetime
+    previous_close_eur: Optional[float] = None
 
     @field_validator("symbol")
     @classmethod

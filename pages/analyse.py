@@ -52,7 +52,9 @@ if not st.session_state.analyse_auto_fetched:
 col_title, col_refresh = st.columns([5, 1])
 with col_refresh:
     if st.button(f"🔄 {t('common.refresh')}"):
-        st.session_state.analyse_auto_fetched = False
+        with st.spinner(t("analysis.auto_fetch_notice")):
+            agent.fetch_all_now(fetch_history=True)
+        st.session_state.analyse_auto_fetched = True
         st.rerun()
 
 valuations = agent.get_portfolio_valuation()

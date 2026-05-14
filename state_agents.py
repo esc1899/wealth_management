@@ -69,20 +69,26 @@ def get_portfolio_agent() -> PortfolioAgent:
 
 
 def _safe_take_snapshot() -> None:
-    """Helper: take wealth and dividend snapshots after market fetch, fail silently on errors."""
+    """Helper: take wealth and dividend snapshots after market fetch, fail silently on errors.
+
+    Called from within the fetch background thread — no extra thread needed here.
+    """
     agent = get_wealth_snapshot_agent()
 
-    # Take wealth snapshot (overwrite so new/removed positions are reflected immediately)
     try:
         agent.take_snapshot(is_manual=False, overwrite=True)
     except Exception as e:
         logger.warning("Auto wealth snapshot failed: %s", e)
 
-    # Take dividend snapshot (overwrite so new/removed positions are reflected immediately)
     try:
         agent.take_dividend_snapshot(is_manual=False, overwrite=True)
     except Exception as e:
         logger.warning("Auto dividend snapshot failed: %s", e)
+
+    try:
+        agent.backfill_snapshots(days=14)
+    except Exception as e:
+        logger.warning("Snapshot backfill failed: %s", e)
 
 
 @st.cache_resource

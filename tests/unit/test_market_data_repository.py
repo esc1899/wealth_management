@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 
 import pytest
 
-from core.storage.base import init_db
+from core.storage.base import init_db, migrate_db
 from core.storage.market_data import MarketDataRepository
 from core.storage.models import HistoricalPrice, PriceRecord
 
@@ -17,6 +17,7 @@ def repo():
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     init_db(conn)
+    migrate_db(conn)
     return MarketDataRepository(conn)
 
 
@@ -54,6 +55,25 @@ class TestUpsertPrice:
         repo.upsert_price(make_price("MSFT", 250.0))
         prices = repo.get_all_prices()
         assert len(prices) == 2
+
+    def test_previous_close_eur_stored_and_read_back(self, repo):
+        record = make_price(price_eur=160.0)
+        record = record.model_copy(update={"previous_close_eur": 155.0})
+        repo.upsert_price(record)
+        result = repo.get_price("AAPL")
+        assert result.previous_close_eur == pytest.approx(155.0)
+
+    def test_previous_close_eur_none_by_default(self, repo):
+        repo.upsert_price(make_price())
+        result = repo.get_price("AAPL")
+        assert result.previous_close_eur is None
+
+    def test_previous_close_eur_updated_on_upsert(self, repo):
+        repo.upsert_price(make_price(price_eur=150.0))
+        updated = make_price(price_eur=160.0).model_copy(update={"previous_close_eur": 148.0})
+        repo.upsert_price(updated)
+        result = repo.get_price("AAPL")
+        assert result.previous_close_eur == pytest.approx(148.0)
 
 
 class TestGetPrice:
@@ -143,3 +163,47 @@ class TestGetHistorical:
             repo.upsert_historical(make_history(d=today - timedelta(days=i)))
         history = repo.get_historical("AAPL", days=5)
         assert len(history) == 5
+
+
+class TestGetPrevClose:
+    def test_returns_most_recent_close_before_today(self, repo):
+        from datetime import timedelta
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        day_before = today - timedelta(days=2)
+        repo.upsert_historical(make_history(d=yesterday, close=100.0))
+        repo.upsert_historical(make_history(d=day_before, close=90.0))
+        assert repo.get_prev_close("AAPL") == pytest.approx(100.0)
+
+    def test_excludes_todays_entry(self, repo):
+        from datetime import timedelta
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        repo.upsert_historical(make_history(d=today, close=999.0))
+        repo.upsert_historical(make_history(d=yesterday, close=50.0))
+        assert repo.get_prev_close("AAPL") == pytest.approx(50.0)
+
+    def test_returns_none_when_no_history_before_today(self, repo):
+        repo.upsert_historical(make_history(d=date.today(), close=100.0))
+        assert repo.get_prev_close("AAPL") is None
+
+    def test_returns_none_when_empty(self, repo):
+        assert repo.get_prev_close("AAPL") is None
+
+
+class TestGetPriceForDate:
+    def test_returns_price_for_existing_date(self, repo):
+        repo.upsert_historical(make_history(d=date(2026, 5, 12), close=123.45))
+        result = repo.get_price_for_date("AAPL", "2026-05-12")
+        assert result == pytest.approx(123.45)
+
+    def test_returns_none_for_missing_date(self, repo):
+        repo.upsert_historical(make_history(d=date(2026, 5, 12), close=123.45))
+        assert repo.get_price_for_date("AAPL", "2026-05-13") is None
+
+    def test_returns_none_for_unknown_symbol(self, repo):
+        assert repo.get_price_for_date("UNKNOWN", "2026-05-12") is None
+
+    def test_case_insensitive(self, repo):
+        repo.upsert_historical(make_history(symbol="AAPL", d=date(2026, 5, 12), close=50.0))
+        assert repo.get_price_for_date("aapl", "2026-05-12") == pytest.approx(50.0)

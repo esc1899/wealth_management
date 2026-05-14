@@ -294,8 +294,8 @@ class MarketDataAgent:
             pnl_eur = (current_value - cost_basis) if current_value is not None and cost_basis is not None else None
             pnl_pct = (pnl_eur / cost_basis * 100) if pnl_eur is not None and cost_basis is not None and cost_basis > 0 else None
 
-            # Daily P&L: current price vs. previous historical close
-            prev_close = self._market.get_prev_close(pos.ticker)
+            # Daily P&L: current price vs. previous close fetched alongside current price
+            prev_close = price_record.previous_close_eur if price_record else None
             if current_price is not None and prev_close is not None and pos.quantity is not None:
                 if pos.unit == "g":
                     prev_value = (prev_close / TROY_OZ_TO_G) * pos.quantity
@@ -413,6 +413,7 @@ class MarketDataAgent:
             snap_agent = WealthSnapshotAgent(positions_repo, market_repo, snap_repo, agent, div_repo)
             snap_agent.take_snapshot(is_manual=False, overwrite=False)
             snap_agent.take_dividend_snapshot(is_manual=False, overwrite=False)
+            snap_agent.backfill_snapshots(days=14)
         except ValueError:
             pass  # Snapshot for today already exists — ok
         except Exception:

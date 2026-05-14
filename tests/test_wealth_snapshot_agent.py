@@ -691,3 +691,105 @@ class TestErrorHandling:
         assert len(preview.missing_pos) == 2
         assert "Festgeld 1" in preview.missing_pos
         assert "Immobilie" in preview.missing_pos
+
+
+def _make_position(ticker="AAPL", asset_class="Aktie", quantity=10.0, unit="Stück",
+                   auto_fetch=True, extra_data=None) -> Position:
+    return Position(
+        id=1,
+        name="Test",
+        asset_class=asset_class,
+        investment_type=asset_class,
+        ticker=ticker,
+        quantity=quantity,
+        unit=unit,
+        in_portfolio=True,
+        added_date=date(2026, 1, 1),
+        extra_data=extra_data or {},
+    )
+
+
+class TestBackfillSnapshots:
+    def _make_agent(self, positions, price_map, existing_dates=None):
+        """positions: list[Position], price_map: {date_str: price}, existing_dates: set"""
+        pos_repo = Mock(spec=PositionsRepository)
+        pos_repo.get_portfolio.return_value = positions
+        market_repo = Mock(spec=MarketDataRepository)
+        market_repo.get_price_for_date.side_effect = lambda sym, d: price_map.get(d)
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        wealth_repo.get_by_date.side_effect = lambda d: "exists" if d in (existing_dates or set()) else None
+        wealth_repo.create.return_value = Mock()
+        market_agent = Mock()
+        return WealthSnapshotAgent(
+            positions_repo=pos_repo,
+            market_repo=market_repo,
+            wealth_repo=wealth_repo,
+            market_data_agent=market_agent,
+        ), wealth_repo
+
+    def test_creates_snapshot_for_missing_weekday(self):
+        from datetime import timedelta
+        today = date.today()
+        # Find a recent weekday
+        d = today - timedelta(days=1)
+        while d.weekday() >= 5:
+            d -= timedelta(days=1)
+        price_map = {d.isoformat(): 100.0}
+        pos = _make_position(quantity=5.0)
+        agent, wealth_repo = self._make_agent([pos], price_map)
+        created = agent.backfill_snapshots(days=7)
+        assert created >= 1
+        wealth_repo.create.assert_called()
+
+    def test_skips_existing_snapshot(self):
+        from datetime import timedelta
+        today = date.today()
+        d = today - timedelta(days=1)
+        while d.weekday() >= 5:
+            d -= timedelta(days=1)
+        price_map = {d.isoformat(): 100.0}
+        pos = _make_position(quantity=5.0)
+        agent, wealth_repo = self._make_agent([pos], price_map, existing_dates={d.isoformat()})
+        agent.backfill_snapshots(days=7)
+        wealth_repo.create.assert_not_called()
+
+    def test_skips_weekends(self):
+        from datetime import timedelta
+        # Build a price_map only for weekends in the last 7 days
+        today = date.today()
+        weekend_prices = {}
+        for i in range(1, 8):
+            d = today - timedelta(days=i)
+            if d.weekday() >= 5:
+                weekend_prices[d.isoformat()] = 100.0
+        pos = _make_position(quantity=5.0)
+        agent, wealth_repo = self._make_agent([pos], weekend_prices)
+        agent.backfill_snapshots(days=7)
+        wealth_repo.create.assert_not_called()
+
+    def test_skips_day_with_no_price_data(self):
+        pos = _make_position(quantity=5.0)
+        agent, wealth_repo = self._make_agent([pos], price_map={})  # no prices stored
+        agent.backfill_snapshots(days=7)
+        wealth_repo.create.assert_not_called()
+
+    def test_manual_position_uses_estimated_value(self):
+        from datetime import timedelta
+        today = date.today()
+        d = today - timedelta(days=1)
+        while d.weekday() >= 5:
+            d -= timedelta(days=1)
+        manual_pos = _make_position(
+            ticker=None, asset_class="Immobilie", auto_fetch=False,
+            extra_data={"estimated_value": 250_000.0}
+        )
+        agent, wealth_repo = self._make_agent([manual_pos], price_map={})
+        created = agent.backfill_snapshots(days=3)
+        assert created >= 1
+        call_kwargs = wealth_repo.create.call_args_list[0][1]
+        assert call_kwargs["total_eur"] == pytest.approx(250_000.0)
+
+    def test_returns_zero_for_empty_portfolio(self):
+        agent, wealth_repo = self._make_agent([], price_map={})
+        assert agent.backfill_snapshots(days=7) == 0
+        wealth_repo.create.assert_not_called()

@@ -26,7 +26,7 @@ from agents.portfolio_agent import PortfolioAgent
 from agents.research_agent import ResearchAgent
 from core.encryption import EncryptionService
 from core.llm.local import OllamaResponse, ToolCall
-from core.storage.base import init_db
+from core.storage.base import init_db, migrate_db
 from core.storage.market_data import MarketDataRepository
 from core.storage.models import Position, PriceRecord
 from core.storage.positions import PositionsRepository
@@ -45,6 +45,7 @@ def conn():
     c.execute("PRAGMA journal_mode=WAL")
     c.execute("PRAGMA foreign_keys=ON")
     init_db(c)
+    migrate_db(c)
     return c
 
 

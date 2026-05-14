@@ -368,6 +368,90 @@ class WealthSnapshotAgent:
     # List and access
     # ------------------------------------------------------------------
 
+    def backfill_snapshots(self, days: int = 14) -> int:
+        """
+        Create snapshots for missing trading days using stored historical prices.
+        Uses current positions as approximation (accurate when no trades occurred).
+        Returns number of snapshots created.
+        """
+        from datetime import timedelta
+        from core.currency import is_cash_unit
+
+        TROY_OZ_TO_G = 31.1035
+        today = date.today()
+        positions = self._positions.get_portfolio()
+        if not positions:
+            return 0
+
+        registry = get_asset_class_registry()
+
+        created = 0
+        for days_back in range(1, days + 1):
+            target_date = today - timedelta(days=days_back)
+            if target_date.weekday() >= 5:  # skip weekends
+                continue
+            target_str = target_date.isoformat()
+            if self._wealth.get_by_date(target_str) is not None:
+                continue
+
+            breakdown: Dict[str, float] = {ac: 0.0 for ac in registry.all_names()}
+            total = 0.0
+            missing = []
+
+            for pos in positions:
+                cfg = registry.get(pos.asset_class)
+                is_auto = cfg.auto_fetch if cfg else False
+
+                if not is_auto:
+                    # Manual / non-tradeable: use stored estimated_value
+                    extra = pos.extra_data or {}
+                    est_val = extra.get("estimated_value")
+                    if est_val is not None:
+                        v = float(est_val)
+                        total += v
+                        breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + v
+                    else:
+                        missing.append(pos.name)
+                    continue
+
+                if is_cash_unit(pos.unit) and pos.quantity is not None:
+                    # Cash: quantity IS the EUR value
+                    total += pos.quantity
+                    breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + pos.quantity
+                    continue
+
+                if not pos.ticker or pos.quantity is None:
+                    missing.append(pos.name)
+                    continue
+
+                price = self._market.get_price_for_date(pos.ticker, target_str)
+                if price is None:
+                    missing.append(pos.name)
+                    continue
+
+                value = (price / TROY_OZ_TO_G) * pos.quantity if pos.unit == "g" else price * pos.quantity
+                total += value
+                breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + value
+
+            if total <= 0:
+                continue  # no data for this day (e.g. market holiday with no stored prices)
+
+            coverage = (len(positions) - len(missing)) / len(positions) * 100
+            self._wealth.create(
+                date_str=target_str,
+                total_eur=total,
+                breakdown=breakdown,
+                coverage_pct=coverage,
+                missing_pos=missing if missing else None,
+                is_manual=False,
+                note="backfill",
+            )
+            created += 1
+
+        if created:
+            logger.info("Backfilled %d wealth snapshots", created)
+        return created
+
     def get_latest_snapshot(self) -> Optional[WealthSnapshot]:
         """Get the most recent snapshot."""
         return self._wealth.latest()

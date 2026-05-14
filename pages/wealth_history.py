@@ -227,7 +227,7 @@ with tab_wealth:
                 t("wealth_history.data_coverage"): f"{snap.coverage_pct:.1f}%",
                 t("wealth_history.manual_flag"): "✓" if snap.is_manual else "",
             })
-        st.dataframe(data, use_container_width=True, hide_index=True)
+        st.dataframe(data[::-1], use_container_width=True, hide_index=True)
     else:
         st.info(t("wealth_history.no_data"))
 
@@ -241,6 +241,6 @@ with tab_dividend:
                 t("wealth_history.data_coverage"): f"{snap.coverage_pct:.1f}%",
                 t("wealth_history.manual_flag"): "✓" if snap.is_manual else "",
             })
-        st.dataframe(data, use_container_width=True, hide_index=True)
+        st.dataframe(data[::-1], use_container_width=True, hide_index=True)
     else:
         st.info(t("wealth_history.no_data"))

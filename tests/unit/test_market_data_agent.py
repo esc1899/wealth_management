@@ -251,8 +251,8 @@ class TestDailyPnL:
     def test_day_pnl_none_when_no_prev_close(self, agent):
         pos = _make_position("AAPL", quantity=10, price=150.0)
         agent._positions.get_portfolio.return_value = [pos]
+        # previous_close_eur is None by default → no day_pnl
         agent._market.get_price.return_value = _make_price_record("AAPL", price_eur=180.0)
-        agent._market.get_prev_close.return_value = None
 
         v = agent.get_portfolio_valuation()[0]
         assert v.day_pnl_eur is None
@@ -261,8 +261,9 @@ class TestDailyPnL:
     def test_day_pnl_computed_when_prev_close_available(self, agent):
         pos = _make_position("AAPL", quantity=10, price=150.0)
         agent._positions.get_portfolio.return_value = [pos]
-        agent._market.get_price.return_value = _make_price_record("AAPL", price_eur=180.0)
-        agent._market.get_prev_close.return_value = 175.0  # yesterday's close
+        record = _make_price_record("AAPL", price_eur=180.0)
+        record = record.model_copy(update={"previous_close_eur": 175.0})
+        agent._market.get_price.return_value = record
 
         v = agent.get_portfolio_valuation()[0]
         # current: 10 * 180 = 1800, prev: 10 * 175 = 1750 → day_pnl = +50
@@ -272,12 +273,23 @@ class TestDailyPnL:
     def test_day_pnl_negative(self, agent):
         pos = _make_position("AAPL", quantity=10, price=150.0)
         agent._positions.get_portfolio.return_value = [pos]
-        agent._market.get_price.return_value = _make_price_record("AAPL", price_eur=165.0)
-        agent._market.get_prev_close.return_value = 170.0
+        record = _make_price_record("AAPL", price_eur=165.0)
+        record = record.model_copy(update={"previous_close_eur": 170.0})
+        agent._market.get_price.return_value = record
 
         v = agent.get_portfolio_valuation()[0]
         # current: 1650, prev: 1700 → -50
         assert v.day_pnl_eur == pytest.approx(-50.0)
+
+    def test_day_pnl_none_without_previous_close(self, agent):
+        pos = _make_position("AAPL", quantity=10, price=150.0)
+        agent._positions.get_portfolio.return_value = [pos]
+        agent._market.get_price.return_value = _make_price_record("AAPL", price_eur=180.0)
+        # previous_close_eur is None by default in _make_price_record
+
+        v = agent.get_portfolio_valuation()[0]
+        assert v.day_pnl_eur is None
+        assert v.day_pnl_pct is None
 
 class TestSetupScheduler:
     def test_returns_scheduler(self, agent):

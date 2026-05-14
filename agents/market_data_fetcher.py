@@ -207,6 +207,17 @@ class MarketDataFetcher:
         eur_rate = self._get_eur_rate(currency)
         price_eur = price * eur_rate
 
+        # Fetch previous close from fast_info (reuses same ticker, no extra network request)
+        previous_close_eur: Optional[float] = None
+        try:
+            raw_prev = getattr(ticker.fast_info, "previous_close", None)
+            if raw_prev and raw_prev > 0:
+                if currency == "GBP":  # was GBp before conversion above
+                    raw_prev = raw_prev / 100
+                previous_close_eur = round(raw_prev * eur_rate, 6)
+        except Exception:
+            pass  # previous_close is best-effort; day_pnl will be None without it
+
         return PriceRecord(
             symbol=symbol,
             price_eur=round(price_eur, 6),
@@ -214,6 +225,7 @@ class MarketDataFetcher:
             price_original=round(price, 6),
             exchange_rate=round(eur_rate, 6),
             fetched_at=datetime.now(timezone.utc),
+            previous_close_eur=previous_close_eur,
         )
 
     def _extract_price_and_currency(self, ticker: yf.Ticker) -> tuple:

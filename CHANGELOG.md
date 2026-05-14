@@ -8,6 +8,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Fix: Tagesperformance — Strukturelle Lösung + Snapshot-Backfill — 2026-05-14
+
+**Problem:** `day_pnl` hing von `historical_prices` ab (`get_prev_close()`). War der Rechner aus, waren die historischen Kurse veraltet → falsche Tagesperformance (z.B. Samsung 15% statt 2,5%).
+
+**Strukturelle Lösung: `previous_close_eur` direkt beim Preis-Fetch speichern**
+- `core/storage/models.py`: `PriceRecord` um `previous_close_eur: Optional[float] = None` erweitert
+- `core/storage/base.py`: DB-Migration `ALTER TABLE current_prices ADD COLUMN previous_close_eur REAL`
+- `agents/market_data_fetcher.py`: `_fetch_single()` holt `ticker.fast_info.previous_close` im selben API-Call; GBP-Pence-Konvertierung analog zu `price_original`
+- `core/storage/market_data.py`: `upsert_price()` schreibt + liest `previous_close_eur`; `get_prev_close()` Fix: `date < date('now')` statt zweitletzter Eintrag; neues `get_price_for_date()` für Backfill
+- `agents/market_data_agent.py`: `get_portfolio_valuation()` nutzt `price_record.previous_close_eur` statt `get_prev_close()` — Tagesperformance so aktuell wie der Tageskurs
+
+**Snapshot-Backfill für verpasste Börsentage**
+- `agents/wealth_snapshot_agent.py`: neue `backfill_snapshots(days=14)` Methode — iteriert 14 Tage zurück, überspringt Wochenenden + bereits vorhandene Snapshots, rekonstruiert Portfolio-Wert aus `historical_prices` (Auto-Fetch-Positionen), `estimated_value` (manuelle), `quantity × 1` (Bargeld)
+- `state_agents.py`: `_safe_take_snapshot()` läuft synchron im Fetch-Background-Thread (kein zusätzlicher daemon-Thread → kein SQLite-Lock); ruft `backfill_snapshots(14)` nach jedem Fetch
+- Alle 3 Trigger (🔄 Button, Auto-Fetch Analyse-Seite, 18:00 Scheduler-Job) laufen über dieselbe Kette
+
+**UI-Verbesserung**
+- `pages/wealth_history.py`: Rohdaten-Tabellen (Vermögen + Dividenden) zeigen jüngste Einträge oben (`[::-1]`)
+- `pages/analyse.py`: 🔄 Button ruft immer `fetch_all_now(fetch_history=True)` auf (History wurde bisher nur beim ersten Mal oder manuell geholt)
+
+**Tests:** 26 neue Tests (TestBackfillSnapshots, TestGetPrevClose, TestGetPriceForDate, TestUpsertPrice-Erweiterungen, TestDailyPnL-Umstellung) — 767 gesamt
+
+**DB-Schema-Änderung:** Streamlit muss nach Update neu gestartet werden.
+
+---
+
 ### Security + Tech-Debt Fixes (SEC-2, SEC-3, DEBT-21, DEBT-22) — 2026-05-14
 
 **SEC-2 — Prompt Injection: tavily.py title + URL sanitisiert**

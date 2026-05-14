@@ -23,14 +23,15 @@ class MarketDataRepository:
         cursor = self._conn.execute(
             """
             INSERT INTO current_prices
-                (symbol, price_eur, currency_original, price_original, exchange_rate, fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+                (symbol, price_eur, currency_original, price_original, exchange_rate, fetched_at, previous_close_eur)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(symbol) DO UPDATE SET
-                price_eur         = excluded.price_eur,
-                currency_original = excluded.currency_original,
-                price_original    = excluded.price_original,
-                exchange_rate     = excluded.exchange_rate,
-                fetched_at        = excluded.fetched_at
+                price_eur           = excluded.price_eur,
+                currency_original   = excluded.currency_original,
+                price_original      = excluded.price_original,
+                exchange_rate       = excluded.exchange_rate,
+                fetched_at          = excluded.fetched_at,
+                previous_close_eur  = excluded.previous_close_eur
             """,
             (
                 record.symbol,
@@ -39,6 +40,7 @@ class MarketDataRepository:
                 record.price_original,
                 record.exchange_rate,
                 record.fetched_at.isoformat(),
+                record.previous_close_eur,
             ),
         )
         self._conn.commit()
@@ -98,23 +100,29 @@ class MarketDataRepository:
         return [self._deserialize_historical(row) for row in rows]
 
     def get_prev_close(self, symbol: str) -> Optional[float]:
-        """Return the second-most-recent historical closing price for a symbol.
+        """Return the most recent historical closing price strictly before today.
 
-        Used to compute daily P&L (current_price vs. previous day's close).
-        Returns None if fewer than 2 data points exist.
+        Used to compute daily P&L (current_price vs. last exchange close).
+        Returns None if no such data point exists.
         """
-        rows = self._conn.execute(
+        row = self._conn.execute(
             """
             SELECT close_eur FROM historical_prices
-            WHERE symbol = ?
+            WHERE symbol = ? AND date < date('now')
             ORDER BY date DESC
-            LIMIT 2
+            LIMIT 1
             """,
             (symbol.upper(),),
-        ).fetchall()
-        if len(rows) < 2:
-            return None
-        return float(rows[1]["close_eur"])
+        ).fetchone()
+        return float(row["close_eur"]) if row else None
+
+    def get_price_for_date(self, symbol: str, date_str: str) -> Optional[float]:
+        """Return the closing price in EUR for a symbol on a specific date. Returns None if not found."""
+        row = self._conn.execute(
+            "SELECT close_eur FROM historical_prices WHERE symbol = ? AND date = ?",
+            (symbol.upper(), date_str),
+        ).fetchone()
+        return float(row["close_eur"]) if row else None
 
     def get_all_symbols_historical(self, days: int = 90) -> dict[str, list[HistoricalPrice]]:
         """Return historical data for all symbols, grouped by symbol."""
@@ -186,6 +194,7 @@ class MarketDataRepository:
             price_original=row["price_original"],
             exchange_rate=row["exchange_rate"],
             fetched_at=datetime.fromisoformat(row["fetched_at"]),
+            previous_close_eur=row["previous_close_eur"],
         )
 
     def _deserialize_historical(self, row: sqlite3.Row) -> HistoricalPrice:

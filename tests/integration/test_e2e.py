@@ -15,7 +15,7 @@ from agents.market_data_agent import MarketDataAgent
 from agents.market_data_fetcher import MarketDataFetcher
 from agents.portfolio_agent import PortfolioAgent
 from core.encryption import EncryptionService
-from core.storage.base import init_db
+from core.storage.base import init_db, migrate_db
 from core.storage.market_data import MarketDataRepository
 from core.storage.models import Position, PriceRecord
 from core.storage.positions import PositionsRepository
@@ -31,6 +31,7 @@ def conn():
     c.row_factory = sqlite3.Row
     c.execute("PRAGMA journal_mode=WAL")
     init_db(c)
+    migrate_db(c)
     return c
 
 
