@@ -24,7 +24,7 @@ streamlit run app.py
 # Start on the fixed Dock-app port
 streamlit run app.py --server.port 6655
 
-# Restart after DB-schema or agent-signature changes
+# Restart after DB-schema, agent-signature, or repository-method changes
 kill $(pgrep -f "streamlit run") && streamlit run app.py
 ```
 

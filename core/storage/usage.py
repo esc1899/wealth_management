@@ -82,7 +82,8 @@ class UsageRepository:
                       SUM(output_tokens) AS output_tokens,
                       SUM(cache_read_tokens) AS cache_read_tokens,
                       SUM(cache_write_tokens) AS cache_write_tokens,
-                      SUM(web_search_requests) AS web_search_requests
+                      SUM(web_search_requests) AS web_search_requests,
+                      COUNT(*) AS calls
                FROM llm_usage lu
                WHERE date(created_at) = ?
                GROUP BY agent, skill, model, source
@@ -121,6 +122,44 @@ class UsageRepository:
                ORDER BY day DESC
                LIMIT ?""",
             (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def monthly_totals_by_model(self) -> list[dict]:
+        """Monthly totals grouped by month/agent/model/source — all time, cost-computable."""
+        rows = self._conn.execute(
+            f"""SELECT strftime('%Y-%m', created_at) AS month,
+                      agent, model, source,
+                      SUM(input_tokens) AS input_tokens,
+                      SUM(output_tokens) AS output_tokens,
+                      SUM(COALESCE(cache_read_tokens, 0)) AS cache_read_tokens,
+                      SUM(COALESCE(cache_write_tokens, 0)) AS cache_write_tokens,
+                      SUM(COALESCE(web_search_requests, 0)) AS web_search_requests,
+                      COUNT(*) AS calls
+               FROM llm_usage lu
+               WHERE {self._RESET_FILTER}
+               GROUP BY month, agent, model, source
+               ORDER BY month ASC"""
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def daily_totals_by_model(self, days: int = 30) -> list[dict]:
+        """Daily totals grouped by day/model/source for the last N days — cost-computable."""
+        rows = self._conn.execute(
+            f"""SELECT date(created_at) AS day,
+                      model, source,
+                      SUM(input_tokens) AS input_tokens,
+                      SUM(output_tokens) AS output_tokens,
+                      SUM(COALESCE(cache_read_tokens, 0)) AS cache_read_tokens,
+                      SUM(COALESCE(cache_write_tokens, 0)) AS cache_write_tokens,
+                      SUM(COALESCE(web_search_requests, 0)) AS web_search_requests,
+                      COUNT(*) AS calls
+               FROM llm_usage lu
+               WHERE {self._RESET_FILTER}
+                 AND date(created_at) >= date('now', ?)
+               GROUP BY day, model, source
+               ORDER BY day ASC""",
+            (f"-{days} days",),
         ).fetchall()
         return [dict(r) for r in rows]
 

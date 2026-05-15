@@ -1,11 +1,12 @@
 """
-Statistics — LLM token usage and costs per agent/skill/model.
+Statistics — LLM costs and usage per agent/month.
 """
+
+from datetime import date
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from datetime import datetime
 
 from core.i18n import t
 from core.storage.usage import compute_cost
@@ -20,7 +21,7 @@ config_repo = get_app_config_repo()
 model_prices = config_repo.get_model_prices()
 
 # ------------------------------------------------------------------
-# Source filter (applies to both tabs)
+# Source filter
 # ------------------------------------------------------------------
 
 _SOURCE_OPTIONS = {"all": "Alle", "manual": "Manuell", "scheduled": "Geplant (Auto)"}
@@ -34,237 +35,209 @@ _sel_source = st.radio(
 )
 
 # ------------------------------------------------------------------
-# Tab structure
+# Load data
 # ------------------------------------------------------------------
 
-tab_summary, tab_recent = st.tabs(["Übersicht", "Letzte Calls"])
+today_rows_raw = repo.total_today()
+alltime_rows_raw = repo.total_all_time()
+monthly_rows_raw = repo.monthly_totals_by_model()
+daily_rows_raw = repo.daily_totals_by_model(days=30)
+
+
+def _filter_source(rows: list[dict]) -> list[dict]:
+    if _sel_source == "all":
+        return rows
+    return [r for r in rows if r.get("source") == _sel_source]
+
+
+today_rows = _filter_source(today_rows_raw)
+alltime_rows = _filter_source(alltime_rows_raw)
+monthly_rows = _filter_source(monthly_rows_raw)
+daily_rows = _filter_source(daily_rows_raw)
 
 # ------------------------------------------------------------------
-# Tab 1: Today vs. all-time totals
+# Cost helpers
 # ------------------------------------------------------------------
 
-with tab_summary:
-    today_rows_raw = repo.total_today()
-    alltime_rows_raw = repo.total_all_time()
 
-    def _filter_source(rows, source):
-        if source == "all":
-            return rows
-        return [r for r in rows if r.get("source") == source]
+def _row_cost(r: dict) -> float:
+    return compute_cost(
+        r["input_tokens"],
+        r["output_tokens"],
+        r["model"],
+        model_prices,
+        r.get("cache_read_tokens"),
+        r.get("cache_write_tokens"),
+        r.get("web_search_requests"),
+    )
 
-    today_rows = _filter_source(today_rows_raw, _sel_source)
-    alltime_rows = _filter_source(alltime_rows_raw, _sel_source)
 
-    col_today, col_alltime = st.columns(2)
 
-    with col_today:
-        st.subheader(t("statistics.today"))
-        if today_rows:
-            df_today = pd.DataFrame(today_rows)
-            df_today["total"] = (df_today["input_tokens"] + df_today["output_tokens"] +
-                                  df_today["cache_read_tokens"].fillna(0) + df_today["cache_write_tokens"].fillna(0)).astype(int)
-            df_today["cost"] = df_today.apply(
-                lambda r: compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
-                                      r.get("cache_read_tokens"), r.get("cache_write_tokens"), r.get("web_search_requests")),
-                axis=1,
-            ).round(4)
-            # Cache savings % = (cache_read_tokens × 0.9 × input_price) / total_cost × 100
-            def _cache_savings_pct(r):
-                if not r.get("cache_read_tokens"):
-                    return 0.0
-                cache_read = r.get("cache_read_tokens") or 0
-                model = r.get("model", "")
-                price = model_prices.get(model, {})
-                input_price = price.get("input", 0.0)
-                total_cost = r["cost"] * 1_000_000
-                savings = cache_read * input_price * 0.9
-                return (savings / total_cost * 100) if total_cost > 0 else 0.0
-            df_today["cache_savings_pct"] = df_today.apply(_cache_savings_pct, axis=1).round(1)
-            df_today = df_today.rename(columns={
-                "agent":         t("statistics.col_agent"),
-                "skill":         t("statistics.col_skill"),
-                "model":         t("statistics.col_model"),
-                "source":        "Quelle",
-                "input_tokens":  t("statistics.col_input"),
-                "output_tokens": t("statistics.col_output"),
-                "total":         t("statistics.col_total"),
-                "cost":          t("statistics.col_cost"),
-                "cache_savings_pct": "Cache Savings %",
-            })
-            st.dataframe(df_today, use_container_width=True, hide_index=True)
-            total_today = sum(
-                r["input_tokens"] + r["output_tokens"] +
-                (r.get("cache_read_tokens") or 0) + (r.get("cache_write_tokens") or 0)
-                for r in today_rows
-            )
-            cost_today = sum(
-                compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
-                           r.get("cache_read_tokens"), r.get("cache_write_tokens"), r.get("web_search_requests"))
-                for r in today_rows
-            )
-            m1, m2 = st.columns(2)
-            m1.metric(t("statistics.total_tokens"), f"{total_today:,}")
-            m2.metric(t("statistics.total_cost"), f"${cost_today:.4f}")
-        else:
-            st.info(t("statistics.no_data_today"))
+# ------------------------------------------------------------------
+# KPI: this month / last month
+# ------------------------------------------------------------------
 
-    with col_alltime:
-        st.subheader(t("statistics.all_time"))
-        if alltime_rows:
-            df_all = pd.DataFrame(alltime_rows)
-            df_all["total"] = (df_all["input_tokens"] + df_all["output_tokens"] +
-                                df_all["cache_read_tokens"].fillna(0) + df_all["cache_write_tokens"].fillna(0)).astype(int)
-            df_all["avg_per_call"] = (df_all["total"] / df_all["calls"]).round(0).astype(int)
-            df_all["cost"] = df_all.apply(
-                lambda r: compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
-                                      r.get("cache_read_tokens"), r.get("cache_write_tokens"), r.get("web_search_requests")),
-                axis=1,
-            ).round(4)
-            def _cache_savings_usd(r):
-                cache_read = r.get("cache_read_tokens") or 0
-                if cache_read == 0:
-                    return 0.0
-                price = model_prices.get(r.get("model", ""), {})
-                input_price = price.get("input", 0.0)
-                return round(cache_read * 0.90 * input_price / 1_000_000, 4)
-            df_all["savings_usd"] = df_all.apply(_cache_savings_usd, axis=1)
-            df_all["avg_cost"] = (df_all["cost"] / df_all["calls"]).round(6)
-            df_all["avg_duration_s"] = pd.to_numeric(df_all["avg_duration_ms"], errors="coerce").div(1000).round(1)
-            df_all = df_all.drop(columns=["avg_duration_ms"], errors="ignore")
-            df_all = df_all.rename(columns={
-                "agent":          t("statistics.col_agent"),
-                "skill":          t("statistics.col_skill"),
-                "model":          t("statistics.col_model"),
-                "source":         "Quelle",
-                "input_tokens":   t("statistics.col_input"),
-                "output_tokens":  t("statistics.col_output"),
-                "calls":          t("statistics.col_calls"),
-                "total":          t("statistics.col_total"),
-                "avg_per_call":   t("statistics.col_avg"),
-                "cost":           t("statistics.col_cost"),
-                "avg_cost":       t("statistics.col_avg_cost"),
-                "avg_duration_s": "Ø Dauer (s)",
-                "cache_read_tokens": "Cache Reads",
-                "savings_usd":    "Einsparung $",
-            })
-            st.dataframe(df_all, use_container_width=True, hide_index=True)
-            total_all = sum(
-                r["input_tokens"] + r["output_tokens"] +
-                (r.get("cache_read_tokens") or 0) + (r.get("cache_write_tokens") or 0)
-                for r in alltime_rows
-            )
-            total_calls = sum(r["calls"] for r in alltime_rows)
-            cost_all = sum(
-                compute_cost(r["input_tokens"], r["output_tokens"], r["model"], model_prices,
-                            r.get("cache_read_tokens"), r.get("cache_write_tokens"), r.get("web_search_requests"))
-                for r in alltime_rows
-            )
-            total_cache_savings = sum(
-                round((r.get("cache_read_tokens") or 0) * 0.90 * model_prices.get(r.get("model", ""), {}).get("input", 0.0) / 1_000_000, 4)
-                for r in alltime_rows
-            )
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric(t("statistics.total_tokens"), f"{total_all:,}")
-            m2.metric(t("statistics.total_calls"), f"{total_calls:,}")
-            m3.metric(t("statistics.total_cost"), f"${cost_all:.4f}")
-            m4.metric("Cache Einsparung", f"${total_cache_savings:.4f}")
-        else:
-            st.info(t("statistics.no_data"))
+today = date.today()
+current_month = today.strftime("%Y-%m")
+last_month = f"{today.year - 1}-12" if today.month == 1 else f"{today.year}-{today.month - 1:02d}"
 
-    # ------------------------------------------------------------------
-    # Reset
-    # ------------------------------------------------------------------
+this_month_rows = [r for r in monthly_rows if r["month"] == current_month]
+last_month_rows = [r for r in monthly_rows if r["month"] == last_month]
 
-    st.divider()
-    st.subheader(t("statistics.reset_header"))
+today_cost = sum(_row_cost(r) for r in today_rows)
+today_calls = sum(r.get("calls", 0) for r in today_rows)
+this_month_cost = sum(_row_cost(r) for r in this_month_rows)
+this_month_calls = sum(r.get("calls", 0) for r in this_month_rows)
+last_month_cost = sum(_row_cost(r) for r in last_month_rows)
+last_month_calls = sum(r.get("calls", 0) for r in last_month_rows)
 
-    if alltime_rows:
-        reset_cols = st.columns([3, 1])
-        with reset_cols[1]:
-            if st.button(t("statistics.reset_all_button"), type="secondary", use_container_width=True):
-                repo.reset()
-                st.success(t("statistics.reset_all_confirm"))
-                st.rerun()
+# ------------------------------------------------------------------
+# Header KPIs
+# ------------------------------------------------------------------
 
-        # Per-row reset
-        with reset_cols[0]:
-            st.caption("Reset per Agent/Skill/Modell:")
-        for row in alltime_rows_raw:  # always show all rows in reset section
-            label = f"{row['agent']} / {row['skill'] or '—'} / {row['model']} / {row.get('source','manual')}"
-            rc1, rc2 = st.columns([5, 1])
-            rc1.markdown(f"`{label}`")
-            if rc2.button(
-                t("statistics.reset_row_button"),
-                key=f"_reset_{row['agent']}_{row['skill']}_{row['model']}_{row.get('source','')}",
-                use_container_width=True,
-            ):
-                repo.reset(agent=row["agent"], model=row["model"], skill=row["skill"])
-                st.success(t("statistics.reset_row_confirm"))
-                st.rerun()
+m1, m2, m3 = st.columns(3)
+m1.metric(t("statistics.today"), f"${today_cost:.4f}", delta=f"{today_calls} Calls", delta_color="off")
+m2.metric(t("statistics.this_month"), f"${this_month_cost:.4f}", delta=f"{this_month_calls} Calls", delta_color="off")
+m3.metric(t("statistics.last_month"), f"${last_month_cost:.4f}", delta=f"{last_month_calls} Calls", delta_color="off")
 
-    st.caption(t("statistics.prices_note"))
+st.divider()
 
-    # ------------------------------------------------------------------
-    # Daily trend chart
-    # ------------------------------------------------------------------
+# ------------------------------------------------------------------
+# Tabs
+# ------------------------------------------------------------------
 
-    st.divider()
-    st.subheader(t("statistics.daily_chart"))
+tab_trend, tab_agents, tab_calls = st.tabs([
+    t("statistics.tab_trend"),
+    t("statistics.tab_agents"),
+    t("statistics.tab_calls"),
+])
 
-    daily_rows = repo.daily_totals(limit=30)
-    if daily_rows:
-        df_daily = pd.DataFrame(daily_rows)
-        df_daily["total"] = df_daily["input_tokens"] + df_daily["output_tokens"]  # daily_totals doesn't include cache tokens
-        df_daily = df_daily.sort_values("day")
+# ── Tab: Verlauf ───────────────────────────────────────────────────────────────
+
+with tab_trend:
+    st.subheader(t("statistics.monthly_chart"))
+
+    if monthly_rows:
+        # Aggregate cost by month
+        monthly_agg: dict[str, dict] = {}
+        for r in monthly_rows:
+            m = r["month"]
+            if m not in monthly_agg:
+                monthly_agg[m] = {"month": m, "cost": 0.0, "calls": 0}
+            monthly_agg[m]["cost"] += _row_cost(r)
+            monthly_agg[m]["calls"] += r.get("calls", 0)
+
+        sorted_months = sorted(monthly_agg.keys())[-12:]
+        df_monthly = pd.DataFrame([monthly_agg[m] for m in sorted_months])
+
         fig = px.bar(
-            df_daily,
-            x="day",
-            y=["input_tokens", "output_tokens"],
-            labels={
-                "day":           t("statistics.col_day"),
-                "value":         t("statistics.col_tokens"),
-                "variable":      t("statistics.col_type"),
-                "input_tokens":  t("statistics.col_input"),
-                "output_tokens": t("statistics.col_output"),
-            },
-            color_discrete_map={
-                "input_tokens":  "#4C9BE8",
-                "output_tokens": "#E8834C",
-            },
+            df_monthly,
+            x="month",
+            y="cost",
+            labels={"month": "", "cost": "Kosten ($)"},
+            color_discrete_sequence=["#4C9BE8"],
+            text=df_monthly["cost"].apply(lambda v: f"${v:.3f}"),
         )
-        fig.update_layout(legend_title_text="", xaxis_title="", yaxis_title=t("statistics.col_tokens"))
+        fig.update_traces(textposition="outside")
+        fig.update_layout(yaxis_title="Kosten ($)", showlegend=False, uniformtext_minsize=8)
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info(t("statistics.no_data"))
 
-    # ------------------------------------------------------------------
-    # Per-agent breakdown (all time) as pie
-    # ------------------------------------------------------------------
+    st.subheader(t("statistics.daily_costs"))
 
-    if alltime_rows:
-        st.subheader(t("statistics.by_agent"))
-        df_pie = pd.DataFrame(alltime_rows)
-        df_pie["total"] = (df_pie["input_tokens"] + df_pie["output_tokens"] +
-                            df_pie["cache_read_tokens"].fillna(0) + df_pie["cache_write_tokens"].fillna(0)).astype(int)
-        fig2 = px.pie(
-            df_pie,
-            names="agent",
-            values="total",
-            hole=0.4,
+    if daily_rows:
+        # Aggregate cost by day
+        daily_agg: dict[str, float] = {}
+        for r in daily_rows:
+            d = r["day"]
+            daily_agg[d] = daily_agg.get(d, 0.0) + _row_cost(r)
+
+        df_daily = pd.DataFrame(
+            [{"day": d, "cost": c} for d, c in sorted(daily_agg.items())],
         )
-        fig2.update_traces(textinfo="label+percent")
+        fig2 = px.bar(
+            df_daily,
+            x="day",
+            y="cost",
+            labels={"day": "", "cost": "Kosten ($)"},
+            color_discrete_sequence=["#4C9BE8"],
+        )
+        fig2.update_layout(yaxis_title="Kosten ($)", showlegend=False)
         st.plotly_chart(fig2, use_container_width=True)
+    else:
+        st.info(t("statistics.no_data"))
 
-# ------------------------------------------------------------------
-# Tab 2: Recent calls
-# ------------------------------------------------------------------
+    with st.expander(t("statistics.today_detail")):
+        if today_rows:
+            df_today = pd.DataFrame(today_rows)
+            df_today["cost"] = df_today.apply(_row_cost, axis=1).round(4)
+            display_cols = [c for c in ["agent", "skill", "model", "source", "input_tokens", "output_tokens", "calls", "cost"] if c in df_today.columns]
+            df_today = df_today[display_cols].rename(columns={
+                "agent": t("statistics.col_agent"),
+                "skill": t("statistics.col_skill"),
+                "model": t("statistics.col_model"),
+                "source": "Quelle",
+                "input_tokens": t("statistics.col_input"),
+                "output_tokens": t("statistics.col_output"),
+                "calls": t("statistics.col_calls"),
+                "cost": t("statistics.col_cost"),
+            })
+            st.dataframe(df_today, use_container_width=True, hide_index=True)
+        else:
+            st.info(t("statistics.no_data_today"))
 
-with tab_recent:
-    st.caption("Letzte 50 LLM-Aufrufe (chronologisch, neueste zuerst)")
+    st.caption(t("statistics.prices_note"))
+
+# ── Tab: Nach Agent ────────────────────────────────────────────────────────────
+
+with tab_agents:
+    if alltime_rows:
+        # All-time per agent
+        agent_alltime: dict[str, dict] = {}
+        for r in alltime_rows:
+            a = r["agent"]
+            if a not in agent_alltime:
+                agent_alltime[a] = {"agent": a, "cost_total": 0.0, "calls_total": 0}
+            agent_alltime[a]["cost_total"] += _row_cost(r)
+            agent_alltime[a]["calls_total"] += r.get("calls", 0)
+
+        # This month per agent
+        agent_month: dict[str, dict] = {}
+        for r in this_month_rows:
+            a = r["agent"]
+            if a not in agent_month:
+                agent_month[a] = {"cost_month": 0.0, "calls_month": 0}
+            agent_month[a]["cost_month"] += _row_cost(r)
+            agent_month[a]["calls_month"] += r.get("calls", 0)
+
+        rows_agent = []
+        for agent, data in sorted(agent_alltime.items()):
+            month_data = agent_month.get(agent, {})
+            cost_total = data["cost_total"]
+            calls_total = data["calls_total"]
+            rows_agent.append({
+                t("statistics.col_agent"): agent,
+                "Calls (Monat)": month_data.get("calls_month", 0),
+                t("statistics.col_cost_month"): round(month_data.get("cost_month", 0.0), 4),
+                "Calls (Gesamt)": calls_total,
+                t("statistics.col_cost_total"): round(cost_total, 4),
+                "Ø Kosten/Call": round(cost_total / calls_total, 6) if calls_total else 0.0,
+            })
+
+        df_agents = pd.DataFrame(rows_agent)
+        st.dataframe(df_agents, use_container_width=True, hide_index=True)
+    else:
+        st.info(t("statistics.no_data"))
+
+# ── Tab: Letzte Calls ──────────────────────────────────────────────────────────
+
+with tab_calls:
+    st.caption("Letzte 50 LLM-Aufrufe (neueste zuerst)")
     st.caption(
-        "**Eff. Input** = tatsächlich verarbeitete Input-Tokens (regulär + Cache Write + Cache Read). "
-        "**Cache Write** = neue Tokens im Cache (Web-Ergebnisse, 1.25× teurer). "
-        "**Cache Read** = aus Cache gelesen (0.1× Preis, fast kostenlos)."
+        "**Eff. Input** = reguläre Input-Tokens + Cache Write + Cache Read. "
+        "**Cache Write** = neue Cache-Einträge (1.25×). "
+        "**Cache Read** = aus Cache gelesen (0.1×, fast kostenlos)."
     )
 
     recent_calls = repo.get_recent_calls(limit=50)
@@ -273,39 +246,34 @@ with tab_recent:
         df_recent = pd.DataFrame(recent_calls)
         df_recent["created_at"] = pd.to_datetime(df_recent["created_at"]).dt.strftime("%d.%m %H:%M:%S")
 
-        def _duration_color(duration_ms):
+        def _duration_label(duration_ms):
             if duration_ms is None:
                 return "—"
             if duration_ms < 1000:
                 return f"🟢 {duration_ms:.0f}"
             elif duration_ms < 3000:
                 return f"🟡 {duration_ms:.0f}"
-            else:
-                return f"🔴 {duration_ms:.0f}"
+            return f"🔴 {duration_ms:.0f}"
 
-        df_recent["duration_ms"] = df_recent["duration_ms"].apply(_duration_color)
-
-        # Effective input = all token types combined
+        df_recent["duration_ms"] = df_recent["duration_ms"].apply(_duration_label)
         df_recent["eff_input"] = (
-            df_recent["input_tokens"].fillna(0).astype(int) +
-            df_recent.get("cache_write_tokens", pd.Series(0, index=df_recent.index)).fillna(0).astype(int) +
-            df_recent.get("cache_read_tokens", pd.Series(0, index=df_recent.index)).fillna(0).astype(int)
+            df_recent["input_tokens"].fillna(0).astype(int)
+            + df_recent.get("cache_write_tokens", pd.Series(0, index=df_recent.index)).fillna(0).astype(int)
+            + df_recent.get("cache_read_tokens", pd.Series(0, index=df_recent.index)).fillna(0).astype(int)
         )
-
         df_recent = df_recent.rename(columns={
-            "created_at":           "Zeit",
-            "agent":                t("statistics.col_agent"),
-            "skill":                t("statistics.col_skill"),
-            "model":                t("statistics.col_model"),
-            "source":               "Quelle",
-            "input_tokens":         t("statistics.col_input"),
-            "output_tokens":        t("statistics.col_output"),
-            "cache_write_tokens":   "Cache Write (1.25×)",
-            "cache_read_tokens":    "Cache Read (0.1×)",
-            "eff_input":            "Eff. Input",
-            "duration_ms":          "Dauer (ms)",
+            "created_at":         "Zeit",
+            "agent":              t("statistics.col_agent"),
+            "skill":              t("statistics.col_skill"),
+            "model":              t("statistics.col_model"),
+            "source":             "Quelle",
+            "input_tokens":       t("statistics.col_input"),
+            "output_tokens":      t("statistics.col_output"),
+            "cache_write_tokens": "Cache Write (1.25×)",
+            "cache_read_tokens":  "Cache Read (0.1×)",
+            "eff_input":          "Eff. Input",
+            "duration_ms":        "Dauer (ms)",
         })
-
         st.dataframe(df_recent, use_container_width=True, hide_index=True)
     else:
         st.info("Noch keine Aufrufe aufgezeichnet.")

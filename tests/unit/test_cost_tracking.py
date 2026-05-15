@@ -242,3 +242,133 @@ def test_usage_repo_records_skill_from_callback(usage_repo):
     rows = usage_repo.total_all_time()
     assert len(rows) == 1
     assert rows[0]["skill"] == "Standard News"
+
+
+# ---------------------------------------------------------------------------
+# monthly_totals_by_model
+# ---------------------------------------------------------------------------
+
+def test_monthly_totals_empty(usage_repo):
+    assert usage_repo.monthly_totals_by_model() == []
+
+
+def test_monthly_totals_single_record(usage_repo):
+    usage_repo.record("news_agent", "claude-haiku-4-5-20251001", 1000, 500)
+    rows = usage_repo.monthly_totals_by_model()
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["agent"] == "news_agent"
+    assert r["model"] == "claude-haiku-4-5-20251001"
+    assert r["input_tokens"] == 1000
+    assert r["output_tokens"] == 500
+    assert r["calls"] == 1
+
+
+def test_monthly_totals_aggregates_same_month(usage_repo):
+    usage_repo.record("news_agent", "claude-haiku-4-5-20251001", 1000, 500)
+    usage_repo.record("news_agent", "claude-haiku-4-5-20251001", 2000, 300)
+    rows = usage_repo.monthly_totals_by_model()
+    assert len(rows) == 1
+    assert rows[0]["input_tokens"] == 3000
+    assert rows[0]["output_tokens"] == 800
+    assert rows[0]["calls"] == 2
+
+
+def test_monthly_totals_splits_by_agent(usage_repo):
+    usage_repo.record("news_agent", "claude-haiku-4-5-20251001", 1000, 500)
+    usage_repo.record("search_agent", "claude-haiku-4-5-20251001", 2000, 300)
+    rows = usage_repo.monthly_totals_by_model()
+    assert len(rows) == 2
+    agents = {r["agent"] for r in rows}
+    assert agents == {"news_agent", "search_agent"}
+
+
+def test_monthly_totals_includes_cache_tokens(usage_repo):
+    usage_repo.record(
+        "news_agent", "claude-haiku-4-5-20251001", 500, 200,
+        cache_read_tokens=100, cache_write_tokens=50,
+    )
+    rows = usage_repo.monthly_totals_by_model()
+    assert len(rows) == 1
+    assert rows[0]["cache_read_tokens"] == 100
+    assert rows[0]["cache_write_tokens"] == 50
+
+
+def test_monthly_totals_respects_reset(usage_repo):
+    usage_repo.record("news_agent", "claude-haiku-4-5-20251001", 1000, 500)
+    usage_repo.reset()
+    usage_repo.record("news_agent", "claude-haiku-4-5-20251001", 200, 100)
+    rows = usage_repo.monthly_totals_by_model()
+    assert len(rows) == 1
+    assert rows[0]["input_tokens"] == 200
+
+
+# ---------------------------------------------------------------------------
+# daily_totals_by_model
+# ---------------------------------------------------------------------------
+
+def test_daily_totals_by_model_empty(usage_repo):
+    assert usage_repo.daily_totals_by_model() == []
+
+
+def test_daily_totals_by_model_single_record(usage_repo):
+    usage_repo.record("news_agent", "claude-haiku-4-5-20251001", 1000, 500)
+    rows = usage_repo.daily_totals_by_model()
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["model"] == "claude-haiku-4-5-20251001"
+    assert r["input_tokens"] == 1000
+    assert r["output_tokens"] == 500
+    assert r["calls"] == 1
+
+
+def test_daily_totals_by_model_aggregates_same_day(usage_repo):
+    usage_repo.record("news_agent", "claude-haiku-4-5-20251001", 1000, 500)
+    usage_repo.record("search_agent", "claude-haiku-4-5-20251001", 2000, 300)
+    rows = usage_repo.daily_totals_by_model()
+    # Same day + same model + same source → 1 row
+    assert len(rows) == 1
+    assert rows[0]["input_tokens"] == 3000
+    assert rows[0]["calls"] == 2
+
+
+def test_daily_totals_by_model_splits_by_model(usage_repo):
+    usage_repo.record("news_agent", "claude-haiku-4-5-20251001", 1000, 500)
+    usage_repo.record("search_agent", "claude-sonnet-4-6", 2000, 300)
+    rows = usage_repo.daily_totals_by_model()
+    assert len(rows) == 2
+    models = {r["model"] for r in rows}
+    assert models == {"claude-haiku-4-5-20251001", "claude-sonnet-4-6"}
+
+
+def test_daily_totals_by_model_includes_cache_tokens(usage_repo):
+    usage_repo.record(
+        "news_agent", "claude-haiku-4-5-20251001", 500, 200,
+        cache_read_tokens=80, cache_write_tokens=40, web_search_requests=3,
+    )
+    rows = usage_repo.daily_totals_by_model()
+    assert len(rows) == 1
+    assert rows[0]["cache_read_tokens"] == 80
+    assert rows[0]["cache_write_tokens"] == 40
+    assert rows[0]["web_search_requests"] == 3
+
+
+def test_daily_totals_by_model_respects_reset(usage_repo):
+    usage_repo.record("news_agent", "claude-haiku-4-5-20251001", 1000, 500)
+    usage_repo.reset()
+    usage_repo.record("news_agent", "claude-haiku-4-5-20251001", 200, 100)
+    rows = usage_repo.daily_totals_by_model()
+    assert len(rows) == 1
+    assert rows[0]["input_tokens"] == 200
+
+
+# ---------------------------------------------------------------------------
+# total_today includes calls
+# ---------------------------------------------------------------------------
+
+def test_total_today_includes_calls(usage_repo):
+    usage_repo.record("news_agent", "claude-haiku-4-5-20251001", 100, 50)
+    usage_repo.record("news_agent", "claude-haiku-4-5-20251001", 200, 80)
+    rows = usage_repo.total_today()
+    assert len(rows) == 1
+    assert rows[0]["calls"] == 2

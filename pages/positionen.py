@@ -541,9 +541,9 @@ def _render_edit_form(pos_id: int | None, readonly: bool = False):
         st.markdown("#### 📊 Dividende / Zinssatz (manueller Override)")
 
         # Show current yfinance value if available
-        form_ticker = editing.ticker if editing else _ss("_pos_ticker", "")
-        if form_ticker:
-            div_rec = _market_repo.get_dividend(form_ticker)
+        ticker_for_div = (form_ticker or "").strip() or (editing.ticker if editing else None)
+        if ticker_for_div:
+            div_rec = _market_repo.get_dividend(ticker_for_div)
             if div_rec:
                 rate_str = f"{div_rec.rate_eur:.4f}€/Aktie" if div_rec.rate_eur is not None else "Kurs n/a"
                 date_str = div_rec.fetched_at.strftime('%d.%m.%Y') if div_rec.fetched_at else "—"
