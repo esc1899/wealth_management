@@ -2,6 +2,8 @@
 Yearly performance attribution — computes per-position contribution to portfolio return
 for a given calendar year.
 
+Data source: historical_prices (start = last close of prev year Dec 31, end = last close
+of current year Dec 31 or live price if current year is still running).
 Same unit-conversion logic as monthly_attribution.py and market_data_agent.py.
 """
 
@@ -37,18 +39,24 @@ def compute_yearly_attribution(
 ) -> List[AttributionYearRow]:
     """
     For each portfolio position (not watchlist, not excluded) with a ticker:
-    - Find first available closing price in historical_prices for Jan of the given year
-    - Use current_value_eur (already unit-converted) as end value
-    - Apply same unit conversion as market_data_agent for start value
+    - Start price: last closing price of Dec 31 of the PREVIOUS year (period-return convention)
+    - End price: last closing price of Dec 31 of the computed year, or current_price_eur if current year
 
     Purchase-date correction: if a position was bought after Jan 1, cost_basis_eur
     replaces the historical start price to avoid distorted returns.
 
     Positions without historical data are included with delta=None, contribution=0.
     """
+    today = date.today()
+    is_current_year = (year == today.year)
+
     period_start = date(year, 1, 1)
     year_start = period_start.isoformat()
     year_end = f"{year:04d}-12-31"
+
+    # Previous year range — start price = last close of prev year
+    prev_year_start = f"{year - 1:04d}-01-01"
+    prev_year_end = f"{year - 1:04d}-12-31"
 
     portfolio_vals = [
         v for v in valuations
@@ -63,7 +71,7 @@ def compute_yearly_attribution(
 
     total_start_value = 0.0
     for v in portfolio_vals:
-        sv = _get_start_value_yearly(market_repo, v, year_start, year_end, period_start)
+        sv = _get_start_value_yearly(market_repo, v, prev_year_start, prev_year_end, period_start)
         if sv:
             total_start_value += sv
 
@@ -71,7 +79,6 @@ def compute_yearly_attribution(
     for v in portfolio_vals:
         unit = getattr(v, "unit", None) or ""
         qty = v.quantity
-        end_val = v.current_value_eur
 
         purchase_date = getattr(v, "purchase_date", None)
         bought_mid_period = purchase_date is not None and purchase_date > period_start
@@ -80,8 +87,15 @@ def compute_yearly_attribution(
             start_val = v.cost_basis_eur
             start_price = None
         else:
-            start_price = _get_year_start_price(market_repo, v.symbol, year_start, year_end)
-            start_val = _to_start_value(start_price, qty, unit)
+            start_price = _get_period_end_price(market_repo, v.symbol, prev_year_start, prev_year_end)
+            start_val = _to_value(start_price, qty, unit)
+
+        if is_current_year:
+            end_price = v.current_price_eur
+            end_val = v.current_value_eur
+        else:
+            end_price = _get_period_end_price(market_repo, v.symbol, year_start, year_end)
+            end_val = _to_value(end_price, qty, unit)
 
         delta_pct: Optional[float] = None
         contribution_eur = 0.0
@@ -100,7 +114,7 @@ def compute_yearly_attribution(
             investment_type=v.investment_type,
             unit=unit,
             start_price_eur=start_price,
-            end_price_eur=v.current_price_eur,
+            end_price_eur=end_price,
             quantity=qty,
             delta_pct=delta_pct,
             weight_pct=weight_pct,
@@ -113,16 +127,16 @@ def compute_yearly_attribution(
     return rows
 
 
-def _get_start_value_yearly(market_repo, v, year_start: str, year_end: str, period_start: date) -> Optional[float]:
+def _get_start_value_yearly(market_repo, v, prev_year_start: str, prev_year_end: str, period_start: date) -> Optional[float]:
     """Return start value for a valuation, using cost_basis_eur for mid-period purchases."""
     purchase_date = getattr(v, "purchase_date", None)
     if purchase_date is not None and purchase_date > period_start:
         return getattr(v, "cost_basis_eur", None)
-    start_price = _get_year_start_price(market_repo, v.symbol, year_start, year_end)
-    return _to_start_value(start_price, v.quantity, getattr(v, "unit", None))
+    start_price = _get_period_end_price(market_repo, v.symbol, prev_year_start, prev_year_end)
+    return _to_value(start_price, v.quantity, getattr(v, "unit", None))
 
 
-def _to_start_value(
+def _to_value(
     price: Optional[float], qty: Optional[float], unit: Optional[str]
 ) -> Optional[float]:
     if not price or not qty:
@@ -132,17 +146,17 @@ def _to_start_value(
     return price * qty
 
 
-def _get_year_start_price(market_repo, symbol: str, year_start: str, year_end: str) -> Optional[float]:
-    """Return the first closing price for symbol within the year range."""
+def _get_period_end_price(market_repo, symbol: str, range_start: str, range_end: str) -> Optional[float]:
+    """Return the LAST closing price for symbol within the date range."""
     try:
         rows = market_repo._conn.execute(
             """
             SELECT close_eur FROM historical_prices
             WHERE symbol = ? AND date BETWEEN ? AND ?
-            ORDER BY date ASC
+            ORDER BY date DESC
             LIMIT 1
             """,
-            (symbol.upper(), year_start, year_end),
+            (symbol.upper(), range_start, range_end),
         ).fetchall()
         if rows:
             return float(rows[0]["close_eur"])

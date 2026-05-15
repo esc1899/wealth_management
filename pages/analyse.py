@@ -259,7 +259,7 @@ if _attribution:
             row["Div. (€)*"] = f"+{r.dividend_contribution_eur:,.0f}" if r.dividend_contribution_eur > 0 else "—"
         _table_rows.append(row)
     st.dataframe(pd.DataFrame(_table_rows), use_container_width=True, hide_index=True)
-    _month_captions = ["Monatsstart = erster verfügbarer Schlusskurs im Monat aus historical_prices."]
+    _month_captions = ["Start = letzter Schlusskurs des Vormonats, Ende = letzter Schlusskurs des Monats (laufender Monat: aktueller Kurs)."]
     if _has_dividends_month:
         _month_captions.append("* Div. = geschätzte Dividende (Jahresdividende ÷ 12, aktuelle Rate — keine tatsächlichen Zahlungen).")
     st.caption(" ".join(_month_captions))
@@ -384,7 +384,7 @@ if _year_attribution:
             row["Div. (€)*"] = f"+{r.dividend_contribution_eur:,.0f}" if r.dividend_contribution_eur > 0 else "—"
         _year_table_rows.append(row)
     st.dataframe(pd.DataFrame(_year_table_rows), use_container_width=True, hide_index=True)
-    _year_captions = ["Jahresstart = erster verfügbarer Schlusskurs im Januar aus historical_prices."]
+    _year_captions = ["Start = letzter Schlusskurs des Vorjahres (31. Dez), Ende = letzter Schlusskurs des Jahres (laufendes Jahr: aktueller Kurs)."]
     if _has_dividends_year:
         _year_captions.append("* Div. = geschätzte Jahresdividende (aktuelle Rate — keine tatsächlichen Zahlungen).")
     st.caption(" ".join(_year_captions))

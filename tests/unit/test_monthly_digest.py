@@ -157,7 +157,7 @@ class TestGenerateMonthlyDigest:
                 volume INTEGER
             )
         """)
-        conn.execute("INSERT INTO historical_prices VALUES (1, 'AAPL', '2026-05-02', 100.0, NULL)")
+        conn.execute("INSERT INTO historical_prices VALUES (1, 'AAPL', '2026-04-30', 100.0, NULL)")
         conn.commit()
         market_repo = MagicMock()
         market_repo._conn = conn

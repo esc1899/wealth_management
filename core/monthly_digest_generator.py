@@ -74,10 +74,11 @@ def generate_monthly_digest(
 
     if attribution_rows:
         total_contribution = sum(r.contribution_eur for r in attribution_rows)
+        rows_with_data = [r for r in attribution_rows if r.delta_pct is not None]
         total_start = sum(
-            (r.start_price_eur * r.quantity)
-            for r in attribution_rows
-            if r.start_price_eur and r.quantity
+            r.contribution_eur / (r.delta_pct / 100)
+            for r in rows_with_data
+            if r.delta_pct and r.delta_pct != 0
         )
         total_pct = (total_contribution / total_start * 100) if total_start > 0 else None
 
@@ -86,7 +87,6 @@ def generate_monthly_digest(
         lines.append(f"**Portfolio gesamt:** {pct_str} ({sign}{total_contribution:,.0f}€)")
         lines.append("")
 
-        rows_with_data = [r for r in attribution_rows if r.delta_pct is not None]
         winners = sorted(rows_with_data, key=lambda r: r.contribution_eur, reverse=True)[:3]
         losers = sorted(rows_with_data, key=lambda r: r.contribution_eur)[:3]
 

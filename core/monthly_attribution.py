@@ -2,7 +2,8 @@
 Monthly performance attribution — computes per-position contribution to portfolio return
 for a given calendar month.
 
-Data source: historical_prices (start of month) + current_prices (end/current).
+Data source: historical_prices (start = last close of prev month, end = last close of
+current month or live price if current month is still running).
 No LLM required: pure local computation.
 """
 
@@ -42,9 +43,8 @@ def compute_monthly_attribution(
 ) -> List[AttributionMonthRow]:
     """
     For each portfolio position (not watchlist, not excluded) with a ticker:
-    - Find first available closing price in historical_prices for the given month
-    - Use current_value_eur (already unit-converted) as end value
-    - Apply same unit conversion as market_data_agent for start value
+    - Start price: last closing price of the PREVIOUS month (standard period-return convention)
+    - End price: last closing price of the computed month, or current_price_eur if current month
 
     Unit handling mirrors market_data_agent.get_portfolio_valuation():
       unit="g"  → price is EUR/troy_oz, value = (price / 31.1035) * quantity_grams
@@ -55,9 +55,20 @@ def compute_monthly_attribution(
 
     Positions without historical data are included with delta=None, contribution=0.
     """
+    today = date.today()
+    is_current_month = (year == today.year and month == today.month)
+
     period_start = date(year, month, 1)
     month_start = period_start.isoformat()
     month_end = date(year, month, calendar.monthrange(year, month)[1]).isoformat()
+
+    # Previous month range — start price = last close of previous month
+    if month == 1:
+        prev_year, prev_month_num = year - 1, 12
+    else:
+        prev_year, prev_month_num = year, month - 1
+    prev_month_start = date(prev_year, prev_month_num, 1).isoformat()
+    prev_month_end = date(prev_year, prev_month_num, calendar.monthrange(prev_year, prev_month_num)[1]).isoformat()
 
     portfolio_vals = [
         v for v in valuations
@@ -73,7 +84,7 @@ def compute_monthly_attribution(
     # First pass: compute total start value for contribution_pct denominator
     total_start_value = 0.0
     for v in portfolio_vals:
-        sv = _get_start_value_monthly(market_repo, v, month_start, month_end, period_start)
+        sv = _get_start_value_monthly(market_repo, v, prev_month_start, prev_month_end, period_start)
         if sv:
             total_start_value += sv
 
@@ -82,7 +93,6 @@ def compute_monthly_attribution(
     for v in portfolio_vals:
         unit = getattr(v, "unit", None) or ""
         qty = v.quantity
-        end_val = v.current_value_eur   # already correctly unit-converted by market_data_agent
 
         purchase_date = getattr(v, "purchase_date", None)
         bought_mid_period = purchase_date is not None and purchase_date > period_start
@@ -91,8 +101,15 @@ def compute_monthly_attribution(
             start_val = v.cost_basis_eur
             start_price = None
         else:
-            start_price = _get_month_start_price(market_repo, v.symbol, month_start, month_end)
-            start_val = _to_start_value(start_price, qty, unit)
+            start_price = _get_period_end_price(market_repo, v.symbol, prev_month_start, prev_month_end)
+            start_val = _to_value(start_price, qty, unit)
+
+        if is_current_month:
+            end_price = v.current_price_eur
+            end_val = v.current_value_eur
+        else:
+            end_price = _get_period_end_price(market_repo, v.symbol, month_start, month_end)
+            end_val = _to_value(end_price, qty, unit)
 
         delta_pct: Optional[float] = None
         contribution_eur = 0.0
@@ -111,7 +128,7 @@ def compute_monthly_attribution(
             investment_type=v.investment_type,
             unit=unit,
             start_price_eur=start_price,
-            end_price_eur=v.current_price_eur,
+            end_price_eur=end_price,
             quantity=qty,
             delta_pct=delta_pct,
             weight_pct=weight_pct,
@@ -124,19 +141,19 @@ def compute_monthly_attribution(
     return rows
 
 
-def _get_start_value_monthly(market_repo, v, month_start: str, month_end: str, period_start: date) -> Optional[float]:
+def _get_start_value_monthly(market_repo, v, prev_month_start: str, prev_month_end: str, period_start: date) -> Optional[float]:
     """Return start value for a valuation, using cost_basis_eur for mid-period purchases."""
     purchase_date = getattr(v, "purchase_date", None)
     if purchase_date is not None and purchase_date > period_start:
         return getattr(v, "cost_basis_eur", None)
-    start_price = _get_month_start_price(market_repo, v.symbol, month_start, month_end)
-    return _to_start_value(start_price, v.quantity, getattr(v, "unit", None))
+    start_price = _get_period_end_price(market_repo, v.symbol, prev_month_start, prev_month_end)
+    return _to_value(start_price, v.quantity, getattr(v, "unit", None))
 
 
-def _to_start_value(
+def _to_value(
     price: Optional[float], qty: Optional[float], unit: Optional[str]
 ) -> Optional[float]:
-    """Convert start price + quantity to EUR value, respecting unit conventions."""
+    """Convert price + quantity to EUR value, respecting unit conventions."""
     if not price or not qty:
         return None
     if unit == "g":
@@ -144,17 +161,17 @@ def _to_start_value(
     return price * qty
 
 
-def _get_month_start_price(market_repo, symbol: str, month_start: str, month_end: str) -> Optional[float]:
-    """Return the first closing price for symbol within the month range."""
+def _get_period_end_price(market_repo, symbol: str, range_start: str, range_end: str) -> Optional[float]:
+    """Return the LAST closing price for symbol within the date range."""
     try:
         rows = market_repo._conn.execute(
             """
             SELECT close_eur FROM historical_prices
             WHERE symbol = ? AND date BETWEEN ? AND ?
-            ORDER BY date ASC
+            ORDER BY date DESC
             LIMIT 1
             """,
-            (symbol.upper(), month_start, month_end),
+            (symbol.upper(), range_start, range_end),
         ).fetchall()
         if rows:
             return float(rows[0]["close_eur"])
