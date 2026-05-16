@@ -8,6 +8,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### FEAT-41: Portfolio Checker Status Matrix + Navigation Refactoring — 2026-05-16
+
+**Status Matrix im Portfolio Checker (analog Watchlist Checker)**
+- Section 2 ersetzt die alte Checkbox-Section durch eine interaktive Tabelle (SC / Konsens / Fundamental)
+- Positionen ohne Ticker oder mit `analysis_excluded=True` werden nicht angezeigt
+- SC-Spalte zeigt "—" für Positionen ohne Story (kein Verdict möglich)
+- Zeile auswählen → `st.container(border=True)` mit Positionsname + zwei Buttons: "Positionsanalyse" (Deeplink) + "▶️ N fehlende Checks ausführen"
+- Globaler Button "Alle fehlenden Checks ausführen" + Zähler fehlender Checks
+
+**Row-Level Button in Watchlist Checker**
+- Neue 3. Aktionsspalte: "▶️ N fehlende Checks ausführen" für die selektierte Zeile
+- Führt nur die fehlenden Checks (SC/CG/FA/CA) für genau diese eine Position aus
+
+**`core/background_jobs.py`** (neues Modul)
+- Extrahiert `run_storychecker_job`, `run_consensus_gap_job`, `run_fundamental_job`, `run_capital_allocator_job` aus `watchlist_checker.py`
+- ~360 Zeilen Duplikat eliminiert; beide Pages nutzen dasselbe Modul
+
+**`fmt_verdict_matrix()` in `core/ui/verdicts.py`**
+- Shared Formatter für DataFrame-Zellen: `"icon verdict_text"` oder `"⚪ —"`
+
+**Navigation**
+- "Portfolio Story" → "Portfolio Checker" (`fact_check` Icon)
+- "Watchlist-Analyse" von Assistent-Gruppe ins Portfolio-Menü (local-only)
+
+**CA ausgeblendet (by design):** Capital Allocator existiert nur für Watchlist. Leicht später ergänzbar.
+
+**Tests:** 787 passing
+
+---
+
 ### Fix: Tagesperformance — Strukturelle Lösung + Snapshot-Backfill — 2026-05-14
 
 **Problem:** `day_pnl` hing von `historical_prices` ab (`get_prev_close()`). War der Rechner aus, waren die historischen Kurse veraltet → falsche Tagesperformance (z.B. Samsung 15% statt 2,5%).
