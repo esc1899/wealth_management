@@ -669,6 +669,11 @@ if st.session_state.get("_watchlist_check_result"):
     result = st.session_state["_watchlist_check_result"]
     result, position_fits = _normalize_result(result)
 
+    if hasattr(result, 'created_at') and result.created_at:
+        _wc_ts = result.created_at
+        _wc_ts_str = _wc_ts.strftime('%d.%m.%Y %H:%M') if hasattr(_wc_ts, 'strftime') else str(_wc_ts)[:16]
+        st.caption(f"Analyse vom {_wc_ts_str}")
+
     # Fit-counts summary
     if hasattr(result, 'fit_counts'):
         try:

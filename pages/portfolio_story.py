@@ -463,6 +463,9 @@ st.subheader(t("portfolio_story.results_section"))
 
 if "_ps_result" in st.session_state:
     result = st.session_state["_ps_result"]
+    _ts = st.session_state.get("_ps_result_timestamp")
+    if _ts:
+        st.caption(f"Analyse vom {_ts.strftime('%d.%m.%Y %H:%M')}")
 
     # Story Verdict
     col1, col2 = st.columns(2)
@@ -485,7 +488,10 @@ if "_ps_result" in st.session_state:
 
 # Latest saved analysis (if available)
 elif latest_analysis:
-    st.info(t("portfolio_story.last_analysis_label"))
+    _saved_ts = latest_analysis.created_at
+    if _saved_ts:
+        _ts_str = _saved_ts.strftime('%d.%m.%Y %H:%M') if hasattr(_saved_ts, 'strftime') else str(_saved_ts)[:16]
+        st.caption(f"Analyse vom {_ts_str}")
     col1, col2 = st.columns(2)
     with col1:
         icon = _verdict_icon(latest_analysis.verdict)
