@@ -15,11 +15,14 @@ from datetime import datetime, timezone
 
 import streamlit as st
 
+import pandas as pd
+
 from config import config
+from core.background_jobs import run_storychecker_job, run_consensus_gap_job, run_fundamental_job
 from core.currency import symbol
-from core.i18n import t
+from core.i18n import t, current_language
 from core.storage.models import PortfolioStory
-from core.ui.verdicts import cloud_notice, verdict_badge, VERDICT_CONFIGS
+from core.ui.verdicts import cloud_notice, verdict_badge, VERDICT_CONFIGS, fmt_verdict_matrix
 from state import (
     get_analysis_service,
     get_app_config_repo,
@@ -88,102 +91,8 @@ def _render_position_details_expander(all_verdicts_by_agent, all_positions):
             st.divider()
 
 
-# ──────────────────────────────────────────────────────────────────────
-# Background Job for Storychecker Pre-checks
-# ──────────────────────────────────────────────────────────────────────
-
-_PS_JOB = {
-    "running": False,
-    "done": False,
-    "count": 0,
-    "error": None,
-    "agents": [],
-}
-
-_JOB_DEFAULTS = {
-    "running": False,
-    "done": False,
-    "count": 0,
-    "error": None,
-    "agents": [],
-}
-
-
-def _run_storychecker_job(
-    positions,
-    language: str,
-    job: dict,
-    db_path: str,
-    enc_key: str,
-    api_key: str,
-) -> None:
-    """
-    Run storychecker for given positions in a background thread.
-    Uses thread-local DB connection (not Streamlit singletons).
-    Imports from core.storage.base (thread-safe) not state_db (Streamlit singleton).
-    """
-    try:
-        from core.storage.base import get_connection, init_db, migrate_db, build_encryption_service
-        from core.storage.positions import PositionsRepository
-        from core.storage.analyses import PositionAnalysesRepository
-        from core.storage.storychecker import StorycheckerRepository
-        from core.llm.claude import ClaudeProvider
-        from core.constants import CLAUDE_HAIKU
-        from agents.storychecker_agent import StorycheckerAgent
-        from state import get_skills_repo
-
-        # Thread-local connection — exact pattern from watchlist_checker.py
-        conn = get_connection(db_path)
-        init_db(conn)
-        migrate_db(conn)
-
-        salt_path = os.path.join(os.path.dirname(os.path.abspath(db_path)), "salt.bin")
-        enc = build_encryption_service(enc_key, salt_path)
-        pos_repo = PositionsRepository(conn, enc)
-        analyses_repo = PositionAnalysesRepository(conn)
-        storychecker_repo = StorycheckerRepository(conn)
-        skills_repo = get_skills_repo()
-
-        if config.OPENAI_BASE_URL:
-            from core.llm.openai_compatible import OpenAICompatibleProvider
-            llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
-        else:
-            llm = ClaudeProvider(api_key=api_key, model=CLAUDE_HAIKU, base_url=config.LLM_BASE_URL)
-
-        agent = StorycheckerAgent(
-            positions_repo=pos_repo,
-            storychecker_repo=storychecker_repo,
-            analyses_repo=analyses_repo,
-            llm=llm,
-            skills_repo=skills_repo,
-        )
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        results = loop.run_until_complete(
-            agent.batch_check_all(positions=positions, language=language)
-        )
-        loop.close()
-
-        success_count = sum(1 for _, err in results if err is None)
-        errors = [f"{name}: {err}" for name, err in results if err is not None]
-        job.update({
-            "running": False,
-            "done": True,
-            "count": success_count,
-            "error": "; ".join(errors) if errors else None,
-        })
-    except Exception as e:
-        job.update({
-            "running": False,
-            "done": True,
-            "count": 0,
-            "error": str(e),
-        })
-
-
-st.set_page_config(page_title="Portfolio Story", page_icon="📖", layout="wide")
-st.title(f"📖 {t('portfolio_story.title')}")
+st.set_page_config(page_title="Portfolio Checker", page_icon="🔍", layout="wide")
+st.title(f"🔍 {t('portfolio_story.title')}")
 st.caption(t("portfolio_story.subtitle"))
 
 # ──────────────────────────────────────────────────────────────────────
@@ -210,6 +119,18 @@ all_positions = _portfolio_service.get_portfolio_positions()
 # Compute verdicts for all positions (all 3 agents at once)
 all_ids = [p.id for p in all_positions if p.id]
 all_verdicts_by_agent = _analysis_service.get_all_verdicts(all_ids) if all_ids else {}
+
+# Precompute check status for status matrix (Section 2)
+sc_verdicts = all_verdicts_by_agent.get("storychecker", {})
+cg_verdicts = all_verdicts_by_agent.get("consensus_gap", {})
+fa_verdicts = all_verdicts_by_agent.get("fundamental_analyzer", {})
+_valid_portfolio = [p for p in all_positions if p.id]
+_sc_eligible_ids = {p.id for p in _valid_portfolio if p.story and p.ticker}
+_cg_fa_eligible_ids = {p.id for p in _valid_portfolio if p.ticker}
+n_missing_sc = sum(1 for pid in _sc_eligible_ids if pid not in sc_verdicts)
+n_missing_cg = sum(1 for pid in _cg_fa_eligible_ids if pid not in cg_verdicts)
+n_missing_fa = sum(1 for pid in _cg_fa_eligible_ids if pid not in fa_verdicts)
+n_total_missing = n_missing_sc + n_missing_cg + n_missing_fa
 
 # ──────────────────────────────────────────────────────────────────────
 # Section 1: Define / Update Portfolio Story
@@ -309,51 +230,127 @@ if "_ps_draft" in st.session_state:
 st.divider()
 
 # ──────────────────────────────────────────────────────────────────────
-# Section 2: Pre-checks (Story Checker for Positions)
+# Section 2: Positions-Check Status Matrix
 # ──────────────────────────────────────────────────────────────────────
 
-st.subheader(t("portfolio_story.pending_checks_section"))
+st.subheader(t("portfolio_story.cockpit_section"))
 
-portfolio = _portfolio_service.get_portfolio_positions()
-positions_with_story = []
-n_missing_story = 0
-story_verdicts = {}
+# Post-run toasts
+if cockpit_msg := st.session_state.pop("_pc_done_msg", None):
+    st.success(cockpit_msg)
+if cockpit_errors := st.session_state.pop("_pc_errors", None):
+    for _err in cockpit_errors:
+        st.error(f"❌ {_err}")
 
-if portfolio:
-    # Only positions with story field set
-    positions_with_story = [p for p in portfolio if p.story and p.ticker]
+# Build matrix rows (SC only for positions with story+ticker; others need ticker)
+_matrix_rows = []
+for _p in _valid_portfolio:
+    _sc_cell = fmt_verdict_matrix(sc_verdicts.get(_p.id), "storychecker") if (_p.story and _p.ticker) else "—"
+    _cg_cell = fmt_verdict_matrix(cg_verdicts.get(_p.id), "consensus_gap") if _p.ticker else "—"
+    _fa_cell = fmt_verdict_matrix(fa_verdicts.get(_p.id), "fundamental_analyzer") if _p.ticker else "—"
+    _matrix_rows.append({
+        "name": _p.name,
+        "ticker": _p.ticker or "—",
+        "sc": _sc_cell,
+        "cg": _cg_cell,
+        "fa": _fa_cell,
+    })
 
-    if positions_with_story:
-        portfolio_ids = [p.id for p in positions_with_story]
-
-        # Count missing story checker verdicts
-        story_verdicts = _analysis_service.get_verdicts(portfolio_ids, "storychecker")
-        n_missing_story = sum(1 for pid in portfolio_ids if pid not in story_verdicts)
-
-        # Get latest timestamp
-        latest_ts = None
-        for verdict_obj in story_verdicts.values():
-            if verdict_obj and hasattr(verdict_obj, 'created_at') and verdict_obj.created_at:
-                if latest_ts is None or verdict_obj.created_at > latest_ts:
-                    latest_ts = verdict_obj.created_at
-
-        ts_str = t("portfolio_story.ts_last_run").format(ts=latest_ts.strftime('%d.%m. %H:%M')) if latest_ts else t("portfolio_story.ts_never")
-
-        if n_missing_story > 0:
-            st.info(
-                t("portfolio_story.pending_info").format(n=n_missing_story, total=len(positions_with_story), ts=ts_str)
-            )
-
-# Checkbox for pre-checks
-run_position_checks = st.checkbox(
-    t("portfolio_story.run_pending_checkbox"),
-    value=False,
-    key="_ps_run_prechecks",
+_matrix_selection = st.dataframe(
+    pd.DataFrame(_matrix_rows),
+    use_container_width=True,
+    hide_index=True,
+    on_select="rerun",
+    selection_mode="single-row",
+    column_config={
+        "name": st.column_config.TextColumn("Position", width="medium"),
+        "ticker": st.column_config.TextColumn("Ticker", width="small"),
+        "sc": st.column_config.TextColumn(t("portfolio_story.cockpit_col_sc"), width="medium"),
+        "cg": st.column_config.TextColumn(t("portfolio_story.cockpit_col_cg"), width="medium"),
+        "fa": st.column_config.TextColumn(t("portfolio_story.cockpit_col_fa"), width="medium"),
+    },
 )
 
-# Show job status if running
-if "_PS_JOB" in st.session_state and st.session_state["_PS_JOB"]["running"]:
-    st.info(t("portfolio_story.checks_running_info"))
+# Row selection → action buttons
+_selected_rows = _matrix_selection.selection.rows if _matrix_selection.selection else []
+if _selected_rows and _selected_rows[0] < len(_valid_portfolio):
+    _sel_pos = _valid_portfolio[_selected_rows[0]]
+    _row_missing = []
+    if _sel_pos.id in _sc_eligible_ids and _sel_pos.id not in sc_verdicts: _row_missing.append("sc")
+    if _sel_pos.id in _cg_fa_eligible_ids and _sel_pos.id not in cg_verdicts: _row_missing.append("cg")
+    if _sel_pos.id in _cg_fa_eligible_ids and _sel_pos.id not in fa_verdicts: _row_missing.append("fa")
+
+    _nav_col1, _nav_col2, _nav_spacer = st.columns([1, 2, 2])
+    with _nav_col1:
+        if st.button(t("portfolio_story.nav_to_pd"), key="pc_nav_pd_btn", use_container_width=True):
+            st.session_state["pd_preselect_position_id"] = _sel_pos.id
+            st.switch_page("pages/position_dashboard.py")
+    with _nav_col2:
+        if _row_missing:
+            if st.button(t("portfolio_story.cockpit_run_row_missing").format(n=len(_row_missing)), key="pc_run_row_btn", use_container_width=True):
+                _lang = current_language()
+                _row_total = 0
+                _row_errors: list[str] = []
+                _pos_single = [_sel_pos]
+                _JOB_ARGS = (config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY)
+
+                def _run_row_job_pc(target, spinner_text, label):
+                    _j = {"running": True, "done": False, "count": 0, "error": None}
+                    threading.Thread(target=target, args=(_pos_single, _lang, _j) + _JOB_ARGS, daemon=True).start()
+                    with st.spinner(spinner_text):
+                        while _j["running"]: time.sleep(1)
+                    if _j["error"]: _row_errors.append(f"{label}: {_j['error']}"); return 0
+                    return _j["count"]
+
+                if "sc" in _row_missing:
+                    _row_total += _run_row_job_pc(run_storychecker_job, t("watchlist_checker.running_story_spinner").format(n=1), "Story Checker")
+                if "cg" in _row_missing:
+                    _row_total += _run_row_job_pc(run_consensus_gap_job, t("watchlist_checker.running_consensus_spinner").format(n=1), "Konsens-Lücken")
+                if "fa" in _row_missing:
+                    _row_total += _run_row_job_pc(run_fundamental_job, t("watchlist_checker.running_fund_spinner").format(n=1), "Fundamental")
+
+                if _row_errors: st.session_state["_pc_errors"] = _row_errors
+                st.session_state["_pc_done_msg"] = t("watchlist_checker.cockpit_done").format(n=_row_total)
+                st.rerun()
+
+# Global: run all missing / all complete
+if n_total_missing > 0:
+    n_incomplete = sum(
+        1 for p in _valid_portfolio if p.id and (
+            (p.id in _sc_eligible_ids and p.id not in sc_verdicts) or
+            (p.id in _cg_fa_eligible_ids and (p.id not in cg_verdicts or p.id not in fa_verdicts))
+        )
+    )
+    st.caption(t("watchlist_checker.cockpit_missing_summary").format(n=n_total_missing, positions=n_incomplete))
+    if st.button(t("portfolio_story.cockpit_run_all_missing"), key="pc_run_all_btn"):
+        _lang = current_language()
+        _total_done = 0
+        _all_errors: list[str] = []
+        _JOB_ARGS_ALL = (config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY)
+
+        def _run_all_job(target, positions, spinner_text, label):
+            _j = {"running": True, "done": False, "count": 0, "error": None}
+            threading.Thread(target=target, args=(positions, _lang, _j) + _JOB_ARGS_ALL, daemon=True).start()
+            with st.spinner(spinner_text):
+                while _j["running"]: time.sleep(1)
+            if _j["error"]: _all_errors.append(f"{label}: {_j['error']}"); return 0
+            return _j["count"]
+
+        if n_missing_sc > 0:
+            _missing = [p for p in _valid_portfolio if p.id in _sc_eligible_ids and p.id not in sc_verdicts]
+            _total_done += _run_all_job(run_storychecker_job, _missing, t("watchlist_checker.running_story_spinner").format(n=len(_missing)), "Story Checker")
+        if n_missing_cg > 0:
+            _missing = [p for p in _valid_portfolio if p.id in _cg_fa_eligible_ids and p.id not in cg_verdicts]
+            _total_done += _run_all_job(run_consensus_gap_job, _missing, t("watchlist_checker.running_consensus_spinner").format(n=len(_missing)), "Konsens-Lücken")
+        if n_missing_fa > 0:
+            _missing = [p for p in _valid_portfolio if p.id in _cg_fa_eligible_ids and p.id not in fa_verdicts]
+            _total_done += _run_all_job(run_fundamental_job, _missing, t("watchlist_checker.running_fund_spinner").format(n=len(_missing)), "Fundamental")
+
+        if _all_errors: st.session_state["_pc_errors"] = _all_errors
+        st.session_state["_pc_done_msg"] = t("watchlist_checker.cockpit_done").format(n=_total_done)
+        st.rerun()
+else:
+    st.success(t("watchlist_checker.cockpit_all_complete"))
 
 st.divider()
 
@@ -367,38 +364,6 @@ if st.button(t("portfolio_story.run_button"), type="primary", use_container_widt
     if not current_story or not current_story.story:
         st.error(t("portfolio_story.no_story_error"))
     else:
-        # Run pre-checks if enabled (only missing ones)
-        if run_position_checks and n_missing_story > 0 and positions_with_story:
-            # Start background thread
-            missing_positions = [
-                p for p in positions_with_story
-                if p.id not in story_verdicts
-            ]
-
-            _PS_JOB.update({
-                **_JOB_DEFAULTS,
-                "running": True,
-                "agents": ["Story Checker"],
-            })
-            st.session_state["_PS_JOB"] = _PS_JOB
-
-            threading.Thread(
-                target=_run_storychecker_job,
-                args=(missing_positions, "de", _PS_JOB,
-                      config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY),
-                daemon=True,
-            ).start()
-
-            # Show spinner while waiting
-            with st.spinner(t("portfolio_story.running_checks_spinner").format(n=len(missing_positions))):
-                while _PS_JOB["running"]:
-                    time.sleep(1)
-
-            if _PS_JOB["error"]:
-                st.error(f"❌ Error: {_PS_JOB['error']}")
-            else:
-                st.success(t("portfolio_story.checks_done_success").format(n=_PS_JOB['count']))
-
         # Build portfolio snapshot (WITHOUT dividends — LLM would invent numbers)
         valuations = {v.symbol: v for v in valuations_list} if valuations_list else {}
 

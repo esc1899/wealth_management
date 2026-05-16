@@ -70,6 +70,14 @@ def render_verdict_legend(config: Dict[str, Tuple[str, str]]) -> None:
             st.markdown(f"**{icon} {label}** — {t(f'common.legend_{verdict}')}")
 
 
+def fmt_verdict_matrix(verdict_obj, config_key: str) -> str:
+    """Format a verdict object as 'icon verdict' text for dataframe matrix cells."""
+    if verdict_obj and verdict_obj.verdict:
+        icon = verdict_icon(verdict_obj.verdict, VERDICT_CONFIGS[config_key])
+        return f"{icon} {verdict_obj.verdict}"
+    return "⚪ —"
+
+
 def cloud_notice(model: str, provider: str = "claude") -> None:
     """Render standardized cloud/local notice."""
     from config import config

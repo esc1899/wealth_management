@@ -96,31 +96,34 @@ _assistant_group = (
     else t("nav.group_assistant_remote")
 )
 
-# Assistant pages: local experimental features (Watchlist Checker, Investment Kompass) only visible locally
-_assistant_pages = [
-    st.Page("pages/portfolio_chat.py",    title=t("nav.portfolio_chat"),     icon=":material/chat:"),
-    st.Page("pages/portfolio_story.py",   title="Portfolio Story",           icon=":material/description:"),
+# Portfolio pages (Watchlist-Analyse local-only)
+_portfolio_pages = [
+    st.Page("pages/dashboard.py",          title=t("nav.dashboard"),   icon=":material/dashboard:"),
+    st.Page("pages/positionen.py",         title=t("nav.positions"),   icon=":material/edit_note:"),
+    st.Page("pages/marktdaten.py",         title=t("nav.market_data"), icon=":material/trending_up:"),
+    st.Page("pages/analyse.py",            title=t("nav.analysis"),    icon=":material/bar_chart:"),
+    st.Page("pages/position_dashboard.py", title="Positionsanalyse",   icon=":material/person_search:"),
 ]
-
-# Experimental local-only features
 if _is_local:
-    _assistant_pages.extend([
-        st.Page("pages/watchlist_checker.py",   title="Watchlist Checker",   icon=":material/check_circle:"),
-        st.Page("pages/watchlist_analysis.py",  title="Watchlist-Analyse",   icon=":material/search:"),
-    ])
+    _portfolio_pages.append(
+        st.Page("pages/watchlist_analysis.py", title="Watchlist-Analyse", icon=":material/search:"),
+    )
 
+# Assistant pages
+_assistant_pages = [
+    st.Page("pages/portfolio_chat.py",  title=t("nav.portfolio_chat"),  icon=":material/chat:"),
+    st.Page("pages/portfolio_story.py", title="Portfolio Checker",       icon=":material/fact_check:"),
+]
+if _is_local:
+    _assistant_pages.append(
+        st.Page("pages/watchlist_checker.py", title="Watchlist Checker", icon=":material/check_circle:"),
+    )
 _assistant_pages.append(
-    st.Page("pages/wealth_history.py",     title=t("nav.wealth_history"), icon=":material/show_chart:")
+    st.Page("pages/wealth_history.py",  title=t("nav.wealth_history"),  icon=":material/show_chart:")
 )
 
 pg = st.navigation({
-    t("nav.group_portfolio"): [
-        st.Page("pages/dashboard.py",      title=t("nav.dashboard"),   icon=":material/dashboard:"),
-        st.Page("pages/positionen.py",     title=t("nav.positions"),   icon=":material/edit_note:"),
-        st.Page("pages/marktdaten.py",     title=t("nav.market_data"), icon=":material/trending_up:"),
-        st.Page("pages/analyse.py",        title=t("nav.analysis"),    icon=":material/bar_chart:"),
-        st.Page("pages/position_dashboard.py", title="Positionsanalyse", icon=":material/person_search:"),
-    ],
+    t("nav.group_portfolio"): _portfolio_pages,
     _assistant_group: _assistant_pages,
     t("nav.group_research"): [
         st.Page("pages/research_chat.py",   title=t("nav.research_chat"),    icon=":material/search:"),
