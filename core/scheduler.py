@@ -497,6 +497,7 @@ class AgentSchedulerService:
         wealth_repo = WealthSnapshotRepository(conn)
 
         # Create a temporary market data agent for portfolio valuation
+        from agents.market_data_agent import MarketDataAgent
         from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
         fetcher = MarketDataFetcher(rate_limiter=RateLimiter(calls_per_second=1))
         market_data_agent = MarketDataAgent(

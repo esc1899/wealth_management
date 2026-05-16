@@ -151,8 +151,8 @@ class MarketDataRepository:
             INSERT INTO dividend_data (symbol, rate_eur, yield_pct, currency, fetched_at)
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(symbol) DO UPDATE SET
-                rate_eur  = excluded.rate_eur,
-                yield_pct = excluded.yield_pct,
+                rate_eur  = COALESCE(excluded.rate_eur, dividend_data.rate_eur),
+                yield_pct = COALESCE(excluded.yield_pct, dividend_data.yield_pct),
                 currency  = excluded.currency,
                 fetched_at = excluded.fetched_at
             """,

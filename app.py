@@ -107,7 +107,6 @@ if _is_local:
     _assistant_pages.extend([
         st.Page("pages/watchlist_checker.py",   title="Watchlist Checker",   icon=":material/check_circle:"),
         st.Page("pages/watchlist_analysis.py",  title="Watchlist-Analyse",   icon=":material/search:"),
-        st.Page("pages/capital_allocator.py",   title="Capital Allocator",   icon=":material/account_balance:"),
     ])
 
 _assistant_pages.append(
