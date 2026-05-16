@@ -124,9 +124,9 @@ all_verdicts_by_agent = _analysis_service.get_all_verdicts(all_ids) if all_ids e
 sc_verdicts = all_verdicts_by_agent.get("storychecker", {})
 cg_verdicts = all_verdicts_by_agent.get("consensus_gap", {})
 fa_verdicts = all_verdicts_by_agent.get("fundamental_analyzer", {})
-_valid_portfolio = [p for p in all_positions if p.id]
-_sc_eligible_ids = {p.id for p in _valid_portfolio if p.story and p.ticker}
-_cg_fa_eligible_ids = {p.id for p in _valid_portfolio if p.ticker}
+_valid_portfolio = [p for p in all_positions if p.id and p.ticker and not p.analysis_excluded]
+_sc_eligible_ids = {p.id for p in _valid_portfolio if p.story}
+_cg_fa_eligible_ids = {p.id for p in _valid_portfolio}
 n_missing_sc = sum(1 for pid in _sc_eligible_ids if pid not in sc_verdicts)
 n_missing_cg = sum(1 for pid in _cg_fa_eligible_ids if pid not in cg_verdicts)
 n_missing_fa = sum(1 for pid in _cg_fa_eligible_ids if pid not in fa_verdicts)
@@ -242,12 +242,12 @@ if cockpit_errors := st.session_state.pop("_pc_errors", None):
     for _err in cockpit_errors:
         st.error(f"❌ {_err}")
 
-# Build matrix rows (SC only for positions with story+ticker; others need ticker)
+# Build matrix rows (SC only for positions with story; all others get CG+FA cells)
 _matrix_rows = []
 for _p in _valid_portfolio:
-    _sc_cell = fmt_verdict_matrix(sc_verdicts.get(_p.id), "storychecker") if (_p.story and _p.ticker) else "—"
-    _cg_cell = fmt_verdict_matrix(cg_verdicts.get(_p.id), "consensus_gap") if _p.ticker else "—"
-    _fa_cell = fmt_verdict_matrix(fa_verdicts.get(_p.id), "fundamental_analyzer") if _p.ticker else "—"
+    _sc_cell = fmt_verdict_matrix(sc_verdicts.get(_p.id), "storychecker") if _p.story else "—"
+    _cg_cell = fmt_verdict_matrix(cg_verdicts.get(_p.id), "consensus_gap")
+    _fa_cell = fmt_verdict_matrix(fa_verdicts.get(_p.id), "fundamental_analyzer")
     _matrix_rows.append({
         "name": _p.name,
         "ticker": _p.ticker or "—",
@@ -271,54 +271,56 @@ _matrix_selection = st.dataframe(
     },
 )
 
-# Row selection → action buttons
+# Row selection → action buttons (directly below table)
 _selected_rows = _matrix_selection.selection.rows if _matrix_selection.selection else []
 if _selected_rows and _selected_rows[0] < len(_valid_portfolio):
     _sel_pos = _valid_portfolio[_selected_rows[0]]
     _row_missing = []
     if _sel_pos.id in _sc_eligible_ids and _sel_pos.id not in sc_verdicts: _row_missing.append("sc")
-    if _sel_pos.id in _cg_fa_eligible_ids and _sel_pos.id not in cg_verdicts: _row_missing.append("cg")
-    if _sel_pos.id in _cg_fa_eligible_ids and _sel_pos.id not in fa_verdicts: _row_missing.append("fa")
+    if _sel_pos.id not in cg_verdicts: _row_missing.append("cg")
+    if _sel_pos.id not in fa_verdicts: _row_missing.append("fa")
 
-    _nav_col1, _nav_col2, _nav_spacer = st.columns([1, 2, 2])
-    with _nav_col1:
-        if st.button(t("portfolio_story.nav_to_pd"), key="pc_nav_pd_btn", use_container_width=True):
-            st.session_state["pd_preselect_position_id"] = _sel_pos.id
-            st.switch_page("pages/position_dashboard.py")
-    with _nav_col2:
-        if _row_missing:
-            if st.button(t("portfolio_story.cockpit_run_row_missing").format(n=len(_row_missing)), key="pc_run_row_btn", use_container_width=True):
-                _lang = current_language()
-                _row_total = 0
-                _row_errors: list[str] = []
-                _pos_single = [_sel_pos]
-                _JOB_ARGS = (config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY)
+    with st.container(border=True):
+        st.caption(f"**{_sel_pos.name}** ({_sel_pos.ticker})")
+        _nav_col1, _nav_col2, _nav_spacer = st.columns([1, 2, 3])
+        with _nav_col1:
+            if st.button(t("portfolio_story.nav_to_pd"), key="pc_nav_pd_btn", use_container_width=True):
+                st.session_state["pd_preselect_position_id"] = _sel_pos.id
+                st.switch_page("pages/position_dashboard.py")
+        with _nav_col2:
+            if _row_missing:
+                if st.button(t("portfolio_story.cockpit_run_row_missing").format(n=len(_row_missing)), key="pc_run_row_btn", use_container_width=True):
+                    _lang = current_language()
+                    _row_total = 0
+                    _row_errors: list[str] = []
+                    _pos_single = [_sel_pos]
+                    _JOB_ARGS = (config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY)
 
-                def _run_row_job_pc(target, spinner_text, label):
-                    _j = {"running": True, "done": False, "count": 0, "error": None}
-                    threading.Thread(target=target, args=(_pos_single, _lang, _j) + _JOB_ARGS, daemon=True).start()
-                    with st.spinner(spinner_text):
-                        while _j["running"]: time.sleep(1)
-                    if _j["error"]: _row_errors.append(f"{label}: {_j['error']}"); return 0
-                    return _j["count"]
+                    def _run_row_job_pc(target, spinner_text, label):
+                        _j = {"running": True, "done": False, "count": 0, "error": None}
+                        threading.Thread(target=target, args=(_pos_single, _lang, _j) + _JOB_ARGS, daemon=True).start()
+                        with st.spinner(spinner_text):
+                            while _j["running"]: time.sleep(1)
+                        if _j["error"]: _row_errors.append(f"{label}: {_j['error']}"); return 0
+                        return _j["count"]
 
-                if "sc" in _row_missing:
-                    _row_total += _run_row_job_pc(run_storychecker_job, t("watchlist_checker.running_story_spinner").format(n=1), "Story Checker")
-                if "cg" in _row_missing:
-                    _row_total += _run_row_job_pc(run_consensus_gap_job, t("watchlist_checker.running_consensus_spinner").format(n=1), "Konsens-Lücken")
-                if "fa" in _row_missing:
-                    _row_total += _run_row_job_pc(run_fundamental_job, t("watchlist_checker.running_fund_spinner").format(n=1), "Fundamental")
+                    if "sc" in _row_missing:
+                        _row_total += _run_row_job_pc(run_storychecker_job, t("watchlist_checker.running_story_spinner").format(n=1), "Story Checker")
+                    if "cg" in _row_missing:
+                        _row_total += _run_row_job_pc(run_consensus_gap_job, t("watchlist_checker.running_consensus_spinner").format(n=1), "Konsens-Lücken")
+                    if "fa" in _row_missing:
+                        _row_total += _run_row_job_pc(run_fundamental_job, t("watchlist_checker.running_fund_spinner").format(n=1), "Fundamental")
 
-                if _row_errors: st.session_state["_pc_errors"] = _row_errors
-                st.session_state["_pc_done_msg"] = t("watchlist_checker.cockpit_done").format(n=_row_total)
-                st.rerun()
+                    if _row_errors: st.session_state["_pc_errors"] = _row_errors
+                    st.session_state["_pc_done_msg"] = t("watchlist_checker.cockpit_done").format(n=_row_total)
+                    st.rerun()
 
 # Global: run all missing / all complete
 if n_total_missing > 0:
     n_incomplete = sum(
-        1 for p in _valid_portfolio if p.id and (
+        1 for p in _valid_portfolio if (
             (p.id in _sc_eligible_ids and p.id not in sc_verdicts) or
-            (p.id in _cg_fa_eligible_ids and (p.id not in cg_verdicts or p.id not in fa_verdicts))
+            p.id not in cg_verdicts or p.id not in fa_verdicts
         )
     )
     st.caption(t("watchlist_checker.cockpit_missing_summary").format(n=n_total_missing, positions=n_incomplete))
