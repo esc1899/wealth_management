@@ -793,3 +793,75 @@ class TestBackfillSnapshots:
         agent, wealth_repo = self._make_agent([], price_map={})
         assert agent.backfill_snapshots(days=7) == 0
         wealth_repo.create.assert_not_called()
+
+
+class TestRecalculateSnapshot:
+    def _make_agent(self, positions, price_map, existing_snapshot=None):
+        pos_repo = Mock(spec=PositionsRepository)
+        pos_repo.get_portfolio.return_value = positions
+        market_repo = Mock(spec=MarketDataRepository)
+        market_repo.get_price_for_date_or_prior.side_effect = lambda sym, d: price_map.get(d)
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        wealth_repo.get_by_date.return_value = existing_snapshot
+        wealth_repo.create.return_value = Mock(coverage_pct=100.0)
+        market_agent = Mock()
+        return WealthSnapshotAgent(
+            positions_repo=pos_repo,
+            market_repo=market_repo,
+            wealth_repo=wealth_repo,
+            market_data_agent=market_agent,
+        ), wealth_repo
+
+    def test_recalculate_overwrites_existing(self):
+        pos = _make_position(quantity=10.0)
+        existing = Mock(id=42)
+        agent, wealth_repo = self._make_agent([pos], {"2026-01-15": 200.0}, existing_snapshot=existing)
+        result = agent.recalculate_snapshot("2026-01-15")
+        wealth_repo.delete.assert_called_once_with(42)
+        wealth_repo.create.assert_called_once()
+        assert result is not None
+
+    def test_recalculate_creates_when_no_existing(self):
+        pos = _make_position(quantity=10.0)
+        agent, wealth_repo = self._make_agent([pos], {"2026-01-15": 200.0}, existing_snapshot=None)
+        result = agent.recalculate_snapshot("2026-01-15")
+        wealth_repo.delete.assert_not_called()
+        wealth_repo.create.assert_called_once()
+        call_kwargs = wealth_repo.create.call_args[1]
+        assert call_kwargs["total_eur"] == pytest.approx(2000.0)
+        assert call_kwargs["note"] == "recalculated"
+        assert call_kwargs["is_manual"] is True
+
+    def test_recalculate_returns_none_when_no_price_data(self):
+        pos = _make_position(quantity=10.0)
+        agent, wealth_repo = self._make_agent([pos], {}, existing_snapshot=None)
+        result = agent.recalculate_snapshot("2026-01-15")
+        assert result is None
+        wealth_repo.create.assert_not_called()
+
+    def test_recalculate_coverage_reflects_missing(self):
+        pos_with_price = _make_position(ticker="AAPL", quantity=10.0)
+        pos_no_price = Position(
+            id=2, name="NoData Inc", asset_class="Aktie", investment_type="Aktie",
+            ticker="NODATA", quantity=5.0, unit="Stück", in_portfolio=True,
+            added_date=date(2026, 1, 1), extra_data={},
+        )
+        # price_map only has AAPL prices (keyed by date), NODATA returns None
+        price_map_by_ticker = {"AAPL": 100.0}
+
+        pos_repo = Mock(spec=PositionsRepository)
+        pos_repo.get_portfolio.return_value = [pos_with_price, pos_no_price]
+        market_repo = Mock(spec=MarketDataRepository)
+        market_repo.get_price_for_date_or_prior.side_effect = lambda sym, d: price_map_by_ticker.get(sym)
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        wealth_repo.get_by_date.return_value = None
+        wealth_repo.create.return_value = Mock(coverage_pct=50.0)
+        market_agent = Mock()
+        agent = WealthSnapshotAgent(
+            positions_repo=pos_repo, market_repo=market_repo,
+            wealth_repo=wealth_repo, market_data_agent=market_agent,
+        )
+        agent.recalculate_snapshot("2026-01-15")
+        call_kwargs = wealth_repo.create.call_args[1]
+        assert call_kwargs["coverage_pct"] == pytest.approx(50.0)
+        assert "NoData Inc" in call_kwargs["missing_pos"]

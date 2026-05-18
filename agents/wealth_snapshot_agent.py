@@ -452,6 +452,82 @@ class WealthSnapshotAgent:
             logger.info("Backfilled %d wealth snapshots", created)
         return created
 
+    def recalculate_snapshot(self, date_str: str) -> Optional[WealthSnapshot]:
+        """
+        Recalculate an existing snapshot using stored historical prices for that date.
+        Uses the same logic as backfill_snapshots() but for a single specific date.
+        Overwrites the existing snapshot if one exists.
+
+        Returns the updated snapshot, or None if no price data is available for that date.
+        """
+        from core.currency import is_cash_unit
+
+        TROY_OZ_TO_G = 31.1035
+        positions = self._positions.get_portfolio()
+        if not positions:
+            return None
+
+        registry = get_asset_class_registry()
+        breakdown: Dict[str, float] = {ac: 0.0 for ac in registry.all_names()}
+        total = 0.0
+        missing = []
+
+        for pos in positions:
+            cfg = registry.get(pos.asset_class)
+            is_auto = cfg.auto_fetch if cfg else False
+
+            if not is_auto:
+                extra = pos.extra_data or {}
+                est_val = extra.get("estimated_value")
+                if est_val is not None:
+                    v = float(est_val)
+                    total += v
+                    breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + v
+                else:
+                    missing.append(pos.name)
+                continue
+
+            if is_cash_unit(pos.unit) and pos.quantity is not None:
+                total += pos.quantity
+                breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + pos.quantity
+                continue
+
+            if not pos.ticker or pos.quantity is None:
+                missing.append(pos.name)
+                continue
+
+            price = self._market.get_price_for_date_or_prior(pos.ticker, date_str)
+            if price is None:
+                # Price not in DB yet — fetch 1y history for this ticker and retry
+                self._market_data_agent.fetch_historical_for_symbol(pos.ticker)
+                price = self._market.get_price_for_date_or_prior(pos.ticker, date_str)
+            if price is None:
+                missing.append(pos.name)
+                continue
+
+            value = (price / TROY_OZ_TO_G) * pos.quantity if pos.unit == "g" else price * pos.quantity
+            total += value
+            breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + value
+
+        if total <= 0:
+            return None
+
+        coverage = (len(positions) - len(missing)) / len(positions) * 100
+
+        existing = self._wealth.get_by_date(date_str)
+        if existing is not None:
+            self._wealth.delete(existing.id)
+
+        return self._wealth.create(
+            date_str=date_str,
+            total_eur=total,
+            breakdown=breakdown,
+            coverage_pct=coverage,
+            missing_pos=missing if missing else None,
+            is_manual=True,
+            note="recalculated",
+        )
+
     def get_latest_snapshot(self) -> Optional[WealthSnapshot]:
         """Get the most recent snapshot."""
         return self._wealth.latest()

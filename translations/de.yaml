@@ -734,6 +734,12 @@ wealth_history:
   update_button: "Snapshots jetzt aktualisieren"
   update_success: "Snapshots aktualisiert."
   update_error: "Fehler beim Aktualisieren: {error}"
+  recalculate_help: "Snapshot neu berechnen (historische Kurse)"
+  recalculate_no_data: "Keine historischen Kursdaten für dieses Datum verfügbar."
+  recalculate_success: "{date}: {coverage}% Abdeckung ({missing} fehlend)"
+  recalculate_success_full: "{date}: {coverage}% Abdeckung"
+  recalculating: "Snapshot wird neu berechnet..."
+  delete_help: "Snapshot löschen"
 
 portfolio_story:
   cash_rule_title: "💰 Bargeldregel"

@@ -71,10 +71,10 @@ class MarketDataRepository:
     # ------------------------------------------------------------------
 
     def upsert_historical(self, record: HistoricalPrice) -> HistoricalPrice:
-        """Insert historical close, ignore if already exists (history is immutable)."""
+        """Insert or update historical close price (overwrites existing for same symbol+date)."""
         cursor = self._conn.execute(
             """
-            INSERT OR IGNORE INTO historical_prices (symbol, date, close_eur, volume)
+            INSERT OR REPLACE INTO historical_prices (symbol, date, close_eur, volume)
             VALUES (?, ?, ?, ?)
             """,
             (
@@ -86,6 +86,18 @@ class MarketDataRepository:
         )
         self._conn.commit()
         return record.model_copy(update={"id": cursor.lastrowid or None})
+
+    def get_price_for_date_or_prior(self, symbol: str, date_str: str, max_days_back: int = 5) -> Optional[float]:
+        """Return closing price for exact date, or the closest prior date within max_days_back days."""
+        row = self._conn.execute(
+            """
+            SELECT close_eur FROM historical_prices
+            WHERE symbol = ? AND date <= ? AND date >= date(?, '-' || ? || ' days')
+            ORDER BY date DESC LIMIT 1
+            """,
+            (symbol.upper(), date_str, date_str, max_days_back),
+        ).fetchone()
+        return float(row["close_eur"]) if row else None
 
     def get_historical(self, symbol: str, days: int = 365) -> list[HistoricalPrice]:
         rows = self._conn.execute(

@@ -127,10 +127,14 @@ class TestUpsertHistorical:
         history = repo.get_historical("AAPL")
         assert len(history) == 1
 
-    def test_duplicate_is_ignored(self, repo):
+    def test_duplicate_is_replaced(self, repo):
+        from core.storage.models import HistoricalPrice
         repo.upsert_historical(make_history())
-        repo.upsert_historical(make_history())  # same symbol + date
-        assert len(repo.get_historical("AAPL")) == 1
+        updated = HistoricalPrice(symbol="AAPL", date=date.today(), close_eur=999.0)
+        repo.upsert_historical(updated)
+        history = repo.get_historical("AAPL")
+        assert len(history) == 1
+        assert history[0].close_eur == pytest.approx(999.0)
 
     def test_different_dates_stored(self, repo):
         from datetime import timedelta

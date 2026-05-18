@@ -734,6 +734,12 @@ wealth_history:
   update_button: "Update snapshots now"
   update_success: "Snapshots updated."
   update_error: "Error updating: {error}"
+  recalculate_help: "Recalculate snapshot (historical prices)"
+  recalculate_no_data: "No historical price data available for this date."
+  recalculate_success: "{date}: {coverage}% coverage ({missing} missing)"
+  recalculate_success_full: "{date}: {coverage}% coverage"
+  recalculating: "Recalculating snapshot..."
+  delete_help: "Delete snapshot"
 
 portfolio_story:
   cash_rule_title: "💰 Cash Rule"

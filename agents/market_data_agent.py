@@ -125,6 +125,13 @@ class MarketDataAgent:
 
         return result
 
+    def fetch_historical_for_symbol(self, symbol: str) -> int:
+        """Fetch and store 1y of historical prices for a single symbol. Returns count stored."""
+        history = self._fetcher.fetch_historical(symbol.upper(), period="1y")
+        for h in history:
+            self._market.upsert_historical(h)
+        return len(history)
+
     def fetch_dividends_now(self, symbols: Optional[list[str]] = None) -> dict[str, str]:
         """
         Fetch dividend data for given symbols (or all auto-fetch symbols if None).

@@ -212,6 +212,14 @@ else:
 
 st.markdown(f"### {t('wealth_history.raw_data')}")
 
+# Show recalculation result after rerun
+if "recalc_result" in st.session_state:
+    msg = st.session_state.pop("recalc_result")
+    if msg["ok"]:
+        st.success(msg["text"])
+    else:
+        st.warning(msg["text"])
+
 tab_wealth, tab_dividend = st.tabs([
     t("wealth_history.wealth_tab"),
     t("wealth_history.dividend_tab"),
@@ -219,28 +227,70 @@ tab_wealth, tab_dividend = st.tabs([
 
 with tab_wealth:
     if wealth_snapshots:
-        data = []
-        for snap in wealth_snapshots:
-            data.append({
-                t("wealth_history.date_label"): snap.date,
-                t("wealth_history.total_wealth"): f"€ {snap.total_eur:,.0f}",
-                t("wealth_history.data_coverage"): f"{snap.coverage_pct:.1f}%",
-                t("wealth_history.manual_flag"): "✓" if snap.is_manual else "",
-            })
-        st.dataframe(data[::-1], use_container_width=True, hide_index=True)
+        header = st.columns([2, 2, 2, 1, 1, 1])
+        header[0].markdown(f"**{t('wealth_history.date_label')}**")
+        header[1].markdown(f"**{t('wealth_history.total_wealth')}**")
+        header[2].markdown(f"**{t('wealth_history.data_coverage')}**")
+        header[3].markdown(f"**{t('wealth_history.manual_flag')}**")
+        st.divider()
+        for snap in reversed(wealth_snapshots):
+            low_coverage = snap.coverage_pct < 95.0
+            cols = st.columns([2, 2, 2, 1, 1, 1])
+            cols[0].write(snap.date)
+            cols[1].write(f"€ {snap.total_eur:,.0f}")
+            coverage_label = f"⚠️ {snap.coverage_pct:.1f}%" if low_coverage else f"{snap.coverage_pct:.1f}%"
+            cols[2].write(coverage_label)
+            cols[3].write("✓" if snap.is_manual else "")
+            if cols[4].button("🔄", key=f"recalc_w_{snap.date}", help=t("wealth_history.recalculate_help")):
+                with st.spinner(t("wealth_history.recalculating")):
+                    try:
+                        result = agent.recalculate_snapshot(snap.date)
+                    except Exception as e:
+                        st.error(str(e))
+                        result = None
+                if result:
+                    if result.missing_pos:
+                        msg_text = t("wealth_history.recalculate_success").format(
+                            date=snap.date, coverage=f"{result.coverage_pct:.1f}", missing=len(result.missing_pos)
+                        )
+                    else:
+                        msg_text = t("wealth_history.recalculate_success_full").format(
+                            date=snap.date, coverage=f"{result.coverage_pct:.1f}"
+                        )
+                    st.session_state["recalc_result"] = {"ok": True, "text": msg_text}
+                else:
+                    st.session_state["recalc_result"] = {"ok": False, "text": t("wealth_history.recalculate_no_data")}
+                st.rerun()
+            if cols[5].button("🗑️", key=f"del_w_{snap.date}", help=t("wealth_history.delete_help")):
+                try:
+                    agent.delete_snapshot(snap.date)
+                    st.rerun()
+                except Exception as e:
+                    st.error(str(e))
     else:
         st.info(t("wealth_history.no_data"))
 
 with tab_dividend:
     if dividend_snapshots:
-        data = []
-        for snap in dividend_snapshots:
-            data.append({
-                t("wealth_history.date_label"): snap.date,
-                t("wealth_history.annual_dividend"): f"€ {snap.total_eur:,.0f}",
-                t("wealth_history.data_coverage"): f"{snap.coverage_pct:.1f}%",
-                t("wealth_history.manual_flag"): "✓" if snap.is_manual else "",
-            })
-        st.dataframe(data[::-1], use_container_width=True, hide_index=True)
+        from state import get_dividend_snapshot_repo as _get_div_repo
+        _div_repo = _get_div_repo()
+        header = st.columns([2, 2, 2, 1, 1])
+        header[0].markdown(f"**{t('wealth_history.date_label')}**")
+        header[1].markdown(f"**{t('wealth_history.annual_dividend')}**")
+        header[2].markdown(f"**{t('wealth_history.data_coverage')}**")
+        header[3].markdown(f"**{t('wealth_history.manual_flag')}**")
+        st.divider()
+        for snap in reversed(dividend_snapshots):
+            cols = st.columns([2, 2, 2, 1, 1])
+            cols[0].write(snap.date)
+            cols[1].write(f"€ {snap.total_eur:,.0f}")
+            cols[2].write(f"{snap.coverage_pct:.1f}%")
+            cols[3].write("✓" if snap.is_manual else "")
+            if cols[4].button("🗑️", key=f"del_d_{snap.date}", help=t("wealth_history.delete_help")):
+                try:
+                    _div_repo.delete(snap.id)
+                    st.rerun()
+                except Exception as e:
+                    st.error(str(e))
     else:
         st.info(t("wealth_history.no_data"))
