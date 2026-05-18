@@ -159,8 +159,16 @@ class TestGenerateMonthlyDigest:
         """)
         conn.execute("INSERT INTO historical_prices VALUES (1, 'AAPL', '2026-04-30', 100.0, NULL)")
         conn.commit()
+
+        def _get_last_price_in_range(symbol, range_start, range_end):
+            row = conn.execute(
+                "SELECT close_eur FROM historical_prices WHERE symbol = ? AND date BETWEEN ? AND ? ORDER BY date DESC LIMIT 1",
+                (symbol.upper(), range_start, range_end),
+            ).fetchone()
+            return float(row["close_eur"]) if row else None
+
         market_repo = MagicMock()
-        market_repo._conn = conn
+        market_repo.get_last_price_in_range.side_effect = _get_last_price_in_range
 
         vals = [_make_valuation("AAPL", current_price=110.0, quantity=10.0)]
         app_config = MagicMock()

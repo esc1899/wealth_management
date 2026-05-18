@@ -31,7 +31,8 @@ def _make_valuation(symbol, investment_type="Wertpapiere", current_price=100.0, 
 
 def _make_market_repo(rows: list[tuple[str, str, float]]) -> MagicMock:
     """
-    Mock repo with in-memory SQLite for historical_prices.
+    Mock repo backed by in-memory SQLite. Implements get_last_price_in_range()
+    via a real query so tests stay data-driven without coupling to _conn internals.
     rows: list of (symbol, date_str, close_eur)
     """
     conn = sqlite3.connect(":memory:")
@@ -51,8 +52,20 @@ def _make_market_repo(rows: list[tuple[str, str, float]]) -> MagicMock:
             (symbol.upper(), date_str, price),
         )
     conn.commit()
+
+    def _get_last_price_in_range(symbol, range_start, range_end):
+        row = conn.execute(
+            """
+            SELECT close_eur FROM historical_prices
+            WHERE symbol = ? AND date BETWEEN ? AND ?
+            ORDER BY date DESC LIMIT 1
+            """,
+            (symbol.upper(), range_start, range_end),
+        ).fetchone()
+        return float(row["close_eur"]) if row else None
+
     repo = MagicMock()
-    repo._conn = conn
+    repo.get_last_price_in_range.side_effect = _get_last_price_in_range
     return repo
 
 

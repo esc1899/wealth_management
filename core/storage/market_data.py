@@ -136,6 +136,18 @@ class MarketDataRepository:
         ).fetchone()
         return float(row["close_eur"]) if row else None
 
+    def get_last_price_in_range(self, symbol: str, range_start: str, range_end: str) -> Optional[float]:
+        """Return the last closing price in EUR for symbol within [range_start, range_end] inclusive."""
+        row = self._conn.execute(
+            """
+            SELECT close_eur FROM historical_prices
+            WHERE symbol = ? AND date BETWEEN ? AND ?
+            ORDER BY date DESC LIMIT 1
+            """,
+            (symbol.upper(), range_start, range_end),
+        ).fetchone()
+        return float(row["close_eur"]) if row else None
+
     def get_all_symbols_historical(self, days: int = 90) -> dict[str, list[HistoricalPrice]]:
         """Return historical data for all symbols, grouped by symbol."""
         rows = self._conn.execute(

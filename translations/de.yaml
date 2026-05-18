@@ -938,6 +938,8 @@ watchlist_analysis:
   page_subtitle: "Alle Sub-Check-Ergebnisse für eine Watchlist-Position auf einen Blick"
   select_position: "Position wählen"
   no_positions: "Keine Watchlist-Positionen vorhanden."
+  no_position_id: "Position hat keine ID — keine Analyse verfügbar."
+  not_yet_analyzed: "Noch nicht analysiert"
   checks_header: "🔍 Story · Konsens · Fundamental"
   ca_header: "🏦 Capital Allocator"
   nav_button: "🔍 Watchlist-Analyse"

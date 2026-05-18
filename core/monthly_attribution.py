@@ -101,14 +101,14 @@ def compute_monthly_attribution(
             start_val = v.cost_basis_eur
             start_price = None
         else:
-            start_price = _get_period_end_price(market_repo, v.symbol, prev_month_start, prev_month_end)
+            start_price = market_repo.get_last_price_in_range(v.symbol, prev_month_start, prev_month_end)
             start_val = _to_value(start_price, qty, unit)
 
         if is_current_month:
             end_price = v.current_price_eur
             end_val = v.current_value_eur
         else:
-            end_price = _get_period_end_price(market_repo, v.symbol, month_start, month_end)
+            end_price = market_repo.get_last_price_in_range(v.symbol, month_start, month_end)
             end_val = _to_value(end_price, qty, unit)
 
         delta_pct: Optional[float] = None
@@ -146,7 +146,7 @@ def _get_start_value_monthly(market_repo, v, prev_month_start: str, prev_month_e
     purchase_date = getattr(v, "purchase_date", None)
     if purchase_date is not None and purchase_date > period_start:
         return getattr(v, "cost_basis_eur", None)
-    start_price = _get_period_end_price(market_repo, v.symbol, prev_month_start, prev_month_end)
+    start_price = market_repo.get_last_price_in_range(v.symbol, prev_month_start, prev_month_end)
     return _to_value(start_price, v.quantity, getattr(v, "unit", None))
 
 
@@ -161,20 +161,3 @@ def _to_value(
     return price * qty
 
 
-def _get_period_end_price(market_repo, symbol: str, range_start: str, range_end: str) -> Optional[float]:
-    """Return the LAST closing price for symbol within the date range."""
-    try:
-        rows = market_repo._conn.execute(
-            """
-            SELECT close_eur FROM historical_prices
-            WHERE symbol = ? AND date BETWEEN ? AND ?
-            ORDER BY date DESC
-            LIMIT 1
-            """,
-            (symbol.upper(), range_start, range_end),
-        ).fetchall()
-        if rows:
-            return float(rows[0]["close_eur"])
-    except Exception:
-        pass
-    return None

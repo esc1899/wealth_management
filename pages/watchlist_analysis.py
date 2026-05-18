@@ -73,7 +73,7 @@ selected_display = st.selectbox(
 selected_position = position_display[selected_display]
 
 if not selected_position.id:
-    st.warning("Position hat keine ID — keine Analyse verfügbar.")
+    st.warning(t("watchlist_analysis.no_position_id"))
     st.stop()
 
 st.divider()
@@ -107,7 +107,7 @@ def _render_checker_card(title: str, verdict_obj, config, full_text_fn):
     with st.container():
         if verdict_obj is None:
             st.markdown(f"**{title}**")
-            st.markdown("_:gray[Noch nicht analysiert]_")
+            st.markdown(f"_:gray[{t('watchlist_analysis.not_yet_analyzed')}]_")
             return
 
         badge = verdict_badge(verdict_obj.verdict, config)

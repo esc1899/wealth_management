@@ -11,7 +11,7 @@ import logging
 
 
 from dataclasses import dataclass, field
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Optional, Dict, List
 
 from core.storage.market_data import MarketDataRepository
@@ -21,6 +21,7 @@ from core.storage.dividend_snapshots import DividendSnapshotRepository
 from core.storage.models import WealthSnapshot, DividendSnapshot, Position
 from agents.market_data_agent import MarketDataAgent
 from core.asset_class_config import get_asset_class_registry
+from core.currency import is_cash_unit
 
 
 
@@ -94,7 +95,6 @@ class WealthSnapshotAgent:
         valuations = self._market_data_agent.get_portfolio_valuation(include_watchlist=False)
 
         # Initialize breakdown with all asset classes (0.0 as default)
-        from core.asset_class_config import get_asset_class_registry
         registry = get_asset_class_registry()
         breakdown: Dict[str, float] = {ac: 0.0 for ac in registry.all_names()}
 
@@ -374,8 +374,6 @@ class WealthSnapshotAgent:
         Uses current positions as approximation (accurate when no trades occurred).
         Returns number of snapshots created.
         """
-        from datetime import timedelta
-        from core.currency import is_cash_unit
 
         TROY_OZ_TO_G = 31.1035
         today = date.today()
@@ -460,8 +458,6 @@ class WealthSnapshotAgent:
 
         Returns the updated snapshot, or None if no price data is available for that date.
         """
-        from core.currency import is_cash_unit
-
         TROY_OZ_TO_G = 31.1035
         positions = self._positions.get_portfolio()
         if not positions:
