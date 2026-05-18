@@ -1,5 +1,6 @@
 """Internationalization — simple YAML-based translation with t() helper."""
 import os
+from datetime import datetime, date
 from functools import lru_cache
 import yaml
 import streamlit as st
@@ -38,3 +39,31 @@ def set_language(lang: str) -> None:
 def current_language() -> str:
     """Return the currently active language code."""
     return st.session_state.get("lang", DEFAULT_LANGUAGE)
+
+
+_DATE_FORMATS = {
+    "de": "%d.%m.%Y",
+    "en": "%Y-%m-%d",
+}
+_DATETIME_FORMATS = {
+    "de": "%d.%m.%Y %H:%M",
+    "en": "%Y-%m-%d %H:%M",
+}
+
+
+def fmt_date(d) -> str:
+    """Format a date or datetime using the current locale."""
+    lang = current_language()
+    fmt = _DATE_FORMATS.get(lang, _DATE_FORMATS["de"])
+    if isinstance(d, str):
+        d = date.fromisoformat(d)
+    return d.strftime(fmt)
+
+
+def fmt_dt(dt) -> str:
+    """Format a datetime using the current locale (date + time)."""
+    lang = current_language()
+    fmt = _DATETIME_FORMATS.get(lang, _DATETIME_FORMATS["de"])
+    if isinstance(dt, str):
+        dt = datetime.fromisoformat(dt)
+    return dt.strftime(fmt)

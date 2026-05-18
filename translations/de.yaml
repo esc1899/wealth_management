@@ -24,6 +24,7 @@ common:
   ai_disclaimer: "⚠️ KI-generiert – keine Anlageberatung"
   agent_error: "Fehler beim Agenten-Aufruf"
   legend_header: "Legende"
+  generated_at: "Generiert:"
 
 nav:
   dashboard: "Dashboard"
@@ -154,6 +155,7 @@ analysis:
   portfolio_empty: "Portfolio ist leer."
   no_price_data: "Noch keine Kursdaten. Bitte auf der Marktdaten-Seite aktualisieren."
   weight_by_type: "Gewichtung nach Anlageklasse"
+  macro_timestamp: "Makro-Daten: Stand"
   weight_by_position: "Gewichtung nach Position"
   no_weight_data: "Keine Kursdaten für Gewichtung."
   refreshing: "Aktualisieren"

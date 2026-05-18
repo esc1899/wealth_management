@@ -4,6 +4,7 @@ import pytest
 from datetime import datetime, date
 from unittest.mock import Mock, MagicMock
 from core.storage.wealth_snapshots import WealthSnapshotRepository
+from core.storage.dividend_snapshots import DividendSnapshotRepository
 from core.storage.positions import PositionsRepository
 from core.storage.market_data import MarketDataRepository
 from core.storage.models import Position
@@ -865,3 +866,105 @@ class TestRecalculateSnapshot:
         call_kwargs = wealth_repo.create.call_args[1]
         assert call_kwargs["coverage_pct"] == pytest.approx(50.0)
         assert "NoData Inc" in call_kwargs["missing_pos"]
+
+    def test_recalculate_with_gold_units(self):
+        """Gold positions (unit='g') must apply troy-oz conversion: value = (price/31.1035) * grams."""
+        TROY_OZ_TO_G = 31.1035
+        gold_price_eur_per_oz = 3110.35  # €100 per gram at this price
+        gold_grams = 10.0
+        expected_value = (gold_price_eur_per_oz / TROY_OZ_TO_G) * gold_grams  # 1000.0
+
+        pos = Position(
+            id=1, name="Gold", asset_class="Edelmetall", investment_type="Edelmetall",
+            ticker="GC=F", quantity=gold_grams, unit="g", in_portfolio=True,
+            added_date=date(2026, 1, 1), extra_data={},
+        )
+        pos_repo = Mock(spec=PositionsRepository)
+        pos_repo.get_portfolio.return_value = [pos]
+        market_repo = Mock(spec=MarketDataRepository)
+        market_repo.get_price_for_date_or_prior.return_value = gold_price_eur_per_oz
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        wealth_repo.get_by_date.return_value = None
+        wealth_repo.create.return_value = Mock(coverage_pct=100.0, missing_pos=None)
+        agent = WealthSnapshotAgent(
+            positions_repo=pos_repo, market_repo=market_repo,
+            wealth_repo=wealth_repo, market_data_agent=Mock(),
+        )
+        agent.recalculate_snapshot("2026-01-15")
+        call_kwargs = wealth_repo.create.call_args[1]
+        assert call_kwargs["total_eur"] == pytest.approx(expected_value)
+
+
+class TestTakeDividendSnapshot:
+    def _make_agent(self, valuations, existing_dividend=None):
+        pos_repo = Mock(spec=PositionsRepository)
+        market_repo = Mock(spec=MarketDataRepository)
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        dividend_repo = Mock(spec=DividendSnapshotRepository)
+        dividend_repo.get_by_date.return_value = existing_dividend
+        dividend_repo.create.return_value = Mock(total_eur=sum(
+            v.annual_dividend_eur for v in valuations if v.annual_dividend_eur
+        ), coverage_pct=100.0)
+        market_agent = Mock()
+        market_agent.get_portfolio_valuation.return_value = valuations
+        agent = WealthSnapshotAgent(
+            positions_repo=pos_repo, market_repo=market_repo,
+            wealth_repo=wealth_repo, market_data_agent=market_agent,
+            dividend_repo=dividend_repo,
+        )
+        return agent, dividend_repo
+
+    def _make_valuation(self, symbol="AAPL", asset_class="Aktie", annual_dividend_eur=None):
+        v = Mock()
+        v.symbol = symbol
+        v.asset_class = asset_class
+        v.annual_dividend_eur = annual_dividend_eur
+        v.in_portfolio = True
+        return v
+
+    def test_basic_snapshot_sums_dividends(self):
+        vals = [
+            self._make_valuation("AAPL", annual_dividend_eur=100.0),
+            self._make_valuation("MSFT", annual_dividend_eur=200.0),
+        ]
+        agent, dividend_repo = self._make_agent(vals)
+        agent.take_dividend_snapshot("2026-01-15")
+        call_kwargs = dividend_repo.create.call_args[1]
+        assert call_kwargs["total_eur"] == pytest.approx(300.0)
+
+    def test_positions_without_dividend_are_excluded(self):
+        vals = [
+            self._make_valuation("AAPL", annual_dividend_eur=100.0),
+            self._make_valuation("BRK", annual_dividend_eur=None),
+            self._make_valuation("NVDA", annual_dividend_eur=0.0),
+        ]
+        agent, dividend_repo = self._make_agent(vals)
+        agent.take_dividend_snapshot("2026-01-15")
+        call_kwargs = dividend_repo.create.call_args[1]
+        assert call_kwargs["total_eur"] == pytest.approx(100.0)
+
+    def test_raises_if_snapshot_exists_and_overwrite_false(self):
+        existing = Mock(id=99)
+        agent, _ = self._make_agent([], existing_dividend=existing)
+        with pytest.raises(ValueError, match="already exists"):
+            agent.take_dividend_snapshot("2026-01-15", overwrite=False)
+
+    def test_overwrites_existing_when_flag_set(self):
+        existing = Mock(id=42)
+        vals = [self._make_valuation("AAPL", annual_dividend_eur=50.0)]
+        agent, dividend_repo = self._make_agent(vals, existing_dividend=existing)
+        agent.take_dividend_snapshot("2026-01-15", overwrite=True)
+        dividend_repo.delete.assert_called_once_with(42)
+        dividend_repo.create.assert_called_once()
+
+    def test_raises_without_dividend_repo(self):
+        pos_repo = Mock(spec=PositionsRepository)
+        market_repo = Mock(spec=MarketDataRepository)
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        market_agent = Mock()
+        agent = WealthSnapshotAgent(
+            positions_repo=pos_repo, market_repo=market_repo,
+            wealth_repo=wealth_repo, market_data_agent=market_agent,
+        )
+        with pytest.raises(ValueError, match="not initialized"):
+            agent.take_dividend_snapshot()

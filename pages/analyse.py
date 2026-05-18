@@ -12,7 +12,7 @@ import plotly.express as px
 import streamlit as st
 
 from core.currency import symbol
-from core.i18n import t
+from core.i18n import t, fmt_dt
 from core.macro_context import load_or_refresh_macro
 from core.monthly_attribution import compute_monthly_attribution
 from core.monthly_digest_generator import generate_monthly_digest
@@ -98,7 +98,7 @@ with st.container():
             m4.metric("DAX (heute)", "—")
         try:
             _ts = datetime.fromisoformat(_macro.fetched_at)
-            st.caption(f"Makro-Daten: Stand {_ts.strftime('%d.%m.%Y %H:%M')} UTC")
+            st.caption(f"{t('analysis.macro_timestamp')} {fmt_dt(_ts)} UTC")
         except Exception:
             pass
     else:
@@ -279,7 +279,7 @@ with st.expander(f"📋 Monatsdigest {_month_label}", expanded=False):
     _digest = _digest_repo.get(_digest_key)
     if _digest:
         st.markdown(_digest.body_markdown)
-        st.caption(f"Generiert: {_digest.generated_at.strftime('%d.%m.%Y %H:%M')} UTC")
+        st.caption(f"{t('common.generated_at')} {fmt_dt(_digest.generated_at)} UTC")
         if st.button("🔄 Digest neu generieren", key="regen_digest"):
             _md = generate_monthly_digest(
                 valuations, _analyses_repo, _app_config_repo,
@@ -403,7 +403,7 @@ with st.expander(f"📋 Jahresdigest {_year_label}", expanded=False):
     _year_digest = _yearly_digest_repo.get(_year_digest_key)
     if _year_digest:
         st.markdown(_year_digest.body_markdown)
-        st.caption(f"Generiert: {_year_digest.generated_at.strftime('%d.%m.%Y %H:%M')} UTC")
+        st.caption(f"{t('common.generated_at')} {fmt_dt(_year_digest.generated_at)} UTC")
         if st.button("🔄 Digest neu generieren", key="regen_year_digest"):
             _year_md = generate_yearly_digest(
                 valuations, _analyses_repo, _app_config_repo,

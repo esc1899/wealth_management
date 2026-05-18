@@ -24,6 +24,7 @@ common:
   ai_disclaimer: "⚠️ AI-generated – not financial advice"
   agent_error: "Agent call failed"
   legend_header: "Legend"
+  generated_at: "Generated:"
 
 nav:
   dashboard: "Dashboard"
@@ -153,6 +154,7 @@ analysis:
   portfolio_empty: "Portfolio is empty."
   no_price_data: "No price data yet. Please refresh on the Market Data page."
   weight_by_type: "Allocation by Asset Class"
+  macro_timestamp: "Macro data: as of"
   weight_by_position: "Allocation by Position"
   no_weight_data: "No price data for allocation."
   refreshing: "Refresh"

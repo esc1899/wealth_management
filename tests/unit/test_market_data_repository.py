@@ -9,7 +9,7 @@ import pytest
 
 from core.storage.base import init_db, migrate_db
 from core.storage.market_data import MarketDataRepository
-from core.storage.models import HistoricalPrice, PriceRecord
+from core.storage.models import DividendRecord, HistoricalPrice, PriceRecord
 
 
 @pytest.fixture
@@ -211,3 +211,75 @@ class TestGetPriceForDate:
     def test_case_insensitive(self, repo):
         repo.upsert_historical(make_history(symbol="AAPL", d=date(2026, 5, 12), close=50.0))
         assert repo.get_price_for_date("aapl", "2026-05-12") == pytest.approx(50.0)
+
+
+class TestGetLastPriceInRange:
+    def test_returns_last_close_within_range(self, repo):
+        repo.upsert_historical(make_history(d=date(2026, 4, 28), close=95.0))
+        repo.upsert_historical(make_history(d=date(2026, 4, 29), close=98.0))
+        repo.upsert_historical(make_history(d=date(2026, 4, 30), close=100.0))
+        result = repo.get_last_price_in_range("AAPL", "2026-04-01", "2026-04-30")
+        assert result == pytest.approx(100.0)
+
+    def test_returns_none_when_no_data_in_range(self, repo):
+        repo.upsert_historical(make_history(d=date(2026, 3, 31), close=90.0))
+        assert repo.get_last_price_in_range("AAPL", "2026-04-01", "2026-04-30") is None
+
+    def test_excludes_data_outside_range(self, repo):
+        repo.upsert_historical(make_history(d=date(2026, 3, 31), close=80.0))
+        repo.upsert_historical(make_history(d=date(2026, 4, 15), close=90.0))
+        repo.upsert_historical(make_history(d=date(2026, 5, 1), close=100.0))
+        result = repo.get_last_price_in_range("AAPL", "2026-04-01", "2026-04-30")
+        assert result == pytest.approx(90.0)
+
+    def test_case_insensitive(self, repo):
+        repo.upsert_historical(make_history(symbol="AAPL", d=date(2026, 4, 30), close=50.0))
+        assert repo.get_last_price_in_range("aapl", "2026-04-01", "2026-04-30") == pytest.approx(50.0)
+
+    def test_returns_none_for_unknown_symbol(self, repo):
+        assert repo.get_last_price_in_range("UNKNOWN", "2026-04-01", "2026-04-30") is None
+
+
+def make_dividend(symbol: str = "AAPL", rate_eur: float = 3.0, yield_pct: float = 0.02) -> DividendRecord:
+    return DividendRecord(
+        symbol=symbol,
+        rate_eur=rate_eur,
+        yield_pct=yield_pct,
+        currency="USD",
+        fetched_at=datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc),
+    )
+
+
+class TestDividendData:
+    def test_upsert_creates_record(self, repo):
+        repo.upsert_dividend(make_dividend())
+        result = repo.get_dividend("AAPL")
+        assert result is not None
+        assert result.symbol == "AAPL"
+        assert result.rate_eur == pytest.approx(3.0)
+        assert result.yield_pct == pytest.approx(0.02)
+
+    def test_upsert_updates_existing(self, repo):
+        repo.upsert_dividend(make_dividend(rate_eur=3.0, yield_pct=0.02))
+        repo.upsert_dividend(make_dividend(rate_eur=4.0, yield_pct=0.025))
+        result = repo.get_dividend("AAPL")
+        assert result.rate_eur == pytest.approx(4.0)
+        assert result.yield_pct == pytest.approx(0.025)
+
+    def test_get_dividend_unknown_symbol_returns_none(self, repo):
+        assert repo.get_dividend("UNKNOWN") is None
+
+    def test_get_all_dividends_empty(self, repo):
+        assert repo.get_all_dividends() == {}
+
+    def test_get_all_dividends_returns_dict_keyed_by_symbol(self, repo):
+        repo.upsert_dividend(make_dividend("AAPL", rate_eur=3.0))
+        repo.upsert_dividend(make_dividend("MSFT", rate_eur=5.0))
+        all_divs = repo.get_all_dividends()
+        assert set(all_divs.keys()) == {"AAPL", "MSFT"}
+        assert all_divs["AAPL"].rate_eur == pytest.approx(3.0)
+        assert all_divs["MSFT"].rate_eur == pytest.approx(5.0)
+
+    def test_case_insensitive_lookup(self, repo):
+        repo.upsert_dividend(make_dividend("AAPL"))
+        assert repo.get_dividend("aapl") is not None
