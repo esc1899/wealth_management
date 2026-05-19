@@ -255,8 +255,8 @@ if _attribution:
     _total_start = sum(r.start_price_eur * r.quantity for r in _rows_for_pct)
     _contrib_for_pct = sum(r.contribution_eur for r in _rows_for_pct)
     _pct_analyse = (_contrib_for_pct / _total_start * 100) if _total_start > 0 else None
-    _month_gesamt_base = _vermoegen_total - _total_contrib
-    _pct_gesamt = (_total_contrib / _month_gesamt_base * 100) if _month_gesamt_base > 0 else None
+    _month_gesamt_base = _vermoegen_total - _contrib_for_pct
+    _pct_gesamt = (_contrib_for_pct / _month_gesamt_base * 100) if _month_gesamt_base > 0 else None
     _month_abs = f"{_total_contrib:+,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
     _pct_a = f"{_pct_analyse:+.1f}% Analyse" if _pct_analyse is not None else ""
     _pct_g = f"{_pct_gesamt:+.1f}% Gesamt" if _pct_gesamt is not None else ""
@@ -380,8 +380,8 @@ if _year_attribution:
     _year_total_start = sum(r.contribution_eur / (r.delta_pct / 100) for r in _year_rows_for_pct)
     _year_contrib_for_pct = sum(r.contribution_eur for r in _year_rows_for_pct)
     _year_pct_analyse = (_year_contrib_for_pct / _year_total_start * 100) if _year_total_start > 0 else None
-    _year_gesamt_base = _vermoegen_total - _year_total_contrib
-    _year_pct_gesamt = (_year_total_contrib / _year_gesamt_base * 100) if _year_gesamt_base > 0 else None
+    _year_gesamt_base = _vermoegen_total - _year_contrib_for_pct
+    _year_pct_gesamt = (_year_contrib_for_pct / _year_gesamt_base * 100) if _year_gesamt_base > 0 else None
     _year_abs = f"{_year_total_contrib:+,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
     _pct_a = f"{_year_pct_analyse:+.1f}% Analyse" if _year_pct_analyse is not None else ""
     _pct_g = f"{_year_pct_gesamt:+.1f}% Gesamt" if _year_pct_gesamt is not None else ""
