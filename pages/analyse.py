@@ -251,8 +251,8 @@ if _attribution:
 
     # Summary metric — numerator and denominator must use the same row set.
     _total_contrib = sum(r.contribution_eur for r in _attribution)
-    _rows_for_pct = [r for r in _attribution if r.start_price_eur and r.quantity]
-    _total_start = sum(r.start_price_eur * r.quantity for r in _rows_for_pct)
+    _rows_for_pct = [r for r in _attribution if r.delta_pct is not None and r.delta_pct != 0]
+    _total_start = sum(r.contribution_eur / (r.delta_pct / 100) for r in _rows_for_pct)
     _contrib_for_pct = sum(r.contribution_eur for r in _rows_for_pct)
     _pct_analyse = (_contrib_for_pct / _total_start * 100) if _total_start > 0 else None
     _month_gesamt_base = _vermoegen_total - _contrib_for_pct
