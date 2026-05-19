@@ -64,6 +64,9 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 
 This project is a hands-on introduction to building real AI-powered applications. The exercises are not toy examples — the end result is your own personal wealth management tool. That is the point: learning agent architecture by building something you actually want to use.
 
+**Structured learning paths → [LEARNING_JOURNEYS.md](LEARNING_JOURNEYS.md)**
+Five journeys for different backgrounds: AI User, Developer, Agent Architect, Security Engineer, Product Thinker. Each includes step-by-step exercises with specific files to read, things to run, and questions to discuss. Includes workshop format suggestions for half-day, full-day, and lunch-and-learn sessions.
+
 ### Running a local LLM with Ollama
 Install Ollama and pull a model (e.g. `qwen3:8b`). Learn what running an LLM on your own hardware means: model size vs. RAM, context windows, cold start latency, and when a local model is good enough vs. when you need a cloud API.
 
