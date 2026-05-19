@@ -117,6 +117,46 @@ if not has_prices:
     st.warning(t("analysis.no_price_data"))
 
 # ------------------------------------------------------------------
+# Gesamtwert-Übersicht
+# ------------------------------------------------------------------
+_analyse_total = sum(
+    v.current_value_eur
+    for v in valuations
+    if v.current_value_eur and v.in_portfolio and not getattr(v, "analysis_excluded", False)
+)
+_vermoegen_total = sum(
+    v.current_value_eur
+    for v in valuations
+    if v.current_value_eur and v.in_portfolio
+)
+_excluded_value = _vermoegen_total - _analyse_total
+
+_c1, _c2, _c3 = st.columns(3)
+with _c1:
+    st.metric(
+        "Analyse-Gesamtwert",
+        f"{symbol()}{_analyse_total:,.0f}".replace(",", "X").replace(".", ",").replace("X", "."),
+        help="Portfolio-Positionen mit Ticker, ohne ausgeschlossene Positionen — Basis für Monats-/Jahresanalyse",
+    )
+with _c2:
+    st.metric(
+        "Vermögens-Gesamtwert",
+        f"{symbol()}{_vermoegen_total:,.0f}".replace(",", "X").replace(".", ",").replace("X", "."),
+        help="Alle Portfolio-Positionen inkl. ausgeschlossener — entspricht der Vermögenshistorie",
+    )
+with _c3:
+    if _excluded_value > 0:
+        st.metric(
+            "Davon ausgeschlossen",
+            f"{symbol()}{_excluded_value:,.0f}".replace(",", "X").replace(".", ",").replace("X", "."),
+            help=f"{_excluded_count} Position{'en' if _excluded_count != 1 else ''} von der Analyse ausgeschlossen",
+        )
+    else:
+        st.metric("Ausgeschlossen", "—", help="Keine Positionen ausgeschlossen")
+
+st.divider()
+
+# ------------------------------------------------------------------
 # Today's performance (daily P&L)
 # ------------------------------------------------------------------
 st.subheader(t("analysis.day_pnl_header"))
@@ -137,17 +177,15 @@ day_rows = [
 if day_rows:
     df_day = pd.DataFrame(day_rows).sort_values(col_day_eur)
     total_day = df_day[col_day_eur].sum()
-    total_sign = "+" if total_day >= 0 else ""
-    _total_prev = sum(
-        (v.current_value_eur - v.day_pnl_eur)
-        for v in valuations
-        if v.day_pnl_eur is not None and v.current_value_eur is not None
-    )
-    _day_pct_str = f"{total_day / _total_prev * 100:+.2f}% " if _total_prev else ""
-    st.caption(
-        f"**Gesamt heute: {_day_pct_str}({total_sign}{symbol()}{total_day:,.2f})**"
-        .replace(",", "X").replace(".", ",").replace("X", ".")
-    )
+    _analyse_prev = _analyse_total - total_day
+    _gesamt_prev = _vermoegen_total - total_day
+    _day_pct_analyse = (total_day / _analyse_prev * 100) if _analyse_prev else None
+    _day_pct_gesamt = (total_day / _gesamt_prev * 100) if _gesamt_prev else None
+    _day_abs = f"{total_day:+,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    _pct_a = f"{_day_pct_analyse:+.2f}% Analyse" if _day_pct_analyse is not None else ""
+    _pct_g = f"{_day_pct_gesamt:+.2f}% Gesamt" if _day_pct_gesamt is not None else ""
+    _sep = " · " if _pct_a and _pct_g else ""
+    st.caption(f"**Heute: {symbol()}{_day_abs} — {_pct_a}{_sep}{_pct_g}**")
 
     fig_day = px.bar(
         df_day, x="Symbol", y=col_day_eur,
@@ -211,20 +249,19 @@ _attribution = compute_monthly_attribution(valuations, _market_repo, _sel_year, 
 if _attribution:
     _rows_with_data = [r for r in _attribution if r.delta_pct is not None]
 
-    # Summary metric
+    # Summary metric — numerator and denominator must use the same row set.
     _total_contrib = sum(r.contribution_eur for r in _attribution)
-    _total_start = sum(
-        (r.start_price_eur * r.quantity)
-        for r in _attribution
-        if r.start_price_eur and r.quantity
-    )
-    _total_pct = (_total_contrib / _total_start * 100) if _total_start > 0 else None
-    _sign = "+" if _total_contrib >= 0 else ""
-    _pct_str = f"{_total_pct:+.1f}%" if _total_pct is not None else "n/a"
-    st.caption(
-        f"**Portfolio gesamt {_month_label}: {_pct_str} ({_sign}{symbol()}{_total_contrib:,.0f})**"
-        .replace(",", "X").replace(".", ",").replace("X", ".")
-    )
+    _rows_for_pct = [r for r in _attribution if r.start_price_eur and r.quantity]
+    _total_start = sum(r.start_price_eur * r.quantity for r in _rows_for_pct)
+    _contrib_for_pct = sum(r.contribution_eur for r in _rows_for_pct)
+    _pct_analyse = (_contrib_for_pct / _total_start * 100) if _total_start > 0 else None
+    _month_gesamt_base = _vermoegen_total - _total_contrib
+    _pct_gesamt = (_total_contrib / _month_gesamt_base * 100) if _month_gesamt_base > 0 else None
+    _month_abs = f"{_total_contrib:+,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    _pct_a = f"{_pct_analyse:+.1f}% Analyse" if _pct_analyse is not None else ""
+    _pct_g = f"{_pct_gesamt:+.1f}% Gesamt" if _pct_gesamt is not None else ""
+    _sep = " · " if _pct_a and _pct_g else ""
+    st.caption(f"**{_month_label}: {symbol()}{_month_abs} — {_pct_a}{_sep}{_pct_g}**")
 
     if _rows_with_data:
         _df_attr = pd.DataFrame([
@@ -337,20 +374,19 @@ _year_attribution = compute_yearly_attribution(valuations, _market_repo, _sel_ye
 if _year_attribution:
     _year_rows_with_data = [r for r in _year_attribution if r.delta_pct is not None]
 
+    # Summary metric — numerator and denominator must use the same row set.
     _year_total_contrib = sum(r.contribution_eur for r in _year_attribution)
-    _year_rows_for_pct = [r for r in _year_rows_with_data if r.delta_pct]
-    _year_total_start = sum(
-        r.contribution_eur / (r.delta_pct / 100)
-        for r in _year_rows_for_pct
-        if r.delta_pct != 0
-    )
-    _year_total_pct = (_year_total_contrib / _year_total_start * 100) if _year_total_start > 0 else None
-    _year_sign = "+" if _year_total_contrib >= 0 else ""
-    _year_pct_str = f"{_year_total_pct:+.1f}%" if _year_total_pct is not None else "n/a"
-    st.caption(
-        f"**Portfolio gesamt {_year_label}: {_year_pct_str} ({_year_sign}{symbol()}{_year_total_contrib:,.0f})**"
-        .replace(",", "X").replace(".", ",").replace("X", ".")
-    )
+    _year_rows_for_pct = [r for r in _year_rows_with_data if r.delta_pct and r.delta_pct != 0]
+    _year_total_start = sum(r.contribution_eur / (r.delta_pct / 100) for r in _year_rows_for_pct)
+    _year_contrib_for_pct = sum(r.contribution_eur for r in _year_rows_for_pct)
+    _year_pct_analyse = (_year_contrib_for_pct / _year_total_start * 100) if _year_total_start > 0 else None
+    _year_gesamt_base = _vermoegen_total - _year_total_contrib
+    _year_pct_gesamt = (_year_total_contrib / _year_gesamt_base * 100) if _year_gesamt_base > 0 else None
+    _year_abs = f"{_year_total_contrib:+,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    _pct_a = f"{_year_pct_analyse:+.1f}% Analyse" if _year_pct_analyse is not None else ""
+    _pct_g = f"{_year_pct_gesamt:+.1f}% Gesamt" if _year_pct_gesamt is not None else ""
+    _sep = " · " if _pct_a and _pct_g else ""
+    st.caption(f"**{_year_label}: {symbol()}{_year_abs} — {_pct_a}{_sep}{_pct_g}**")
 
     if _year_rows_with_data:
         _df_year_attr = pd.DataFrame([

@@ -19,7 +19,7 @@ _APP_CONFIG_KEY = "macro_context"
 # yfinance tickers for macro indicators
 _VIX_TICKER = "^VIX"
 _USD_EUR_TICKER = "USDEUR=X"   # USD → EUR rate (same format as existing market_data_fetcher)
-_GOLD_TICKER = "XAUUSD=X"     # Gold spot price in USD per troy oz
+_GOLD_TICKER = "GC=F"         # Gold futures (front month) in USD per troy oz
 _DAX_TICKER = "^GDAXI"
 
 

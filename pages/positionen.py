@@ -311,50 +311,46 @@ def _render_edit_form(pos_id: int | None, readonly: bool = False):
         else:
             form_anlageart = None
 
-        # Empfehlung: Source + Analysis Exclusion (in bordered container)
+        # Empfehlung: Source (in bordered container)
         with st.container(border=True):
-            col_rec, col_excl = st.columns(2)
+            # Collect all existing recommendation sources
+            all_positions = repo.get_portfolio() + repo.get_watchlist()
+            existing_sources = sorted(
+                {p.recommendation_source for p in all_positions if p.recommendation_source},
+                key=str.lower
+            )
 
-            with col_rec:
-                # Collect all existing recommendation sources
-                all_positions = repo.get_portfolio() + repo.get_watchlist()
-                existing_sources = sorted(
-                    {p.recommendation_source for p in all_positions if p.recommendation_source},
-                    key=str.lower
-                )
+            # Default index: use editing value if it exists in options, else None (first option)
+            source_default = editing.recommendation_source if editing and editing.recommendation_source in existing_sources else None
+            source_idx = existing_sources.index(source_default) if source_default else 0
 
-                # Default index: use editing value if it exists in options, else None (first option)
-                source_default = editing.recommendation_source if editing and editing.recommendation_source in existing_sources else None
-                source_idx = existing_sources.index(source_default) if source_default else 0
+            # Selectbox: only for existing sources
+            selected_existing = st.selectbox(
+                t("positionen.empfohlen_von"),
+                options=[None] + existing_sources,
+                index=source_idx + 1 if source_default else 0,
+                format_func=lambda x: x or "—",
+                disabled=readonly,
+            )
 
-                # Selectbox: only for existing sources
-                selected_existing = st.selectbox(
-                    t("positionen.empfohlen_von"),
-                    options=[None] + existing_sources,
-                    index=source_idx + 1 if source_default else 0,
-                    format_func=lambda x: x or "—",
-                    disabled=readonly,
-                )
+            # Text input: for entering a new source (appears below selectbox)
+            new_source_input = st.text_input(
+                t("positionen.new_recommendation_source_label"),
+                value="",
+                placeholder="Oder neuen Empfehler eingeben...",
+                disabled=readonly,
+            )
 
-                # Text input: for entering a new source (appears below selectbox)
-                new_source_input = st.text_input(
-                    t("positionen.new_recommendation_source_label"),
-                    value="",
-                    placeholder="Oder neuen Empfehler eingeben...",
-                    disabled=readonly,
-                )
+            # Use whichever was filled in: new_source_input takes priority
+            form_rec_source = new_source_input if new_source_input else selected_existing
 
-                # Use whichever was filled in: new_source_input takes priority
-                form_rec_source = new_source_input if new_source_input else selected_existing
-
-            with col_excl:
-                # Analysis exclusion checkbox
-                analysis_excluded = st.checkbox(
-                    t("positionen.analysis_excluded_label"),
-                    value=editing.analysis_excluded if editing else False,
-                    help=t("positionen.analysis_excluded_help") if t("positionen.analysis_excluded_help") else None,
-                    disabled=readonly,
-                )
+        # Analysis exclusion checkbox (standalone — applies to all analyses, not just attribution)
+        analysis_excluded = st.checkbox(
+            t("positionen.analysis_excluded_label"),
+            value=editing.analysis_excluded if editing else False,
+            help=t("positionen.analysis_excluded_help") if t("positionen.analysis_excluded_help") else None,
+            disabled=readonly,
+        )
 
         # Quantity (optional for manual_valuation types; hidden for Grundstück)
         shows_quantity = cfg.is_field_visible("quantity") or (
