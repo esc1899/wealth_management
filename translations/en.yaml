@@ -52,6 +52,26 @@ nav:
   statistics: "Statistics"
   cowork_inbox: "Research Inbox"
   tax_loss_harvesting: "Tax Loss Harvesting"
+  dividend_calendar: "Dividends"
+
+
+dividend_calendar:
+  title: "Dividends"
+  subtitle: "Annual Forecast & Distribution"
+  total_annual: "Annual Dividend"
+  monthly_avg: "Monthly Average"
+  coverage: "Coverage"
+  bar_chart_title: "Monthly Cashflow (Forecast)"
+  pie_chart_title: "Top-10 Dividend Payers"
+  positions_table: "Positions"
+  others: "Others"
+  no_data: "No dividend data available. Please refresh market data."
+  run_analysis: "Start AI Analysis"
+  analysis_running: "Analyzing dividend portfolio..."
+  col_annual: "Annual (EUR)"
+  col_monthly: "Monthly (EUR)"
+  col_yield: "Yield"
+  col_source: "Source"
 
 
 tax_loss_harvesting:

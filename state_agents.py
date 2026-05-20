@@ -20,6 +20,7 @@ from agents.research_agent import ResearchAgent
 from agents.search_agent import SearchAgent
 from agents.storychecker_agent import StorycheckerAgent
 from agents.structural_change_agent import StructuralChangeAgent
+from agents.dividend_calendar_agent import DividendCalendarAgent
 from agents.tax_loss_harvesting_agent import TaxLossHarvestingAgent
 from agents.watchlist_checker_agent import WatchlistCheckerAgent
 from agents.wealth_snapshot_agent import WealthSnapshotAgent
@@ -279,6 +280,13 @@ def get_tax_loss_harvesting_agent() -> TaxLossHarvestingAgent:
     model = _get_agent_model("tax_loss_harvesting", "ollama", _DEFAULT_OLLAMA_MODEL)
     llm = _make_ollama_provider(model, "tax_loss_harvesting", timeout=300.0)
     return TaxLossHarvestingAgent(llm=llm)
+
+
+@st.cache_resource
+def get_dividend_calendar_agent() -> DividendCalendarAgent:
+    model = _get_agent_model("dividend_calendar", "ollama", _DEFAULT_OLLAMA_MODEL)
+    llm = _make_ollama_provider(model, "dividend_calendar", timeout=120.0)
+    return DividendCalendarAgent(llm=llm)
 
 
 @st.cache_resource

@@ -52,6 +52,26 @@ nav:
   statistics: "Statistiken"
   cowork_inbox: "Research Inbox"
   tax_loss_harvesting: "Tax Loss Harvesting"
+  dividend_calendar: "Dividenden"
+
+
+dividend_calendar:
+  title: "Dividenden"
+  subtitle: "Jahresprognose & Verteilung"
+  total_annual: "Jährliche Dividende"
+  monthly_avg: "Monatlicher Ø"
+  coverage: "Abdeckung"
+  bar_chart_title: "Monatlicher Cashflow (Prognose)"
+  pie_chart_title: "Top-10 Dividendenzahler"
+  positions_table: "Positionen"
+  others: "Sonstige"
+  no_data: "Keine Dividendendaten vorhanden. Marktdaten aktualisieren."
+  run_analysis: "KI-Analyse starten"
+  analysis_running: "Analysiere Dividenden-Portfolio..."
+  col_annual: "Jährlich (EUR)"
+  col_monthly: "Monatlich (EUR)"
+  col_yield: "Rendite"
+  col_source: "Quelle"
 
 
 tax_loss_harvesting:

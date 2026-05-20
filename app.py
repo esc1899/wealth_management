@@ -119,6 +119,9 @@ if _is_local:
     _assistant_pages.append(
         st.Page("pages/watchlist_checker.py", title="Watchlist Checker", icon=":material/check_circle:"),
     )
+    _assistant_pages.append(
+        st.Page("pages/dividend_calendar.py", title=t("nav.dividend_calendar"), icon=":material/payments:"),
+    )
 _assistant_pages.append(
     st.Page("pages/wealth_history.py",  title=t("nav.wealth_history"),  icon=":material/show_chart:")
 )

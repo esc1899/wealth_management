@@ -559,6 +559,13 @@ def _render_edit_form(pos_id: int | None, readonly: bool = False):
             disabled=readonly,
         )
 
+        form_dividend_aristocrat = st.checkbox(
+            "👑 Dividend Aristocrat",
+            value=bool(existing_extra.get("dividend_aristocrat", False)),
+            help="25+ Jahre konsekutives Dividendenwachstum. Manuell setzen.",
+            disabled=readonly,
+        )
+
         # ── Save / Cancel (only in edit mode) ──────────────────────────────────
         if not readonly:
             col_save, col_cancel = st.columns([1, 5])
@@ -623,6 +630,12 @@ def _render_edit_form(pos_id: int | None, readonly: bool = False):
                 extra["dividend_yield_override"] = form_dividend_override
             elif "dividend_yield_override" in extra:
                 del extra["dividend_yield_override"]
+
+            # Dividend Aristocrat flag
+            if form_dividend_aristocrat:
+                extra["dividend_aristocrat"] = True
+            elif "dividend_aristocrat" in extra:
+                del extra["dividend_aristocrat"]
 
             pos_data = dict(
                 asset_class=selected_ac,
@@ -919,64 +932,4 @@ st.divider()
 st.subheader(t("positionen.tab_watchlist"))
 _render_table(repo.get_watchlist(), "positionen.empty_watchlist", "wl")
 
-# ------------------------------------------------------------------
-# Dividends & Interest Income Overview
-# ------------------------------------------------------------------
-
-st.divider()
-st.subheader("📈 Erwartete Dividenden & Ausschüttungen (Jahresprognose, brutto)")
-
-_market_agent = get_market_agent()
-_valuations = _market_agent.get_portfolio_valuation(include_watchlist=False)
-
-# Filter to only portfolio positions with dividend data
-_div_valuations = [
-    v for v in _valuations
-    if v.annual_dividend_eur is not None and v.annual_dividend_eur > 0
-]
-
-if _div_valuations:
-    # Build table data
-    _div_data = []
-    for v in sorted(_div_valuations, key=lambda x: x.annual_dividend_eur or 0, reverse=True):
-        _div_data.append({
-            "Position": v.name,
-            "Klasse": v.asset_class,
-            "Yield": f"{(v.dividend_yield_pct or 0) * 100:.2f}%" if v.dividend_yield_pct else "—",
-            "Jährlich (€)": f"{symbol()}{v.annual_dividend_eur:,.0f}" if v.annual_dividend_eur else "—",
-        })
-
-    import pandas as pd
-    _df_div = pd.DataFrame(_div_data)
-    st.dataframe(_df_div, use_container_width=True, hide_index=True)
-
-    # Total
-    _total_div = sum(v.annual_dividend_eur for v in _div_valuations if v.annual_dividend_eur)
-    st.markdown(f"**Gesamtportfolio: €{_total_div:,.0f}/Jahr**")
-else:
-    st.info("Keine Positionen mit Dividendendaten. Klicken Sie auf 'Dividenden aktualisieren', um Daten zu laden.")
-
-# Fetch button (always visible)
-col_fetch, col_info = st.columns([1, 4])
-with col_fetch:
-    if st.button("🔄 Dividenden aktualisieren", use_container_width=True):
-        _clear_form()
-        with st.spinner("Fetching dividend data..."):
-            errors = _market_agent.fetch_dividends_now()
-            if errors:
-                st.warning(f"Fehler bei {len(errors)} Symbolen: {', '.join(errors.keys())[:100]}")
-            else:
-                st.success("Dividend data updated successfully")
-            st.rerun()
-
-# Last fetch info
-_div_records = get_market_repo().get_all_dividends()
-if _div_records:
-    _latest_fetch = max(
-        (r.fetched_at for r in _div_records.values() if r.fetched_at),
-        default=None
-    )
-    if _latest_fetch:
-        with col_info:
-            st.caption(f"Zuletzt aktualisiert: {_latest_fetch.strftime('%d.%m.%Y %H:%M')} UTC")
 

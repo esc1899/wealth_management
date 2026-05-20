@@ -158,6 +158,24 @@ skills:
         - Themes: ESG, Technology, Emerging Markets, Global — as requested by the user
         Output: ranked list with ticker/ISIN, name, TER, 1y/3y/5y performance, AUM, theme match
 
+    - name: "Dividend Aristocrats Scanner"
+      description: "Check dividend sustainability, aristocrat status, and payout history"
+      prompt: |
+        Analyze the stock as a dividend income investment:
+        - Research dividend history (minimum 5 years), payout ratio, and sustainability
+        - Check if it qualifies as Dividend Aristocrat (25+ consecutive years of dividend growth)
+          or Dividend King (50+ years)
+        - Identify any recent dividend cut risk signals: earnings pressure, high payout ratio
+          (>80% for industrials, >90% for REITs), rising debt, or declining free cash flow
+        - Compare current yield vs. sector peers and 5-year average yield
+        - Note ex-dividend dates and payment frequency if available
+
+        Verdict (pick one):
+        - aristocrat: 25+ consecutive years of dividend growth, highly reliable
+        - sustainable: consistent payments, healthy payout ratio, no near-term cut risk
+        - at_risk: elevated payout ratio or earnings pressure — monitor closely
+        - no_dividend: does not pay a dividend
+
     - name: "Lindy Effect Scanner"
       description: "Finds companies with Lindy properties — long track record, crisis-tested, boring & durable"
       prompt: |
