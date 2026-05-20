@@ -51,6 +51,35 @@ nav:
   group_system: "System ⚙️"
   statistics: "Statistics"
   cowork_inbox: "Research Inbox"
+  tax_loss_harvesting: "Tax Loss Harvesting"
+
+
+tax_loss_harvesting:
+  title: "Tax Loss Harvesting"
+  help_title: "What is Tax Loss Harvesting?"
+  help_text: |
+    **Tax Loss Harvesting** is a tax optimization strategy: you realize unrealized losses
+    at year-end to offset them against realized gains.
+
+    **Capital gains tax (Germany):** 26.375% (incl. solidarity surcharge). Each realized
+    loss reduces your tax liability by this amount.
+
+    **Wash-sale rule (Germany):** Avoid buying back identical securities immediately.
+    A 30-day waiting period after selling is recommended.
+
+    **Tip:** Use watchlist candidates as replacements — similar asset class, but not the
+    identical company.
+
+    ⚠️ This is not tax advice. Please consult a tax advisor before acting.
+  threshold_label: "Only losses greater than"
+  run_button: "Start analysis"
+  no_candidates: "No loss positions found above the threshold."
+  candidates_found: "{n} loss position(s) above the threshold."
+  metric_candidates: "Loss positions"
+  metric_loss: "Total loss"
+  metric_tax_benefit: "Potential tax savings"
+  download_label: "Download report (.md)"
+
 
 investment_types:
   Wertpapiere: "Securities"

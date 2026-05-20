@@ -29,6 +29,12 @@ class TestPageLoadability:
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 
+    def test_tax_loss_harvesting_page_loads(self):
+        """Tax Loss Harvesting page should load without exceptions."""
+        at = AppTest.from_file("pages/tax_loss_harvesting.py")
+        at.run()
+        assert not at.exception, f"Page threw exception: {at.exception}"
+
     def test_fundamental_analyzer_page_loads(self):
         """Fundamental Analyzer page should load without exceptions."""
         at = AppTest.from_file("pages/fundamental_analyzer.py")

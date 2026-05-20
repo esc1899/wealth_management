@@ -51,6 +51,33 @@ nav:
   group_system: "System ⚙️"
   statistics: "Statistiken"
   cowork_inbox: "Research Inbox"
+  tax_loss_harvesting: "Tax Loss Harvesting"
+
+
+tax_loss_harvesting:
+  title: "Tax Loss Harvesting"
+  help_title: "Was ist Tax Loss Harvesting?"
+  help_text: |
+    **Tax Loss Harvesting** ist eine Steueroptimierungsstrategie: Du realisierst unrealisierte
+    Verluste am Jahresende um sie mit realisierten Gewinnen zu verrechnen.
+
+    **Abgeltungssteuer:** 26,375% (inkl. Solidaritätszuschlag). Jeder realisierte Verlust
+    reduziert deine Steuerlast um diesen Betrag.
+
+    **Wash-Sale-Regel (Deutschland):** Kaufe identische Wertpapiere nicht sofort zurück.
+    30 Tage Mindestabstand nach Verkauf werden empfohlen.
+
+    **Tipp:** Nutze Watchlist-Kandidaten als Ersatz — ähnliche Anlageklasse, aber kein identisches Unternehmen.
+
+    ⚠️ Dies ist keine Steuerberatung. Bitte konsultiere einen Steuerberater.
+  threshold_label: "Nur Verluste größer als"
+  run_button: "Analyse starten"
+  no_candidates: "Keine Verlustpositionen über dem Schwellwert gefunden."
+  candidates_found: "{n} Verlustposition(en) über dem Schwellwert."
+  metric_candidates: "Verlustpositionen"
+  metric_loss: "Gesamtverlust"
+  metric_tax_benefit: "Mögliche Steuerersparnis"
+  download_label: "Report herunterladen (.md)"
 
 
 investment_types:

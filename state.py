@@ -54,6 +54,7 @@ from state_agents import (
     get_wealth_snapshot_agent,
     get_portfolio_story_agent,
     get_watchlist_checker_agent,
+    get_tax_loss_harvesting_agent,
     get_cowork_watcher,
 )
 
@@ -105,6 +106,7 @@ __all__ = [
     "get_wealth_snapshot_agent",
     "get_portfolio_story_agent",
     "get_watchlist_checker_agent",
+    "get_tax_loss_harvesting_agent",
     "get_cowork_watcher",
     "get_position_story_service",
     "get_portfolio_comment_model",

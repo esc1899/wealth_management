@@ -20,6 +20,7 @@ from agents.research_agent import ResearchAgent
 from agents.search_agent import SearchAgent
 from agents.storychecker_agent import StorycheckerAgent
 from agents.structural_change_agent import StructuralChangeAgent
+from agents.tax_loss_harvesting_agent import TaxLossHarvestingAgent
 from agents.watchlist_checker_agent import WatchlistCheckerAgent
 from agents.wealth_snapshot_agent import WealthSnapshotAgent
 from core.scheduler import AgentSchedulerService
@@ -271,6 +272,13 @@ def get_watchlist_checker_agent() -> WatchlistCheckerAgent:
         wc_repo=get_watchlist_checker_repo(),
         agent_runs_repo=get_agent_runs_repo(),
     )
+
+
+@st.cache_resource
+def get_tax_loss_harvesting_agent() -> TaxLossHarvestingAgent:
+    model = _get_agent_model("tax_loss_harvesting", "ollama", _DEFAULT_OLLAMA_MODEL)
+    llm = _make_ollama_provider(model, "tax_loss_harvesting", timeout=300.0)
+    return TaxLossHarvestingAgent(llm=llm)
 
 
 @st.cache_resource

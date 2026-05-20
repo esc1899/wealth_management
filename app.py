@@ -112,7 +112,8 @@ if _is_local:
 # Assistant pages
 _assistant_pages = [
     st.Page("pages/portfolio_chat.py",  title=t("nav.portfolio_chat"),  icon=":material/chat:"),
-    st.Page("pages/portfolio_story.py", title="Portfolio Checker",       icon=":material/fact_check:"),
+    st.Page("pages/portfolio_story.py",        title="Portfolio Checker",       icon=":material/fact_check:"),
+    st.Page("pages/tax_loss_harvesting.py",    title=t("nav.tax_loss_harvesting"), icon=":material/trending_down:"),
 ]
 if _is_local:
     _assistant_pages.append(

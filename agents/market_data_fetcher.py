@@ -7,6 +7,7 @@ import logging
 import re
 import time
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timezone
 from typing import Optional
 
@@ -30,7 +31,7 @@ _FOREX_TICKER = "{currency}EUR=X"
 class RateLimiter:
     """Token bucket: ensures a minimum gap between requests."""
 
-    def __init__(self, calls_per_second: float = 2.0):
+    def __init__(self, calls_per_second: float = 5.0):
         self._min_interval = 1.0 / calls_per_second
         self._last_call = 0.0
         self._lock = threading.Lock()
@@ -39,9 +40,12 @@ class RateLimiter:
         with self._lock:
             now = time.monotonic()
             gap = self._min_interval - (now - self._last_call)
-            if gap > 0:
-                time.sleep(gap)
-            self._last_call = time.monotonic()
+            sleep_time = max(0.0, gap)
+            # Reserve the slot and release the lock before sleeping so other
+            # threads can schedule their own slots concurrently.
+            self._last_call = now + sleep_time
+        if sleep_time > 0:
+            time.sleep(sleep_time)
 
 
 def validate_symbol(symbol: str) -> bool:
@@ -57,8 +61,9 @@ class MarketDataFetcher:
     """
 
     def __init__(self, rate_limiter: Optional[RateLimiter] = None):
-        self._rate_limiter = rate_limiter or RateLimiter(calls_per_second=2.0)
-        self._fx_cache: dict[str, float] = {}  # currency -> EUR rate, per instance
+        self._rate_limiter = rate_limiter or RateLimiter()
+        self._fx_cache: dict[str, float] = {}
+        self._fx_cache_lock = threading.Lock()
 
     # ------------------------------------------------------------------
     # Public interface
@@ -81,15 +86,18 @@ class MarketDataFetcher:
         records: list[PriceRecord] = []
         failed: list[str] = list(invalid)
 
-        for symbol in valid:
+        def _fetch_one(symbol: str) -> tuple[str, Optional[PriceRecord]]:
             try:
-                record = self._fetch_single(symbol)
+                return symbol, self._fetch_single(symbol)
+            except Exception:
+                return symbol, None
+
+        with ThreadPoolExecutor(max_workers=min(8, len(valid) or 1)) as pool:
+            for symbol, record in pool.map(_fetch_one, valid):
                 if record:
                     records.append(record)
                 else:
                     failed.append(symbol)
-            except Exception:
-                failed.append(symbol)
 
         return records, failed
 
@@ -268,11 +276,12 @@ class MarketDataFetcher:
         """Return the EUR conversion rate for a given currency. Cached per session."""
         if currency in EUR_CURRENCIES:
             return 1.0
-        if currency in self._fx_cache:
-            return self._fx_cache[currency]
-
+        with self._fx_cache_lock:
+            if currency in self._fx_cache:
+                return self._fx_cache[currency]
         rate = self._fetch_eur_rate(currency)
-        self._fx_cache[currency] = rate
+        with self._fx_cache_lock:
+            self._fx_cache[currency] = rate
         return rate
 
     def _fetch_eur_rate(self, currency: str) -> float:
