@@ -5,6 +5,7 @@ Market Data — trigger price fetches and show current prices.
 import pandas as pd
 import streamlit as st
 
+from core.asset_class_config import get_asset_class_registry
 from core.i18n import t
 from state import get_market_agent, get_positions_repo
 
@@ -19,7 +20,7 @@ with col_refresh:
     if st.button(f"🔄 {t('common.refresh')}"):
         with st.spinner(t("market_data.fetching")):
             try:
-                result = agent.fetch_all_now(fetch_history=True)
+                result = agent.fetch_all_now(fetch_history=False, include_watchlist=False)
                 if result.fetched > 0:
                     st.success(f"{result.fetched} {t('market_data.fetch_success')}")
                 else:
@@ -42,12 +43,14 @@ st.divider()
 # Positions with current prices
 # ------------------------------------------------------------------
 valuations = agent.get_portfolio_valuation(include_watchlist=True)
-tickers = repo.get_tickers_for_price_fetch()
+_auto_fetch_classes = set(get_asset_class_registry().auto_fetch_names())
 
-tickers_label = t("market_data.positions_tickers").replace("{count}", str(len(tickers)))
+tickers_label = t("market_data.positions_tickers").replace(
+    "{count}", str(len([v for v in valuations if v.in_portfolio and v.asset_class in _auto_fetch_classes]))
+)
 st.subheader(tickers_label)
 
-if not tickers:
+if not any(v.in_portfolio and v.asset_class in _auto_fetch_classes for v in valuations):
     st.info(t("market_data.no_tickers"))
     st.stop()
 
@@ -104,8 +107,8 @@ def render_valuations(entries):
     st.caption("ℹ️ Dividenden / Ausschüttungen werden nicht automatisch mit Kursen aktualisiert — Button auf der Positionen-Seite.")
 
 
-portfolio_vals = [v for v in valuations if v.in_portfolio]
-watchlist_vals = [v for v in valuations if v.in_watchlist]
+portfolio_vals = [v for v in valuations if v.in_portfolio and v.asset_class in _auto_fetch_classes]
+watchlist_vals = [v for v in valuations if v.in_watchlist and v.asset_class in _auto_fetch_classes]
 
 if portfolio_vals or not watchlist_vals:
     st.markdown(t("market_data.portfolio_section"))
@@ -116,7 +119,7 @@ if watchlist_vals:
     render_valuations(watchlist_vals)
 
 # Positions without ticker
-no_ticker = [p for p in repo.get_portfolio() if not p.ticker]
+no_ticker = [p for p in repo.get_portfolio() if not p.ticker and p.asset_class in _auto_fetch_classes]
 if no_ticker:
     st.divider()
     st.warning(f"{len(no_ticker)} {t('market_data.no_ticker_warning')}:")

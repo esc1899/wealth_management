@@ -5,6 +5,8 @@ Market Data Agent — orchestrates price fetching, storage, and scheduling.
 from __future__ import annotations
 import logging
 import os
+import threading
+from concurrent.futures import ThreadPoolExecutor, wait as futures_wait
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -62,6 +64,8 @@ class PortfolioValuation:
 
 
 class MarketDataAgent:
+    _global_fetch_lock = threading.Lock()
+
     def __init__(
         self,
         positions_repo: PositionsRepository,
@@ -85,14 +89,25 @@ class MarketDataAgent:
     # On-demand fetch
     # ------------------------------------------------------------------
 
-    def fetch_all_now(self, fetch_history: bool = False) -> FetchResult:
+    def fetch_all_now(self, fetch_history: bool = False, include_watchlist: bool = True) -> FetchResult:
+        if not MarketDataAgent._global_fetch_lock.acquire(blocking=False):
+            logger.info("fetch_all_now: already running, skipping")
+            return FetchResult()
+        try:
+            return self._fetch_all_now_impl(fetch_history, include_watchlist)
+        finally:
+            MarketDataAgent._global_fetch_lock.release()
+
+    def _fetch_all_now_impl(self, fetch_history: bool, include_watchlist: bool = True) -> FetchResult:
         result = FetchResult()
 
         # Only fetch prices for asset classes with auto_fetch=True
         registry = get_asset_class_registry()
         auto_fetch_classes = set(registry.auto_fetch_names())
 
-        all_positions = self._positions.get_portfolio() + self._positions.get_watchlist()
+        all_positions = self._positions.get_portfolio()
+        if include_watchlist:
+            all_positions += self._positions.get_watchlist()
         symbols = list({
             p.ticker.upper()
             for p in all_positions
@@ -110,11 +125,20 @@ class MarketDataAgent:
             result.fetched += 1
 
         if fetch_history:
-            for symbol in symbols:
-                history = self._fetcher.fetch_historical(symbol, period="1y")
-                for h in history:
-                    self._market.upsert_historical(h)
-                result.history_fetched += len(history)
+            def _fetch_hist(sym):
+                return self._fetcher.fetch_historical(sym, period="1y")
+
+            with ThreadPoolExecutor(max_workers=min(10, len(symbols))) as hist_pool:
+                futs = {hist_pool.submit(_fetch_hist, s): s for s in symbols}
+                done, _ = futures_wait(futs, timeout=60)
+            for fut in done:
+                try:
+                    records = fut.result()
+                    for h in records:
+                        self._market.upsert_historical(h)
+                    result.history_fetched += len(records)
+                except Exception:
+                    pass
 
         # Invoke post-fetch callback if registered (e.g., automatic wealth snapshot)
         if self._post_fetch_callback:

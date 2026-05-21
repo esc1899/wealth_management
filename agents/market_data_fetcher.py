@@ -7,7 +7,7 @@ import logging
 import re
 import time
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait as futures_wait, FIRST_COMPLETED
 from datetime import date, datetime, timezone
 from typing import Optional
 
@@ -92,12 +92,21 @@ class MarketDataFetcher:
             except Exception:
                 return symbol, None
 
-        with ThreadPoolExecutor(max_workers=min(8, len(valid) or 1)) as pool:
-            for symbol, record in pool.map(_fetch_one, valid):
-                if record:
-                    records.append(record)
-                else:
-                    failed.append(symbol)
+        with ThreadPoolExecutor(max_workers=min(20, len(valid) or 1)) as pool:
+            futs = {pool.submit(_fetch_one, s): s for s in valid}
+            done, not_done = futures_wait(futs, timeout=15)
+            for fut in done:
+                try:
+                    _, record = fut.result()
+                    if record:
+                        records.append(record)
+                    else:
+                        failed.append(futs[fut])
+                except Exception:
+                    failed.append(futs[fut])
+            for fut in not_done:
+                fut.cancel()
+                failed.append(futs[fut])
 
         return records, failed
 
