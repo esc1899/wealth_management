@@ -461,6 +461,10 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE llm_usage ADD COLUMN cache_write_tokens INTEGER")
     if "web_search_requests" not in existing_usage:
         conn.execute("ALTER TABLE llm_usage ADD COLUMN web_search_requests INTEGER")
+    if "generation_id" not in existing_usage:
+        conn.execute("ALTER TABLE llm_usage ADD COLUMN generation_id TEXT")
+    if "actual_cost_usd" not in existing_usage:
+        conn.execute("ALTER TABLE llm_usage ADD COLUMN actual_cost_usd REAL")
 
     # Create portfolio_story_position_fits table if it doesn't exist
     conn.execute("""CREATE TABLE IF NOT EXISTS portfolio_story_position_fits (

@@ -8,7 +8,9 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from config import config
 from core.i18n import t
+from core.llm.openrouter_costs import fetch_account_usage, fetch_and_store_costs
 from core.storage.usage import compute_cost
 from state import get_app_config_repo, get_usage_repo
 
@@ -19,6 +21,51 @@ st.caption(t("statistics.subtitle"))
 repo = get_usage_repo()
 config_repo = get_app_config_repo()
 model_prices = config_repo.get_model_prices()
+
+# ------------------------------------------------------------------
+# Section: Echte Kosten (OpenRouter)
+# ------------------------------------------------------------------
+
+_OR_ACTIVE = bool(config.OPENAI_BASE_URL and config.OPENAI_API_KEY)
+
+if _OR_ACTIVE:
+    st.subheader("💰 Echte Kosten (OpenRouter)")
+
+    actual_summary = repo.actual_costs_summary()
+    _ac_today = actual_summary.get("today") or 0.0
+    _ac_month = actual_summary.get("this_month") or 0.0
+    _ac_all = actual_summary.get("all_time") or 0.0
+    _pending = actual_summary.get("pending") or 0
+
+    _col1, _col2, _col3, _col4 = st.columns(4)
+    _col1.metric("Heute (real)", f"${_ac_today:.4f}")
+    _col2.metric("Diesen Monat (real)", f"${_ac_month:.4f}")
+    _col3.metric("Gesamt (real)", f"${_ac_all:.4f}")
+    _col4.metric("Ausstehend", str(_pending), help="Calls mit OpenRouter-ID, Kosten noch nicht abgerufen")
+
+    _fetch_col, _account_col = st.columns([1, 2])
+    with _fetch_col:
+        if st.button("🔄 Kosten abrufen", help="Holt echte Kosten von OpenRouter für alle ausstehenden Calls"):
+            _uncosted = repo.get_uncosted_openrouter_records(limit=200)
+            if _uncosted:
+                with st.spinner(f"Rufe Kosten für {len(_uncosted)} Calls ab…"):
+                    _updated = fetch_and_store_costs(
+                        config.OPENAI_API_KEY, config.OPENAI_BASE_URL, _uncosted, repo
+                    )
+                st.success(f"✅ {_updated}/{len(_uncosted)} Kosten aktualisiert")
+                st.rerun()
+            else:
+                st.info("Keine ausstehenden Calls.")
+
+    with _account_col:
+        if st.button("🔑 Account-Gesamtverbrauch abrufen"):
+            _total = fetch_account_usage(config.OPENAI_API_KEY, config.OPENAI_BASE_URL)
+            if _total is not None:
+                st.info(f"OpenRouter Account: **${_total:.4f}** Gesamtverbrauch seit Accounterstellung")
+            else:
+                st.warning("Konnte Account-Verbrauch nicht abrufen.")
+
+    st.divider()
 
 # ------------------------------------------------------------------
 # Source filter
@@ -95,6 +142,8 @@ last_month_calls = sum(r.get("calls", 0) for r in last_month_rows)
 # Header KPIs
 # ------------------------------------------------------------------
 
+st.subheader("📊 Geschätzte Kosten")
+st.caption("Basis: konfigurierte Preise × Token-Zählung")
 m1, m2, m3 = st.columns(3)
 m1.metric(t("statistics.today"), f"${today_cost:.4f}", delta=f"{today_calls} Calls", delta_color="off")
 m2.metric(t("statistics.this_month"), f"${this_month_cost:.4f}", delta=f"{this_month_calls} Calls", delta_color="off")
@@ -261,6 +310,10 @@ with tab_calls:
             + df_recent.get("cache_write_tokens", pd.Series(0, index=df_recent.index)).fillna(0).astype(int)
             + df_recent.get("cache_read_tokens", pd.Series(0, index=df_recent.index)).fillna(0).astype(int)
         )
+        if "actual_cost_usd" in df_recent.columns:
+            df_recent["actual_cost_usd"] = df_recent["actual_cost_usd"].apply(
+                lambda v: f"${v:.5f}" if v is not None else "—"
+            )
         df_recent = df_recent.rename(columns={
             "created_at":         "Zeit",
             "agent":              t("statistics.col_agent"),
@@ -273,7 +326,15 @@ with tab_calls:
             "cache_read_tokens":  "Cache Read (0.1×)",
             "eff_input":          "Eff. Input",
             "duration_ms":        "Dauer (ms)",
+            "actual_cost_usd":    "Echte Kosten ($)",
         })
-        st.dataframe(df_recent, use_container_width=True, hide_index=True)
+        display_recent_cols = [c for c in [
+            "Zeit", t("statistics.col_agent"), t("statistics.col_skill"),
+            t("statistics.col_model"), "Quelle",
+            t("statistics.col_input"), t("statistics.col_output"),
+            "Cache Write (1.25×)", "Cache Read (0.1×)", "Eff. Input",
+            "Dauer (ms)", "Echte Kosten ($)",
+        ] if c in df_recent.columns]
+        st.dataframe(df_recent[display_recent_cols], use_container_width=True, hide_index=True)
     else:
         st.info("Noch keine Aufrufe aufgezeichnet.")

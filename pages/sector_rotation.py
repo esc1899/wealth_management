@@ -14,6 +14,7 @@ import streamlit as st
 
 from core.i18n import t, current_language
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge, cloud_notice
+from core.ui.markdown import llm_markdown
 from state import (
     get_portfolio_service,
     get_sector_rotation_agent,
@@ -199,7 +200,7 @@ with _col_right:
 
             # Vollständiger Report
             with st.expander(t("sector_rotation.report_header"), expanded=True):
-                st.markdown(_run.result)
+                llm_markdown(_run.result)
 
             if st.button(t("sector_rotation.new_scan_button"), key="_sr_new"):
                 st.session_state["sr_run_id"] = None
@@ -227,7 +228,7 @@ if _history:
                     for sv in _h_verdicts
                 ]
                 st.caption(" · ".join(_summary_parts))
-            st.markdown(_h.result)
+            llm_markdown(_h.result)
             if st.button(
                 "Laden",
                 key=f"_sr_load_{_h.id}",

@@ -31,22 +31,73 @@ def _make_openai_provider(model: str, agent_name: str) -> "OpenAICompatibleProvi
         model=model,
         base_url=config.OPENAI_BASE_URL,
         tavily_news_mode=agent_name in _TAVILY_NEWS_AGENTS,
+        provider_order=config.OPENAI_PROVIDER or None,
     )
-    provider.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
+
+    def _on_usage(i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None):
+        get_usage_repo().record(
+            agent_name, model, i, o,
+            skill=skill, duration_ms=dur, position_count=pos,
+            cache_read_tokens=cache_read, cache_write_tokens=cache_write,
+            web_search_requests=web_search,
+            generation_id=provider.last_generation_id,
+        )
+
+    provider.on_usage = _on_usage
+    return provider
+
+
+def _make_deepseek_provider(model: str, agent_name: str) -> "OpenAICompatibleProvider":
+    """Create a DeepSeek direct API provider (cheaper than OpenRouter middlemen)."""
+    from core.llm.openai_compatible import OpenAICompatibleProvider
+    provider = OpenAICompatibleProvider(
+        api_key=config.DEEPSEEK_API_KEY,
+        model=model,
+        base_url=config.DEEPSEEK_BASE_URL,
+    )
+
+    def _on_usage(i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None):
+        get_usage_repo().record(
+            agent_name, model, i, o,
+            skill=skill, duration_ms=dur, position_count=pos,
+            cache_read_tokens=cache_read, cache_write_tokens=cache_write,
+            web_search_requests=web_search,
+            generation_id=provider.last_generation_id,
+        )
+
+    provider.on_usage = _on_usage
     return provider
 
 
 def _make_public_provider(model: str, agent_name: str, enable_thinking: bool = False) -> LLMProvider:
-    """Return either OpenAI-compatible or Claude provider based on active config."""
+    """Route to the right provider based on model name prefix."""
+    if model.startswith("claude-") and config.LLM_API_KEY:
+        return _make_claude_provider(model, agent_name, enable_thinking=enable_thinking)
+    if model.startswith("deepseek-") and config.DEEPSEEK_API_KEY:
+        return _make_deepseek_provider(model, agent_name)
     if config.OPENAI_BASE_URL:
         return _make_openai_provider(model, agent_name)
     return _make_claude_provider(model, agent_name, enable_thinking=enable_thinking)
 
 
 def _get_public_agent_model(agent_key: str, default: str) -> str:
-    """Get model for a public (cloud) agent. Uses model_openai or model_claude keys depending on active provider."""
-    model_type = "openai" if config.OPENAI_BASE_URL else "claude"
-    return _get_agent_model(agent_key, model_type, default)
+    """Get model for a public agent. Uses unified model_public_* key, falls back to legacy provider-specific keys."""
+    repo = get_app_config_repo()
+    saved = repo.get(f"model_public_{agent_key}")
+    if saved:
+        return saved
+    for prefix in ("openai", "claude"):
+        saved = repo.get(f"model_{prefix}_{agent_key}")
+        if saved:
+            return saved
+    env_default = config.LLM_DEFAULT_MODEL
+    if env_default:
+        return env_default
+    if config.OPENAI_MODELS:
+        return config.OPENAI_MODELS[0]
+    if config.CLAUDE_MODELS:
+        return config.CLAUDE_MODELS[0]
+    return default
 
 
 def _make_ollama_provider(model: str, agent_name: str, timeout: float = 120.0) -> OllamaProvider:

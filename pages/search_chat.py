@@ -8,6 +8,7 @@ import streamlit as st
 
 from core.i18n import t
 from core.ui.verdicts import cloud_notice
+from core.ui.markdown import llm_markdown
 from state import get_search_agent, get_skills_repo
 
 st.set_page_config(page_title="Investment Search", page_icon="🔎", layout="wide")
@@ -158,7 +159,7 @@ with col_chat:
             for msg in messages:
                 role = "user" if msg.role == "user" else "assistant"
                 with st.chat_message(role):
-                    st.markdown(msg.content)
+                    llm_markdown(msg.content)
                     if role == "assistant":
                         st.caption(t("common.ai_disclaimer"))
 

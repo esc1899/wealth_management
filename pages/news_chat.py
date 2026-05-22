@@ -8,6 +8,7 @@ import streamlit as st
 
 from core.i18n import t
 from core.ui.verdicts import cloud_notice
+from core.ui.markdown import llm_markdown
 from state import get_news_agent, get_news_repo, get_positions_repo, get_skills_repo
 
 st.set_page_config(page_title="News Digest", page_icon="📰", layout="wide")
@@ -53,7 +54,7 @@ def _render_digest(result: str):
         sections.append("\n".join(current))
 
     if not sections or (len(sections) == 1 and not sections[0].startswith("## ")):
-        st.markdown(result)
+        llm_markdown(result)
         return
 
     for section in sections:
@@ -206,7 +207,7 @@ with col_right:
             for msg in followup_messages:
                 role = "user" if msg.role == "user" else "assistant"
                 with st.chat_message(role):
-                    st.markdown(msg.content)
+                    llm_markdown(msg.content)
                     if role == "assistant":
                         st.caption(t("common.ai_disclaimer"))
 

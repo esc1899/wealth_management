@@ -96,51 +96,49 @@ _assistant_group = (
     else t("nav.group_assistant_remote")
 )
 
-# Portfolio pages (Watchlist-Analyse local-only)
+# Portfolio pages (Watchlist-Analyse + Dividenden local-only)
 _portfolio_pages = [
     st.Page("pages/dashboard.py",          title=t("nav.dashboard"),   icon=":material/dashboard:"),
     st.Page("pages/positionen.py",         title=t("nav.positions"),   icon=":material/edit_note:"),
     st.Page("pages/marktdaten.py",         title=t("nav.market_data"), icon=":material/trending_up:"),
     st.Page("pages/analyse.py",            title=t("nav.analysis"),    icon=":material/bar_chart:"),
     st.Page("pages/position_dashboard.py", title="Positionsanalyse",   icon=":material/person_search:"),
+    st.Page("pages/wealth_history.py",     title=t("nav.wealth_history"), icon=":material/show_chart:"),
 ]
 if _is_local:
     _portfolio_pages.append(
         st.Page("pages/watchlist_analysis.py", title="Watchlist-Analyse", icon=":material/search:"),
     )
+    _portfolio_pages.append(
+        st.Page("pages/dividend_calendar.py", title=t("nav.dividend_calendar"), icon=":material/payments:"),
+    )
 
 # Assistant pages
 _assistant_pages = [
-    st.Page("pages/portfolio_chat.py",  title=t("nav.portfolio_chat"),  icon=":material/chat:"),
-    st.Page("pages/portfolio_story.py",        title="Portfolio Checker",       icon=":material/fact_check:"),
-    st.Page("pages/tax_loss_harvesting.py",    title=t("nav.tax_loss_harvesting"), icon=":material/trending_down:"),
+    st.Page("pages/portfolio_chat.py",   title=t("nav.portfolio_chat"), icon=":material/chat:"),
+    st.Page("pages/portfolio_story.py",  title="Portfolio Checker",     icon=":material/fact_check:"),
 ]
 if _is_local:
     _assistant_pages.append(
         st.Page("pages/watchlist_checker.py", title="Watchlist Checker", icon=":material/check_circle:"),
     )
-    _assistant_pages.append(
-        st.Page("pages/dividend_calendar.py", title=t("nav.dividend_calendar"), icon=":material/payments:"),
-    )
-_assistant_pages.append(
-    st.Page("pages/wealth_history.py",  title=t("nav.wealth_history"),  icon=":material/show_chart:")
-)
 
 pg = st.navigation({
     t("nav.group_portfolio"): _portfolio_pages,
     _assistant_group: _assistant_pages,
     t("nav.group_research"): [
-        st.Page("pages/research_chat.py",   title=t("nav.research_chat"),    icon=":material/search:"),
-        st.Page("pages/news_chat.py",       title=t("nav.news_chat"),        icon=":material/newspaper:"),
-        st.Page("pages/search_chat.py",     title=t("nav.search_chat"),      icon=":material/manage_search:"),
-        st.Page("pages/storychecker.py",    title=t("nav.storychecker"),     icon=":material/fact_check:"),
-        st.Page("pages/fundamental_analyzer.py", title="Fundamental Analyzer", icon=":material/calculate:"),
-        st.Page("pages/cowork_inbox.py",    title="Research Inbox",          icon=":material/inbox:"),
+        st.Page("pages/research_chat.py",        title=t("nav.research_chat"),    icon=":material/search:"),
+        st.Page("pages/news_chat.py",            title=t("nav.news_chat"),        icon=":material/newspaper:"),
+        st.Page("pages/search_chat.py",          title=t("nav.search_chat"),      icon=":material/manage_search:"),
+        st.Page("pages/storychecker.py",         title=t("nav.storychecker"),     icon=":material/fact_check:"),
+        st.Page("pages/fundamental_analyzer.py", title="Fundamental Analyzer",   icon=":material/calculate:"),
+        st.Page("pages/consensus_gap.py",        title=t("nav.consensus_gap"),   icon=":material/target:"),
+        st.Page("pages/cowork_inbox.py",         title="Research Inbox",         icon=":material/inbox:"),
     ],
     t("nav.group_claude_strategy"): [
-        st.Page("pages/structural_scan.py",   title=t("nav.structural_scan"),   icon=":material/radar:"),
-        st.Page("pages/consensus_gap.py",     title=t("nav.consensus_gap"),     icon=":material/target:"),
-        st.Page("pages/sector_rotation.py",   title=t("nav.sector_rotation"),   icon=":material/rotate_right:"),
+        st.Page("pages/tax_loss_harvesting.py", title=t("nav.tax_loss_harvesting"), icon=":material/trending_down:"),
+        st.Page("pages/structural_scan.py",     title=t("nav.structural_scan"),     icon=":material/radar:"),
+        st.Page("pages/sector_rotation.py",     title=t("nav.sector_rotation"),     icon=":material/rotate_right:"),
     ],
     t("nav.group_system"): [
         st.Page("pages/statistics.py",      title=t("nav.statistics"),       icon=":material/bar_chart:"),

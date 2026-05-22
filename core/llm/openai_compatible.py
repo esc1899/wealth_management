@@ -88,10 +88,12 @@ class OpenAICompatibleProvider(LLMProvider):
     Uses the openai SDK with base_url override to support any compatible endpoint.
     """
 
-    def __init__(self, api_key: str = "", model: str = "", base_url: str = "", tavily_news_mode: bool = False):
+    def __init__(self, api_key: str = "", model: str = "", base_url: str = "", tavily_news_mode: bool = False, provider_order: Optional[List[str]] = None):
         self._client = AsyncOpenAI(api_key=api_key, base_url=base_url or None)
         self._model = model
         self._tavily_news_mode = tavily_news_mode
+        self._provider_extra = {"provider": {"order": provider_order, "allow_fallbacks": True}} if provider_order else {}
+        self.last_generation_id: Optional[str] = None
 
     def _normalize_messages(self, messages: list[dict]) -> list[dict]:
         """
@@ -140,7 +142,9 @@ class OpenAICompatibleProvider(LLMProvider):
             messages=oai_messages,
             max_tokens=max_tokens,
             temperature=temperature,
+            extra_body=self._provider_extra or None,
         )
+        self.last_generation_id = getattr(response, "id", None)
 
         if self.on_usage and response.usage:
             self.on_usage(
@@ -188,12 +192,15 @@ class OpenAICompatibleProvider(LLMProvider):
         }
         if oai_tools:
             kwargs["tools"] = oai_tools
+        if self._provider_extra:
+            kwargs["extra_body"] = self._provider_extra
 
         _t0 = time.monotonic()
         total_input = total_output = 0
 
         for _ in range(_MAX_SEARCH_ITERATIONS):
             response = await self._client.chat.completions.create(**kwargs)
+            self.last_generation_id = getattr(response, "id", None)
             msg = response.choices[0].message
 
             if response.usage:

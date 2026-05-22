@@ -17,6 +17,7 @@ _NEGATIVE_VERDICTS = frozenset({"gefährdet", "eingeholt", "überbewertet"})
 
 from core.currency import symbol
 from core.i18n import t
+from core.ui.markdown import llm_markdown
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge
 from state import (
     get_market_agent,
@@ -71,7 +72,7 @@ def _render_checker_card(title: str, verdict_obj, config, full_text_fn):
                 st.caption(verdict_obj.created_at.strftime("%d. %b %Y"))
 
         if verdict_obj.summary:
-            st.markdown(f"_{verdict_obj.summary}_")
+            llm_markdown(f"_{verdict_obj.summary}_")
 
         full_text = None
         try:
@@ -81,7 +82,7 @@ def _render_checker_card(title: str, verdict_obj, config, full_text_fn):
 
         if full_text:
             with st.expander("▼ Vollständige Analyse"):
-                st.markdown(full_text)
+                llm_markdown(full_text)
 
 
 def _render_confluence_score(sc_v, cg_v, fa_v) -> None:

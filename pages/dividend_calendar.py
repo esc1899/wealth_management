@@ -22,6 +22,7 @@ from core.dividend_calendar import (
 from core.i18n import t, current_language
 from core.services.portfolio_comment_service import get_style_by_id
 from core.ui.verdicts import cloud_notice
+from core.ui.markdown import llm_markdown
 from state import (
     get_market_agent,
     get_market_repo,
@@ -227,7 +228,7 @@ if _JOB["done"]:
         _result = _JOB["result"]
         if _result.summary:
             st.info(f"**Fazit:** {_result.summary}")
-        st.markdown(_result.full_text)
+        llm_markdown(_result.full_text)
         st.caption(t("common.ai_disclaimer"))
 
         # KI-Kommentarstil

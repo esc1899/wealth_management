@@ -13,6 +13,7 @@ import streamlit as st
 
 from core.i18n import t
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge, verdict_icon
+from core.ui.markdown import llm_markdown
 from state import (
     get_analysis_service,
     get_capital_allocator_repo,
@@ -119,7 +120,7 @@ def _render_checker_card(title: str, verdict_obj, config, full_text_fn):
                 st.caption(verdict_obj.created_at.strftime("%d. %b %Y"))
 
         if verdict_obj.summary:
-            st.markdown(f"_{verdict_obj.summary}_")
+            llm_markdown(f"_{verdict_obj.summary}_")
 
         full_text = None
         try:
@@ -129,7 +130,7 @@ def _render_checker_card(title: str, verdict_obj, config, full_text_fn):
 
         if full_text:
             with st.expander(t("capital_allocator.full_analysis"), expanded=False):
-                st.markdown(full_text)
+                llm_markdown(full_text)
 
 
 # ------------------------------------------------------------------
@@ -195,7 +196,7 @@ if ca_verdict:
         if ca_verdict.created_at:
             st.caption(ca_verdict.created_at.strftime("%d. %b %Y, %H:%M"))
         if ca_verdict.summary:
-            st.markdown(f"_{ca_verdict.summary}_")
+            llm_markdown(f"_{ca_verdict.summary}_")
     with col2:
         icon = verdict_icon(ca_verdict.verdict, VERDICT_CONFIGS["capital_allocator"])
         st.metric(t("capital_allocator.verdict_label"), f"{icon} {ca_verdict.verdict}")
@@ -206,7 +207,7 @@ if ca_verdict:
             assistant_msgs = [m for m in messages if m.role == "assistant"]
             if assistant_msgs:
                 with st.expander(t("capital_allocator.full_analysis"), expanded=True):
-                    st.markdown(assistant_msgs[-1].content)
+                    llm_markdown(assistant_msgs[-1].content)
         except Exception:
             pass
 else:

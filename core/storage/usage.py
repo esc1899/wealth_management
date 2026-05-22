@@ -29,14 +29,51 @@ class UsageRepository:
         cache_read_tokens: Optional[int] = None,
         cache_write_tokens: Optional[int] = None,
         web_search_requests: Optional[int] = None,
+        generation_id: Optional[str] = None,
     ) -> None:
         self._conn.execute(
             "INSERT INTO llm_usage"
-            " (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count, cache_read_tokens, cache_write_tokens, web_search_requests, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count, cache_read_tokens, cache_write_tokens, web_search_requests, datetime.utcnow().isoformat()),
+            " (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count,"
+            "  cache_read_tokens, cache_write_tokens, web_search_requests, generation_id, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count,
+             cache_read_tokens, cache_write_tokens, web_search_requests, generation_id,
+             datetime.utcnow().isoformat()),
         )
         self._conn.commit()
+
+    def update_actual_cost(self, record_id: int, cost_usd: float) -> None:
+        """Store the real cost (from OpenRouter API) for a specific usage record."""
+        self._conn.execute(
+            "UPDATE llm_usage SET actual_cost_usd = ? WHERE id = ?",
+            (cost_usd, record_id),
+        )
+        self._conn.commit()
+
+    def get_uncosted_openrouter_records(self, limit: int = 200) -> list[dict]:
+        """Records that have a generation_id but no actual_cost_usd yet."""
+        rows = self._conn.execute(
+            """SELECT id, generation_id, created_at FROM llm_usage
+               WHERE generation_id IS NOT NULL AND actual_cost_usd IS NULL
+               ORDER BY created_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def actual_costs_summary(self) -> dict:
+        """Sum of actual_cost_usd for today, this month, all time."""
+        today = date.today().isoformat()
+        current_month = date.today().strftime("%Y-%m")
+        row = self._conn.execute(
+            """SELECT
+                 SUM(CASE WHEN date(created_at) = ? THEN actual_cost_usd ELSE 0 END) AS today,
+                 SUM(CASE WHEN strftime('%Y-%m', created_at) = ? THEN actual_cost_usd ELSE 0 END) AS this_month,
+                 SUM(actual_cost_usd) AS all_time,
+                 COUNT(CASE WHEN generation_id IS NOT NULL AND actual_cost_usd IS NULL THEN 1 END) AS pending
+               FROM llm_usage""",
+            (today, current_month),
+        ).fetchone()
+        return dict(row) if row else {"today": 0.0, "this_month": 0.0, "all_time": 0.0, "pending": 0}
 
     # ------------------------------------------------------------------
     # Reset
@@ -194,7 +231,9 @@ class UsageRepository:
     def get_recent_calls(self, limit: int = 50) -> list[dict]:
         """Last N LLM calls (newest first), regardless of reset filters."""
         rows = self._conn.execute(
-            """SELECT created_at, agent, skill, model, source, input_tokens, output_tokens, duration_ms, cache_read_tokens, cache_write_tokens, web_search_requests
+            """SELECT id, created_at, agent, skill, model, source, input_tokens, output_tokens,
+                      duration_ms, cache_read_tokens, cache_write_tokens, web_search_requests,
+                      generation_id, actual_cost_usd
                FROM llm_usage
                ORDER BY created_at DESC
                LIMIT ?""",

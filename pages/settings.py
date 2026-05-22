@@ -94,10 +94,11 @@ def _get_claude_model_list() -> list[str]:
 
 _CLAUDE_MODELS = _get_claude_model_list()
 
-# Detect if OpenAI-compatible provider is active
-_OPENAI_ACTIVE = bool(config.OPENAI_BASE_URL)
-_PUBLIC_MODELS = config.OPENAI_MODELS if _OPENAI_ACTIVE else _CLAUDE_MODELS
-_PUBLIC_TYPE = "openai" if _OPENAI_ACTIVE else "claude"
+# Combined public model list: DeepSeek first (cheapest), then OpenRouter, then Claude
+_HAS_ANTHROPIC = bool(config.LLM_API_KEY)
+_HAS_OPENROUTER = bool(config.OPENAI_BASE_URL and config.OPENAI_API_KEY)
+_HAS_DEEPSEEK = bool(config.DEEPSEEK_API_KEY)
+_ALL_PUBLIC_MODELS = list(dict.fromkeys(config.DEEPSEEK_MODELS + config.OPENAI_MODELS + _CLAUDE_MODELS))
 
 # Fetch available Ollama models
 import requests as _requests
@@ -130,17 +131,15 @@ def _claude_sel(agent_key: str, label: str) -> str:
 
 def _public_sel(agent_key: str, label: str) -> str:
     saved = (
-        app_config.get(f"model_{_PUBLIC_TYPE}_{agent_key}")
-        or app_config.get(f"model_{_PUBLIC_TYPE}")
-        or (_PUBLIC_MODELS[0] if _PUBLIC_MODELS else "")
+        app_config.get(f"model_public_{agent_key}")
+        or app_config.get(f"model_openai_{agent_key}")
+        or app_config.get(f"model_claude_{agent_key}")
+        or app_config.get("model_public")
+        or (_ALL_PUBLIC_MODELS[0] if _ALL_PUBLIC_MODELS else "")
     )
-    idx = _PUBLIC_MODELS.index(saved) if saved in _PUBLIC_MODELS else 0
-    return st.selectbox(
-        label,
-        options=_PUBLIC_MODELS or ["(configure OPENAI_MODELS)" if _OPENAI_ACTIVE else "(no models)"],
-        index=idx,
-        key=f"_model_{_PUBLIC_TYPE}_{agent_key}"
-    )
+    options = _ALL_PUBLIC_MODELS or ["(keine Modelle konfiguriert)"]
+    idx = options.index(saved) if saved in options else 0
+    return st.selectbox(label, options=options, index=idx, key=f"_model_public_{agent_key}")
 
 st.markdown(f"**{t('settings.ollama_agents_header')}** 🔒")
 col_o1, col_o2, col_o3 = st.columns(3)
@@ -155,10 +154,16 @@ col_o4, _ = st.columns([1, 2])
 with col_o4:
     sel_portfolio_comment = _ollama_sel("portfolio_comment", "💬 KI-Kommentare")
 
-_provider_icon = "🌐" if _OPENAI_ACTIVE else "☁️"
-_provider_label = t('settings.claude_agents_header') if not _OPENAI_ACTIVE else "OpenAI-compatible"
+_providers = []
+if _HAS_ANTHROPIC:
+    _providers.append("Anthropic")
+if _HAS_DEEPSEEK:
+    _providers.append("DeepSeek")
+if _HAS_OPENROUTER:
+    _providers.append("OpenRouter")
+_provider_label = "☁️ Cloud (" + " + ".join(_providers) + ")" if _providers else "☁️ Cloud"
 
-st.markdown(f"**{_provider_label}** {_provider_icon}")
+st.markdown(f"**{_provider_label}**")
 col_c1, col_c2, col_c3 = st.columns(3)
 with col_c1:
     sel_news = _public_sel("news", t("settings.agent_news"))
@@ -167,7 +172,7 @@ with col_c2:
 with col_c3:
     sel_storychecker = _public_sel("storychecker", t("settings.agent_storychecker"))
 
-st.markdown(f"**{_provider_label} Strategy** {_provider_icon}")
+st.markdown(f"**{_provider_label} Strategy**")
 col_s1, col_s2, col_s3 = st.columns(3)
 with col_s1:
     sel_structural = _public_sel("structural_scan", t("settings.agent_structural_scan"))
@@ -176,22 +181,25 @@ with col_s2:
 with col_s3:
     sel_fundamental = _public_sel("fundamental_analyzer", t("settings.agent_fundamental"))
 
-col_s4, _ = st.columns([1, 2])
+col_s4, col_s5, _ = st.columns([1, 1, 1])
 with col_s4:
     sel_capital_allocator = _public_sel("capital_allocator", "Capital Allocator")
+with col_s5:
+    sel_sector_rotation = _public_sel("sector_rotation", t("settings.agent_sector_rotation"))
 
 if st.button(t("settings.save_models_button"), key="_save_models_btn", use_container_width=False):
     app_config.set("model_ollama_portfolio", sel_portfolio)
     app_config.set("model_ollama_portfolio_story", sel_portfolio_story)
     app_config.set("model_ollama_watchlist_checker", sel_watchlist_checker)
     app_config.set("model_ollama_portfolio_comment", sel_portfolio_comment)
-    app_config.set(f"model_{_PUBLIC_TYPE}_news", sel_news)
-    app_config.set(f"model_{_PUBLIC_TYPE}_search", sel_search)
-    app_config.set(f"model_{_PUBLIC_TYPE}_storychecker", sel_storychecker)
-    app_config.set(f"model_{_PUBLIC_TYPE}_structural_scan", sel_structural)
-    app_config.set(f"model_{_PUBLIC_TYPE}_consensus_gap", sel_consensus)
-    app_config.set(f"model_{_PUBLIC_TYPE}_fundamental_analyzer", sel_fundamental)
-    app_config.set(f"model_{_PUBLIC_TYPE}_capital_allocator", sel_capital_allocator)
+    app_config.set("model_public_news", sel_news)
+    app_config.set("model_public_search", sel_search)
+    app_config.set("model_public_storychecker", sel_storychecker)
+    app_config.set("model_public_structural_scan", sel_structural)
+    app_config.set("model_public_consensus_gap", sel_consensus)
+    app_config.set("model_public_fundamental_analyzer", sel_fundamental)
+    app_config.set("model_public_capital_allocator", sel_capital_allocator)
+    app_config.set("model_public_sector_rotation", sel_sector_rotation)
     st.cache_resource.clear()
     st.success(t("settings.models_saved"))
 

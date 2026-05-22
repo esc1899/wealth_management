@@ -15,6 +15,7 @@ import streamlit as st
 
 from core.i18n import t, current_language
 from core.ui.verdicts import cloud_notice, verdict_icon, VERDICT_CONFIGS
+from core.ui.markdown import llm_markdown
 from state import (
     get_analyses_repo,
     get_fundamental_analyzer_agent,
@@ -266,7 +267,7 @@ with col_right:
                     assistant_msgs = [m for m in messages if m.role == "assistant"]
                     if assistant_msgs:
                         with st.expander(t("fundamental.full_analysis"), expanded=True):
-                            st.markdown(assistant_msgs[0].content)
+                            llm_markdown(assistant_msgs[0].content)
 
                 # Inline history expander
                 _history = [
@@ -302,7 +303,7 @@ with col_right:
                     if i == 0:
                         continue
                 with st.chat_message(msg.role):
-                    st.markdown(msg.content)
+                    llm_markdown(msg.content)
                     if msg.role == "assistant":
                         st.caption(t("fundamental.web_search_info"))
 

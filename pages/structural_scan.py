@@ -14,6 +14,7 @@ import streamlit as st
 
 from core.i18n import t, current_language
 from core.ui.verdicts import cloud_notice
+from core.ui.markdown import llm_markdown
 from state import (
     get_skills_repo,
     get_structural_change_agent,
@@ -168,7 +169,7 @@ if _active_run_id:
         if _run.user_focus:
             st.caption(f"{t('structural_scan.focus_label')}: {_run.user_focus}")
 
-        st.markdown(_run.result)
+        llm_markdown(_run.result)
         st.divider()
 
         # ── Proposal panel ───────────────────────────────────────────
@@ -207,7 +208,7 @@ if _active_run_id:
         _messages = _repo.get_messages(_active_run_id)
         for msg in _messages[2:]:
             with st.chat_message(msg.role):
-                st.markdown(msg.content)
+                llm_markdown(msg.content)
 
         _followup = st.chat_input(t("structural_scan.chat_placeholder"))
         if _followup:
@@ -247,7 +248,7 @@ if _history:
         if _h.user_focus:
             _label += f" · {_h.user_focus[:40]}"
         with st.expander(_label):
-            st.markdown(_h.result)
+            llm_markdown(_h.result)
             if st.button(
                 t("structural_scan.continue_button"),
                 key=f"_scan_continue_{_h.id}",

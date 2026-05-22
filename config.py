@@ -29,10 +29,17 @@ class Config:
     LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "")
     LLM_DEFAULT_MODEL: str = os.getenv("LLM_DEFAULT_MODEL", "")
 
-    # OpenAI-compatible provider (optional — Perplexity Sonar, Groq, Together, etc.)
+    # OpenAI-compatible provider (optional — OpenRouter, Perplexity, Groq, etc.)
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "")
     OPENAI_MODELS: list = [m.strip() for m in os.getenv("OPENAI_MODELS", "").split(",") if m.strip()]
+    # OpenRouter provider routing — comma-separated preferred providers, e.g. "NovitaAI,SiliconFlow"
+    OPENAI_PROVIDER: list = [p.strip() for p in os.getenv("OPENAI_PROVIDER", "").split(",") if p.strip()]
+
+    # DeepSeek direct API (cheaper than OpenRouter middlemen)
+    DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY", "")
+    DEEPSEEK_BASE_URL: str = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+    DEEPSEEK_MODELS: list = [m.strip() for m in os.getenv("DEEPSEEK_MODELS", "deepseek-chat,deepseek-reasoner").split(",") if m.strip()]
 
     # Tavily Search (optional — replaces Anthropic's built-in web_search when set)
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")

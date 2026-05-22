@@ -15,6 +15,7 @@ import streamlit as st
 
 from core.i18n import t, current_language
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon, verdict_badge, render_verdict_legend, cloud_notice
+from core.ui.markdown import llm_markdown
 from state import (
     get_analyses_repo,
     get_consensus_gap_agent,
@@ -274,10 +275,10 @@ with col_right:
                 _assistant = [m for m in _msgs if m.role == "assistant"]
                 if _assistant:
                     with st.expander("▼ Vollständige Analyse", expanded=True):
-                        st.markdown(_assistant[0].content)
+                        llm_markdown(_assistant[0].content)
             elif _a.analysis_text:
                 with st.expander("▼ Vollständige Analyse", expanded=True):
-                    st.markdown(_a.analysis_text)
+                    llm_markdown(_a.analysis_text)
 
             # Inline history expander
             _history = [

@@ -23,6 +23,7 @@ from core.currency import symbol
 from core.i18n import t, current_language
 from core.storage.models import PortfolioStory
 from core.ui.verdicts import cloud_notice, verdict_badge, VERDICT_CONFIGS, fmt_verdict_matrix
+from core.ui.markdown import llm_markdown
 from state import (
     get_analysis_service,
     get_app_config_repo,
@@ -448,7 +449,7 @@ if "_ps_result" in st.session_state:
 
     # Full text expandable
     with st.expander(t("portfolio_story.full_analysis_label")):
-        st.markdown(result.full_text)
+        llm_markdown(result.full_text)
 
     # Positions-Story-Details expandable
     _render_position_details_expander(all_verdicts_by_agent, all_positions)
@@ -473,7 +474,7 @@ elif latest_analysis:
             st.info(latest_analysis.perf_summary)
 
     with st.expander(t("portfolio_story.full_analysis_label")):
-        st.markdown(latest_analysis.full_text)
+        llm_markdown(latest_analysis.full_text)
 
     # Positions-Story-Details expandable (also show for saved analysis)
     _render_position_details_expander(all_verdicts_by_agent, all_positions)

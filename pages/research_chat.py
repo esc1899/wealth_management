@@ -9,6 +9,7 @@ import streamlit as st
 from core.i18n import t, current_language
 from core.strategy_config import CUSTOM_STRATEGY_NAME
 from core.ui.verdicts import cloud_notice
+from core.ui.markdown import llm_markdown
 from state import get_research_agent, get_skills_repo
 
 st.set_page_config(page_title="Research Chat", page_icon="🔍", layout="wide")
@@ -152,7 +153,7 @@ with col_chat:
                     continue
                 role = "user" if msg.role == "user" else "assistant"
                 with st.chat_message(role):
-                    st.markdown(msg.content)
+                    llm_markdown(msg.content)
                     if role == "assistant":
                         st.caption(t("common.ai_disclaimer"))
 

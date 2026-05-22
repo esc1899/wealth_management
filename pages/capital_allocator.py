@@ -13,6 +13,7 @@ import streamlit as st
 
 from core.i18n import t, current_language
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge, verdict_icon, cloud_notice
+from core.ui.markdown import llm_markdown
 from state import (
     get_capital_allocator_agent,
     get_capital_allocator_repo,
@@ -113,7 +114,7 @@ if latest_verdict:
         st.metric(t("capital_allocator.verdict_label"), f"{icon} {latest_verdict.verdict}")
 
     if latest_verdict.summary:
-        st.markdown(f"_{latest_verdict.summary}_")
+        llm_markdown(f"_{latest_verdict.summary}_")
 
     # Full analysis text from the latest session's assistant message
     if latest_verdict.session_id and pos_sessions:
@@ -124,7 +125,7 @@ if latest_verdict:
         assistant_msgs = [m for m in messages if m.role == "assistant"]
         if assistant_msgs:
             with st.expander(t("capital_allocator.full_analysis"), expanded=True):
-                st.markdown(assistant_msgs[-1].content)
+                llm_markdown(assistant_msgs[-1].content)
 else:
     st.info(t("capital_allocator.no_analysis"))
 
@@ -152,5 +153,5 @@ if len(all_analyses) > 1:
                 assistant_msgs = [m for m in messages if m.role == "assistant"]
                 if assistant_msgs:
                     with st.expander("Vollständige Analyse", expanded=False):
-                        st.markdown(assistant_msgs[-1].content)
+                        llm_markdown(assistant_msgs[-1].content)
             st.divider()

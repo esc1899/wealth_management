@@ -12,6 +12,7 @@ import streamlit as st
 
 from core.i18n import t, current_language
 from core.ui.verdicts import cloud_notice
+from core.ui.markdown import llm_markdown
 from state import (
     get_market_agent,
     get_portfolio_service,
@@ -165,7 +166,7 @@ if _RESULT is not None:
             + " — Ticker sowohl im Verlust-Portfolio als auch auf der Watchlist."
         )
 
-    st.markdown(_RESULT.report_markdown)
+    llm_markdown(_RESULT.report_markdown)
 
     st.download_button(
         label=t("tax_loss_harvesting.download_label"),

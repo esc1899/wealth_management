@@ -10,6 +10,7 @@ from config import config
 from core.currency import symbol
 from core.health import is_local_url
 from core.i18n import t
+from core.ui.markdown import llm_markdown
 from state import get_portfolio_agent, get_positions_repo
 
 st.set_page_config(page_title="Portfolio Chat", page_icon="💬", layout="wide")
@@ -40,7 +41,7 @@ with col_chat:
 
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+            llm_markdown(msg["content"])
 
     if prompt := st.chat_input(t("portfolio_chat.input_placeholder")):
         st.session_state.messages.append({"role": "user", "content": prompt})

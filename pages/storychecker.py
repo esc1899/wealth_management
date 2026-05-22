@@ -15,6 +15,7 @@ import streamlit as st
 
 from core.i18n import t, current_language
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon, cloud_notice
+from core.ui.markdown import llm_markdown
 from state import get_analyses_repo, get_positions_repo, get_storychecker_agent
 
 st.set_page_config(page_title="Story Checker", page_icon="🔍", layout="wide")
@@ -229,7 +230,7 @@ with col_right:
                     _assistant_msgs = [m for m in _messages if m.role == "assistant"]
                     if _assistant_msgs:
                         with st.expander("▼ Vollständige Analyse", expanded=True):
-                            st.markdown(_assistant_msgs[0].content)
+                            llm_markdown(_assistant_msgs[0].content)
 
                 # Inline history expander
                 _history = [
@@ -266,7 +267,7 @@ with col_right:
                     # Skip the auto-generated first user message (too verbose to show)
                     continue
                 with st.chat_message("assistant"):
-                    st.markdown(msg.content)
+                    llm_markdown(msg.content)
                     st.caption(t("common.ai_disclaimer"))
 
             if prompt := st.chat_input(t("storychecker.chat_placeholder")):
