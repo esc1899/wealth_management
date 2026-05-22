@@ -90,6 +90,7 @@ def _seed_default_skills(repo: SkillsRepository) -> None:
     repo.seed_new_skills("portfolio_story", _skills_data.get("portfolio_story", []))
     repo.seed_new_skills("watchlist_checker", _skills_data.get("watchlist_checker", []))
     repo.seed_new_skills("search", _skills_data.get("search", []))
+    repo.seed_new_skills("sector_rotation", _skills_data.get("sector_rotation", []))
     # Load private skills if config/private_skills.yaml exists (gitignored)
     private_path = Path(__file__).parent / "config" / "private_skills.yaml"
     if private_path.exists():
@@ -162,3 +163,9 @@ def get_monthly_digest_repo() -> MonthlyDigestRepository:
 @st.cache_resource
 def get_yearly_digest_repo() -> YearlyDigestRepository:
     return YearlyDigestRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_sector_rotation_repo():
+    from core.storage.sector_rotation import SectorRotationRepository
+    return SectorRotationRepository(get_db_connection())

@@ -48,6 +48,12 @@ VERDICT_CONFIGS: Dict[str, Dict[str, Tuple[str, str]]] = {
         "fragwürdig": ("🟠", t("capital_allocator.verdict_fragwuerdig")),
         "destruktiv": ("🔴", t("capital_allocator.verdict_destruktiv")),
     },
+    "sector_rotation": {
+        "aligned":       ("✅", "Aligned"),
+        "lagging":       ("⚠️", "Lagging"),
+        "overexposed":   ("🔴", "Überexponiert"),
+        "rotation_risk": ("⚡", "Rotation Risk"),
+    },
 }
 
 

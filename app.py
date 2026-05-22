@@ -138,8 +138,9 @@ pg = st.navigation({
         st.Page("pages/cowork_inbox.py",    title="Research Inbox",          icon=":material/inbox:"),
     ],
     t("nav.group_claude_strategy"): [
-        st.Page("pages/structural_scan.py", title=t("nav.structural_scan"),  icon=":material/radar:"),
-        st.Page("pages/consensus_gap.py",   title=t("nav.consensus_gap"),    icon=":material/target:"),
+        st.Page("pages/structural_scan.py",   title=t("nav.structural_scan"),   icon=":material/radar:"),
+        st.Page("pages/consensus_gap.py",     title=t("nav.consensus_gap"),     icon=":material/target:"),
+        st.Page("pages/sector_rotation.py",   title=t("nav.sector_rotation"),   icon=":material/rotate_right:"),
     ],
     t("nav.group_system"): [
         st.Page("pages/statistics.py",      title=t("nav.statistics"),       icon=":material/bar_chart:"),

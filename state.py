@@ -35,6 +35,7 @@ from state_repos import (
     get_cowork_repo,
     get_monthly_digest_repo,
     get_yearly_digest_repo,
+    get_sector_rotation_repo,
 )
 
 # Agents (15 total)
@@ -57,6 +58,7 @@ from state_agents import (
     get_tax_loss_harvesting_agent,
     get_dividend_calendar_agent,
     get_cowork_watcher,
+    get_sector_rotation_agent,
 )
 
 # Services
@@ -92,6 +94,7 @@ __all__ = [
     "get_cowork_repo",
     "get_monthly_digest_repo",
     "get_yearly_digest_repo",
+    "get_sector_rotation_repo",
     "get_portfolio_agent",
     "get_market_agent",
     "get_research_agent",
@@ -110,6 +113,7 @@ __all__ = [
     "get_tax_loss_harvesting_agent",
     "get_dividend_calendar_agent",
     "get_cowork_watcher",
+    "get_sector_rotation_agent",
     "get_position_story_service",
     "get_portfolio_comment_model",
     "get_portfolio_comment_service",

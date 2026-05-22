@@ -368,6 +368,30 @@ def init_db(conn: sqlite3.Connection) -> None:
             error_msg    TEXT
         )""",
         "CREATE INDEX IF NOT EXISTS idx_scheduled_job_runs_job ON scheduled_job_runs(job_id)",
+        """CREATE TABLE IF NOT EXISTS sector_rotation_runs (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            skill_name TEXT NOT NULL,
+            result     TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        """CREATE TABLE IF NOT EXISTS sector_rotation_messages (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id     INTEGER NOT NULL REFERENCES sector_rotation_runs(id),
+            role       TEXT NOT NULL,
+            content    TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_sector_rotation_messages_run ON sector_rotation_messages(run_id)",
+        """CREATE TABLE IF NOT EXISTS sector_verdicts (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id     INTEGER NOT NULL REFERENCES sector_rotation_runs(id),
+            sector     TEXT NOT NULL,
+            verdict    TEXT NOT NULL,
+            momentum   TEXT,
+            summary    TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_sector_verdicts_run ON sector_verdicts(run_id)",
     ]:
         conn.execute(stmt)
     conn.commit()

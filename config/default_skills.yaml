@@ -93,6 +93,40 @@ skills:
         - ESG rating changes or index inclusions/exclusions
         Flag any events that could lead to reputational damage or ESG-driven divestment.
 
+  # ── Sektor Rotation Monitor ─────────────────────────────────────────────────
+  # Skills for the SectorRotationAgent (Cloud ☁️ — macro positioning analysis).
+
+  sector_rotation:
+    - name: "Globale Sektor-Rotation"
+      description: "Analysiert globale Sektor-Rotation (GICS) vs. Portfolio-Positionierung"
+      prompt: |
+        Analysiere die aktuelle globale Sektor-Rotation anhand von GICS-Sektoren:
+        Technology, Healthcare, Financials, Energy, Consumer Discretionary,
+        Consumer Staples, Industrials, Materials, Communication Services,
+        Real Estate, Utilities.
+
+        Fokus:
+        - ETF-Flows der letzten 3 Monate (XLK, XLF, XLE, XLV, XLY, XLC, XLI, XLB, XLRE, XLU)
+        - Relative Performance YTD und 3M
+        - Makro-Driver (Zinsen, USD, Rohstoffe, Konjunkturzyklus)
+        - Positionierung institutioneller Investoren (falls verfügbar)
+
+        Für jeden Sektor im Portfolio: Was ist der Trend, und ist das Portfolio gut positioniert?
+
+    - name: "Europäische Sektor-Rotation"
+      description: "Fokus auf europäische Sektoren (STOXX 600 Sektor-ETFs)"
+      prompt: |
+        Analysiere die Sektor-Rotation im europäischen Markt (STOXX 600).
+
+        Fokus auf STOXX 600 Sektor-ETFs und europäische Makro-Faktoren:
+        - EZB-Politik und Zinserwartungen
+        - EUR/USD-Entwicklung
+        - Energiepreise und Industriezyklen
+        - Politische Risiken (EU-Wahlen, Brexit-Nachbeben, Russland/Ukraine)
+
+        Bewerte für jeden Sektor: Momentum (Zufluss/Abfluss), Bewertung relativ
+        zum historischen Durchschnitt, und Portfolio-Alignment.
+
   # ── Konsens-Lücken-Analyse ──────────────────────────────────────────────────
   # Skills for the ConsensusGapAgent (Cloud ☁️ — Säule 2 der Claude-Strategie).
 

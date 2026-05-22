@@ -10,6 +10,7 @@ from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET
 from core.llm.local import OllamaProvider
 from agents.capital_allocator_agent import CapitalAllocatorAgent
 from agents.consensus_gap_agent import ConsensusGapAgent
+from agents.sector_rotation_agent import SectorRotationAgent
 from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
 from agents.market_data_agent import MarketDataAgent
 from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
@@ -207,6 +208,14 @@ def get_consensus_gap_agent() -> ConsensusGapAgent:
 def get_capital_allocator_repo():
     from core.storage.capital_allocator import CapitalAllocatorRepository
     return CapitalAllocatorRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_sector_rotation_agent() -> SectorRotationAgent:
+    from state_repos import get_sector_rotation_repo
+    model = _get_public_agent_model("sector_rotation", CLAUDE_SONNET)
+    llm = _make_public_provider(model, "sector_rotation")
+    return SectorRotationAgent(llm=llm, sr_repo=get_sector_rotation_repo())
 
 
 @st.cache_resource

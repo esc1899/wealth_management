@@ -53,6 +53,7 @@ nav:
   cowork_inbox: "Research Inbox"
   tax_loss_harvesting: "Tax Loss Harvesting"
   dividend_calendar: "Dividends"
+  sector_rotation: "Sector Rotation"
 
 
 dividend_calendar:
@@ -761,6 +762,25 @@ consensus_gap:
   batch_running: "Claude analyzing all positions…"
   batch_done: "Positions analyzed"
   batch_errors: "Errors"
+
+
+sector_rotation:
+  title: "Sector Rotation Monitor"
+  subtitle: "Analysis of sector rotation momentum vs. portfolio positioning"
+  no_skills: "No sector rotation skills found. Please restart to load default skills."
+  new_scan_header: "Start New Scan"
+  skill_label: "Analysis Strategy"
+  run_button: "Start Scan"
+  running: "Claude is analyzing sector rotation … This takes a few minutes."
+  portfolio_context: "Portfolio Positions"
+  verdicts_header: "Sector Verdicts"
+  report_header: "Full Report"
+  history_header: "Earlier Analyses"
+  no_runs: "No analyses yet."
+  new_scan_button: "New Scan"
+  momentum_inflow: "Inflow ↑"
+  momentum_neutral: "Neutral →"
+  momentum_outflow: "Outflow ↓"
 
 
 wealth_history:

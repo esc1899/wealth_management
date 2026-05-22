@@ -59,6 +59,12 @@ class TestPageLoadability:
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 
+    def test_sector_rotation_page_loads(self):
+        """Sector Rotation Monitor page should load without exceptions."""
+        at = AppTest.from_file("pages/sector_rotation.py")
+        at.run()
+        assert not at.exception, f"Page threw exception: {at.exception}"
+
     def test_research_chat_page_loads(self):
         """Research Chat page should load without exceptions."""
         at = AppTest.from_file("pages/research_chat.py")
