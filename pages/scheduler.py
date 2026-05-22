@@ -35,6 +35,7 @@ def _get_claude_model_list() -> list[str]:
 
 
 _CLAUDE_MODELS = _get_claude_model_list()
+_AVAILABLE_MODELS = config.OPENAI_MODELS if config.OPENAI_BASE_URL else _CLAUDE_MODELS
 
 # ------------------------------------------------------------------
 # Constants
@@ -180,18 +181,18 @@ else:
                     for _run in _runs:
                         _icon = _STATUS_ICONS.get(_run.status, "⚪")
                         _src = _SOURCE_LABELS.get(_run.source, _run.source)
-                        _start_str = _run.started_at.strftime("%d.%m.%Y %H:%M")
+                        _start_str = _run.started_at.astimezone().strftime("%d.%m.%Y %H:%M")
                         if _run.completed_at and _run.started_at:
                             _dur = int((_run.completed_at - _run.started_at).total_seconds())
                             _dur_str = f"{_dur}s"
                         else:
                             _dur_str = "—"
                         _line = f"{_icon} **{_start_str}** · {_src} · {_dur_str}"
+                        st.markdown(_line)
+                        if _run.log_output:
+                            st.code(_run.log_output, language=None)
                         if _run.error_msg:
-                            st.markdown(_line)
-                            st.caption(f"Fehler: {_run.error_msg}")
-                        else:
-                            st.markdown(_line)
+                            st.caption(f"❌ {_run.error_msg}")
 
 st.divider()
 
@@ -268,7 +269,7 @@ with st.form("add_job_form"):
         with _jf_ycol2:
             _jf_day = st.number_input(t("settings.job_day_label"), min_value=1, max_value=28, value=1, key="_jf_day_yearly")
 
-    _jf_model_opts = [""] + _CLAUDE_MODELS
+    _jf_model_opts = [""] + _AVAILABLE_MODELS
     _jf_model = st.selectbox(
         t("settings.job_model_label"),
         options=_jf_model_opts,

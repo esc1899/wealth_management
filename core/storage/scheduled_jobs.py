@@ -132,6 +132,13 @@ class ScheduledJobRunsRepository:
         )
         self._conn.commit()
 
+    def append_log(self, run_id: int, msg: str) -> None:
+        self._conn.execute(
+            "UPDATE scheduled_job_runs SET log_output = COALESCE(log_output || char(10), '') || ? WHERE id = ?",
+            (msg, run_id),
+        )
+        self._conn.commit()
+
     def get_for_job(self, job_id: int, limit: int = 10) -> List[ScheduledJobRun]:
         rows = self._conn.execute(
             "SELECT * FROM scheduled_job_runs WHERE job_id = ? ORDER BY started_at DESC LIMIT ?",
@@ -156,4 +163,5 @@ class ScheduledJobRunsRepository:
             started_at=datetime.fromisoformat(row["started_at"]),
             completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None,
             error_msg=row["error_msg"],
+            log_output=row["log_output"] if row["log_output"] else None,
         )

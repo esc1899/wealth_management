@@ -295,8 +295,9 @@ class TestChatWithTools:
         assert captured["messages"][0]["role"] == "user"
 
     @pytest.mark.asyncio
-    async def test_empty_tools_omits_tools_key(self, provider):
+    async def test_empty_tools_omits_tools_key(self, provider, monkeypatch):
         """When tools are empty after conversion, 'tools' key is omitted."""
+        monkeypatch.delenv("TAVILY_API_KEY", raising=False)
         captured = {}
 
         async def mock_create(**kwargs):
@@ -373,8 +374,9 @@ class TestChatWithTools:
         assert captured_usage["duration"] >= 0
 
     @pytest.mark.asyncio
-    async def test_web_search_tool_dropped_tools_key_omitted(self, provider):
+    async def test_web_search_tool_dropped_tools_key_omitted(self, provider, monkeypatch):
         """When only web_search_20250305 tool, tools key is omitted."""
+        monkeypatch.delenv("TAVILY_API_KEY", raising=False)
         captured = {}
 
         async def mock_create(**kwargs):

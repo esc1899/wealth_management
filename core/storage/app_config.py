@@ -69,6 +69,11 @@ class AppConfigRepository:
         CLAUDE_HAIKU:   {"input": 1.00,  "output": 5.00},
         CLAUDE_SONNET:  {"input": 3.00,  "output": 15.00},
         CLAUDE_OPUS:    {"input": 5.00,  "output": 25.00},
+        # DeepSeek via OpenRouter, May 2026
+        "deepseek/deepseek-v4-flash":   {"input": 0.27,  "output": 1.10},
+        "deepseek/deepseek-v4-pro":     {"input": 0.90,  "output": 3.50},
+        "deepseek/deepseek-chat":       {"input": 0.27,  "output": 1.10},
+        "deepseek/deepseek-r1":         {"input": 0.55,  "output": 2.19},
         # Local models are free
         "qwen3:8b":     {"input": 0.0,   "output": 0.0},
         "llama3.2":     {"input": 0.0,   "output": 0.0},

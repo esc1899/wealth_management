@@ -5,6 +5,7 @@ Requires OPENAI_API_KEY and OPENAI_BASE_URL.
 
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
@@ -15,20 +16,33 @@ from core.llm.base import LLMProvider, Message, Role
 _logger = logging.getLogger(__name__)
 
 _WEB_SEARCH_TYPES = {"web_search_20250305"}
+_MAX_SEARCH_ITERATIONS = 8
 
 
-def _to_openai_tools(tools: list[dict]) -> list[dict]:
+def _to_openai_tools(tools: list[dict], tavily_key: str = "") -> list[dict]:
     """Convert Anthropic tool format to OpenAI function calling format.
 
     Handles three formats:
     - Format A (already OpenAI): type=function → pass through
     - Format B (Anthropic custom): name + input_schema → convert to function
-    - Format C (Anthropic built-in): web_search_20250305 → drop (provider handles)
+    - Format C (Anthropic built-in): web_search_20250305 → replace with Tavily if key set, else drop
     """
+    from core.search import tavily as _tavily
     result = []
+    tavily_added = False
     for t in tools:
-        # Skip Anthropic built-in tools (Sonar handles search internally)
         if t.get("type") in _WEB_SEARCH_TYPES:
+            if tavily_key and not tavily_added:
+                td = _tavily.TAVILY_TOOL_DEFINITION
+                result.append({
+                    "type": "function",
+                    "function": {
+                        "name": td["name"],
+                        "description": td["description"],
+                        "parameters": td["input_schema"],
+                    },
+                })
+                tavily_added = True
             continue
         # Already in OpenAI format
         if t.get("type") == "function":
@@ -74,9 +88,10 @@ class OpenAICompatibleProvider(LLMProvider):
     Uses the openai SDK with base_url override to support any compatible endpoint.
     """
 
-    def __init__(self, api_key: str = "", model: str = "", base_url: str = ""):
+    def __init__(self, api_key: str = "", model: str = "", base_url: str = "", tavily_news_mode: bool = False):
         self._client = AsyncOpenAI(api_key=api_key, base_url=base_url or None)
         self._model = model
+        self._tavily_news_mode = tavily_news_mode
 
     def _normalize_messages(self, messages: list[dict]) -> list[dict]:
         """
@@ -150,19 +165,23 @@ class OpenAICompatibleProvider(LLMProvider):
         Call OpenAI-compatible API with tool definitions.
         Converts Anthropic tool format to OpenAI function calling format.
 
-        For Perplexity Sonar: built-in web search is automatic.
-        For other providers: full function calling support.
+        web_search calls are executed internally via Tavily (if TAVILY_API_KEY is set)
+        and looped until the model produces a final text response or calls a non-search tool.
+        Other tool calls (e.g. propose_for_watchlist) are returned to the caller.
         """
         import time
+        from core.search import tavily as _tavily
+
+        tavily_key = os.getenv("TAVILY_API_KEY", "")
 
         # Normalize Anthropic multi-turn format → OpenAI format
         messages = self._normalize_messages(messages)
 
-        oai_tools = _to_openai_tools(tools)
+        oai_tools = _to_openai_tools(tools, tavily_key)
         oai_messages = [{"role": "system", "content": system}] if system else []
         oai_messages.extend(messages)
 
-        kwargs = {
+        kwargs: dict = {
             "model": self._model,
             "messages": oai_messages,
             "max_tokens": max_tokens,
@@ -171,51 +190,74 @@ class OpenAICompatibleProvider(LLMProvider):
             kwargs["tools"] = oai_tools
 
         _t0 = time.monotonic()
-        response = await self._client.chat.completions.create(**kwargs)
-        _duration_ms = int((time.monotonic() - _t0) * 1000)
+        total_input = total_output = 0
 
-        msg = response.choices[0].message
-        tool_calls = []
-        if msg.tool_calls:
-            for tc in msg.tool_calls:
-                try:
-                    input_dict = json.loads(tc.function.arguments)
-                except (json.JSONDecodeError, AttributeError) as e:
-                    _logger.warning("Failed to parse tool arguments: %s", e)
-                    input_dict = {}
-                tool_calls.append(_OAIToolCall(
-                    id=tc.id,
-                    name=tc.function.name,
-                    input=input_dict,
-                ))
+        for _ in range(_MAX_SEARCH_ITERATIONS):
+            response = await self._client.chat.completions.create(**kwargs)
+            msg = response.choices[0].message
 
-        if self.on_usage and response.usage:
-            self.on_usage(
-                response.usage.prompt_tokens,
-                response.usage.completion_tokens,
-                self.skill_context,
-                _duration_ms,
-                self.position_count,
-                None,
-                None,
+            if response.usage:
+                total_input += response.usage.prompt_tokens
+                total_output += response.usage.completion_tokens
+
+            # Separate web_search calls (handled here) from other tool calls (returned to caller)
+            search_calls = []
+            other_calls: list[_OAIToolCall] = []
+            if msg.tool_calls:
+                for tc in msg.tool_calls:
+                    try:
+                        input_dict = json.loads(tc.function.arguments)
+                    except (json.JSONDecodeError, AttributeError) as e:
+                        _logger.warning("Failed to parse tool arguments: %s", e)
+                        input_dict = {}
+                    if tc.function.name == "web_search" and tavily_key:
+                        search_calls.append((tc.id, input_dict.get("query", "")))
+                    else:
+                        other_calls.append(_OAIToolCall(id=tc.id, name=tc.function.name, input=input_dict))
+
+            if search_calls:
+                # Execute Tavily searches and feed results back
+                oai_assistant_msg: dict = {
+                    "role": "assistant",
+                    "content": msg.content or None,
+                    "tool_calls": [
+                        {"id": tc_id, "type": "function", "function": {"name": "web_search", "arguments": json.dumps({"query": q})}}
+                        for tc_id, q in search_calls
+                    ],
+                }
+                oai_messages.append(oai_assistant_msg)
+                _tavily_kwargs = {"days": 14, "topic": "news"} if self._tavily_news_mode else {}
+                for tc_id, query in search_calls:
+                    try:
+                        result = _tavily.search(query, tavily_key, **_tavily_kwargs)
+                    except Exception as e:
+                        _logger.warning("Tavily search failed for query %r: %s", query, e)
+                        result = f"Search unavailable: {e}"
+                    oai_messages.append({"role": "tool", "tool_call_id": tc_id, "content": result})
+                kwargs["messages"] = oai_messages
+                continue
+
+            # No (more) web_search calls — done
+            _duration_ms = int((time.monotonic() - _t0) * 1000)
+            if self.on_usage:
+                self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count, None, None)
+
+            oai_assistant_msg = {"role": "assistant", "content": msg.content or None}
+            if other_calls:
+                oai_assistant_msg["tool_calls"] = [
+                    {"id": tc.id, "type": "function", "function": {"name": tc.name, "arguments": json.dumps(tc.input)}}
+                    for tc in other_calls
+                ]
+
+            stop_reason = "tool_use" if other_calls else "end_turn"
+            return _OAIResponse(
+                content=msg.content or "",
+                tool_calls=other_calls,
+                stop_reason=stop_reason,
+                raw_blocks=[oai_assistant_msg],
             )
 
-        # Build OAI-format assistant message for multi-turn compatibility
-        oai_assistant_msg: dict = {"role": "assistant", "content": msg.content or None}
-        if tool_calls:
-            oai_assistant_msg["tool_calls"] = [
-                {
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {"name": tc.name, "arguments": json.dumps(tc.input)},
-                }
-                for tc in tool_calls
-            ]
-
-        stop_reason = "tool_use" if tool_calls else "end_turn"
-        return _OAIResponse(
-            content=msg.content or "",
-            tool_calls=tool_calls,
-            stop_reason=stop_reason,
-            raw_blocks=[oai_assistant_msg],
-        )
+        _duration_ms = int((time.monotonic() - _t0) * 1000)
+        if self.on_usage:
+            self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count, None, None)
+        return _OAIResponse(content="", tool_calls=[], stop_reason="end_turn", raw_blocks=[])

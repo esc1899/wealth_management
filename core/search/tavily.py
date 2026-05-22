@@ -65,18 +65,34 @@ def sanitize_search_result(text: str) -> str:
     return text
 
 
-def search(query: str, api_key: str, max_results: int = 5, max_content_chars: int = 1500) -> str:
+def search(
+    query: str,
+    api_key: str,
+    max_results: int = 5,
+    max_content_chars: int = 2500,
+    search_depth: str = "advanced",
+    days: int = None,
+    topic: str = None,
+) -> str:
     """
     Execute a Tavily search and return results as a formatted string
     suitable for injection as a tool_result into Claude's context.
 
     max_content_chars limits each result's content to prevent token overflow when
     many searches accumulate in a single chat_with_tools call.
+    search_depth: "basic" (fast) or "advanced" (deeper crawl, better quality).
+    days: if set, restricts results to the last N days.
+    topic: "news" focuses on news sources; None = general web.
     """
     from tavily import TavilyClient  # type: ignore
 
     client = TavilyClient(api_key=api_key)
-    response = client.search(query=query, max_results=max_results)
+    search_kwargs = {"query": query, "max_results": max_results, "search_depth": search_depth}
+    if days is not None:
+        search_kwargs["days"] = days
+    if topic is not None:
+        search_kwargs["topic"] = topic
+    response = client.search(**search_kwargs)
 
     results = response.get("results", [])
     if not results:

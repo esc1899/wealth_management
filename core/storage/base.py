@@ -574,6 +574,10 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     if "previous_close_eur" not in existing_prices:
         conn.execute("ALTER TABLE current_prices ADD COLUMN previous_close_eur REAL")
 
+    existing_runs = {row[1] for row in conn.execute("PRAGMA table_info(scheduled_job_runs)")}
+    if "log_output" not in existing_runs:
+        conn.execute("ALTER TABLE scheduled_job_runs ADD COLUMN log_output TEXT")
+
     conn.commit()
 
 

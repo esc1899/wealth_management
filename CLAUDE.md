@@ -26,6 +26,13 @@ streamlit run app.py --server.port 6655
 
 # Restart after DB-schema, agent-signature, or repository-method changes
 kill $(pgrep -f "streamlit run") && streamlit run app.py
+
+# Restart the LaunchAgent (Dock-App) — use this when .env was changed
+launchctl unload ~/Library/LaunchAgents/com.erik.wealth-management.plist
+launchctl load ~/Library/LaunchAgents/com.erik.wealth-management.plist
+
+# Scheduled job debugging — real tracebacks are here, not in the UI
+tail -100 /tmp/wm_streamlit.log | grep -A5 "Error\|Exception\|Traceback"
 ```
 
 ---

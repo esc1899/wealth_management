@@ -21,6 +21,8 @@ def _make_claude_provider(model: str, agent_name: str, enable_thinking: bool = F
     return provider
 
 
+_TAVILY_NEWS_AGENTS = {"news", "structural_scan"}
+
 def _make_openai_provider(model: str, agent_name: str) -> "OpenAICompatibleProvider":
     """Create and wire up an OpenAI-compatible provider with usage tracking."""
     from core.llm.openai_compatible import OpenAICompatibleProvider
@@ -28,6 +30,7 @@ def _make_openai_provider(model: str, agent_name: str) -> "OpenAICompatibleProvi
         api_key=config.OPENAI_API_KEY,
         model=model,
         base_url=config.OPENAI_BASE_URL,
+        tavily_news_mode=agent_name in _TAVILY_NEWS_AGENTS,
     )
     provider.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
     return provider
@@ -58,11 +61,15 @@ def _get_agent_model(agent_key: str, model_type: str, default: str) -> str:
     repo = get_app_config_repo()
     if model_type == "openai":
         env_default = config.LLM_DEFAULT_MODEL or (config.OPENAI_MODELS[0] if config.OPENAI_MODELS else "")
+        valid = set(config.OPENAI_MODELS)
+        def _ok(m) -> str:
+            return (m or "") if (not valid or m in valid) else ""
     else:
         env_default = config.LLM_DEFAULT_MODEL
+        _ok = lambda m: m or ""
     return (
-        repo.get(f"model_{model_type}_{agent_key}")
-        or repo.get(f"model_{model_type}")
+        _ok(repo.get(f"model_{model_type}_{agent_key}"))
+        or _ok(repo.get(f"model_{model_type}"))
         or env_default
         or default
     )

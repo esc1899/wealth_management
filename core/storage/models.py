@@ -664,6 +664,7 @@ class ScheduledJobRun(BaseModel):
     started_at: datetime
     completed_at: Optional[datetime] = None
     error_msg: Optional[str] = None
+    log_output: Optional[str] = None
 
 
 # Constants for position fit roles

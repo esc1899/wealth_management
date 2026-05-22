@@ -163,4 +163,4 @@ class TestSearch:
 
         search("my query", "my-api-key", max_results=3)
 
-        mock_client.search.assert_called_once_with(query="my query", max_results=3)
+        mock_client.search.assert_called_once_with(query="my query", max_results=3, search_depth="advanced")

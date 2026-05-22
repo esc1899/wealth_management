@@ -95,7 +95,7 @@ def run_storychecker_job(positions: list, language: str, job: dict, db_path: str
         _sc_model = _resolve_model_from_conn(conn, "storychecker", CLAUDE_HAIKU)
         if config.OPENAI_BASE_URL:
             from core.llm.openai_compatible import OpenAICompatibleProvider
-            llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
+            llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=_sc_model, base_url=config.OPENAI_BASE_URL)
         else:
             llm = ClaudeProvider(api_key=api_key, model=_sc_model, base_url=config.LLM_BASE_URL)
         llm.skill_context = skill_name
@@ -137,7 +137,7 @@ def run_consensus_gap_job(positions: list, language: str, job: dict, db_path: st
         _cg_model = _resolve_model_from_conn(conn, "consensus_gap", CLAUDE_SONNET)
         if config.OPENAI_BASE_URL:
             from core.llm.openai_compatible import OpenAICompatibleProvider
-            llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
+            llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=_cg_model, base_url=config.OPENAI_BASE_URL)
         else:
             llm = ClaudeProvider(api_key=api_key, model=_cg_model, base_url=config.LLM_BASE_URL)
         llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None, _m=llm.model, _r=_usage_repo: _r.record("consensus_gap", _m, i, o, skill=skill, source="manual", duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
@@ -182,7 +182,7 @@ def run_fundamental_job(positions: list, language: str, job: dict, db_path: str,
         _fa_model = _resolve_model_from_conn(conn, "fundamental_analyzer", CLAUDE_HAIKU)
         if config.OPENAI_BASE_URL:
             from core.llm.openai_compatible import OpenAICompatibleProvider
-            fund_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
+            fund_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=_fa_model, base_url=config.OPENAI_BASE_URL)
         else:
             fund_llm = ClaudeProvider(api_key=api_key, model=_fa_model, base_url=config.LLM_BASE_URL)
         fund_llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None, _m=fund_llm.model, _r=_usage_repo: _r.record("fundamental_analyzer", _m, i, o, skill=skill, source="manual", duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
@@ -233,7 +233,7 @@ def run_capital_allocator_job(positions: list, language: str, job: dict, db_path
         _ca_model = _resolve_model_from_conn(conn, "capital_allocator", CLAUDE_SONNET)
         if config.OPENAI_BASE_URL:
             from core.llm.openai_compatible import OpenAICompatibleProvider
-            ca_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=config.LLM_DEFAULT_MODEL or "sonar", base_url=config.OPENAI_BASE_URL)
+            ca_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=_ca_model, base_url=config.OPENAI_BASE_URL)
         else:
             ca_llm = ClaudeProvider(api_key=api_key, model=_ca_model, base_url=config.LLM_BASE_URL)
         ca_llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None, _m=ca_llm.model, _r=_usage_repo: _r.record("capital_allocator", _m, i, o, skill=skill, source="manual", duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)

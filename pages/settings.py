@@ -205,6 +205,10 @@ st.subheader(t("settings.model_prices_header"))
 st.caption(t("settings.model_prices_caption"))
 
 _current_prices = app_config.get_model_prices()
+# Auto-add any configured OPENAI_MODELS not yet in the price table (with 0.0 as placeholder)
+for _m in config.OPENAI_MODELS:
+    if _m not in _current_prices:
+        _current_prices[_m] = {"input": 0.0, "output": 0.0}
 
 # Header row
 _ph1, _ph2, _ph3 = st.columns([3, 1, 1])

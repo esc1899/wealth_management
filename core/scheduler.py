@@ -18,6 +18,7 @@ from typing import Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from config import config
 from core.storage.base import build_encryption_service, get_connection, init_db, migrate_db
 from core.storage.models import ScheduledJob
 from core.storage.news import NewsRepository
@@ -106,8 +107,11 @@ class AgentSchedulerService:
             if not job:
                 return
             run = runs_repo.create(job_id, source="manual")
+            def log_fn(msg: str) -> None:
+                runs_repo.append_log(run.id, msg)
+                logger.info("[job %s] %s", job_id, msg)
             try:
-                await self._dispatch_agent(job, conn)
+                await self._dispatch_agent(job, conn, log_fn)
                 jobs_repo.update_last_run(job_id)
                 runs_repo.complete(run.id)
             except Exception as exc:
@@ -188,8 +192,11 @@ class AgentSchedulerService:
             if not job or not job.enabled:
                 return
             run = runs_repo.create(job_id, source=source)
+            def log_fn(msg: str) -> None:
+                runs_repo.append_log(run.id, msg)
+                logger.info("[job %s] %s", job_id, msg)
             try:
-                await self._dispatch_agent(job, conn)
+                await self._dispatch_agent(job, conn, log_fn)
                 jobs_repo.update_last_run(job_id)
                 runs_repo.complete(run.id)
             except Exception as exc:
@@ -312,32 +319,51 @@ class AgentSchedulerService:
         finally:
             conn.close()
 
-    async def _dispatch_agent(self, job: ScheduledJob, conn) -> None:
+    async def _dispatch_agent(self, job: ScheduledJob, conn, log_fn=None) -> None:
+        _log = log_fn or (lambda msg: logger.info(msg))
         if job.agent_name == "news":
-            await self._run_news_job(job, conn)
+            await self._run_news_job(job, conn, _log)
         elif job.agent_name == "structural_scan":
-            await self._run_structural_scan_job(job, conn)
+            await self._run_structural_scan_job(job, conn, _log)
         elif job.agent_name == "consensus_gap":
-            await self._run_consensus_gap_job(job, conn)
+            await self._run_consensus_gap_job(job, conn, _log)
         elif job.agent_name == "storychecker":
-            await self._run_storychecker_job(job, conn)
+            await self._run_storychecker_job(job, conn, _log)
         elif job.agent_name == "fundamental":
-            await self._run_fundamental_job(job, conn)
+            await self._run_fundamental_job(job, conn, _log)
         elif job.agent_name == "wealth_snapshot":
-            await self._run_wealth_snapshot_job(job, conn)
+            await self._run_wealth_snapshot_job(job, conn, _log)
         elif job.agent_name == "monthly_digest":
-            await self._run_monthly_digest_job(job, conn)
+            await self._run_monthly_digest_job(job, conn, _log)
         elif job.agent_name == "yearly_digest":
-            await self._run_yearly_digest_job(job, conn)
+            await self._run_yearly_digest_job(job, conn, _log)
         else:
             logger.warning("Unknown agent_name '%s' in job %s", job.agent_name, job.id)
+
+    def _resolve_model(self, agent_name: str, job_model: str, conn) -> str:
+        """Resolve the correct model for a scheduled job.
+
+        job.model might be stale (e.g. a Claude name stored before OpenRouter was set up).
+        When using OpenRouter, always re-validate from app_config DB.
+        """
+        from core.storage.app_config import AppConfigRepository
+        if self._openai_base_url:
+            app_cfg = AppConfigRepository(conn)
+            return (
+                app_cfg.get(f"model_openai_{agent_name}")
+                or app_cfg.get("model_openai")
+                or (config.OPENAI_MODELS[0] if config.OPENAI_MODELS else job_model)
+                or job_model
+            )
+        return job_model or self._default_claude_model
 
     def _make_scheduled_llm(self, agent_name: str, model: str, conn):
         from core.llm.claude import ClaudeProvider
         from core.llm.openai_compatible import OpenAICompatibleProvider
         usage_repo = UsageRepository(conn)
         if self._openai_base_url:
-            llm = OpenAICompatibleProvider(api_key=self._openai_api_key, model=model, base_url=self._openai_base_url)
+            llm = OpenAICompatibleProvider(api_key=self._openai_api_key, model=model, base_url=self._openai_base_url,
+                                           tavily_news_mode=agent_name in {"news", "structural_scan"})
         else:
             llm = ClaudeProvider(api_key=self._anthropic_key, model=model, base_url=self._llm_base_url)
         llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: usage_repo.record(
@@ -345,23 +371,26 @@ class AgentSchedulerService:
         )
         return llm
 
-    async def _run_news_job(self, job: ScheduledJob, conn) -> None:
+    async def _run_news_job(self, job: ScheduledJob, conn, log_fn=None) -> None:
         from agents.news_agent import NewsAgent
+        _log = log_fn or logger.info
 
         enc = build_encryption_service(self._enc_key, self._salt_path)
         positions_repo = PositionsRepository(conn, enc)
         news_repo = NewsRepository(conn)
 
-        model = job.model or self._default_claude_model
+        model = self._resolve_model("news", job.model or "", conn)
+        _log(f"Modell: {model}")
         llm = self._make_scheduled_llm("news_digest", model, conn)
         agent = NewsAgent(llm=llm)
 
         positions = [p for p in positions_repo.get_portfolio() if not p.analysis_excluded]
         tickers = [p.ticker for p in positions if p.ticker]
         if not tickers:
-            logger.info("News job %s: no tickers in portfolio, skipping", job.id)
+            _log("Keine Tickers im Portfolio — übersprungen")
             return
 
+        _log(f"{len(tickers)} Tickers: {', '.join(tickers)}")
         ticker_names = {p.ticker: p.name for p in positions if p.ticker}
         await agent.start_run(
             tickers=tickers,
@@ -371,18 +400,20 @@ class AgentSchedulerService:
             user_context="Automatisch geplanter News-Digest.",
             repo=news_repo,
         )
-        logger.info("News job %s completed for %d tickers", job.id, len(tickers))
+        _log(f"News-Digest abgeschlossen")
 
-    async def _run_structural_scan_job(self, job, conn) -> None:
+    async def _run_structural_scan_job(self, job, conn, log_fn=None) -> None:
         from agents.structural_change_agent import StructuralChangeAgent
         from agents.storychecker_agent import StorycheckerAgent
         from core.storage.analyses import PositionAnalysesRepository
         from core.storage.skills import SkillsRepository
         from core.storage.storychecker import StorycheckerRepository
         from core.storage.structural_scans import StructuralScansRepository
+        _log = log_fn or logger.info
 
         enc = build_encryption_service(self._enc_key, self._salt_path)
-        model = job.model or self._default_claude_model
+        model = self._resolve_model("structural_scan", job.model or "", conn)
+        _log(f"Modell: {model}")
         llm = self._make_scheduled_llm("structural_scan", model, conn)
         positions_repo = PositionsRepository(conn, enc)
         scans_repo = StructuralScansRepository(conn)
@@ -394,10 +425,10 @@ class AgentSchedulerService:
             repo=scans_repo,
             language="de",
         )
-        logger.info("Structural scan job %s completed — %d new candidates", job.id, len(new_candidates))
+        _log(f"Strukturscan abgeschlossen — {len(new_candidates)} neue Kandidaten")
 
         if new_candidates:
-            logger.info("Structural scan job %s: running story checks on %d candidates", job.id, len(new_candidates))
+            _log(f"Story-Checks für {len(new_candidates)} Kandidaten")
             sc_llm = self._make_scheduled_llm("storychecker", model, conn)
             storychecker = StorycheckerAgent(
                 positions_repo=positions_repo,
@@ -407,38 +438,43 @@ class AgentSchedulerService:
                 skills_repo=SkillsRepository(conn),
             )
             await storychecker.batch_check_all(positions=new_candidates, language="de")
-            logger.info("Story checks done for structural scan job %s", job.id)
+            _log("Story-Checks abgeschlossen")
 
-    async def _run_consensus_gap_job(self, job, conn) -> None:
+    async def _run_consensus_gap_job(self, job, conn, log_fn=None) -> None:
         from agents.consensus_gap_agent import ConsensusGapAgent
         from core.storage.analyses import PositionAnalysesRepository
+        _log = log_fn or logger.info
 
         enc = build_encryption_service(self._enc_key, self._salt_path)
-        model = job.model or self._default_claude_model
+        model = self._resolve_model("consensus_gap", job.model or "", conn)
+        _log(f"Modell: {model}")
         llm = self._make_scheduled_llm("consensus_gap", model, conn)
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         agent = ConsensusGapAgent(llm=llm, analyses_repo=analyses_repo)
         positions = [p for p in positions_repo.get_portfolio() if p.story and not p.analysis_excluded]
         if not positions:
-            logger.info("Consensus gap job %s: no positions with story, skipping", job.id)
+            _log("Keine Positionen mit Story — übersprungen")
             return
+        _log(f"{len(positions)} Positionen werden analysiert")
         await agent.analyze_portfolio(
             positions=positions,
             skill_name=job.skill_name,
             skill_prompt=job.skill_prompt,
             language="de",
         )
-        logger.info("Consensus gap job %s completed for %d positions", job.id, len(positions))
+        _log(f"Konsens-Lücken abgeschlossen")
 
-    async def _run_storychecker_job(self, job, conn) -> None:
+    async def _run_storychecker_job(self, job, conn, log_fn=None) -> None:
         from agents.storychecker_agent import StorycheckerAgent
         from core.storage.analyses import PositionAnalysesRepository
         from core.storage.skills import SkillsRepository
         from core.storage.storychecker import StorycheckerRepository
+        _log = log_fn or logger.info
 
         enc = build_encryption_service(self._enc_key, self._salt_path)
-        model = job.model or self._default_claude_model
+        model = self._resolve_model("storychecker", job.model or "", conn)
+        _log(f"Modell: {model}")
         llm = self._make_scheduled_llm("storychecker", model, conn)
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
@@ -453,19 +489,22 @@ class AgentSchedulerService:
         )
         positions = [p for p in positions_repo.get_portfolio() if p.story and not p.analysis_excluded]
         if not positions:
-            logger.info("Storychecker job %s: no positions with story, skipping", job.id)
+            _log("Keine Positionen mit Story — übersprungen")
             return
+        _log(f"{len(positions)} Positionen werden geprüft")
         await agent.batch_check_all(positions=positions, language="de")
-        logger.info("Storychecker job %s completed for %d positions", job.id, len(positions))
+        _log("Storychecker abgeschlossen")
 
-    async def _run_fundamental_job(self, job, conn) -> None:
+    async def _run_fundamental_job(self, job, conn, log_fn=None) -> None:
         from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
         from core.storage.analyses import PositionAnalysesRepository
         from core.storage.fundamental_analyzer import FundamentalAnalyzerRepository
         from core.storage.models import PublicPosition
+        _log = log_fn or logger.info
 
         enc = build_encryption_service(self._enc_key, self._salt_path)
-        model = job.model or self._default_claude_model
+        model = self._resolve_model("fundamental_analyzer", job.model or "", conn)
+        _log(f"Modell: {model}")
         llm = self._make_scheduled_llm("fundamental_analyzer", model, conn)
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
@@ -473,9 +512,9 @@ class AgentSchedulerService:
         agent = FundamentalAnalyzerAgent(positions_repo=positions_repo, analyses_repo=analyses_repo, fa_repo=fa_repo, llm=llm)
         positions = [p for p in positions_repo.get_portfolio() if p.ticker and not p.analysis_excluded]
         if not positions:
-            logger.info("Fundamental job %s: no positions with ticker, skipping", job.id)
+            _log("Keine Positionen mit Ticker — übersprungen")
             return
-        # Convert Position to PublicPosition (no private financial data for cloud agent)
+        _log(f"{len(positions)} Positionen werden analysiert")
         pub_positions = [PublicPosition(id=p.id, name=p.name, ticker=p.ticker, isin=p.isin, asset_class=p.asset_class, anlageart=p.anlageart, story=p.story, story_skill=p.story_skill) for p in positions]
         await agent.analyze_portfolio(
             positions=pub_positions,
@@ -483,10 +522,11 @@ class AgentSchedulerService:
             skill_prompt=job.skill_prompt,
             language="de",
         )
-        logger.info("Fundamental job %s completed for %d positions", job.id, len(positions))
+        _log("Fundamental-Analyse abgeschlossen")
 
-    async def _run_wealth_snapshot_job(self, job: ScheduledJob, conn) -> None:
+    async def _run_wealth_snapshot_job(self, job: ScheduledJob, conn, log_fn=None) -> None:
         """Create a periodic wealth snapshot (no LLM needed)."""
+        _log = log_fn or logger.info
         from agents.wealth_snapshot_agent import WealthSnapshotAgent
         from core.storage.market_data import MarketDataRepository
         from core.storage.wealth_snapshots import WealthSnapshotRepository
@@ -517,15 +557,11 @@ class AgentSchedulerService:
         )
 
         snapshot = agent.take_snapshot(is_manual=False)
-        logger.info(
-            "Wealth snapshot job %s completed: %s EUR (%d%% coverage)",
-            job.id,
-            f"{snapshot.total_eur:,.0f}",
-            int(snapshot.coverage_pct),
-        )
+        _log(f"Snapshot: {snapshot.total_eur:,.0f} EUR ({int(snapshot.coverage_pct)}% Abdeckung)")
 
-    async def _run_monthly_digest_job(self, job: ScheduledJob, conn) -> None:
+    async def _run_monthly_digest_job(self, job: ScheduledJob, conn, log_fn=None) -> None:
         """Generate and persist the monthly portfolio digest (no LLM required)."""
+        _log = log_fn or logger.info
         from datetime import date as dateobj
         from core.monthly_digest_generator import generate_monthly_digest
         from core.storage.analyses import PositionAnalysesRepository
@@ -569,10 +605,11 @@ class AgentSchedulerService:
             market_repo=market_repo,
         )
         digest_repo.save(month_key, body)
-        logger.info("Monthly digest job %s completed for %s", job.id, month_key)
+        _log(f"Monatsdigest {month_key} gespeichert")
 
-    async def _run_yearly_digest_job(self, job: ScheduledJob, conn) -> None:
+    async def _run_yearly_digest_job(self, job: ScheduledJob, conn, log_fn=None) -> None:
         """Generate and persist the yearly portfolio digest (no LLM required)."""
+        _log = log_fn or logger.info
         from datetime import date as dateobj
         from core.yearly_digest_generator import generate_yearly_digest
         from core.storage.analyses import PositionAnalysesRepository
@@ -615,7 +652,7 @@ class AgentSchedulerService:
             monthly_digest_repo=monthly_digest_repo,
         )
         digest_repo.save(year_key, body)
-        logger.info("Yearly digest job %s completed for %s", job.id, year_key)
+        _log(f"Jahresdigest {year_key} gespeichert")
 
     def _open_conn(self):
         conn = get_connection(self._db_path)
