@@ -215,15 +215,21 @@ class DevilsAdvocateAgent:
             return []
 
         parsed = _extract_parsed(response)
+        logger.info(
+            "devils_advocate: first call for %s — parsed=%d, content_len=%d",
+            pos.name, len(parsed), len(response.content),
+        )
 
-        # Fallback: if LLM wrote analysis but didn't call the tool, force a second call
-        if not parsed and response.content.strip():
+        # Fallback: if first call returned no tool call, force a second structured call.
+        # Fires even when content is empty (model searched but wrote nothing).
+        if not parsed:
             try:
-                analysis_so_far = response.content.strip()
+                analysis_so_far = response.content.strip() or "(Keine Textanalyse erhalten — analysiere eigenständig)"
                 followup_msg = (
                     f"Du hast diese Analyse verfasst:\n\n{analysis_so_far}\n\n"
                     f"Rufe jetzt submit_da_verdict auf. Position ID: {pos.id}"
                 )
+                logger.info("devils_advocate: firing fallback for %s", pos.name)
                 response2 = await self._llm.chat_with_tools(
                     messages=[
                         {"role": "user", "content": user_msg},
@@ -236,6 +242,7 @@ class DevilsAdvocateAgent:
                     tool_choice={"type": "tool", "name": "submit_da_verdict"},
                 )
                 parsed = _extract_parsed(response2)
+                logger.info("devils_advocate: fallback result for %s — parsed=%d", pos.name, len(parsed))
                 if parsed:
                     response = response2
             except Exception as exc:
@@ -288,4 +295,9 @@ class DevilsAdvocateAgent:
             lines.append("")
             lines.append("**Investment-These (greife diese spezifisch an):**")
             lines.append(pos.story)
+        lines.append("")
+        lines.append(
+            f"Recherchiere und verfasse die Bären-Analyse — "
+            f"dann rufe `submit_da_verdict` auf (position_id={pos.id})."
+        )
         return "\n".join(lines)

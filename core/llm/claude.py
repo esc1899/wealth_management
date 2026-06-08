@@ -189,7 +189,8 @@ class ClaudeProvider(LLMProvider):
         if tool_choice:
             kwargs["tool_choice"] = tool_choice
         # effort: "high" reduces thinking token overhead; Haiku does not support effort
-        if self._model in {CLAUDE_SONNET, CLAUDE_OPUS}:
+        # Skip output_config when tool_choice forces a specific tool — incompatible combination
+        if self._model in {CLAUDE_SONNET, CLAUDE_OPUS} and not tool_choice:
             kwargs["output_config"] = {"effort": "high"}
             _thinking = self._enable_thinking if enable_thinking is None else enable_thinking
             if _thinking:
