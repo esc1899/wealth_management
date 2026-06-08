@@ -26,6 +26,7 @@ from agents.storychecker_agent import StorycheckerAgent
 from agents.consensus_gap_agent import ConsensusGapAgent
 from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
 from agents.capital_allocator_agent import CapitalAllocatorAgent
+from agents.devils_advocate_agent import DevilsAdvocateAgent
 
 logger = logging.getLogger(__name__)
 
@@ -259,6 +260,61 @@ def run_capital_allocator_job(positions: list, language: str, job: dict, db_path
         job.update({"running": False, "done": True, "count": count, "error": error_msg})
     except Exception as exc:
         logger.exception("Background Capital Allocator job failed")
+        job.update({"running": False, "done": True, "count": count, "error": str(exc)})
+    finally:
+        loop.close()
+        if conn:
+            conn.close()
+
+
+def run_devils_advocate_job(positions: list, language: str, job: dict, db_path: str, enc_key: str, api_key: str) -> None:
+    from core.storage.devils_advocate import DevilsAdvocateRepository
+    from core.storage.models import PublicPosition
+    from state import get_skills_repo
+    conn = None
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    count = 0
+    error_msg = None
+    try:
+        conn = get_connection(db_path)
+        init_db(conn)
+        migrate_db(conn)
+        analyses_repo = PositionAnalysesRepository(conn)
+        skills_repo = get_skills_repo()
+        jobs_repo = ScheduledJobsRepository(conn)
+        da_skill_name, da_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "devils_advocate")
+        _log_to_job(job, f"Skill resolved: '{da_skill_name}'")
+        _usage_repo = UsageRepository(conn)
+        _da_model = _resolve_model_from_conn(conn, "devils_advocate", CLAUDE_SONNET)
+        if config.OPENAI_BASE_URL:
+            from core.llm.openai_compatible import OpenAICompatibleProvider
+            da_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=_da_model, base_url=config.OPENAI_BASE_URL)
+        else:
+            da_llm = ClaudeProvider(api_key=api_key, model=_da_model, base_url=config.LLM_BASE_URL)
+        da_llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None, _m=da_llm.model, _r=_usage_repo: _r.record("devils_advocate", _m, i, o, skill=skill, source="manual", duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
+        da_repo = DevilsAdvocateRepository(conn)
+        da_agent = DevilsAdvocateAgent(llm=da_llm, analyses_repo=analyses_repo, da_repo=da_repo)
+        job["agents"] = ["Devil's Advocate"]
+        valid = [p for p in positions if p.id]
+        pub_positions = [PublicPosition(id=p.id, name=p.name, ticker=p.ticker, isin=p.isin, asset_class=p.asset_class, anlageart=p.anlageart, story=p.story, story_skill=p.story_skill) for p in valid]
+        if not valid:
+            error_msg = "Keine Positionen mit ID"
+            _log_to_job(job, f"❌ {error_msg}")
+        else:
+            _log_to_job(job, f"Running DevilsAdvocateAgent on {len(valid)} positions")
+            results = loop.run_until_complete(
+                da_agent.analyze_portfolio(positions=pub_positions, skill_name=da_skill_name, skill_prompt=da_skill_prompt, language=language)
+            )
+            count = len(results) if results else 0
+            no_verdict = len(valid) - count
+            if no_verdict > 0:
+                _log_to_job(job, f"⚠️ {no_verdict} position(s) got no verdict")
+                error_msg = f"{no_verdict} von {len(valid)} Positionen ohne Verdict"
+            _log_to_job(job, f"✅ DevilsAdvocateAgent completed: {count} analyzed")
+        job.update({"running": False, "done": True, "count": count, "error": error_msg})
+    except Exception as exc:
+        logger.exception("Background Devils Advocate job failed")
         job.update({"running": False, "done": True, "count": count, "error": str(exc)})
     finally:
         loop.close()

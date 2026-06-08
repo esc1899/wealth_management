@@ -411,6 +411,43 @@ class CapitalAllocatorMessage(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Devils Advocate models
+# ---------------------------------------------------------------------------
+
+class DevilsAdvocateSession(BaseModel):
+    """A devil's advocate bear-case analysis session for a watchlist position."""
+
+    id: Optional[int] = None
+    position_id: int
+    ticker: Optional[str] = None
+    position_name: str
+    skill_name: str
+    created_at: datetime
+    verdict: Optional[str] = None
+
+
+class DevilsAdvocateMessage(BaseModel):
+    """A single message in a devils advocate session."""
+
+    id: Optional[int] = None
+    session_id: int
+    role: str       # 'user' or 'assistant'
+    content: str
+    created_at: datetime
+
+
+class PortfolioRobustnessAnalysis(BaseModel):
+    """A portfolio-level robustness analysis (Ollama, local)."""
+
+    id: Optional[int] = None
+    verdict: str
+    summary: str
+    analysis_text: str
+    position_count: Optional[int] = None
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
 # News model
 # ---------------------------------------------------------------------------
 

@@ -38,7 +38,7 @@ from state_repos import (
     get_sector_rotation_repo,
 )
 
-# Agents (15 total)
+# Agents
 from state_agents import (
     get_portfolio_agent,
     get_market_agent,
@@ -51,6 +51,10 @@ from state_agents import (
     get_consensus_gap_agent,
     get_capital_allocator_agent,
     get_capital_allocator_repo,
+    get_devils_advocate_agent,
+    get_devils_advocate_repo,
+    get_portfolio_robustness_agent,
+    get_portfolio_robustness_repo,
     get_agent_scheduler,
     get_wealth_snapshot_agent,
     get_portfolio_story_agent,
@@ -106,6 +110,10 @@ __all__ = [
     "get_consensus_gap_agent",
     "get_capital_allocator_agent",
     "get_capital_allocator_repo",
+    "get_devils_advocate_agent",
+    "get_devils_advocate_repo",
+    "get_portfolio_robustness_agent",
+    "get_portfolio_robustness_repo",
     "get_agent_scheduler",
     "get_wealth_snapshot_agent",
     "get_portfolio_story_agent",

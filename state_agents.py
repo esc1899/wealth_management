@@ -1,5 +1,5 @@
 """
-Agent factories — all 15 agent singletons.
+Agent factories — all agent singletons.
 """
 
 import logging
@@ -9,6 +9,8 @@ from config import config
 from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET
 from core.llm.local import OllamaProvider
 from agents.capital_allocator_agent import CapitalAllocatorAgent
+from agents.devils_advocate_agent import DevilsAdvocateAgent
+from agents.portfolio_robustness_agent import PortfolioRobustnessAgent
 from agents.consensus_gap_agent import ConsensusGapAgent
 from agents.sector_rotation_agent import SectorRotationAgent
 from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
@@ -227,6 +229,36 @@ def get_capital_allocator_agent() -> CapitalAllocatorAgent:
         analyses_repo=get_analyses_repo(),
         ca_repo=get_capital_allocator_repo(),
     )
+
+
+@st.cache_resource
+def get_devils_advocate_repo():
+    from core.storage.devils_advocate import DevilsAdvocateRepository
+    return DevilsAdvocateRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_devils_advocate_agent() -> DevilsAdvocateAgent:
+    model = _get_public_agent_model("devils_advocate", CLAUDE_SONNET)
+    llm = _make_public_provider(model, "devils_advocate")
+    return DevilsAdvocateAgent(
+        llm=llm,
+        analyses_repo=get_analyses_repo(),
+        da_repo=get_devils_advocate_repo(),
+    )
+
+
+@st.cache_resource
+def get_portfolio_robustness_repo():
+    from core.storage.portfolio_robustness import PortfolioRobustnessRepository
+    return PortfolioRobustnessRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_portfolio_robustness_agent() -> PortfolioRobustnessAgent:
+    model = _get_agent_model("portfolio_robustness", "ollama", _DEFAULT_OLLAMA_MODEL)
+    llm = _make_ollama_provider(model, "portfolio_robustness", timeout=300.0)
+    return PortfolioRobustnessAgent(llm=llm)
 
 
 @st.cache_resource

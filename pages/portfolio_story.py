@@ -30,6 +30,8 @@ from state import (
     get_market_agent,
     get_portfolio_comment_model,
     get_portfolio_comment_service,
+    get_portfolio_robustness_agent,
+    get_portfolio_robustness_repo,
     get_portfolio_service,
     get_portfolio_story_agent,
     get_portfolio_story_repo,
@@ -482,7 +484,94 @@ else:
     st.info(t("portfolio_story.no_analysis"))
 
 # ──────────────────────────────────────────────────────────────────────
-# Section 5: KI-Kommentar
+# Section 5: Portfolio-Gegenanalyse (Ollama, lokal)
+# ──────────────────────────────────────────────────────────────────────
+
+st.divider()
+with st.container(border=True):
+    st.subheader(t("portfolio_robustness.section_header"))
+    st.caption(t("portfolio_robustness.section_subtitle"))
+
+    _pr_agent = get_portfolio_robustness_agent()
+    _pr_repo = get_portfolio_robustness_repo()
+    cloud_notice(_pr_agent.model, provider="ollama")
+
+    _pr_latest = _pr_repo.get_latest()
+
+    _pr_btn_type = "secondary"
+    if st.button(t("portfolio_robustness.run_button"), key="pr_run_btn", type=_pr_btn_type):
+        _pr_lang = current_language()
+        # Build portfolio snapshot (same as for Portfolio Story)
+        _pr_snapshot_lines = []
+        for _p in all_positions:
+            _ticker = f" ({_p.ticker})" if _p.ticker else ""
+            _pr_snapshot_lines.append(f"- {_p.name}{_ticker} [{_p.asset_class}]")
+        _pr_snapshot = "\n".join(_pr_snapshot_lines) if _pr_snapshot_lines else "(kein Portfolio)"
+
+        # Build verdicts summary from all available agents
+        _pr_verdict_lines = []
+        for _agent_name, _agent_verdicts in all_verdicts_by_agent.items():
+            for _p in all_positions:
+                if _p.id and _p.id in _agent_verdicts:
+                    _v = _agent_verdicts[_p.id]
+                    _pr_verdict_lines.append(f"- {_p.name} ({_agent_name}): {_v.verdict}")
+        _pr_verdicts_str = "\n".join(_pr_verdict_lines) if _pr_verdict_lines else "(keine Verdicts)"
+
+        with st.spinner(t("portfolio_robustness.running_spinner")):
+            try:
+                _pr_result = asyncio.run(
+                    _pr_agent.analyze(
+                        portfolio_snapshot=_pr_snapshot,
+                        position_verdicts=_pr_verdicts_str,
+                        language=_pr_lang,
+                        position_count=len(all_positions),
+                    )
+                )
+                _pr_latest = _pr_repo.save(
+                    verdict=_pr_result.verdict,
+                    summary=_pr_result.summary,
+                    analysis_text=_pr_result.analysis_text,
+                    position_count=_pr_result.position_count,
+                )
+                st.session_state["_pr_result"] = _pr_result
+            except Exception as _pr_exc:
+                st.error(f"Fehler: {_pr_exc}")
+
+    if "_pr_result" in st.session_state:
+        _pr_show = st.session_state["_pr_result"]
+    elif _pr_latest:
+        _pr_show = _pr_latest
+    else:
+        _pr_show = None
+
+    if _pr_show:
+        _pr_badge = verdict_badge(_pr_show.verdict, VERDICT_CONFIGS["portfolio_robustness"])
+        _pr_col1, _pr_col2 = st.columns([4, 1])
+        with _pr_col1:
+            st.markdown(f"**{_pr_badge}**")
+            if _pr_show.summary:
+                llm_markdown(f"_{_pr_show.summary}_")
+        with _pr_col2:
+            if _pr_show.created_at:
+                st.caption(_pr_show.created_at.strftime("%d. %b %Y, %H:%M"))
+        with st.expander(t("portfolio_robustness.full_analysis"), expanded=False):
+            llm_markdown(_pr_show.analysis_text)
+
+        # History (last 3)
+        _pr_history = _pr_repo.list_recent(limit=5)
+        if len(_pr_history) > 1:
+            with st.expander(t("portfolio_robustness.history_header"), expanded=False):
+                for _h in _pr_history[1:4]:
+                    _h_badge = verdict_badge(_h.verdict, VERDICT_CONFIGS["portfolio_robustness"])
+                    _h_ts = _h.created_at.strftime("%d.%m.%Y %H:%M") if _h.created_at else "—"
+                    st.markdown(f"**{_h_ts}** — {_h_badge}")
+                    if _h.summary:
+                        st.caption(_h.summary)
+    else:
+        st.info(t("portfolio_robustness.no_analysis"))
+
+# ──────────────────────────────────────────────────────────────────────
+# Section 6: KI-Kommentar
 # ──────────────────────────────────────────────────────────────────────
 
 _ps_full_text = None

@@ -623,6 +623,35 @@ def migrate_db(conn: sqlite3.Connection) -> None:
             error_msg     TEXT
         )""")
 
+    conn.execute("""CREATE TABLE IF NOT EXISTS devils_advocate_sessions (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        position_id   INTEGER NOT NULL,
+        ticker        TEXT,
+        position_name TEXT NOT NULL,
+        skill_name    TEXT NOT NULL DEFAULT '',
+        created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    )""")
+
+    conn.execute("""CREATE TABLE IF NOT EXISTS devils_advocate_messages (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL REFERENCES devils_advocate_sessions(id),
+        role       TEXT NOT NULL,
+        content    TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )""")
+
+    conn.execute("""CREATE INDEX IF NOT EXISTS idx_da_messages_session
+        ON devils_advocate_messages(session_id)""")
+
+    conn.execute("""CREATE TABLE IF NOT EXISTS portfolio_robustness_analyses (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        verdict        TEXT NOT NULL,
+        summary        TEXT NOT NULL,
+        analysis_text  TEXT NOT NULL,
+        position_count INTEGER,
+        created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+    )""")
+
     conn.commit()
 
 

@@ -54,6 +54,18 @@ VERDICT_CONFIGS: Dict[str, Dict[str, Tuple[str, str]]] = {
         "overexposed":   ("🔴", "Überexponiert"),
         "rotation_risk": ("⚡", "Rotation Risk"),
     },
+    "devils_advocate": {
+        "robust":      ("🟢", t("devils_advocate.verdict_robust")),
+        "angreifbar":  ("🟡", t("devils_advocate.verdict_angreifbar")),
+        "fragil":      ("🟠", t("devils_advocate.verdict_fragil")),
+        "kritisch":    ("🔴", t("devils_advocate.verdict_kritisch")),
+    },
+    "portfolio_robustness": {
+        "robust":      ("🟢", t("portfolio_robustness.verdict_robust")),
+        "angreifbar":  ("🟡", t("portfolio_robustness.verdict_angreifbar")),
+        "fragil":      ("🟠", t("portfolio_robustness.verdict_fragil")),
+        "kritisch":    ("🔴", t("portfolio_robustness.verdict_kritisch")),
+    },
 }
 
 

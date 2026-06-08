@@ -46,6 +46,7 @@ from core.storage.analyses import PositionAnalysesRepository
 from core.background_jobs import (
     run_storychecker_job,
     run_consensus_gap_job,
+    run_devils_advocate_job,
     run_fundamental_job,
     run_capital_allocator_job,
 )
@@ -154,6 +155,7 @@ sc_verdicts = _analysis_service.get_verdicts(watchlist_ids, "storychecker")
 cg_verdicts = _analysis_service.get_verdicts(watchlist_ids, "consensus_gap")
 fund_verdicts = _analysis_service.get_verdicts(watchlist_ids, "fundamental_analyzer")
 ca_verdicts = _analysis_service.get_verdicts(watchlist_ids, "capital_allocator")
+da_verdicts = _analysis_service.get_verdicts(watchlist_ids, "devils_advocate")
 
 # Pre-load WC fits for matrix WC-Fit column
 _latest_wc_result = wc_repo.get_latest_analysis()
@@ -167,14 +169,16 @@ n_missing_sc = sum(1 for pid in watchlist_ids if pid not in sc_verdicts)
 n_missing_cg = sum(1 for pid in watchlist_ids if pid not in cg_verdicts)
 n_missing_fund = sum(1 for pid in watchlist_ids if pid not in fund_verdicts)
 n_missing_ca = sum(1 for pid in watchlist_ids if pid not in ca_verdicts)
-n_total_missing = n_missing_sc + n_missing_cg + n_missing_fund + n_missing_ca
+n_missing_da = sum(1 for pid in watchlist_ids if pid not in da_verdicts)
+n_total_missing = n_missing_sc + n_missing_cg + n_missing_fund + n_missing_ca + n_missing_da
 
 # Stale counts (have a verdict but ≥ _STALE_DAYS old)
 n_stale_sc = sum(1 for pid in watchlist_ids if pid in sc_verdicts and _is_stale(sc_verdicts[pid]))
 n_stale_cg = sum(1 for pid in watchlist_ids if pid in cg_verdicts and _is_stale(cg_verdicts[pid]))
 n_stale_fund = sum(1 for pid in watchlist_ids if pid in fund_verdicts and _is_stale(fund_verdicts[pid]))
 n_stale_ca = sum(1 for pid in watchlist_ids if pid in ca_verdicts and _is_stale(ca_verdicts[pid]))
-n_total_stale = n_stale_sc + n_stale_cg + n_stale_fund + n_stale_ca
+n_stale_da = sum(1 for pid in watchlist_ids if pid in da_verdicts and _is_stale(da_verdicts[pid]))
+n_total_stale = n_stale_sc + n_stale_cg + n_stale_fund + n_stale_ca + n_stale_da
 
 # Post-run success toast (set by cockpit button, shown after st.rerun())
 if cockpit_msg := st.session_state.pop("_cockpit_done_msg", None):
@@ -202,6 +206,7 @@ for pos in watchlist:
         "fa": fmt_verdict_matrix(fund_verdicts.get(pos.id), "fundamental_analyzer", stale_days=_STALE_DAYS),
         "cg": fmt_verdict_matrix(cg_verdicts.get(pos.id), "consensus_gap", stale_days=_STALE_DAYS),
         "ca": fmt_verdict_matrix(ca_verdicts.get(pos.id), "capital_allocator", stale_days=_STALE_DAYS),
+        "da": fmt_verdict_matrix(da_verdicts.get(pos.id), "devils_advocate", stale_days=_STALE_DAYS),
         "wc": (fmt_verdict_matrix(wc_fit, "watchlist_checker") if wc_fit else "⚪ —"),
     })
 
@@ -218,6 +223,7 @@ _matrix_selection = st.dataframe(
         "fa": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_fa"), width="medium"),
         "cg": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_cg"), width="medium"),
         "ca": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_ca"), width="medium"),
+        "da": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_da"), width="medium"),
         "wc": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_wc"), width="medium"),
     },
 )
@@ -250,12 +256,14 @@ if _selected_rows and _selected_rows[0] < len(_valid_positions):
     if _sel_pos.id not in cg_verdicts: _row_missing_wc.append("cg")
     if _sel_pos.id not in fund_verdicts: _row_missing_wc.append("fa")
     if _sel_pos.id not in ca_verdicts: _row_missing_wc.append("ca")
+    if _sel_pos.id not in da_verdicts: _row_missing_wc.append("da")
 
     _row_stale_wc = []
     if _sel_pos.id in sc_verdicts and _is_stale(sc_verdicts[_sel_pos.id]): _row_stale_wc.append("sc")
     if _sel_pos.id in cg_verdicts and _is_stale(cg_verdicts[_sel_pos.id]): _row_stale_wc.append("cg")
     if _sel_pos.id in fund_verdicts and _is_stale(fund_verdicts[_sel_pos.id]): _row_stale_wc.append("fa")
     if _sel_pos.id in ca_verdicts and _is_stale(ca_verdicts[_sel_pos.id]): _row_stale_wc.append("ca")
+    if _sel_pos.id in da_verdicts and _is_stale(da_verdicts[_sel_pos.id]): _row_stale_wc.append("da")
 
     _row_needs_update = list(dict.fromkeys(_row_missing_wc + _row_stale_wc))
 
@@ -284,6 +292,7 @@ if _selected_rows and _selected_rows[0] < len(_valid_positions):
                 if "cg" in _row_needs_update: _row_jobs.append((run_consensus_gap_job, _pos_single, "Konsens"))
                 if "fa" in _row_needs_update: _row_jobs.append((run_fundamental_job, _pos_single, "Fundamental"))
                 if "ca" in _row_needs_update: _row_jobs.append((run_capital_allocator_job, _pos_single, "Capital Allocator"))
+                if "da" in _row_needs_update: _row_jobs.append((run_devils_advocate_job, _pos_single, "Devil's Advocate"))
                 _row_total = _run_parallel(_row_jobs, _lang, _row_errors)
                 if _row_errors: st.session_state["_cockpit_errors"] = _row_errors
                 st.session_state["_cockpit_done_msg"] = t("watchlist_checker.cockpit_done").format(n=_row_total)
@@ -294,7 +303,7 @@ if n_total_missing > 0:
     n_incomplete_positions = sum(
         1 for pid in watchlist_ids
         if pid not in sc_verdicts or pid not in cg_verdicts
-        or pid not in fund_verdicts or pid not in ca_verdicts
+        or pid not in fund_verdicts or pid not in ca_verdicts or pid not in da_verdicts
     )
     st.caption(t("watchlist_checker.cockpit_missing_summary").format(
         n=n_total_missing,
@@ -313,6 +322,8 @@ if n_total_missing > 0:
             _all_jobs.append((run_fundamental_job, [p for p in watchlist if p.id and p.id not in fund_verdicts], "Fundamental"))
         if n_missing_ca > 0:
             _all_jobs.append((run_capital_allocator_job, [p for p in watchlist if p.id and p.id not in ca_verdicts], "Capital Allocator"))
+        if n_missing_da > 0:
+            _all_jobs.append((run_devils_advocate_job, [p for p in watchlist if p.id and p.id not in da_verdicts], "Devil's Advocate"))
         total_done = _run_parallel(_all_jobs, _lang, _errors)
         if _errors:
             st.session_state["_cockpit_errors"] = _errors
@@ -329,6 +340,7 @@ if n_total_stale > 0:
         or (pid in cg_verdicts and _is_stale(cg_verdicts[pid]))
         or (pid in fund_verdicts and _is_stale(fund_verdicts[pid]))
         or (pid in ca_verdicts and _is_stale(ca_verdicts[pid]))
+        or (pid in da_verdicts and _is_stale(da_verdicts[pid]))
     )
     st.caption(t("watchlist_checker.cockpit_stale_summary").format(
         n=n_total_stale, positions=n_stale_positions
@@ -345,6 +357,8 @@ if n_total_stale > 0:
             _stale_jobs.append((run_fundamental_job, [p for p in watchlist if p.id and p.id in fund_verdicts and _is_stale(fund_verdicts[p.id])], "Fundamental"))
         if n_stale_ca > 0:
             _stale_jobs.append((run_capital_allocator_job, [p for p in watchlist if p.id and p.id in ca_verdicts and _is_stale(ca_verdicts[p.id])], "Capital Allocator"))
+        if n_stale_da > 0:
+            _stale_jobs.append((run_devils_advocate_job, [p for p in watchlist if p.id and p.id in da_verdicts and _is_stale(da_verdicts[p.id])], "Devil's Advocate"))
         total_done = _run_parallel(_stale_jobs, _lang, _errors)
         if _errors:
             st.session_state["_cockpit_errors"] = _errors

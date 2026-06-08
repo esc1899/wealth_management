@@ -1,7 +1,7 @@
 """
-Watchlist-Analyse — aggregates all 4 sub-check analyses for a single watchlist position.
+Watchlist-Analyse — aggregates all 5 sub-check analyses for a single watchlist position.
 
-Shows: Storychecker, Consensus Gap, Fundamental Analyzer, Capital Allocator.
+Shows: Storychecker, Consensus Gap, Fundamental Analyzer, Capital Allocator, Devil's Advocate.
 Pre-selection via session_state key 'wla_preselect_pos_id'.
 """
 
@@ -18,6 +18,7 @@ from config import config
 from core.background_jobs import (
     run_capital_allocator_job,
     run_consensus_gap_job,
+    run_devils_advocate_job,
     run_fundamental_job,
     run_storychecker_job,
 )
@@ -28,6 +29,8 @@ from state import (
     get_analysis_service,
     get_capital_allocator_repo,
     get_consensus_gap_agent,
+    get_devils_advocate_agent,
+    get_devils_advocate_repo,
     get_fundamental_analyzer_agent,
     get_market_agent,
     get_portfolio_service,
@@ -45,6 +48,7 @@ st.caption(t("watchlist_analysis.page_subtitle"))
 portfolio_service = get_portfolio_service()
 analysis_service = get_analysis_service()
 ca_repo = get_capital_allocator_repo()
+da_repo = get_devils_advocate_repo()
 market_agent = get_market_agent()
 
 # ------------------------------------------------------------------
@@ -177,16 +181,18 @@ sc_verdict = analysis_service.get_verdict(selected_position.id, "storychecker")
 cg_verdict = analysis_service.get_verdict(selected_position.id, "consensus_gap")
 fa_verdict = analysis_service.get_verdict(selected_position.id, "fundamental_analyzer")
 ca_verdict = analysis_service.get_verdict(selected_position.id, "capital_allocator")
+da_verdict = analysis_service.get_verdict(selected_position.id, "devils_advocate")
 
 sc_agent = get_storychecker_agent()
 cg_agent = get_consensus_gap_agent()
 fa_agent = get_fundamental_analyzer_agent()
+da_agent = get_devils_advocate_agent()
 
 # ------------------------------------------------------------------
 # Update button
 # ------------------------------------------------------------------
 
-_stale_count = sum(_is_stale(v) for v in [sc_verdict, cg_verdict, fa_verdict, ca_verdict])
+_stale_count = sum(_is_stale(v) for v in [sc_verdict, cg_verdict, fa_verdict, ca_verdict, da_verdict])
 _btn_label = (
     t("watchlist_analysis.update_button_stale").format(n=_stale_count)
     if _stale_count > 0
@@ -201,12 +207,12 @@ if st.button(_btn_label, key="wla_update_btn", type=_btn_type):
     _errors: list[str] = []
     _states = []
 
-    for _fn in [run_storychecker_job, run_consensus_gap_job, run_fundamental_job, run_capital_allocator_job]:
+    for _fn in [run_storychecker_job, run_consensus_gap_job, run_fundamental_job, run_capital_allocator_job, run_devils_advocate_job]:
         _j = {"running": True, "done": False, "count": 0, "error": None}
         threading.Thread(target=_fn, args=(_pos, _lang, _j) + _args, daemon=True).start()
         _states.append(_j)
 
-    with st.spinner(t("watchlist_checker.running_parallel_spinner").format(n=4)):
+    with st.spinner(t("watchlist_checker.running_parallel_spinner").format(n=5)):
         while any(j["running"] for j in _states):
             time.sleep(1)
 
@@ -291,3 +297,41 @@ if ca_verdict:
             pass
 else:
     st.info(t("capital_allocator.no_analysis"))
+
+st.divider()
+
+# ------------------------------------------------------------------
+# Section: Devil's Advocate (full-width)
+# ------------------------------------------------------------------
+
+st.subheader(t("devils_advocate.da_header"))
+
+if da_verdict:
+    badge = verdict_badge(da_verdict.verdict, VERDICT_CONFIGS["devils_advocate"])
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.markdown(f"### {badge} {da_verdict.verdict}")
+        if da_verdict.created_at:
+            age = _verdict_age_days(da_verdict)
+            date_str = da_verdict.created_at.strftime("%d. %b %Y, %H:%M")
+            if age is not None and age >= _STALE_DAYS:
+                st.caption(f":orange[{date_str} · {t('watchlist_analysis.stale_label')}]")
+            else:
+                st.caption(date_str)
+        if da_verdict.summary:
+            llm_markdown(f"_{da_verdict.summary}_")
+    with col2:
+        icon = verdict_icon(da_verdict.verdict, VERDICT_CONFIGS["devils_advocate"])
+        st.metric(t("devils_advocate.verdict_label"), f"{icon} {da_verdict.verdict}")
+
+    if da_verdict.session_id:
+        try:
+            messages = da_repo.get_messages(da_verdict.session_id)
+            assistant_msgs = [m for m in messages if m.role == "assistant"]
+            if assistant_msgs:
+                with st.expander(t("devils_advocate.full_analysis"), expanded=True):
+                    llm_markdown(assistant_msgs[-1].content)
+        except Exception:
+            pass
+else:
+    st.info(t("devils_advocate.no_analysis"))
