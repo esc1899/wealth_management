@@ -142,6 +142,7 @@ class ClaudeProvider(LLMProvider):
         system: str = "",
         max_tokens: int = 2048,
         enable_thinking: Optional[bool] = None,
+        tool_choice: Optional[dict] = None,
     ) -> ClaudeResponse:
         """
         Single API call with tool definitions.
@@ -185,6 +186,8 @@ class ClaudeProvider(LLMProvider):
         }
         if system:
             kwargs["system"] = [{"type": "text", "text": system}]
+        if tool_choice:
+            kwargs["tool_choice"] = tool_choice
         # effort: "high" reduces thinking token overhead; Haiku does not support effort
         if self._model in {CLAUDE_SONNET, CLAUDE_OPUS}:
             kwargs["output_config"] = {"effort": "high"}

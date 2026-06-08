@@ -195,6 +195,7 @@ class DevilsAdvocateAgent:
                 ],
                 system=system,
                 max_tokens=4000,
+                tool_choice={"type": "any"},
             )
         except Exception as exc:
             logger.warning("devils_advocate: LLM error for %s: %s", pos.name, exc)
@@ -215,8 +216,9 @@ class DevilsAdvocateAgent:
             logger.warning("devils_advocate: no verdict for position %d (%s)", pos.id or 0, pos.name)
             return []
 
-        assistant_content = response.content.strip() or parsed[0][3]
-        self._da_repo.add_message(session.id, "assistant", assistant_content)
+        # Store the analysis from the tool call (not the LLM's interim thinking text)
+        analysis_text = parsed[0][3] if parsed[0][3] else response.content.strip()
+        self._da_repo.add_message(session.id, "assistant", analysis_text)
 
         results = []
         for pos_id_str, verdict, summary, _ in parsed:

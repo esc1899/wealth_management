@@ -310,7 +310,7 @@ if da_verdict:
     badge = verdict_badge(da_verdict.verdict, VERDICT_CONFIGS["devils_advocate"])
     col1, col2 = st.columns([3, 1])
     with col1:
-        st.markdown(f"### {badge} {da_verdict.verdict}")
+        st.markdown(f"### {badge}")
         if da_verdict.created_at:
             age = _verdict_age_days(da_verdict)
             date_str = da_verdict.created_at.strftime("%d. %b %Y, %H:%M")
