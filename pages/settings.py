@@ -150,9 +150,11 @@ with col_o2:
 with col_o3:
     sel_watchlist_checker = _ollama_sel("watchlist_checker", "Watchlist Checker")
 
-col_o4, _ = st.columns([1, 2])
+col_o4, col_o5, _ = st.columns([1, 1, 1])
 with col_o4:
     sel_portfolio_comment = _ollama_sel("portfolio_comment", "💬 KI-Kommentare")
+with col_o5:
+    sel_portfolio_robustness = _ollama_sel("portfolio_robustness", "🐻 Portfolio Robustness")
 
 _providers = []
 if _HAS_ANTHROPIC:
@@ -181,11 +183,13 @@ with col_s2:
 with col_s3:
     sel_fundamental = _public_sel("fundamental_analyzer", t("settings.agent_fundamental"))
 
-col_s4, col_s5, _ = st.columns([1, 1, 1])
+col_s4, col_s5, col_s6 = st.columns([1, 1, 1])
 with col_s4:
     sel_capital_allocator = _public_sel("capital_allocator", "Capital Allocator")
 with col_s5:
     sel_sector_rotation = _public_sel("sector_rotation", t("settings.agent_sector_rotation"))
+with col_s6:
+    sel_devils_advocate = _public_sel("devils_advocate", "🐻 Devil's Advocate")
 
 if st.button(t("settings.save_models_button"), key="_save_models_btn", use_container_width=False):
     app_config.set("model_ollama_portfolio", sel_portfolio)
@@ -200,6 +204,8 @@ if st.button(t("settings.save_models_button"), key="_save_models_btn", use_conta
     app_config.set("model_public_fundamental_analyzer", sel_fundamental)
     app_config.set("model_public_capital_allocator", sel_capital_allocator)
     app_config.set("model_public_sector_rotation", sel_sector_rotation)
+    app_config.set("model_public_devils_advocate", sel_devils_advocate)
+    app_config.set("model_ollama_portfolio_robustness", sel_portfolio_robustness)
     st.cache_resource.clear()
     st.success(t("settings.models_saved"))
 

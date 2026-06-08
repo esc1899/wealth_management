@@ -39,7 +39,8 @@ def _resolve_model_from_conn(conn, agent_key: str, default: str) -> str:
     model_type = "openai" if config.OPENAI_BASE_URL else "claude"
     app_cfg = AppConfigRepository(conn)
     return (
-        app_cfg.get(f"model_{model_type}_{agent_key}")
+        app_cfg.get(f"model_public_{agent_key}")
+        or app_cfg.get(f"model_{model_type}_{agent_key}")
         or app_cfg.get(f"model_{model_type}")
         or config.LLM_DEFAULT_MODEL
         or default
