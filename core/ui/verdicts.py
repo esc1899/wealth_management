@@ -76,11 +76,19 @@ def render_verdict_legend(config: Dict[str, Tuple[str, str]]) -> None:
             st.markdown(f"**{icon} {label}** — {t(f'common.legend_{verdict}')}")
 
 
-def fmt_verdict_matrix(verdict_obj, config_key: str) -> str:
+def fmt_verdict_matrix(verdict_obj, config_key: str, stale_days=None) -> str:
     """Format a verdict object as 'icon verdict' text for dataframe matrix cells."""
     if verdict_obj and verdict_obj.verdict:
         icon = verdict_icon(verdict_obj.verdict, VERDICT_CONFIGS[config_key])
-        return f"{icon} {verdict_obj.verdict}"
+        label = f"{icon} {verdict_obj.verdict}"
+        if stale_days is not None and verdict_obj.created_at:
+            from datetime import datetime, timezone
+            created = verdict_obj.created_at
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            if (datetime.now(timezone.utc) - created).days >= stale_days:
+                label += " ⚠️"
+        return label
     return "⚪ —"
 
 

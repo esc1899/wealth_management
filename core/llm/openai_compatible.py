@@ -244,9 +244,11 @@ class OpenAICompatibleProvider(LLMProvider):
                 }
                 oai_messages.append(oai_assistant_msg)
                 _tavily_kwargs = {"days": 14, "topic": "news"} if self._tavily_news_mode else {}
+                _limit_hit = False
                 for tc_id, query in search_calls:
                     if _web_search_max_uses is not None and _tavily_call_count >= _web_search_max_uses:
-                        result = f"[Search limit of {_web_search_max_uses} reached. Base your answer on the results already gathered.]"
+                        result = f"[Search limit reached. Call the verdict/result tool now — do not search again.]"
+                        _limit_hit = True
                     else:
                         _tavily_call_count += 1
                         total_web_search += 1
@@ -257,6 +259,13 @@ class OpenAICompatibleProvider(LLMProvider):
                             result = f"Search unavailable: {e}"
                     oai_messages.append({"role": "tool", "tool_call_id": tc_id, "content": result})
                 kwargs["messages"] = oai_messages
+                # When limit is hit, force the model to call a non-search tool instead of searching again
+                if _limit_hit:
+                    non_search = [t for t in oai_tools if t["function"]["name"] != "web_search"]
+                    if non_search:
+                        kwargs["tool_choice"] = {"type": "function", "function": {"name": non_search[0]["function"]["name"]}}
+                else:
+                    kwargs.pop("tool_choice", None)
                 continue
 
             # No (more) web_search calls — done

@@ -6,12 +6,22 @@ Pre-selection via session_state key 'wla_preselect_pos_id'.
 """
 
 import logging
+import threading
+import time
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from core.i18n import t
+from config import config
+from core.background_jobs import (
+    run_capital_allocator_job,
+    run_consensus_gap_job,
+    run_fundamental_job,
+    run_storychecker_job,
+)
+from core.i18n import current_language, t
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge, verdict_icon
 from core.ui.markdown import llm_markdown
 from state import (
@@ -25,6 +35,8 @@ from state import (
 )
 
 logger = logging.getLogger(__name__)
+
+_STALE_DAYS = 7
 
 st.set_page_config(page_title="Watchlist-Analyse", page_icon="🔍", layout="wide")
 st.title("🔍 Watchlist-Analyse")
@@ -101,23 +113,47 @@ if selected_position.ticker:
     st.divider()
 
 # ------------------------------------------------------------------
+# Helper: staleness check
+# ------------------------------------------------------------------
+
+def _verdict_age_days(verdict_obj) -> "int | None":
+    if verdict_obj is None or verdict_obj.created_at is None:
+        return None
+    now = datetime.now(timezone.utc)
+    created = verdict_obj.created_at
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    return (now - created).days
+
+
+def _is_stale(verdict_obj) -> bool:
+    age = _verdict_age_days(verdict_obj)
+    return age is None or age >= _STALE_DAYS
+
+
+# ------------------------------------------------------------------
 # Helper: render checker card
 # ------------------------------------------------------------------
 
-def _render_checker_card(title: str, verdict_obj, config, full_text_fn):
+def _render_checker_card(title: str, verdict_obj, config_vc, full_text_fn):
     with st.container():
         if verdict_obj is None:
             st.markdown(f"**{title}**")
             st.markdown(f"_:gray[{t('watchlist_analysis.not_yet_analyzed')}]_")
             return
 
-        badge = verdict_badge(verdict_obj.verdict, config)
+        badge = verdict_badge(verdict_obj.verdict, config_vc)
         title_col, date_col = st.columns([5, 1])
         with title_col:
             st.markdown(f"**{title}** {badge}")
         with date_col:
             if verdict_obj.created_at:
-                st.caption(verdict_obj.created_at.strftime("%d. %b %Y"))
+                age = _verdict_age_days(verdict_obj)
+                date_str = verdict_obj.created_at.strftime("%d. %b %Y")
+                if age is not None and age >= _STALE_DAYS:
+                    st.caption(f":orange[{date_str} · {t('watchlist_analysis.stale_label')}]")
+                else:
+                    st.caption(date_str)
 
         if verdict_obj.summary:
             llm_markdown(f"_{verdict_obj.summary}_")
@@ -145,6 +181,44 @@ ca_verdict = analysis_service.get_verdict(selected_position.id, "capital_allocat
 sc_agent = get_storychecker_agent()
 cg_agent = get_consensus_gap_agent()
 fa_agent = get_fundamental_analyzer_agent()
+
+# ------------------------------------------------------------------
+# Update button
+# ------------------------------------------------------------------
+
+_stale_count = sum(_is_stale(v) for v in [sc_verdict, cg_verdict, fa_verdict, ca_verdict])
+_btn_label = (
+    t("watchlist_analysis.update_button_stale").format(n=_stale_count)
+    if _stale_count > 0
+    else t("watchlist_analysis.update_button")
+)
+_btn_type = "primary" if _stale_count > 0 else "secondary"
+
+if st.button(_btn_label, key="wla_update_btn", type=_btn_type):
+    _lang = current_language()
+    _pos = [selected_position]
+    _args = (config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY)
+    _errors: list[str] = []
+    _states = []
+
+    for _fn in [run_storychecker_job, run_consensus_gap_job, run_fundamental_job, run_capital_allocator_job]:
+        _j = {"running": True, "done": False, "count": 0, "error": None}
+        threading.Thread(target=_fn, args=(_pos, _lang, _j) + _args, daemon=True).start()
+        _states.append(_j)
+
+    with st.spinner(t("watchlist_checker.running_parallel_spinner").format(n=4)):
+        while any(j["running"] for j in _states):
+            time.sleep(1)
+
+    _errors = [f"Fehler bei Analyse {i+1}: {j['error']}" for i, j in enumerate(_states) if j["error"]]
+    if _errors:
+        for _e in _errors:
+            st.error(_e)
+    else:
+        st.toast(t("watchlist_analysis.update_done"), icon="✅")
+    st.rerun()
+
+st.divider()
 
 # ------------------------------------------------------------------
 # Section: Story, Consensus, Fundamental (3 columns)
@@ -194,7 +268,12 @@ if ca_verdict:
     with col1:
         st.markdown(f"### {badge} {ca_verdict.verdict}")
         if ca_verdict.created_at:
-            st.caption(ca_verdict.created_at.strftime("%d. %b %Y, %H:%M"))
+            age = _verdict_age_days(ca_verdict)
+            date_str = ca_verdict.created_at.strftime("%d. %b %Y, %H:%M")
+            if age is not None and age >= _STALE_DAYS:
+                st.caption(f":orange[{date_str} · {t('watchlist_analysis.stale_label')}]")
+            else:
+                st.caption(date_str)
         if ca_verdict.summary:
             llm_markdown(f"_{ca_verdict.summary}_")
     with col2:

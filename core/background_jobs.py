@@ -250,7 +250,11 @@ def run_capital_allocator_job(positions: list, language: str, job: dict, db_path
             results = loop.run_until_complete(
                 ca_agent.analyze_portfolio(positions=pub_positions, skill_name=ca_skill_name, skill_prompt=ca_skill_prompt, language=language)
             )
-            count = len(results) if results else len(valid)
+            count = len(results) if results else 0
+            no_verdict = len(valid) - count
+            if no_verdict > 0:
+                _log_to_job(job, f"⚠️ {no_verdict} position(s) got no verdict (LLM didn't call submit_ca_verdict)")
+                error_msg = f"{no_verdict} von {len(valid)} Positionen ohne Verdict — ggf. DeepSeek Tool-Use erneut versuchen"
             _log_to_job(job, f"✅ CapitalAllocatorAgent completed: {count} analyzed")
         job.update({"running": False, "done": True, "count": count, "error": error_msg})
     except Exception as exc:

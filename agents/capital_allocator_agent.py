@@ -182,11 +182,11 @@ class CapitalAllocatorAgent:
             response = await self._llm.chat_with_tools(
                 messages=[{"role": "user", "content": user_msg}],
                 tools=[
-                    {"type": "web_search_20250305", "name": "web_search", "max_uses": 5},
+                    {"type": "web_search_20250305", "name": "web_search", "max_uses": 1},
                     SUBMIT_CA_VERDICT_TOOL,
                 ],
                 system=system,
-                max_tokens=2500,
+                max_tokens=4000,
             )
         except Exception as exc:
             logger.warning("capital_allocator: LLM error for %s: %s", pos.name, exc)

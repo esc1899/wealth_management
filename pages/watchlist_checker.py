@@ -16,7 +16,7 @@ import threading
 import time
 import streamlit as st
 from dataclasses import dataclass as _dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pandas as pd
 
@@ -52,6 +52,47 @@ from core.background_jobs import (
 
 
 logger = logging.getLogger(__name__)
+
+_STALE_DAYS = 7
+_JOB_ARGS = None  # set after config import below
+
+
+def _is_stale(verdict_obj) -> bool:
+    if verdict_obj is None or verdict_obj.created_at is None:
+        return True
+    created = verdict_obj.created_at
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - created).days >= _STALE_DAYS
+
+
+def _run_parallel(jobs: list, lang: str, errors: list) -> int:
+    """Start all job threads simultaneously, wait once for all. Returns total count.
+
+    jobs: list of (target_fn, positions, label)
+    All threads are started before we block — so navigating away doesn't abort remaining ones.
+    """
+    states = []
+    for target, positions, label in jobs:
+        j = {"running": True, "done": False, "count": 0, "error": None, "logs": []}
+        threading.Thread(
+            target=target,
+            args=(positions, lang, j, config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY),
+            daemon=True,
+        ).start()
+        states.append((j, label))
+
+    with st.spinner(t("watchlist_checker.running_parallel_spinner").format(n=len(states))):
+        while any(j["running"] for j, _ in states):
+            time.sleep(1)
+
+    total = 0
+    for j, label in states:
+        if j["error"]:
+            errors.append(f"{label}: {j['error']}")
+        else:
+            total += j["count"]
+    return total
 
 
 # ------------------------------------------------------------------
@@ -128,6 +169,13 @@ n_missing_fund = sum(1 for pid in watchlist_ids if pid not in fund_verdicts)
 n_missing_ca = sum(1 for pid in watchlist_ids if pid not in ca_verdicts)
 n_total_missing = n_missing_sc + n_missing_cg + n_missing_fund + n_missing_ca
 
+# Stale counts (have a verdict but ≥ _STALE_DAYS old)
+n_stale_sc = sum(1 for pid in watchlist_ids if pid in sc_verdicts and _is_stale(sc_verdicts[pid]))
+n_stale_cg = sum(1 for pid in watchlist_ids if pid in cg_verdicts and _is_stale(cg_verdicts[pid]))
+n_stale_fund = sum(1 for pid in watchlist_ids if pid in fund_verdicts and _is_stale(fund_verdicts[pid]))
+n_stale_ca = sum(1 for pid in watchlist_ids if pid in ca_verdicts and _is_stale(ca_verdicts[pid]))
+n_total_stale = n_stale_sc + n_stale_cg + n_stale_fund + n_stale_ca
+
 # Post-run success toast (set by cockpit button, shown after st.rerun())
 if cockpit_msg := st.session_state.pop("_cockpit_done_msg", None):
     st.success(cockpit_msg)
@@ -150,10 +198,10 @@ for pos in watchlist:
     matrix_rows.append({
         "name": pos.name,
         "ticker": pos.ticker or "—",
-        "sc": fmt_verdict_matrix(sc_verdicts.get(pos.id), "storychecker"),
-        "fa": fmt_verdict_matrix(fund_verdicts.get(pos.id), "fundamental_analyzer"),
-        "cg": fmt_verdict_matrix(cg_verdicts.get(pos.id), "consensus_gap"),
-        "ca": fmt_verdict_matrix(ca_verdicts.get(pos.id), "capital_allocator"),
+        "sc": fmt_verdict_matrix(sc_verdicts.get(pos.id), "storychecker", stale_days=_STALE_DAYS),
+        "fa": fmt_verdict_matrix(fund_verdicts.get(pos.id), "fundamental_analyzer", stale_days=_STALE_DAYS),
+        "cg": fmt_verdict_matrix(cg_verdicts.get(pos.id), "consensus_gap", stale_days=_STALE_DAYS),
+        "ca": fmt_verdict_matrix(ca_verdicts.get(pos.id), "capital_allocator", stale_days=_STALE_DAYS),
         "wc": (fmt_verdict_matrix(wc_fit, "watchlist_checker") if wc_fit else "⚪ —"),
     })
 
@@ -196,12 +244,20 @@ _valid_positions = [p for p in watchlist if p.id]
 if _selected_rows and _selected_rows[0] < len(_valid_positions):
     _sel_pos = _valid_positions[_selected_rows[0]]
 
-    # Welche Checks fehlen für diese Zeile?
+    # Checks fehlend oder veraltet für diese Zeile
     _row_missing_wc = []
     if _sel_pos.id not in sc_verdicts: _row_missing_wc.append("sc")
     if _sel_pos.id not in cg_verdicts: _row_missing_wc.append("cg")
     if _sel_pos.id not in fund_verdicts: _row_missing_wc.append("fa")
     if _sel_pos.id not in ca_verdicts: _row_missing_wc.append("ca")
+
+    _row_stale_wc = []
+    if _sel_pos.id in sc_verdicts and _is_stale(sc_verdicts[_sel_pos.id]): _row_stale_wc.append("sc")
+    if _sel_pos.id in cg_verdicts and _is_stale(cg_verdicts[_sel_pos.id]): _row_stale_wc.append("cg")
+    if _sel_pos.id in fund_verdicts and _is_stale(fund_verdicts[_sel_pos.id]): _row_stale_wc.append("fa")
+    if _sel_pos.id in ca_verdicts and _is_stale(ca_verdicts[_sel_pos.id]): _row_stale_wc.append("ca")
+
+    _row_needs_update = list(dict.fromkeys(_row_missing_wc + _row_stale_wc))
 
     _nav_col1, _nav_col2, _nav_col3, _nav_spacer = st.columns([1, 1, 2, 1])
     with _nav_col1:
@@ -213,31 +269,22 @@ if _selected_rows and _selected_rows[0] < len(_valid_positions):
             st.session_state["_wc_delete_pending"] = {"id": _sel_pos.id, "name": _sel_pos.name}
             st.rerun()
     with _nav_col3:
-        if _row_missing_wc:
-            if st.button(t("watchlist_checker.cockpit_run_row_missing").format(n=len(_row_missing_wc)), key="wc_run_row_btn", use_container_width=True):
+        if _row_needs_update:
+            _row_btn_label = (
+                t("watchlist_checker.cockpit_run_row_missing").format(n=len(_row_needs_update))
+                if not _row_stale_wc
+                else t("watchlist_checker.cockpit_run_row_update").format(n=len(_row_needs_update))
+            )
+            if st.button(_row_btn_label, key="wc_run_row_btn", use_container_width=True):
                 _lang = current_language()
-                _row_total = 0
-                _row_errors: list[str] = []
                 _pos_single = [_sel_pos]
-                _JOB_ARGS = (config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY)
-
-                def _run_row_job(target, spinner_text, label):
-                    _j = {"running": True, "done": False, "count": 0, "error": None}
-                    threading.Thread(target=target, args=(_pos_single, _lang, _j) + _JOB_ARGS, daemon=True).start()
-                    with st.spinner(spinner_text):
-                        while _j["running"]: time.sleep(1)
-                    if _j["error"]: _row_errors.append(f"{label}: {_j['error']}"); return 0
-                    return _j["count"]
-
-                if "sc" in _row_missing_wc:
-                    _row_total += _run_row_job(run_storychecker_job, t("watchlist_checker.running_story_spinner").format(n=1), "Story Checker")
-                if "cg" in _row_missing_wc:
-                    _row_total += _run_row_job(run_consensus_gap_job, t("watchlist_checker.running_consensus_spinner").format(n=1), "Konsens-Lücken")
-                if "fa" in _row_missing_wc:
-                    _row_total += _run_row_job(run_fundamental_job, t("watchlist_checker.running_fund_spinner").format(n=1), "Fundamental")
-                if "ca" in _row_missing_wc:
-                    _row_total += _run_row_job(run_capital_allocator_job, t("capital_allocator.running_spinner").format(n=1), "Capital Allocator")
-
+                _row_errors: list[str] = []
+                _row_jobs = []
+                if "sc" in _row_needs_update: _row_jobs.append((run_storychecker_job, _pos_single, "Story"))
+                if "cg" in _row_needs_update: _row_jobs.append((run_consensus_gap_job, _pos_single, "Konsens"))
+                if "fa" in _row_needs_update: _row_jobs.append((run_fundamental_job, _pos_single, "Fundamental"))
+                if "ca" in _row_needs_update: _row_jobs.append((run_capital_allocator_job, _pos_single, "Capital Allocator"))
+                _row_total = _run_parallel(_row_jobs, _lang, _row_errors)
                 if _row_errors: st.session_state["_cockpit_errors"] = _row_errors
                 st.session_state["_cockpit_done_msg"] = t("watchlist_checker.cockpit_done").format(n=_row_total)
                 st.rerun()
@@ -256,46 +303,53 @@ if n_total_missing > 0:
 
     if st.button(t("watchlist_checker.cockpit_run_all_missing"), key="cockpit_run_all_btn"):
         _lang = current_language()
-        total_done = 0
         _errors: list[str] = []
-
-        def _run_job(target, positions, spinner_text, label, *extra_args):
-            _job = {"running": True, "done": False, "count": 0, "error": None, "logs": []}
-            threading.Thread(target=target, args=(positions, _lang, _job, config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY) + extra_args, daemon=True).start()
-            with st.spinner(spinner_text):
-                while _job["running"]:
-                    time.sleep(1)
-            if _job["error"]:
-                _errors.append(f"{label}: {_job['error']}")
-                return 0
-            return _job["count"]
-
+        _all_jobs = []
         if n_missing_sc > 0:
-            _missing_sc = [p for p in watchlist if p.id and p.id not in sc_verdicts]
-            total_done += _run_job(run_storychecker_job, _missing_sc,
-                t("watchlist_checker.running_story_spinner").format(n=len(_missing_sc)), "Story Checker")
-
+            _all_jobs.append((run_storychecker_job, [p for p in watchlist if p.id and p.id not in sc_verdicts], "Story"))
         if n_missing_cg > 0:
-            _missing_cg = [p for p in watchlist if p.id and p.id not in cg_verdicts]
-            total_done += _run_job(run_consensus_gap_job, _missing_cg,
-                t("watchlist_checker.running_consensus_spinner").format(n=len(_missing_cg)), "Konsens-Lücken")
-
+            _all_jobs.append((run_consensus_gap_job, [p for p in watchlist if p.id and p.id not in cg_verdicts], "Konsens"))
         if n_missing_fund > 0:
-            _missing_fa = [p for p in watchlist if p.id and p.id not in fund_verdicts]
-            total_done += _run_job(run_fundamental_job, _missing_fa,
-                t("watchlist_checker.running_fund_spinner").format(n=len(_missing_fa)), "Fundamental")
-
+            _all_jobs.append((run_fundamental_job, [p for p in watchlist if p.id and p.id not in fund_verdicts], "Fundamental"))
         if n_missing_ca > 0:
-            _missing_ca = [p for p in watchlist if p.id and p.id not in ca_verdicts]
-            total_done += _run_job(run_capital_allocator_job, _missing_ca,
-                t("capital_allocator.running_spinner").format(n=len(_missing_ca)), "Capital Allocator")
-
+            _all_jobs.append((run_capital_allocator_job, [p for p in watchlist if p.id and p.id not in ca_verdicts], "Capital Allocator"))
+        total_done = _run_parallel(_all_jobs, _lang, _errors)
         if _errors:
             st.session_state["_cockpit_errors"] = _errors
         st.session_state["_cockpit_done_msg"] = t("watchlist_checker.cockpit_done").format(n=total_done)
         st.rerun()
 else:
     st.success(t("watchlist_checker.cockpit_all_complete"))
+
+# Global stale update button (shown independently of missing)
+if n_total_stale > 0:
+    n_stale_positions = sum(
+        1 for pid in watchlist_ids
+        if (pid in sc_verdicts and _is_stale(sc_verdicts[pid]))
+        or (pid in cg_verdicts and _is_stale(cg_verdicts[pid]))
+        or (pid in fund_verdicts and _is_stale(fund_verdicts[pid]))
+        or (pid in ca_verdicts and _is_stale(ca_verdicts[pid]))
+    )
+    st.caption(t("watchlist_checker.cockpit_stale_summary").format(
+        n=n_total_stale, positions=n_stale_positions
+    ))
+    if st.button(t("watchlist_checker.cockpit_run_all_stale").format(n=n_total_stale), key="cockpit_run_stale_btn"):
+        _lang = current_language()
+        _errors: list[str] = []
+        _stale_jobs = []
+        if n_stale_sc > 0:
+            _stale_jobs.append((run_storychecker_job, [p for p in watchlist if p.id and p.id in sc_verdicts and _is_stale(sc_verdicts[p.id])], "Story"))
+        if n_stale_cg > 0:
+            _stale_jobs.append((run_consensus_gap_job, [p for p in watchlist if p.id and p.id in cg_verdicts and _is_stale(cg_verdicts[p.id])], "Konsens"))
+        if n_stale_fund > 0:
+            _stale_jobs.append((run_fundamental_job, [p for p in watchlist if p.id and p.id in fund_verdicts and _is_stale(fund_verdicts[p.id])], "Fundamental"))
+        if n_stale_ca > 0:
+            _stale_jobs.append((run_capital_allocator_job, [p for p in watchlist if p.id and p.id in ca_verdicts and _is_stale(ca_verdicts[p.id])], "Capital Allocator"))
+        total_done = _run_parallel(_stale_jobs, _lang, _errors)
+        if _errors:
+            st.session_state["_cockpit_errors"] = _errors
+        st.session_state["_cockpit_done_msg"] = t("watchlist_checker.cockpit_done").format(n=total_done)
+        st.rerun()
 
 # ─────────────────────────────────────────────────────────────────────
 # Section 2: Watchlist prüfen (Main WatchlistCheckerAgent, Ollama)
@@ -426,10 +480,10 @@ if st.session_state.get("_watchlist_check_result"):
     _ctx_hash = hashlib.md5((_ctx + _comment_style_id).encode()).hexdigest()
 
     if st.session_state.get("_watchlist_comment_hash") != _ctx_hash:
+        st.session_state["_watchlist_comment_hash"] = _ctx_hash  # set first to prevent retry loops
         with st.spinner(f"{_comment_style['emoji']} {t('watchlist_checker.ai_comment_spinner')}"):
             try:
                 st.session_state["_watchlist_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
-                st.session_state["_watchlist_comment_hash"] = _ctx_hash
             except Exception as _e:
                 logger.warning("KI-Kommentar fehlgeschlagen: %s", _e)
                 st.warning(t("watchlist_checker.ai_comment_unavailable"))
