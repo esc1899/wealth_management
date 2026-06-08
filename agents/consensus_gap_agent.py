@@ -170,7 +170,7 @@ class ConsensusGapAgent:
             response = await self._llm.chat_with_tools(
                 messages=[{"role": "user", "content": user_msg}],
                 tools=[
-                    {"type": "web_search_20250305", "name": "web_search"},
+                    {"type": "web_search_20250305", "name": "web_search", "max_uses": 1},
                     SUBMIT_VERDICT_TOOL,
                 ],
                 system=system,

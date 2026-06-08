@@ -96,6 +96,9 @@ class Config:
     COWORK_WATCH_ENABLED: bool = os.getenv("COWORK_WATCH_ENABLED", "true").lower() == "true"
     COWORK_AUTO_IMPORT_READY: bool = os.getenv("COWORK_AUTO_IMPORT_READY", "true").lower() == "true"
 
+    # Batch API — 50% cheaper for scheduled background jobs (Anthropic only)
+    USE_BATCH_API: bool = os.getenv("USE_BATCH_API", "false").lower() == "true"
+
     def validate(self) -> list[str]:
         """Return list of error messages for missing required config. Empty = OK."""
         errors = []

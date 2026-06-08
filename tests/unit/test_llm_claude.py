@@ -159,6 +159,83 @@ async def test_chat_with_tools_validates_output(provider):
     assert result.content == "Analysis complete"
 
 
+# ------------------------------------------------------------------
+# Message Batches API
+# ------------------------------------------------------------------
+
+
+def test_build_batch_request_structure():
+    req = ClaudeProvider.build_batch_request(
+        custom_id="sc_42",
+        model="claude-haiku-4-5-20251001",
+        system="You are an analyst.",
+        messages=[{"role": "user", "content": "Analyse AAPL"}],
+        tools=[{"type": "web_search_20250305", "name": "web_search"}],
+        max_tokens=1024,
+    )
+    assert req["custom_id"] == "sc_42"
+    assert req["params"]["model"] == "claude-haiku-4-5-20251001"
+    assert req["params"]["max_tokens"] == 1024
+    assert req["params"]["system"] == "You are an analyst."
+    assert len(req["params"]["messages"]) == 1
+    assert len(req["params"]["tools"]) == 1
+
+
+def test_build_batch_request_no_system_or_tools():
+    req = ClaudeProvider.build_batch_request(
+        custom_id="fa_1",
+        model="claude-haiku-4-5-20251001",
+        system="",
+        messages=[{"role": "user", "content": "Hello"}],
+        tools=[],
+        max_tokens=512,
+    )
+    assert "system" not in req["params"]
+    assert "tools" not in req["params"]
+
+
+@pytest.mark.asyncio
+async def test_submit_batch_returns_id(provider):
+    mock_batch = MagicMock()
+    mock_batch.id = "msgbatch_abc123"
+    provider._client.messages.batches.create = AsyncMock(return_value=mock_batch)
+
+    requests = [
+        ClaudeProvider.build_batch_request("sc_1", "claude-haiku-4-5-20251001", "sys", [{"role": "user", "content": "hi"}], [], 256)
+    ]
+    batch_id = await provider.submit_batch(requests)
+    assert batch_id == "msgbatch_abc123"
+    provider._client.messages.batches.create.assert_called_once_with(requests=requests)
+
+
+@pytest.mark.asyncio
+async def test_fetch_batch_results_still_processing(provider):
+    mock_batch = MagicMock()
+    mock_batch.processing_status = "in_progress"
+    provider._client.messages.batches.retrieve = AsyncMock(return_value=mock_batch)
+
+    result = await provider.fetch_batch_results("msgbatch_abc123")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_batch_results_complete(provider):
+    mock_batch = MagicMock()
+    mock_batch.processing_status = "ended"
+    provider._client.messages.batches.retrieve = AsyncMock(return_value=mock_batch)
+
+    mock_result = MagicMock()
+    mock_result.custom_id = "sc_42"
+
+    async def mock_results(batch_id):
+        yield mock_result
+
+    provider._client.messages.batches.results = mock_results
+
+    results = await provider.fetch_batch_results("msgbatch_abc123")
+    assert results == [mock_result]
+
+
 @pytest.mark.asyncio
 async def test_chat_with_tools_logs_suspicious_output(provider, caplog):
     """chat_with_tools should log warnings when response contains suspicious patterns."""

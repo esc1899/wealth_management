@@ -92,13 +92,14 @@ class ClaudeProvider(LLMProvider):
     Only used for agents explicitly configured to use Claude.
     """
 
-    def __init__(self, api_key: str = "", model: str = DEFAULT_MODEL, base_url: str = "", enable_thinking: bool = False):
+    def __init__(self, api_key: str = "", model: str = DEFAULT_MODEL, base_url: str = "", enable_thinking: bool = False, tavily_search_depth: str = "basic"):
         kwargs = {"api_key": api_key}
         if base_url:
             kwargs["base_url"] = base_url
         self._client = anthropic.AsyncAnthropic(**kwargs)
         self._model = model
         self._enable_thinking = enable_thinking
+        self._tavily_search_depth = tavily_search_depth
 
     async def chat(
         self,
@@ -157,6 +158,14 @@ class ClaudeProvider(LLMProvider):
         tavily_key = os.getenv("TAVILY_API_KEY", "")
         _WEB_SEARCH_SERVER = "web_search_20250305"
 
+        # Extract max_uses before replacement — max_uses is a server-side-only field
+        # that Anthropic enforces, but is lost when we replace the tool with Tavily.
+        _web_search_max_uses: Optional[int] = next(
+            (t.get("max_uses") for t in tools
+             if t.get("type") == _WEB_SEARCH_SERVER or t.get("name") == "web_search"),
+            None,
+        )
+
         # Replace server-side web_search with Tavily client-side tool if configured
         if tavily_key:
             resolved_tools = [
@@ -189,6 +198,7 @@ class ClaudeProvider(LLMProvider):
         total_cache_read = 0
         total_cache_write = 0
         total_web_search = 0
+        _tavily_call_count = 0
 
         # Loop to handle Tavily tool calls (max 10 iterations as safety net)
         for _ in range(10):
@@ -226,17 +236,21 @@ class ClaudeProvider(LLMProvider):
 
                 if web_calls:
                     # Execute searches and inject results
-                    total_web_search += len(web_calls)
                     kwargs["messages"].append(
                         {"role": "assistant", "content": list(response.content)}
                     )
                     tool_results = []
                     for call in web_calls:
                         query = call.input.get("query", "")
-                        try:
-                            result = _tavily.search(query, tavily_key)
-                        except Exception as e:
-                            result = f"Search failed: {e}"
+                        if _web_search_max_uses is not None and _tavily_call_count >= _web_search_max_uses:
+                            result = f"[Search limit of {_web_search_max_uses} reached. Base your answer on the results already gathered.]"
+                        else:
+                            _tavily_call_count += 1
+                            total_web_search += 1
+                            try:
+                                result = _tavily.search(query, tavily_key, search_depth=self._tavily_search_depth)
+                            except Exception as e:
+                                result = f"Search failed: {e}"
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": call.id,
@@ -280,6 +294,45 @@ class ClaudeProvider(LLMProvider):
             raw_blocks=list(response.content),
             web_search_requests=total_web_search,
         )
+
+    # ------------------------------------------------------------------
+    # Message Batches API — 50% cheaper, async processing (up to 24h)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def build_batch_request(
+        custom_id: str,
+        model: str,
+        system: str,
+        messages: list[dict],
+        tools: list[dict],
+        max_tokens: int,
+    ) -> dict:
+        """Build one request dict for the Message Batches API."""
+        params: dict = {"model": model, "max_tokens": max_tokens, "messages": messages}
+        if system:
+            params["system"] = system
+        if tools:
+            params["tools"] = tools
+        return {"custom_id": custom_id, "params": params}
+
+    async def submit_batch(self, requests: list[dict]) -> str:
+        """Submit a message batch. Returns the batch_id."""
+        batch = await self._client.messages.batches.create(requests=requests)
+        return batch.id
+
+    async def fetch_batch_results(self, batch_id: str):
+        """
+        Return results list when the batch is complete, None if still processing.
+        Each result has: .custom_id, .result.type ("succeeded"|"errored"), .result.message
+        """
+        batch = await self._client.messages.batches.retrieve(batch_id)
+        if batch.processing_status != "ended":
+            return None
+        results = []
+        async for result in self._client.messages.batches.results(batch_id):
+            results.append(result)
+        return results
 
     @property
     def model(self) -> str:

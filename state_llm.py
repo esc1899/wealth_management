@@ -9,21 +9,24 @@ from core.llm.local import OllamaProvider
 from state_repos import get_usage_repo, get_app_config_repo
 
 
-def _make_claude_provider(model: str, agent_name: str, enable_thinking: bool = False) -> ClaudeProvider:
+_TAVILY_NEWS_AGENTS = {"news", "structural_scan"}
+_TAVILY_ADVANCED_AGENTS = {"fundamental_analyzer"}
+
+
+def _make_claude_provider(model: str, agent_name: str, enable_thinking: bool = False, tavily_search_depth: str = "basic") -> ClaudeProvider:
     """Create and wire up a Claude provider with usage tracking."""
     provider = ClaudeProvider(
         api_key=config.LLM_API_KEY,
         model=model,
         base_url=config.LLM_BASE_URL,
         enable_thinking=enable_thinking,
+        tavily_search_depth=tavily_search_depth,
     )
     provider.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
     return provider
 
 
-_TAVILY_NEWS_AGENTS = {"news", "structural_scan"}
-
-def _make_openai_provider(model: str, agent_name: str) -> "OpenAICompatibleProvider":
+def _make_openai_provider(model: str, agent_name: str, tavily_search_depth: str = "basic") -> "OpenAICompatibleProvider":
     """Create and wire up an OpenAI-compatible provider with usage tracking."""
     from core.llm.openai_compatible import OpenAICompatibleProvider
     provider = OpenAICompatibleProvider(
@@ -31,6 +34,7 @@ def _make_openai_provider(model: str, agent_name: str) -> "OpenAICompatibleProvi
         model=model,
         base_url=config.OPENAI_BASE_URL,
         tavily_news_mode=agent_name in _TAVILY_NEWS_AGENTS,
+        tavily_search_depth=tavily_search_depth,
         provider_order=config.OPENAI_PROVIDER or None,
     )
 
@@ -71,13 +75,14 @@ def _make_deepseek_provider(model: str, agent_name: str) -> "OpenAICompatiblePro
 
 def _make_public_provider(model: str, agent_name: str, enable_thinking: bool = False) -> LLMProvider:
     """Route to the right provider based on model name prefix."""
+    search_depth = "advanced" if agent_name in _TAVILY_ADVANCED_AGENTS else "basic"
     if model.startswith("claude-") and config.LLM_API_KEY:
-        return _make_claude_provider(model, agent_name, enable_thinking=enable_thinking)
+        return _make_claude_provider(model, agent_name, enable_thinking=enable_thinking, tavily_search_depth=search_depth)
     if model.startswith("deepseek-") and config.DEEPSEEK_API_KEY:
         return _make_deepseek_provider(model, agent_name)
     if config.OPENAI_BASE_URL:
-        return _make_openai_provider(model, agent_name)
-    return _make_claude_provider(model, agent_name, enable_thinking=enable_thinking)
+        return _make_openai_provider(model, agent_name, tavily_search_depth=search_depth)
+    return _make_claude_provider(model, agent_name, enable_thinking=enable_thinking, tavily_search_depth=search_depth)
 
 
 def _get_public_agent_model(agent_key: str, default: str) -> str:

@@ -51,7 +51,7 @@ Be factual and cite specific numbers wherever available."""
 # Tool definitions
 # ------------------------------------------------------------------
 
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search"}
+WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 5}
 
 PROPOSE_FOR_WATCHLIST_TOOL = {
     "name": "propose_for_watchlist",

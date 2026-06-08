@@ -175,6 +175,7 @@ class TestGenerateMonthlyDigest:
         app_config.get_json.return_value = None
         analyses_repo = _make_analyses_repo([])
 
-        result = generate_monthly_digest(vals, analyses_repo, app_config, 2026, 5, market_repo=market_repo)
+        from datetime import date as _date
+        result = generate_monthly_digest(vals, analyses_repo, app_config, 2026, 5, market_repo=market_repo, today=_date(2026, 5, 15))
         assert "Portfolio gesamt" in result
         assert "AAPL" in result

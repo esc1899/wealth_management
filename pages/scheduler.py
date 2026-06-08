@@ -35,7 +35,9 @@ def _get_claude_model_list() -> list[str]:
 
 
 _CLAUDE_MODELS = _get_claude_model_list()
-_AVAILABLE_MODELS = config.OPENAI_MODELS if config.OPENAI_BASE_URL else _CLAUDE_MODELS
+# Show all configured providers — same combined list as Settings page
+_ALL_PUBLIC_MODELS = list(dict.fromkeys(config.DEEPSEEK_MODELS + config.OPENAI_MODELS + _CLAUDE_MODELS))
+_AVAILABLE_MODELS = _ALL_PUBLIC_MODELS or _CLAUDE_MODELS
 
 # ------------------------------------------------------------------
 # Constants
@@ -94,6 +96,8 @@ _SCHEDULABLE_AGENTS = {
     "consensus_gap": t("nav.consensus_gap"),
     "storychecker": t("settings.agent_storychecker"),
     "fundamental": t("settings.agent_fundamental"),
+    "sector_rotation": t("settings.agent_sector_rotation"),
+    "search_agent": t("settings.agent_search"),
 }
 
 # System jobs are auto-seeded and shown as read-only (no delete).
@@ -104,6 +108,8 @@ _SKILL_CAPABLE_AGENTS = {
     "structural_scan": "structural_scan",
     "consensus_gap": "consensus_gap",
     "fundamental": "fundamental",
+    "sector_rotation": "sector_rotation",
+    "search_agent": "search",
 }
 
 _WEEKDAY_NAMES = [
@@ -138,7 +144,8 @@ else:
                     _m = _job.run_month or 1
                     _d = _job.run_day or 1
                     _freq_label += f" ({_d:02d}.{_m:02d}.)"
-                _freq_label += f" {_job.run_hour:02d}:{_job.run_minute:02d}"
+                if _job.frequency != "manual":
+                    _freq_label += f" {_job.run_hour:02d}:{_job.run_minute:02d}"
                 _agent_label = _SCHEDULABLE_AGENTS.get(_job.agent_name, "")
                 if _agent_label and _job.skill_name and _job.skill_name != _agent_label:
                     _job_title = f"{_agent_label} · {_job.skill_name}"
@@ -174,6 +181,49 @@ else:
                     get_agent_scheduler().reload_jobs()
                     st.rerun()
 
+            # Inline model + skill selectors (non-system jobs only)
+            if not _is_system:
+                _model_opts_inline = [""] + _AVAILABLE_MODELS
+                _cur_model = _job.model or ""
+                _cur_model_idx = _model_opts_inline.index(_cur_model) if _cur_model in _model_opts_inline else 0
+                _mc1, _mc2 = st.columns([2, 3])
+                with _mc1:
+                    _sel_model = st.selectbox(
+                        t("settings.job_model_label"),
+                        options=_model_opts_inline,
+                        index=_cur_model_idx,
+                        format_func=lambda x: x if x else t("settings.job_model_default"),
+                        key=f"_job_model_{_job.id}",
+                        label_visibility="collapsed",
+                    )
+                if _sel_model != _cur_model:
+                    _sched_repo.update_model(_job.id, _sel_model or None)
+                    st.rerun()
+
+                if _job.agent_name in _SKILL_CAPABLE_AGENTS:
+                    _inline_area = _SKILL_CAPABLE_AGENTS[_job.agent_name]
+                    _inline_skills = get_skills_repo().get_by_area(_inline_area)
+                    if _inline_skills:
+                        _skill_opts_inline = [None] + _inline_skills
+                        _cur_skill_idx = next(
+                            (i + 1 for i, s in enumerate(_inline_skills) if s.name == _job.skill_name),
+                            0,
+                        )
+                        with _mc2:
+                            _sel_skill_inline = st.selectbox(
+                                "Skill",
+                                options=_skill_opts_inline,
+                                index=_cur_skill_idx,
+                                format_func=lambda s: "— kein Skill —" if s is None else f"{s.name}",
+                                key=f"_job_skill_{_job.id}",
+                                label_visibility="collapsed",
+                            )
+                        _new_skill_name = _sel_skill_inline.name if _sel_skill_inline else ""
+                        _new_skill_prompt = _sel_skill_inline.prompt if _sel_skill_inline else ""
+                        if _new_skill_name != _job.skill_name:
+                            _sched_repo.update_skill(_job.id, _new_skill_name, _new_skill_prompt)
+                            st.rerun()
+
             # Run history
             _runs = _runs_repo.get_for_job(_job.id, limit=10)
             if _runs:
@@ -202,7 +252,7 @@ st.divider()
 
 st.subheader(t("settings.add_scheduled_job"))
 
-_FREQ_OPTIONS = ["daily", "weekly", "monthly", "yearly"]
+_FREQ_OPTIONS = ["daily", "weekly", "monthly", "yearly", "manual"]
 _FREQ_LABELS = [t(f"settings.freq_{f}") for f in _FREQ_OPTIONS]
 
 if "_sched_new_agent" not in st.session_state:
@@ -243,15 +293,19 @@ with st.form("add_job_form"):
     )
     _jf_freq = _FREQ_OPTIONS[_FREQ_LABELS.index(_jf_freq_label)]
 
-    _jf_col1, _jf_col2 = st.columns(2)
-    with _jf_col1:
-        _jf_hour = st.number_input(t("settings.job_hour_label"), min_value=0, max_value=23, value=8, key="_jf_hour")
-    with _jf_col2:
-        _jf_minute = st.number_input(t("settings.job_minute_label"), min_value=0, max_value=59, value=0, step=5, key="_jf_minute")
-
     _jf_weekday = None
     _jf_day = None
     _jf_month = None
+    _jf_hour = 8
+    _jf_minute = 0
+
+    if _jf_freq != "manual":
+        _jf_col1, _jf_col2 = st.columns(2)
+        with _jf_col1:
+            _jf_hour = st.number_input(t("settings.job_hour_label"), min_value=0, max_value=23, value=8, key="_jf_hour")
+        with _jf_col2:
+            _jf_minute = st.number_input(t("settings.job_minute_label"), min_value=0, max_value=59, value=0, step=5, key="_jf_minute")
+
     if _jf_freq == "weekly":
         _WEEKDAY_NAMES_FORM = [
             t("settings.weekday_mon"), t("settings.weekday_tue"), t("settings.weekday_wed"),

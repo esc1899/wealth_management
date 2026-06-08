@@ -172,8 +172,8 @@ class NewsAgent:
         if skill_prompt:
             system += f"\n\n## Filter Strategy: {skill_name}\n{skill_prompt}"
 
-        # 2 searches per ticker, min 4 — keeps costs proportional to portfolio size
-        web_search_tool = {**_WEB_SEARCH_BASE, "max_uses": max(4, len(tickers) * 2)}
+        # 1 search per ticker, min 4, max 10 — keeps costs proportional but bounded
+        web_search_tool = {**_WEB_SEARCH_BASE, "max_uses": min(max(4, len(tickers)), 10)}
 
         position_lines = "\n".join(
             f"- **{t}** ({names.get(t, t)})" for t in tickers

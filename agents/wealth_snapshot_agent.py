@@ -422,7 +422,7 @@ class WealthSnapshotAgent:
                     missing.append(pos.name)
                     continue
 
-                price = self._market.get_price_for_date(pos.ticker, target_str)
+                price = self._market.get_price_for_date_or_prior(pos.ticker, target_str, max_days_back=3)
                 if price is None:
                     missing.append(pos.name)
                     continue

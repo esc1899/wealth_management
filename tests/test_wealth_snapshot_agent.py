@@ -716,7 +716,7 @@ class TestBackfillSnapshots:
         pos_repo = Mock(spec=PositionsRepository)
         pos_repo.get_portfolio.return_value = positions
         market_repo = Mock(spec=MarketDataRepository)
-        market_repo.get_price_for_date.side_effect = lambda sym, d: price_map.get(d)
+        market_repo.get_price_for_date_or_prior.side_effect = lambda sym, d, max_days_back=3: price_map.get(d)
         wealth_repo = Mock(spec=WealthSnapshotRepository)
         wealth_repo.get_by_date.side_effect = lambda d: "exists" if d in (existing_dates or set()) else None
         wealth_repo.create.return_value = Mock()

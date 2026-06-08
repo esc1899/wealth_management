@@ -14,6 +14,15 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 
 ---
 
+## Bekannte Probleme (nicht dringend)
+
+| ID | Entdeckt | Beschreibung |
+|---|---|---|
+| NOTE-1 | 2026-06-06 | ~~**Tavily Monats-Limit erschöpft**~~ — Plan-Limit erhöht (2026-06-07). Verbrauch zusätzlich optimiert: search_depth=basic (alle außer FA), client-side max_uses-Enforcement, fehlende Limits nachgerüstet, NewsAgent-Formel gekappt. ✅ ERLEDIGT |
+| NOTE-2 | 2026-06-06 | **SCANFL delisted/nicht gefunden** — yfinance liefert 404 für Symbol SCANFL. Position prüfen: Ticker noch aktuell? Ggf. aus Portfolio/Watchlist entfernen oder Ticker korrigieren. |
+
+---
+
 ## Planned
 
 ### Features

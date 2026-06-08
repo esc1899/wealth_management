@@ -36,6 +36,7 @@ def generate_monthly_digest(
     year: int,
     month: int,
     market_repo=None,
+    today=None,
 ) -> str:
     """
     Generate a Markdown digest for the given month.
@@ -68,7 +69,7 @@ def generate_monthly_digest(
     attribution_rows: List[AttributionMonthRow] = []
     if market_repo is not None:
         try:
-            attribution_rows = compute_monthly_attribution(valuations, market_repo, year, month)
+            attribution_rows = compute_monthly_attribution(valuations, market_repo, year, month, today=today)
         except Exception:
             pass
 

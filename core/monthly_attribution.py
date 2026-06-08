@@ -40,6 +40,7 @@ def compute_monthly_attribution(
     market_repo,
     year: int,
     month: int,
+    today: Optional[date] = None,
 ) -> List[AttributionMonthRow]:
     """
     For each portfolio position (not watchlist, not excluded) with a ticker:
@@ -55,7 +56,7 @@ def compute_monthly_attribution(
 
     Positions without historical data are included with delta=None, contribution=0.
     """
-    today = date.today()
+    today = today or date.today()
     is_current_month = (year == today.year and month == today.month)
 
     period_start = date(year, month, 1)

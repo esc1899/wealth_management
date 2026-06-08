@@ -61,6 +61,16 @@ class TestDBSchemaMigration:
         missing = critical_tables - table_names
         assert not missing, f"Missing critical tables after migration: {sorted(missing)}"
 
+    def test_pending_batches_table_exists(self, fresh_db):
+        """Verify pending_batches table is created by migrate_db()."""
+        cursor = fresh_db.cursor()
+        cols = {row[1] for row in cursor.execute("PRAGMA table_info(pending_batches)")}
+        expected = {"id", "batch_id", "agent_name", "skill_name", "language", "status",
+                    "submitted_at", "completed_at", "request_count", "success_count",
+                    "error_count", "error_msg"}
+        missing = expected - cols
+        assert not missing, f"Missing columns in pending_batches: {missing}"
+
     def test_fundamental_analyzer_tables_have_correct_schema(self, fresh_db):
         """Verify fundamental_analyzer tables have expected columns."""
         cursor = fresh_db.cursor()

@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 
 # Server-side web search — Anthropic executes this, no client handling needed
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search"}
+WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 3}
 
 MAX_TOOL_ITERATIONS = 5
 

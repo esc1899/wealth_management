@@ -606,6 +606,23 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     if "log_output" not in existing_runs:
         conn.execute("ALTER TABLE scheduled_job_runs ADD COLUMN log_output TEXT")
 
+    existing_batches = {row[1] for row in conn.execute("PRAGMA table_info(pending_batches)")}
+    if not existing_batches:
+        conn.execute("""CREATE TABLE IF NOT EXISTS pending_batches (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            batch_id      TEXT NOT NULL UNIQUE,
+            agent_name    TEXT NOT NULL,
+            skill_name    TEXT,
+            language      TEXT DEFAULT 'de',
+            status        TEXT NOT NULL DEFAULT 'processing',
+            submitted_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            completed_at  TEXT,
+            request_count INTEGER,
+            success_count INTEGER,
+            error_count   INTEGER,
+            error_msg     TEXT
+        )""")
+
     conn.commit()
 
 

@@ -34,7 +34,7 @@ MAX_TOOL_ITERATIONS = 15
 # Tool definitions
 # ------------------------------------------------------------------
 
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search"}
+WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 8}
 
 SUBMIT_VERDICT_TOOL = {
     "name": "submit_sector_verdict",

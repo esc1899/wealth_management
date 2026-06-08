@@ -69,8 +69,11 @@ def _make_market_repo(rows: list[tuple[str, str, float]]) -> MagicMock:
     return repo
 
 
+_TODAY = date(2026, 5, 15)  # fixed reference date for all "current month" tests
+
+
 class TestComputeMonthlyAttribution:
-    # today = 2026-05-15 (per system date in tests)
+    # today = 2026-05-15 (injected via today= param to keep tests date-independent)
     # current month = May 2026 → start price from April, end price = current_price_eur
     # past month = April 2026 → start price from March, end price from April historical
 
@@ -79,7 +82,7 @@ class TestComputeMonthlyAttribution:
         vals = [_make_valuation("AAPL", current_price=110.0, quantity=10.0)]
         # April close = 100.0 (start price for May)
         market_repo = _make_market_repo([("AAPL", "2026-04-30", 100.0)])
-        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5, today=_TODAY)
         assert len(rows) == 1
         r = rows[0]
         assert r.symbol == "AAPL"
@@ -89,7 +92,7 @@ class TestComputeMonthlyAttribution:
     def test_basic_loss_current_month(self):
         vals = [_make_valuation("TLT", current_price=90.0, quantity=5.0)]
         market_repo = _make_market_repo([("TLT", "2026-04-30", 100.0)])
-        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5, today=_TODAY)
         assert len(rows) == 1
         assert rows[0].contribution_eur == pytest.approx(-50.0)
         assert rows[0].delta_pct == pytest.approx(-10.0)
@@ -116,7 +119,7 @@ class TestComputeMonthlyAttribution:
         vals = [_make_valuation("GOOG", current_price=200.0, quantity=5.0)]
         # Only April data (start), no May historical data
         market_repo = _make_market_repo([("GOOG", "2026-04-28", 190.0)])
-        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5, today=_TODAY)
         assert len(rows) == 1
         r = rows[0]
         assert r.end_price_eur == pytest.approx(200.0)  # live price
@@ -126,7 +129,7 @@ class TestComputeMonthlyAttribution:
         """No prev-month data → delta=None, contribution=0."""
         vals = [_make_valuation("MSFT", current_price=400.0, quantity=2.0)]
         market_repo = _make_market_repo([])  # no data
-        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5, today=_TODAY)
         assert len(rows) == 1
         assert rows[0].delta_pct is None
         assert rows[0].contribution_eur == 0.0
@@ -140,7 +143,7 @@ class TestComputeMonthlyAttribution:
             ("AAPL", "2026-04-30", 100.0),
             ("GOOG", "2026-04-30", 190.0),
         ])
-        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5, today=_TODAY)
         symbols = [r.symbol for r in rows]
         assert "AAPL" in symbols
         assert "GOOG" not in symbols
@@ -154,7 +157,7 @@ class TestComputeMonthlyAttribution:
             ("LOSER", "2026-04-30", 100.0),
             ("WINNER", "2026-04-30", 100.0),
         ])
-        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5, today=_TODAY)
         assert rows[0].symbol == "WINNER"
         assert rows[1].symbol == "LOSER"
 
@@ -180,7 +183,7 @@ class TestComputeMonthlyAttribution:
         )]
         # April close = start price for current month (May)
         market_repo = _make_market_repo([("XAUUSD", "2026-04-30", start_price_per_oz)])
-        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5, today=_TODAY)
 
         assert len(rows) == 1
         r = rows[0]
@@ -202,7 +205,7 @@ class TestComputeMonthlyAttribution:
         )]
         # April data should be ignored for mid-period buys
         market_repo = _make_market_repo([("NEW", "2026-04-30", 50.0)])
-        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5, today=_TODAY)
         assert len(rows) == 1
         r = rows[0]
         assert r.contribution_eur == pytest.approx(200.0)   # 1200 - 1000
@@ -220,7 +223,7 @@ class TestComputeMonthlyAttribution:
             cost_basis_eur=800.0,
         )]
         market_repo = _make_market_repo([("OLD", "2026-04-30", 100.0)])
-        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5, today=_TODAY)
         assert len(rows) == 1
         r = rows[0]
         assert r.contribution_eur == pytest.approx(100.0)   # 1100 - 1000 (historical)
@@ -230,7 +233,7 @@ class TestComputeMonthlyAttribution:
         """annual_dividend_eur / 12 is stored in dividend_contribution_eur."""
         vals = [_make_valuation("DIV", current_price=110.0, quantity=10.0, annual_dividend_eur=120.0)]
         market_repo = _make_market_repo([("DIV", "2026-04-30", 100.0)])
-        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5, today=_TODAY)
         assert len(rows) == 1
         assert rows[0].dividend_contribution_eur == pytest.approx(10.0)  # 120 / 12
 
@@ -238,7 +241,7 @@ class TestComputeMonthlyAttribution:
         """Positions without dividend data get dividend_contribution_eur = 0."""
         vals = [_make_valuation("NODIV", current_price=110.0, quantity=10.0, annual_dividend_eur=None)]
         market_repo = _make_market_repo([("NODIV", "2026-04-30", 100.0)])
-        rows = compute_monthly_attribution(vals, market_repo, 2026, 5)
+        rows = compute_monthly_attribution(vals, market_repo, 2026, 5, today=_TODAY)
         assert rows[0].dividend_contribution_eur == 0.0
 
     def test_january_prev_month_wraps_to_december(self):

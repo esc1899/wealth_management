@@ -52,7 +52,7 @@ Wenn investitionswürdig: propose_for_watchlist aufrufen. Der Nutzer bestätigt 
 # ------------------------------------------------------------------
 
 # Server-side web search — Anthropic executes this, no client handling needed
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search"}
+WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 5}
 
 PROPOSE_FOR_WATCHLIST_TOOL = {
     "name": "propose_for_watchlist",

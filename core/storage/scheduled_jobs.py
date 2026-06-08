@@ -65,6 +65,20 @@ class ScheduledJobsRepository:
         )
         self._conn.commit()
 
+    def update_model(self, job_id: int, model: Optional[str]) -> None:
+        self._conn.execute(
+            "UPDATE scheduled_jobs SET model = ? WHERE id = ?",
+            (model, job_id),
+        )
+        self._conn.commit()
+
+    def update_skill(self, job_id: int, skill_name: str, skill_prompt: str) -> None:
+        self._conn.execute(
+            "UPDATE scheduled_jobs SET skill_name = ?, skill_prompt = ? WHERE id = ?",
+            (skill_name, skill_prompt, job_id),
+        )
+        self._conn.commit()
+
     def delete(self, job_id: int) -> bool:
         cursor = self._conn.execute(
             "DELETE FROM scheduled_jobs WHERE id = ?", (job_id,)

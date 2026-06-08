@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from concurrent.futures import ThreadPoolExecutor, wait as futures_wait
+from concurrent.futures import ThreadPoolExecutor, wait as futures_wait, FIRST_COMPLETED
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -130,7 +130,12 @@ class MarketDataAgent:
 
             with ThreadPoolExecutor(max_workers=min(10, len(symbols))) as hist_pool:
                 futs = {hist_pool.submit(_fetch_hist, s): s for s in symbols}
-                done, _ = futures_wait(futs, timeout=60)
+                done, pending = futures_wait(futs, timeout=600)
+            if pending:
+                logger.warning(
+                    "History fetch timeout: %d/%d symbols did not complete",
+                    len(pending), len(futs),
+                )
             for fut in done:
                 try:
                     records = fut.result()

@@ -88,10 +88,11 @@ class OpenAICompatibleProvider(LLMProvider):
     Uses the openai SDK with base_url override to support any compatible endpoint.
     """
 
-    def __init__(self, api_key: str = "", model: str = "", base_url: str = "", tavily_news_mode: bool = False, provider_order: Optional[List[str]] = None):
+    def __init__(self, api_key: str = "", model: str = "", base_url: str = "", tavily_news_mode: bool = False, provider_order: Optional[List[str]] = None, tavily_search_depth: str = "basic"):
         self._client = AsyncOpenAI(api_key=api_key, base_url=base_url or None)
         self._model = model
         self._tavily_news_mode = tavily_news_mode
+        self._tavily_search_depth = tavily_search_depth
         self._provider_extra = {"provider": {"order": provider_order, "allow_fallbacks": True}} if provider_order else {}
         self.last_generation_id: Optional[str] = None
 
@@ -164,6 +165,7 @@ class OpenAICompatibleProvider(LLMProvider):
         tools: list[dict],
         system: str = "",
         max_tokens: int = 2048,
+        enable_thinking: bool = False,  # accepted for API compatibility, ignored
     ) -> _OAIResponse:
         """
         Call OpenAI-compatible API with tool definitions.
@@ -177,6 +179,13 @@ class OpenAICompatibleProvider(LLMProvider):
         from core.search import tavily as _tavily
 
         tavily_key = os.getenv("TAVILY_API_KEY", "")
+
+        # Extract max_uses before _to_openai_tools drops it (server-side field, not in OAI format)
+        _web_search_max_uses: Optional[int] = next(
+            (t.get("max_uses") for t in tools if t.get("type") in _WEB_SEARCH_TYPES),
+            None,
+        )
+        _tavily_call_count = 0
 
         # Normalize Anthropic multi-turn format → OpenAI format
         messages = self._normalize_messages(messages)
@@ -197,6 +206,7 @@ class OpenAICompatibleProvider(LLMProvider):
 
         _t0 = time.monotonic()
         total_input = total_output = 0
+        total_web_search = 0
 
         for _ in range(_MAX_SEARCH_ITERATIONS):
             response = await self._client.chat.completions.create(**kwargs)
@@ -235,11 +245,16 @@ class OpenAICompatibleProvider(LLMProvider):
                 oai_messages.append(oai_assistant_msg)
                 _tavily_kwargs = {"days": 14, "topic": "news"} if self._tavily_news_mode else {}
                 for tc_id, query in search_calls:
-                    try:
-                        result = _tavily.search(query, tavily_key, **_tavily_kwargs)
-                    except Exception as e:
-                        _logger.warning("Tavily search failed for query %r: %s", query, e)
-                        result = f"Search unavailable: {e}"
+                    if _web_search_max_uses is not None and _tavily_call_count >= _web_search_max_uses:
+                        result = f"[Search limit of {_web_search_max_uses} reached. Base your answer on the results already gathered.]"
+                    else:
+                        _tavily_call_count += 1
+                        total_web_search += 1
+                        try:
+                            result = _tavily.search(query, tavily_key, search_depth=self._tavily_search_depth, **_tavily_kwargs)
+                        except Exception as e:
+                            _logger.warning("Tavily search failed for query %r: %s", query, e)
+                            result = f"Search unavailable: {e}"
                     oai_messages.append({"role": "tool", "tool_call_id": tc_id, "content": result})
                 kwargs["messages"] = oai_messages
                 continue
@@ -247,7 +262,7 @@ class OpenAICompatibleProvider(LLMProvider):
             # No (more) web_search calls — done
             _duration_ms = int((time.monotonic() - _t0) * 1000)
             if self.on_usage:
-                self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count, None, None)
+                self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count, None, None, total_web_search or None)
 
             oai_assistant_msg = {"role": "assistant", "content": msg.content or None}
             if other_calls:
@@ -266,5 +281,5 @@ class OpenAICompatibleProvider(LLMProvider):
 
         _duration_ms = int((time.monotonic() - _t0) * 1000)
         if self.on_usage:
-            self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count, None, None)
+            self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count, None, None, total_web_search or None)
         return _OAIResponse(content="", tool_calls=[], stop_reason="end_turn", raw_blocks=[])
