@@ -348,6 +348,8 @@ class AgentSchedulerService:
             await self._run_sector_rotation_job(job, conn, _log)
         elif job.agent_name == "search_agent":
             await self._run_search_agent_job(job, conn, _log)
+        elif job.agent_name == "devils_advocate":
+            await self._run_devils_advocate_job(job, conn, _log)
         elif job.agent_name == "wealth_snapshot":
             await self._run_wealth_snapshot_job(job, conn, _log)
         elif job.agent_name == "monthly_digest":
@@ -686,6 +688,36 @@ class AgentSchedulerService:
             language="de",
         )
         _log("Fundamental-Analyse abgeschlossen")
+
+    async def _run_devils_advocate_job(self, job, conn, log_fn=None) -> None:
+        from agents.devils_advocate_agent import DevilsAdvocateAgent
+        from core.storage.analyses import PositionAnalysesRepository
+        from core.storage.devils_advocate import DevilsAdvocateRepository
+        from core.storage.models import PublicPosition
+        _log = log_fn or logger.info
+
+        enc = build_encryption_service(self._enc_key, self._salt_path)
+        model = self._resolve_model("devils_advocate", job.model or "", conn)
+        _log(f"Modell: {model}")
+        llm = self._make_scheduled_llm("devils_advocate", model, conn)
+        positions_repo = PositionsRepository(conn, enc)
+        analyses_repo = PositionAnalysesRepository(conn)
+        da_repo = DevilsAdvocateRepository(conn)
+        positions = [p for p in positions_repo.get_watchlist() if p.ticker and p.id and not p.analysis_excluded]
+        if not positions:
+            _log("Keine Watchlist-Positionen mit Ticker — übersprungen")
+            return
+        _log(f"{len(positions)} Watchlist-Positionen werden analysiert")
+        pub_positions = [PublicPosition(id=p.id, name=p.name, ticker=p.ticker, isin=p.isin, asset_class=p.asset_class, anlageart=p.anlageart, story=p.story, story_skill=p.story_skill) for p in positions]
+
+        agent = DevilsAdvocateAgent(llm=llm, analyses_repo=analyses_repo, da_repo=da_repo)
+        results = await agent.analyze_portfolio(
+            positions=pub_positions,
+            skill_name=job.skill_name or "Standard",
+            skill_prompt=job.skill_prompt or "",
+            language="de",
+        )
+        _log(f"Devil's Advocate abgeschlossen: {len(results)} Verdicts")
 
     async def _run_wealth_snapshot_job(self, job: ScheduledJob, conn, log_fn=None) -> None:
         """Create a periodic wealth snapshot (no LLM needed)."""

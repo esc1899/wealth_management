@@ -98,6 +98,7 @@ _SCHEDULABLE_AGENTS = {
     "fundamental": t("settings.agent_fundamental"),
     "sector_rotation": t("settings.agent_sector_rotation"),
     "search_agent": t("settings.agent_search"),
+    "devils_advocate": t("devils_advocate.da_header"),
 }
 
 # System jobs are auto-seeded and shown as read-only (no delete).
@@ -110,6 +111,7 @@ _SKILL_CAPABLE_AGENTS = {
     "fundamental": "fundamental",
     "sector_rotation": "sector_rotation",
     "search_agent": "search",
+    "devils_advocate": "devils_advocate",
 }
 
 _WEEKDAY_NAMES = [
