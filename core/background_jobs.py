@@ -47,6 +47,35 @@ def _resolve_model_from_conn(conn, agent_key: str, default: str) -> str:
     )
 
 
+def _make_bg_llm(model: str, agent_name: str, usage_repo: UsageRepository):
+    """Create the correct LLM provider based on model prefix and available API keys.
+
+    Mirrors the routing logic in state_llm._make_public_provider:
+    claude-* + LLM_API_KEY  → Anthropic direct
+    anything + OPENAI_BASE_URL  → OpenRouter/OpenAI-compatible
+    fallback  → Anthropic direct
+    """
+    def _on_usage(i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None):
+        usage_repo.record(agent_name, model, i, o, skill=skill, source="manual", duration_ms=dur,
+                          position_count=pos, cache_read_tokens=cache_read,
+                          cache_write_tokens=cache_write, web_search_requests=web_search)
+
+    if model.startswith("claude-") and config.LLM_API_KEY:
+        llm = ClaudeProvider(api_key=config.LLM_API_KEY, model=model, base_url=config.LLM_BASE_URL)
+        llm.on_usage = _on_usage
+        return llm
+
+    if config.OPENAI_BASE_URL:
+        from core.llm.openai_compatible import OpenAICompatibleProvider
+        llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=model, base_url=config.OPENAI_BASE_URL)
+        llm.on_usage = _on_usage
+        return llm
+
+    llm = ClaudeProvider(api_key=config.LLM_API_KEY, model=model, base_url=config.LLM_BASE_URL)
+    llm.on_usage = _on_usage
+    return llm
+
+
 def _log_to_job(job: dict, msg: str) -> None:
     if "logs" not in job:
         job["logs"] = []
@@ -95,13 +124,8 @@ def run_storychecker_job(positions: list, language: str, job: dict, db_path: str
         job["agents"] = ["Story Checker"]
         skill_name, _ = _resolve_skill(jobs_repo, skills_repo, "storychecker")
         _sc_model = _resolve_model_from_conn(conn, "storychecker", CLAUDE_HAIKU)
-        if config.OPENAI_BASE_URL:
-            from core.llm.openai_compatible import OpenAICompatibleProvider
-            llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=_sc_model, base_url=config.OPENAI_BASE_URL)
-        else:
-            llm = ClaudeProvider(api_key=api_key, model=_sc_model, base_url=config.LLM_BASE_URL)
+        llm = _make_bg_llm(_sc_model, "storychecker", _usage_repo)
         llm.skill_context = skill_name
-        llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None, _m=llm.model, _r=_usage_repo: _r.record("storychecker", _m, i, o, skill=skill, source="manual", duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
         agent = StorycheckerAgent(positions_repo=positions_repo, storychecker_repo=storychecker_repo, analyses_repo=analyses_repo, llm=llm, skills_repo=skills_repo)
         pos_valid = [p for p in positions if p.id]
         _log_to_job(job, f"StorycheckerAgent: {len(pos_valid)} positions")
@@ -137,12 +161,7 @@ def run_consensus_gap_job(positions: list, language: str, job: dict, db_path: st
         job["agents"] = ["Konsens-Lücken"]
         skill_name, skill_prompt = _resolve_skill(jobs_repo, skills_repo, "consensus_gap")
         _cg_model = _resolve_model_from_conn(conn, "consensus_gap", CLAUDE_SONNET)
-        if config.OPENAI_BASE_URL:
-            from core.llm.openai_compatible import OpenAICompatibleProvider
-            llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=_cg_model, base_url=config.OPENAI_BASE_URL)
-        else:
-            llm = ClaudeProvider(api_key=api_key, model=_cg_model, base_url=config.LLM_BASE_URL)
-        llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None, _m=llm.model, _r=_usage_repo: _r.record("consensus_gap", _m, i, o, skill=skill, source="manual", duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
+        llm = _make_bg_llm(_cg_model, "consensus_gap", _usage_repo)
         agent = ConsensusGapAgent(llm=llm, analyses_repo=analyses_repo, cg_repo=cg_repo)
         pos_valid = [p for p in positions if p.id]
         _log_to_job(job, f"ConsensusGapAgent: {len(pos_valid)} positions")
@@ -182,12 +201,7 @@ def run_fundamental_job(positions: list, language: str, job: dict, db_path: str,
         _log_to_job(job, f"Skill resolved: '{fund_skill_name}'")
         _usage_repo = UsageRepository(conn)
         _fa_model = _resolve_model_from_conn(conn, "fundamental_analyzer", CLAUDE_HAIKU)
-        if config.OPENAI_BASE_URL:
-            from core.llm.openai_compatible import OpenAICompatibleProvider
-            fund_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=_fa_model, base_url=config.OPENAI_BASE_URL)
-        else:
-            fund_llm = ClaudeProvider(api_key=api_key, model=_fa_model, base_url=config.LLM_BASE_URL)
-        fund_llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None, _m=fund_llm.model, _r=_usage_repo: _r.record("fundamental_analyzer", _m, i, o, skill=skill, source="manual", duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
+        fund_llm = _make_bg_llm(_fa_model, "fundamental_analyzer", _usage_repo)
         fund_repo = FundamentalAnalyzerRepository(conn)
         fund_agent = FundamentalAnalyzerAgent(positions_repo=positions_repo, analyses_repo=analyses_repo, fa_repo=fund_repo, llm=fund_llm)
         job["agents"] = ["Fundamental"]
@@ -233,12 +247,7 @@ def run_capital_allocator_job(positions: list, language: str, job: dict, db_path
         _log_to_job(job, f"Skill resolved: '{ca_skill_name}'")
         _usage_repo = UsageRepository(conn)
         _ca_model = _resolve_model_from_conn(conn, "capital_allocator", CLAUDE_SONNET)
-        if config.OPENAI_BASE_URL:
-            from core.llm.openai_compatible import OpenAICompatibleProvider
-            ca_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=_ca_model, base_url=config.OPENAI_BASE_URL)
-        else:
-            ca_llm = ClaudeProvider(api_key=api_key, model=_ca_model, base_url=config.LLM_BASE_URL)
-        ca_llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None, _m=ca_llm.model, _r=_usage_repo: _r.record("capital_allocator", _m, i, o, skill=skill, source="manual", duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
+        ca_llm = _make_bg_llm(_ca_model, "capital_allocator", _usage_repo)
         ca_repo = CapitalAllocatorRepository(conn)
         ca_agent = CapitalAllocatorAgent(llm=ca_llm, analyses_repo=analyses_repo, ca_repo=ca_repo)
         job["agents"] = ["Kapitalallokator"]
@@ -288,12 +297,7 @@ def run_devils_advocate_job(positions: list, language: str, job: dict, db_path: 
         _log_to_job(job, f"Skill resolved: '{da_skill_name}'")
         _usage_repo = UsageRepository(conn)
         _da_model = _resolve_model_from_conn(conn, "devils_advocate", CLAUDE_SONNET)
-        if config.OPENAI_BASE_URL:
-            from core.llm.openai_compatible import OpenAICompatibleProvider
-            da_llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=_da_model, base_url=config.OPENAI_BASE_URL)
-        else:
-            da_llm = ClaudeProvider(api_key=api_key, model=_da_model, base_url=config.LLM_BASE_URL)
-        da_llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None, _m=da_llm.model, _r=_usage_repo: _r.record("devils_advocate", _m, i, o, skill=skill, source="manual", duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
+        da_llm = _make_bg_llm(_da_model, "devils_advocate", _usage_repo)
         da_repo = DevilsAdvocateRepository(conn)
         da_agent = DevilsAdvocateAgent(llm=da_llm, analyses_repo=analyses_repo, da_repo=da_repo)
         job["agents"] = ["Devil's Advocate"]
