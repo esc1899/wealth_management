@@ -703,7 +703,7 @@ class AgentSchedulerService:
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         da_repo = DevilsAdvocateRepository(conn)
-        positions = [p for p in positions_repo.get_watchlist() if p.ticker and p.id and not p.analysis_excluded]
+        positions = [p for p in positions_repo.get_watchlist() if p.ticker and p.id and not p.analysis_excluded and not p.in_portfolio]
         if not positions:
             _log("Keine Watchlist-Positionen mit Ticker — übersprungen")
             return

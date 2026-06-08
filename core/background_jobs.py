@@ -301,13 +301,13 @@ def run_devils_advocate_job(positions: list, language: str, job: dict, db_path: 
         da_repo = DevilsAdvocateRepository(conn)
         da_agent = DevilsAdvocateAgent(llm=da_llm, analyses_repo=analyses_repo, da_repo=da_repo)
         job["agents"] = ["Devil's Advocate"]
-        valid = [p for p in positions if p.id]
+        valid = [p for p in positions if p.id and not getattr(p, "in_portfolio", False)]
         pub_positions = [PublicPosition(id=p.id, name=p.name, ticker=p.ticker, isin=p.isin, asset_class=p.asset_class, anlageart=p.anlageart, story=p.story, story_skill=p.story_skill) for p in valid]
         if not valid:
-            error_msg = "Keine Positionen mit ID"
+            error_msg = "Keine Watchlist-Positionen (ohne Portfolio) mit ID"
             _log_to_job(job, f"❌ {error_msg}")
         else:
-            _log_to_job(job, f"Running DevilsAdvocateAgent on {len(valid)} positions")
+            _log_to_job(job, f"Running DevilsAdvocateAgent on {len(valid)} watchlist positions")
             results = loop.run_until_complete(
                 da_agent.analyze_portfolio(positions=pub_positions, skill_name=da_skill_name, skill_prompt=da_skill_prompt, language=language)
             )
