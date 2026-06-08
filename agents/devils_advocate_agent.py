@@ -105,6 +105,20 @@ Für jede Position: submit_da_verdict aufrufen mit position_id, verdict, summary
 # ------------------------------------------------------------------
 
 
+def _extract_parsed(response) -> list:
+    return [
+        (
+            str(c.input.get("position_id")),
+            c.input.get("verdict", "").lower(),
+            c.input.get("summary", ""),
+            c.input.get("analysis", ""),
+        )
+        for c in response.tool_calls
+        if c.name == "submit_da_verdict"
+        and c.input.get("verdict", "").lower() in VALID_VERDICTS
+    ]
+
+
 class DevilsAdvocateAgent:
     """
     Cloud agent (Claude ☁️) — finds the bear case for watchlist positions.
@@ -195,23 +209,38 @@ class DevilsAdvocateAgent:
                 ],
                 system=system,
                 max_tokens=4000,
-                tool_choice={"type": "any"},
             )
         except Exception as exc:
             logger.warning("devils_advocate: LLM error for %s: %s", pos.name, exc)
             return []
 
-        parsed = [
-            (
-                str(c.input.get("position_id")),
-                c.input.get("verdict", "").lower(),
-                c.input.get("summary", ""),
-                c.input.get("analysis", ""),
-            )
-            for c in response.tool_calls
-            if c.name == "submit_da_verdict"
-            and c.input.get("verdict", "").lower() in VALID_VERDICTS
-        ]
+        parsed = _extract_parsed(response)
+
+        # Fallback: if LLM wrote analysis but didn't call the tool, force a second call
+        if not parsed and response.content.strip():
+            try:
+                analysis_so_far = response.content.strip()
+                followup_msg = (
+                    f"Du hast diese Analyse verfasst:\n\n{analysis_so_far}\n\n"
+                    f"Rufe jetzt submit_da_verdict auf. Position ID: {pos.id}"
+                )
+                response2 = await self._llm.chat_with_tools(
+                    messages=[
+                        {"role": "user", "content": user_msg},
+                        {"role": "assistant", "content": analysis_so_far},
+                        {"role": "user", "content": followup_msg},
+                    ],
+                    tools=[SUBMIT_DA_VERDICT_TOOL],
+                    system=system,
+                    max_tokens=1000,
+                    tool_choice={"type": "tool", "name": "submit_da_verdict"},
+                )
+                parsed = _extract_parsed(response2)
+                if parsed:
+                    response = response2
+            except Exception as exc:
+                logger.warning("devils_advocate: fallback call failed for %s: %s", pos.name, exc)
+
         if not parsed:
             logger.warning("devils_advocate: no verdict for position %d (%s)", pos.id or 0, pos.name)
             return []
