@@ -133,9 +133,9 @@ pg = st.navigation({
         st.Page("pages/storychecker.py",         title=t("nav.storychecker"),     icon=":material/fact_check:"),
         st.Page("pages/fundamental_analyzer.py", title="Fundamental Analyzer",   icon=":material/calculate:"),
         st.Page("pages/consensus_gap.py",        title=t("nav.consensus_gap"),   icon=":material/target:"),
-        st.Page("pages/cowork_inbox.py",         title="Research Inbox",         icon=":material/inbox:"),
+        st.Page("pages/cowork_inbox.py",         title=t("nav.cowork_inbox"),    icon=":material/inbox:"),
         st.Page("pages/research_request.py",     title=t("research_request.nav_title"), icon=":material/add_circle:"),
-        st.Page("pages/research_answers.py",     title="Research Answers",       icon=":material/question_answer:"),
+        st.Page("pages/research_answers.py",     title=t("nav.research_answers"), icon=":material/question_answer:"),
     ],
     t("nav.group_claude_strategy"): [
         st.Page("pages/tax_loss_harvesting.py", title=t("nav.tax_loss_harvesting"), icon=":material/trending_down:"),

@@ -17,7 +17,7 @@ import streamlit as st
 
 from core.i18n import t
 from core.ui.markdown import llm_markdown
-from core.ui.research_request_form import render_research_request_form
+from core.ui.research_request_form import REQUEST_TYPES, render_research_request_form
 from state import get_portfolio_service, get_research_queue_repo
 
 st.set_page_config(
@@ -26,8 +26,8 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("🔬 Research Answers")
-st.caption("Antworten von Claude Code auf Research-Anfragen aus der App.")
+st.title(t("research_answers.title"))
+st.caption(t("research_answers.caption"))
 
 rq_repo = get_research_queue_repo()
 
@@ -50,7 +50,11 @@ def _position_for_ticker(ticker):
 # ------------------------------------------------------------------
 
 tab_answers, tab_queue, tab_new = st.tabs(
-    ["💬 Antworten", "📋 Offene Anfragen", t("research_request.tab_new")]
+    [
+        t("research_answers.tab_answers"),
+        t("research_answers.tab_queue"),
+        t("research_request.tab_new"),
+    ]
 )
 
 # ------------------------------------------------------------------
@@ -61,40 +65,42 @@ with tab_answers:
     answers = rq_repo.list_answers()
 
     if not answers:
-        st.info("Noch keine Antworten vorhanden. Benutze `submit_research_answer()` in Claude Code.")
+        st.info(t("research_answers.no_answers"))
     else:
         # Ticker filter
         tickers = sorted({a.ticker for a in answers if a.ticker})
         ticker_filter = None
         if tickers:
+            _all_label = t("research_answers.filter_all")
             col_filter, col_spacer = st.columns([2, 4])
             with col_filter:
                 ticker_filter = st.selectbox(
-                    "Ticker filtern",
-                    ["Alle"] + tickers,
+                    t("research_answers.filter_label"),
+                    [_all_label] + tickers,
                     label_visibility="collapsed",
                 )
-            if ticker_filter == "Alle":
+            if ticker_filter == _all_label:
                 ticker_filter = None
 
         filtered = [a for a in answers if ticker_filter is None or a.ticker == ticker_filter]
 
-        st.caption(f"{len(filtered)} Antwort(en)")
+        st.caption(t("research_answers.answer_count").format(n=len(filtered)))
 
         for answer in filtered:
             ticker_label = f" — {answer.ticker}" if answer.ticker else ""
             req_label = f" _(Request #{answer.request_id})_" if answer.request_id else ""
             ts = answer.created_at[:10] if answer.created_at else ""
 
+            _answer_label = t("research_request.answer_label").format(id=answer.id)
             with st.expander(
-                f"**Antwort #{answer.id}**{ticker_label} {req_label} · {ts}",
+                f"**{_answer_label}**{ticker_label} {req_label} · {ts}",
                 expanded=len(filtered) == 1,
             ):
                 llm_markdown(answer.answer_md)
 
                 col_del, col_pos, col_spacer = st.columns([1, 1, 4])
                 with col_del:
-                    if st.button("🗑️ Löschen", key=f"del_answer_{answer.id}", type="secondary"):
+                    if st.button(t("research_answers.delete_btn"), key=f"del_answer_{answer.id}", type="secondary"):
                         rq_repo.delete_answer(answer.id)
                         st.rerun()
                 _pos = _position_for_ticker(answer.ticker)
@@ -120,22 +126,17 @@ with tab_queue:
     _answers_by_request = {a.request_id: a for a in rq_repo.list_answers() if a.request_id}
 
     if not all_requests:
-        st.info(
-            "Keine offenen Anfragen. Erstelle eine über den **Research anfordern**-Button "
-            "auf der Positionsanalyse-Seite."
-        )
+        st.info(t("research_answers.no_requests"))
     else:
         if open_requests:
-            st.subheader(f"📋 Offen ({len(open_requests)})")
+            st.subheader(t("research_answers.open_header").format(n=len(open_requests)))
             for req in open_requests:
                 ticker_label = f" [{req.ticker}]" if req.ticker else ""
-                type_labels = {
-                    "research_question": "Recherche",
-                    "analysis_deepdive": "Vertiefung",
-                    "watchlist_candidate": "Kandidat",
-                    "general": "Allgemein",
-                }
-                type_label = type_labels.get(req.request_type, req.request_type)
+                type_label = (
+                    t(f"research_request.type_{req.request_type}")
+                    if req.request_type in REQUEST_TYPES
+                    else req.request_type
+                )
                 ts = req.created_at[:10] if req.created_at else ""
 
                 with st.container(border=True):
@@ -144,12 +145,12 @@ with tab_queue:
                         st.markdown(f"**#{req.id}** `{type_label}`{ticker_label} · {ts}")
                         st.markdown(req.focus)
                         if req.context:
-                            st.caption(f"Kontext: {req.context}")
+                            st.caption(t("research_answers.context_caption").format(context=req.context))
                     with col_actions:
-                        if st.button("✅ Erledigt", key=f"done_req_{req.id}"):
+                        if st.button(t("research_answers.done_btn"), key=f"done_req_{req.id}"):
                             rq_repo.complete_request(req.id)
                             st.rerun()
-                        if st.button("🗑️", key=f"del_req_{req.id}", help="Löschen"):
+                        if st.button("🗑️", key=f"del_req_{req.id}", help=t("research_answers.delete_help")):
                             rq_repo.delete_request(req.id)
                             st.rerun()
                     _ans = _answers_by_request.get(req.id)
@@ -161,11 +162,12 @@ with tab_queue:
                             llm_markdown(_ans.answer_md)
 
         if done_requests:
-            with st.expander(f"✅ Erledigt ({len(done_requests)})", expanded=False):
+            with st.expander(t("research_answers.done_expander").format(n=len(done_requests)), expanded=False):
                 for req in done_requests:
                     ticker_label = f" [{req.ticker}]" if req.ticker else ""
                     ts = req.updated_at[:10] if req.updated_at else ""
-                    st.markdown(f"~~**#{req.id}**{ticker_label} — {req.focus}~~ _(erledigt {ts})_")
+                    _done_suffix = t("research_answers.done_suffix").format(ts=ts)
+                    st.markdown(f"~~**#{req.id}**{ticker_label} — {req.focus}~~ {_done_suffix}")
                     # Kein verschachtelter Expander erlaubt → Toggle (FEAT-55)
                     _ans = _answers_by_request.get(req.id)
                     if _ans:

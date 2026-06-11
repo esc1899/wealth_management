@@ -51,6 +51,7 @@ nav:
   group_system: "System ⚙️"
   statistics: "Statistics"
   cowork_inbox: "Research Inbox"
+  research_answers: "Research Answers"
   tax_loss_harvesting: "Tax Loss Harvesting"
   dividend_calendar: "Dividends"
   sector_rotation: "Sector Rotation"
@@ -943,7 +944,7 @@ position_dashboard:
 
 research_request:
   header: "🔬 Request research"
-  caption: "Creates an open research request that Claude picks up automatically on next start."
+  caption: "Creates an open research request that Claude picks up automatically on next start. ⚠️ Ticker and public questions only — no portfolio details (stored unencrypted)."
   focus_label: "What should be investigated?"
   focus_placeholder: "e.g. 'Analyze the competitive position vs. Samsung after Q3 earnings'"
   type_label: "Type"
@@ -965,6 +966,24 @@ research_request:
   nav_title: "Request research"
   to_position_btn: "👤 Go to position"
   linked_answer: "💬 Show answer #{id}"
+
+research_answers:
+  title: "🔬 Research Answers"
+  caption: "Answers from Claude Code to research requests from the app."
+  tab_answers: "💬 Answers"
+  tab_queue: "📋 Open requests"
+  no_answers: "No answers yet. Use `submit_research_answer()` in Claude Code."
+  filter_label: "Filter by ticker"
+  filter_all: "All"
+  answer_count: "{n} answer(s)"
+  delete_btn: "🗑️ Delete"
+  delete_help: "Delete"
+  no_requests: "No open requests. Create one via the **Request research** button on the position analysis page."
+  open_header: "📋 Open ({n})"
+  context_caption: "Context: {context}"
+  done_btn: "✅ Done"
+  done_expander: "✅ Done ({n})"
+  done_suffix: "_(done {ts})_"
 
 cowork:
   page_title: "Research Inbox"
