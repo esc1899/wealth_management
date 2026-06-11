@@ -960,7 +960,7 @@ research_request:
   tab_new: "➕ Neue Anfrage"
   answers_header: "🔬 Research-Antworten ({n})"
   answer_label: "Antwort #{id}"
-  sidebar_btn: "➕ Research anfordern"
+  nav_title: "Research anfordern"
   to_position_btn: "👤 Zur Position"
   linked_answer: "💬 Antwort #{id} anzeigen"
 

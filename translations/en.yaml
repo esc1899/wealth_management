@@ -962,7 +962,7 @@ research_request:
   tab_new: "➕ New request"
   answers_header: "🔬 Research answers ({n})"
   answer_label: "Answer #{id}"
-  sidebar_btn: "➕ Request research"
+  nav_title: "Request research"
   to_position_btn: "👤 Go to position"
   linked_answer: "💬 Show answer #{id}"
 

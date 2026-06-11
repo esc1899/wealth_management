@@ -134,6 +134,7 @@ pg = st.navigation({
         st.Page("pages/fundamental_analyzer.py", title="Fundamental Analyzer",   icon=":material/calculate:"),
         st.Page("pages/consensus_gap.py",        title=t("nav.consensus_gap"),   icon=":material/target:"),
         st.Page("pages/cowork_inbox.py",         title="Research Inbox",         icon=":material/inbox:"),
+        st.Page("pages/research_request.py",     title=t("research_request.nav_title"), icon=":material/add_circle:"),
         st.Page("pages/research_answers.py",     title="Research Answers",       icon=":material/question_answer:"),
     ],
     t("nav.group_claude_strategy"): [
@@ -185,27 +186,6 @@ with st.sidebar:
     if selected != current:
         set_language(selected)
         st.rerun()
-
-
-# Global research request entry point — available on every page (FEAT-55)
-@st.dialog(t("research_request.header"))
-def _research_request_dialog():
-    from core.ui.research_request_form import render_research_request_form
-    from state import get_research_queue_repo
-
-    render_research_request_form(
-        get_research_queue_repo(), show_ticker_field=True, key_prefix="global_"
-    )
-
-
-with st.sidebar:
-    if st.button(
-        t("research_request.sidebar_btn"),
-        key="global_research_btn",
-        use_container_width=True,
-    ):
-        _research_request_dialog()
-
 pg.run()
 
 st.markdown("---")
