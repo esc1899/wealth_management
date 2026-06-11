@@ -958,6 +958,11 @@ research_request:
   created_success: "✅ Research-Request erstellt. Claude sieht ihn beim nächsten Start."
   created_success_ticker: "✅ Research-Request für {ticker} erstellt. Claude sieht ihn beim nächsten Start."
   tab_new: "➕ Neue Anfrage"
+  answers_header: "🔬 Research-Antworten ({n})"
+  answer_label: "Antwort #{id}"
+  sidebar_btn: "➕ Research anfordern"
+  to_position_btn: "👤 Zur Position"
+  linked_answer: "💬 Antwort #{id} anzeigen"
 
 cowork:
   page_title: "Research Inbox"

@@ -357,9 +357,25 @@ else:
 st.divider()
 
 # ------------------------------------------------------------------
-# Section 4: Research anfordern (FEAT-50)
+# Section 4: Research Answers für diesen Ticker (FEAT-55)
 # ------------------------------------------------------------------
 
-render_research_request_form(
-    get_research_queue_repo(), ticker=selected_position.ticker
-)
+_rq_repo = get_research_queue_repo()
+
+if selected_position.ticker:
+    _answers = _rq_repo.list_answers(ticker=selected_position.ticker)
+    if _answers:
+        st.subheader(t("research_request.answers_header").format(n=len(_answers)))
+        for _answer in _answers:
+            _ts = _answer.created_at[:10] if _answer.created_at else ""
+            _req_label = f" · Request #{_answer.request_id}" if _answer.request_id else ""
+            _label = t("research_request.answer_label").format(id=_answer.id)
+            with st.expander(f"**{_label}** · {_ts}{_req_label}", expanded=False):
+                llm_markdown(_answer.answer_md)
+        st.divider()
+
+# ------------------------------------------------------------------
+# Section 5: Research anfordern (FEAT-50)
+# ------------------------------------------------------------------
+
+render_research_request_form(_rq_repo, ticker=selected_position.ticker)

@@ -186,6 +186,26 @@ with st.sidebar:
         set_language(selected)
         st.rerun()
 
+
+# Global research request entry point — available on every page (FEAT-55)
+@st.dialog(t("research_request.header"))
+def _research_request_dialog():
+    from core.ui.research_request_form import render_research_request_form
+    from state import get_research_queue_repo
+
+    render_research_request_form(
+        get_research_queue_repo(), show_ticker_field=True, key_prefix="global_"
+    )
+
+
+with st.sidebar:
+    if st.button(
+        t("research_request.sidebar_btn"),
+        key="global_research_btn",
+        use_container_width=True,
+    ):
+        _research_request_dialog()
+
 pg.run()
 
 st.markdown("---")
