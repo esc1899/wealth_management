@@ -4,22 +4,27 @@
 
 ```mermaid
 graph TD
-    subgraph UI["Streamlit UI (15 Pages)"]
+    subgraph UI["Streamlit UI (30 Pages)"]
         PG1["Dashboard / Positionen / Marktdaten"]
-        PG2["Portfolio Chat / Portfolio Story"]
-        PG3["Storychecker / Watchlist Checker"]
-        PG4["Consensus Gap / Fundamental Analyzer"]
-        PG5["Research Chat / News / Search"]
-        PG6["System: Statistics / Skills"]
+        PG2["Portfolio Chat / Portfolio Checker / Position Dashboard"]
+        PG3["Storychecker / Watchlist Checker / Watchlist-Analyse"]
+        PG4["Consensus Gap / Fundamental Analyzer / Capital Allocator"]
+        PG5["Research Chat / News / Search / Sector Rotation"]
+        PG6["Research Inbox / Research Answers / Research anfordern"]
+        PG7["Dividenden / Tax Loss Harvesting / Analyse"]
+        PG8["System: Statistics / Skills / Scheduler / Settings"]
     end
 
     state["state.py — DI Factory<br/>@st.cache_resource Singletons"]
 
     subgraph Local["Local Agents (Ollama 🔒)"]
         PA["PortfolioAgent"]
-        PSA["PortfolioStoryAgent"]
+        PSA["PortfolioStoryAgentV2"]
         WCA["WatchlistCheckerAgent"]
         MDA["MarketDataAgent"]
+        PRA["PortfolioRobustnessAgent"]
+        TLH["TaxLossHarvestingAgent"]
+        DCA["DividendCalendarAgent"]
     end
 
     subgraph Cloud["Cloud Agents (Claude API ☁️)"]
@@ -30,13 +35,16 @@ graph TD
         CGA["ConsensusGapAgent"]
         STA["StructuralChangeAgent"]
         FAA["FundamentalAnalyzerAgent"]
+        CAA["CapitalAllocatorAgent"]
+        DAA["DevilsAdvocateAgent"]
+        SRA["SectorRotationAgent"]
         WSA["WealthSnapshotAgent"]
     end
 
     subgraph Core["core/ — Platform Layer"]
-        LLM["llm/<br/>OllamaProvider<br/>ClaudeProvider"]
-        STOR["storage/<br/>13 Repositories"]
-        UTIL["i18n / currency<br/>scheduler / constants<br/>portfolio_stability"]
+        LLM["llm/<br/>OllamaProvider<br/>ClaudeProvider<br/>OpenAICompatibleProvider"]
+        STOR["storage/<br/>28 Repositories"]
+        UTIL["i18n / currency<br/>scheduler / background_jobs<br/>attribution / digests"]
     end
 
     DB[("SQLite + Fernet<br/>wealth.db<br/>(encrypted)")]
@@ -81,13 +89,16 @@ sequenceDiagram
 
 ---
 
-## Agent Overview (13 Agents)
+## Agent Overview (18 Agents)
 
-| Agent | Provider | Model | Session Type | Primary Method | Scope |
+| Agent | Provider | Model¹ | Session Type | Primary Method | Scope |
 |-------|----------|-------|--------------|--------|-------|
 | **PortfolioAgent** | Ollama | Local | Stateless | `chat()` + tools | Portfolio CRUD |
-| **PortfolioStoryAgent** | Ollama | Local | Stateless | `analyze()` / `analyze_stability()` / `analyze_story_and_performance()` | Modular portfolio checks (FEAT-18) |
+| **PortfolioStoryAgentV2** | Ollama | Local | Stateless | `analyze()` / `analyze_stability()` / `analyze_story_and_performance()` | Modular portfolio checks (FEAT-18) |
 | **WatchlistCheckerAgent** | Ollama | Local | Stateless | `check_watchlist()` | Watchlist fit into portfolio |
+| **PortfolioRobustnessAgent** | Ollama | Local | Stateless | `analyze()` | Portfolio-level stress assessment (FEAT-48) |
+| **TaxLossHarvestingAgent** | Ollama | Local | Stateless | `analyze()` | Loss positions + tax impact + replacements (FEAT-44) |
+| **DividendCalendarAgent** | Ollama | Local | Stateless | `analyze()` | Dividend cashflow commentary (FEAT-45) |
 | **MarketDataAgent** | — | — | Stateless | APScheduler | Price fetch + history |
 | **ResearchAgent** | Claude | Haiku | DB-persisted | `start_session()` + `chat()` | Research per position |
 | **NewsAgent** | Claude | Haiku | Stateless | `analyze_portfolio()` | News digest |
@@ -95,13 +106,17 @@ sequenceDiagram
 | **StorycheckerAgent** | Claude | Haiku | DB-persisted | `start_session()` + `chat()` + `batch_check_all()` | Thesis validation |
 | **ConsensusGapAgent** | Claude | Sonnet | DB-persisted | `analyze_portfolio()` | Market vs. thesis gap |
 | **StructuralChangeAgent** | Claude | Sonnet | DB-persisted | `scan()` | Structural shifts |
-| **FundamentalAnalyzerAgent** | Claude | Haiku | DB-persisted | `start_session()` + `chat()` + `analyze_portfolio()` | Deep valuation analysis |
-| **CapitalAllocatorAgent** | Claude | Sonnet | DB-persisted | `analyze_portfolio()` | Management capital allocation quality — Watchlist only, on-demand |
+| **FundamentalAnalyzerAgent** | Claude | Sonnet | DB-persisted | `start_session()` + `chat()` + `analyze_portfolio()` | Deep valuation analysis |
+| **CapitalAllocatorAgent** | Claude | Sonnet | DB-persisted | `analyze_portfolio()` | Management capital allocation quality — Watchlist only (FEAT-31) |
+| **DevilsAdvocateAgent** | Claude | Sonnet | DB-persisted | `analyze_portfolio()` | Bear case per watchlist position (FEAT-47) |
+| **SectorRotationAgent** | Claude | Sonnet | Run-persisted | `scan()` | Sector inflow/outflow vs. portfolio exposure (FEAT-46) |
 | **WealthSnapshotAgent** | — | — | Stateless | `take_snapshot()` | Portfolio history |
+
+¹ Compile-time defaults — every agent's model is overridable per agent in Settings (DB) and via `LLM_DEFAULT_MODEL`.
 
 ---
 
-## Storage Layer (14 Repositories)
+## Storage Layer (28 Repositories)
 
 | Repository | Purpose | Tables |
 |---|---|---|
@@ -118,9 +133,21 @@ sequenceDiagram
 | **PositionAnalysesRepository** | Verdicts for all checker agents | `position_analyses` |
 | **StructuralScansRepository** | Structural change scan runs | `structural_scan_runs`, `structural_scan_messages` |
 | **WealthSnapshotRepository** | Historical portfolio snapshots | `wealth_snapshots` |
-| **ScheduledJobsRepository** | Periodic agent runs | `scheduled_jobs` |
-| **NewsRepository** | News digest caching | `news_digests` |
-| **UsageRepository** | Token counts + costs per call | `usage_log` |
+| **ScheduledJobsRepository** | Periodic agent runs + run history | `scheduled_jobs`, `scheduled_job_runs` |
+| **NewsRepository** | News digest runs + messages | `news_runs`, `news_messages` |
+| **UsageRepository** | Token counts + costs per call | `llm_usage`, `usage_resets` |
+| **ResearchQueueRepository** | MCP back channel: requests + answers (FEAT-50/52) | `research_requests`, `research_answers` |
+| **BatchQueueRepository** | Pending Anthropic Batch API jobs | `pending_batches` |
+| **AgentRunsRepository** | Agent run telemetry | `agent_runs` |
+| **CoworkRepository** | Research Inbox entries + suggestions | `cowork_research_entries`, `cowork_watchlist_suggestions` |
+| **DevilsAdvocateRepository** | Bear case sessions (FEAT-47) | `devils_advocate_sessions`, `devils_advocate_messages` |
+| **SectorRotationRepository** | Sector scan runs + verdicts (FEAT-46) | `sector_rotation_runs`, `sector_rotation_messages`, `sector_verdicts` |
+| **PortfolioRobustnessRepository** | Portfolio stress analyses (FEAT-48) | `portfolio_robustness_analyses` |
+| **PortfolioStoryRepository** | Portfolio story analyses + position fits | `portfolio_story_analyses_new`, `portfolio_story_position_fits` |
+| **WatchlistCheckerRepository** | Watchlist checker analyses | `watchlist_checker_analyses` |
+| **DividendSnapshotsRepository** | Dividend data + snapshots (FEAT-45) | `dividend_data`, `dividend_snapshots` |
+| **MonthlyDigestRepository** | Monthly portfolio digests (FEAT-36) | `monthly_digests` |
+| **YearlyDigestRepository** | Yearly portfolio digests (FEAT-37) | `yearly_digests` |
 
 ---
 
@@ -409,10 +436,11 @@ Pages use `core.currency.symbol()` and `core.currency.fmt()` for display.
 
 ## Testing Strategy
 
-- **Unit tests**: Agent logic, repository CRUD, parsing (564 total — 14 page smoke tests)
+- **Unit tests**: Agent logic, repository CRUD, parsing; smoke tests for all 30 pages (AppTest)
 - **Integration tests**: Full workflows with real SQLite (`:memory:`)
 - **No mocking of repositories**: Always use real storage for higher fidelity
-- **Coverage**: 69% (target: 50%+; page smoke tests reduce metric but add safety)
+- **Test-first on bugs**: write the failing test before the fix (see CLAUDE.md Test-Disziplin)
+- **Volume**: 996 tests, ~38s wall time, coverage 71% (target: 50%+)
 
 ```bash
 pytest tests/                 # All
@@ -450,32 +478,35 @@ See **BACKLOG.md § Technical Debt** for full inventory.
 - Explicitly instructs LLM: "Write text in {language}, use EXACTLY these codes as-is"
 
 **Scope**:
-- ✅ 7 agents (StorycheckerAgent, ConsensusGapAgent, FundamentalAgent, ResearchAgent, etc.)
-- ✅ 6 pages (consensus_gap, fundamental_analyzer, structural_scan, research_chat, storychecker, watchlist_checker)
-- ⚠️ **Out of scope**: Page UI labelsportfolio_story.py, positionen.py partially hardcoded German)
+- ✅ All analysis agents accept `language` (StorycheckerAgent, ConsensusGapAgent, FundamentalAnalyzerAgent, ResearchAgent, DevilsAdvocateAgent, …)
+- ✅ Page UI via `translations/de.yaml` + `en.yaml` (`core.i18n.t()`) — most pages fully covered
+- ⚠️ **Known debt**: portfolio_story.py and positionen.py partially hardcoded German; cowork_setup.py intentionally German-only until FEAT-56
 
 ---
 
-## Recent Changes (April 2026)
+## Recent Changes (Mai–Juni 2026)
 
-✅ **DEBT-10: Page Smoke Tests** (2026-04-19)
-   - All 19 pages load without exceptions (Streamlit AppTest framework)
-   - Safety layer for page refactoring, initialization verification
+✅ **MCP Research Loop komplett** (FEAT-49–55, 2026-06-09 bis 2026-06-11)
+   - MCP-Server (stdio + optional HTTP), Research Queue, UserPromptSubmit-Hook
+   - Research Answers UI, globales Request-Formular, Position-Dashboard-Integration
 
-✅ **Documentation Sync & Debt Inventory** (2026-04-19)
-   - ARCHITECTURE, CHANGELOG, MIGRATIONS, BACKLOG updated
-   - BACKLOG restored with DEBT-8/10/13 open items
-   - Cleanup session (Langfuse/Benchmark/Labels) fully documented
+✅ **Security: SEC-4 + SEC-5** (2026-06-09 / 2026-06-11)
+   - Path-Traversal, Prompt-Injection-Rahmung, Längenlimits, constant-time Bearer,
+     XML-Escaping im Hook, Limit-Sync zwischen beiden Schreibpfaden
 
-✅ **Agent i18n Support** (2026-04-17)
-   - Multi-language responses, verdict codes preserved, thread-safe language passing
+✅ **Neue Agents** (Mai–Juni 2026)
+   - DevilsAdvocateAgent + PortfolioRobustnessAgent (FEAT-47/48)
+   - SectorRotationAgent (FEAT-46), TaxLossHarvestingAgent (FEAT-44), DividendCalendarAgent (FEAT-45)
 
-✅ **DEBT Stack Complete** (2026-04-16)
-   - Async modernization (Python 3.12+), State decomposition, Service layer + Agent encapsulation
+✅ **Batch API** (2026-06-07/08) — 50% günstigere Scheduled Jobs via `pending_batches` + Scheduler-Polling
 
-✅ Skills Architecture Complete (Phase 5)  
-✅ Watchlist Checker + Consensus Gap Analysis Integration  
-✅ Fundamental Analyzer (multi-turn session-based)
+✅ **Attribution & Digests** (FEAT-34–39, Mai 2026) — Monats-/Jahres-Attribution inkl. Dividenden, Digest-Reports, Makro-Chips
+
+✅ **Status-Matrix & Background Jobs** (FEAT-40/41) — `core/background_jobs.py` shared für SC/CG/FA/CA, Watchlist Cockpit
+
+✅ **Provider-Flexibilität** (Mai 2026) — OpenRouter/DeepSeek-Migration, Tavily-Search, `OpenAICompatibleProvider`
+
+Ältere Änderungen: siehe CHANGELOG.md.
 
 ---
 
@@ -636,14 +667,14 @@ Das MCP SDK erfordert Python ≥ 3.10, die Haupt-App läuft auf Python 3.9.6. L�
 mcp_venv/     (Python 3.11.15) — nur mcp_server/wealth_mcp.py
 ```
 
-Die Trennung ist sauber: `mcp_server/_helpers.py` enthält die testbare Logik (kein MCP-Import), importierbar aus `.venv`. `wealth_mcp.py` importiert `_helpers` + FastMCP und läuft nur in `mcp_venv`.
+Die Trennung ist sauber: `mcp_server/_helpers.py` enthält die testbare Logik (kein MCP-Import) — YAML-Erzeugung, atomare File-Writes, Input-Validierung (`validate_answer_input`) und die `BearerTokenMiddleware` — importierbar aus `.venv`. `wealth_mcp.py` importiert `_helpers` + FastMCP und läuft nur in `mcp_venv`.
 
 ```
 mcp_server/
-├── _helpers.py       # Pure Python 3.9 — testbar aus .venv
+├── _helpers.py       # Pure Python 3.9 — testbar aus .venv (inkl. Auth-Middleware + Validierung)
 ├── wealth_mcp.py     # FastMCP server — läuft in mcp_venv
 ├── check_queue.py    # Hook-Script — /usr/bin/python3
-├── requirements.txt  # mcp[cli]>=1.0.0, pyyaml>=6.0
+├── requirements.txt  # mcp[cli]>=1.0.0, pyyaml>=6.0, uvicorn
 └── __init__.py
 ```
 
@@ -752,6 +783,19 @@ tmp_path.rename(final_path)  # atomic on same filesystem
 
 Der existierende Watchdog-Filewatcher in der App erkennt neue Dateien und importiert sie als Watchlist-Kandidaten für Human-Review — ohne Code-Änderungen an der App.
 
+### Security-Härtung (SEC-4 + SEC-5)
+
+Der MCP-Server ist der erste externe Schreibpfad, der nicht durch die Streamlit-UI läuft. Mitigations:
+
+| Vektor | Mitigation |
+|---|---|
+| Path Traversal im Outbox-Filename | Slug-Sanitization (`[^A-Za-z0-9._-]` → `_`) + Datum-Präfix |
+| Prompt-Injection via Hook-Context | XML-Rahmung **und** Escaping (`xml.sax.saxutils`) — Tag-Breakout aus `focus`/`ticker` unmöglich, Output ist parsebares XML |
+| Oversize-Inputs | `focus` ≤ 500, `context` ≤ 2000, `ticker` ≤ 20 Zeichen, `answer_md` ≤ 100 KB |
+| Doppelte Schreibpfade (Repo vs. Raw-SQL) | Limits in `core/storage/research_queue.py` **und** `mcp_server/_helpers.py` definiert; Test erzwingt Gleichstand |
+| HTTP-Transport-Auth | Bearer-Token Pflicht, `hmac.compare_digest` (constant-time), Websocket-Scope abgelehnt, bind an `127.0.0.1` |
+| DB-Zugriff | Konvention + Checkliste (CLAUDE.md): Tools berühren nur `research_requests`/`research_answers` |
+
 ### Neue Storage-Tabellen
 
 ```sql
@@ -778,4 +822,4 @@ CREATE TABLE research_answers (
 
 ---
 
-*Last updated: 2026-06-09*
+*Last updated: 2026-06-11*

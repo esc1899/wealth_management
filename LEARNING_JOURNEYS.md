@@ -288,11 +288,23 @@ Read `app.py` — find the login gate (`APP_PASSWORD`).
 
 > **Discussion:** This is a single-password gate for a personal app. What would need to change for a multi-user deployment?
 
+### Step 6 — Audit the MCP attack surface
+
+The MCP server ([`mcp_server/`](mcp_server/)) is the first write path into the system that does not go through the Streamlit UI. Two security reviews hardened it (SEC-4, SEC-5) — retrace them:
+
+- **Input limits on both write paths:** find `MAX_TICKER_LEN` / `MAX_ANSWER_BYTES` in [`core/storage/research_queue.py`](core/storage/research_queue.py) and [`mcp_server/_helpers.py`](mcp_server/_helpers.py). Why are they defined twice? Find the test that forces them to stay in sync (`test_limits_match_mcp_server`).
+- **Hook injection framing + escaping:** read [`mcp_server/check_queue.py`](mcp_server/check_queue.py). User-supplied `focus` text is injected as context before every Claude Code message. Find the two layers of defense: XML framing tags *and* `xml.sax.saxutils` escaping. What attack does the escaping stop that the framing alone does not? (Hint: `</research_request>` inside `focus`.)
+- **Auth middleware:** read `BearerTokenMiddleware` in `_helpers.py`. Why `hmac.compare_digest` instead of `==`? Why is the websocket scope rejected even though Streamable HTTP never uses websockets?
+- **Path traversal:** in `wealth_mcp.py`, find how the outbox filename is built from the ticker. Trace why `ticker="../../etc/cron.d/evil"` cannot escape the outbox directory.
+
+> **Threat model exercise:** The MCP server runs with full read/write access to the SQLite file, but the tools only touch `research_requests`/`research_answers`. Is that enforced technically or by convention? What would you change for defense in depth? (Compare CLAUDE.md → "Neue MCP-Tools: Checkliste".)
+
 ### What you should understand at the end
 
 - Fernet encryption protects data at rest, but key management is the hard part.
 - LLM apps introduce a new input vector: AI-generated content ingested as structured data.
 - Prompt injection via web search is real and the practical mitigation is blast-radius containment, not full prevention.
+- Every new integration layer (file ingest, MCP server, hooks) is a new attack surface — validate at *every* write path, not just the UI.
 - The app's security posture is appropriate for personal self-hosted use; it has known gaps for multi-user deployments.
 
 ---
@@ -560,6 +572,8 @@ MCP is **not** a REST API. Key differences:
 - Discovery: Claude Code reads tool schemas at startup, not at call time
 - No ports, no auth, no server to keep running — the process is started on demand
 
+(There is also an optional **Streamable HTTP** transport for sandboxed clients that cannot spawn local processes — `--transport streamable-http`, guarded by a Bearer token. In this project it exists but is unused: both Claude Code and Claude Desktop spawn the server via stdio.)
+
 > **Question:** If there is no HTTP server, how does Claude Code "call" a tool? Draw the communication flow: Claude Code process → stdio → Python script → tool function → stdout → Claude Code.
 
 ### Step 2 — Read the server code
@@ -573,7 +587,7 @@ Open [`mcp_server/wealth_mcp.py`](mcp_server/wealth_mcp.py). Find:
 
 Now open [`mcp_server/_helpers.py`](mcp_server/_helpers.py). This file has no MCP import.
 
-> **Key insight:** `_helpers.py` exists because `wealth_mcp.py` runs in Python 3.11 (`mcp_venv/`) but tests run in Python 3.9 (`.venv`). By extracting the logic into a pure-Python module, it becomes testable without the SDK dependency. This separation of concerns shows up in many tool integrations: the "what the tool does" is separate from "how it's called."
+> **Key insight:** `_helpers.py` exists because `wealth_mcp.py` runs in Python 3.11 (`mcp_venv/`) but tests run in Python 3.9 (`.venv`). By extracting the logic into a pure-Python module — YAML building, atomic file writes, input validation, even the ASGI auth middleware — it becomes testable without the SDK dependency. This separation of concerns shows up in many tool integrations: the "what the tool does" is separate from "how it's called."
 
 ### Step 3 — Trace the dual-venv architecture
 

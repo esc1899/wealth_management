@@ -21,6 +21,9 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Portfolio Management** — track 11 asset types: stocks, ETFs, funds, precious metals, crypto, bonds, fixed deposits, cash, real estate, and land
 - **Live Market Data** — automatic and on-demand prices via yfinance with EUR conversion
 - **P&L Analysis** — daily gains/losses, allocation charts, day performance
+- **Position Dashboard** — single-page aggregation per position: all agent verdicts, price chart, news digest, and research answers
+- **Performance Attribution** — monthly and yearly contribution per position (incl. estimated dividends), with auto-generated digest reports and macro context chips
+- **Dividend Calendar** — 12-month cash flow forecast, top payers, dividend aristocrat badges
 
 ### Wealth Snapshots (historical tracking)
 - **Wealth Timeline** — view portfolio value over time with asset class breakdown
@@ -33,6 +36,8 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Portfolio Chat** — natural language CRUD interface for your positions; data never leaves your machine
 - **Portfolio Story** — analyzes portfolio narrative alignment and position support; validates whether holdings match your investment thesis
 - **Watchlist Checker** — evaluates which watchlist positions fit into current portfolio structure and strategy, with optional configurable analysis skills
+- **Portfolio Robustness** — portfolio-level stress assessment across scenarios (local, full portfolio visibility)
+- **Tax Loss Harvesting Assistant** — identifies loss positions, computes tax impact, suggests watchlist replacements, warns about wash-sale windows
 
 ### Research (cloud, Claude API + web search)
 - **Research Chat** — deep-dive research per position using Claude with multi-turn conversation
@@ -47,13 +52,17 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 ### Claude Strategy (cloud, Claude Sonnet + web search)
 - **Structural Change Scanner** — identifies irreversible market shifts not yet priced by consensus; adds candidates directly to watchlist
 - **Consensus Gap Analysis** — measures the gap between your investment thesis and market consensus per position
+- **Capital Allocator Quality** — scores management's capital allocation track record (buybacks, M&A, dividends, incentives) for watchlist positions
+- **Devil's Advocate** — builds the strongest bear case against each watchlist position before you buy
+- **Sector Rotation Monitor** — tracks sector inflows/outflows and macro drivers, maps them against your portfolio exposure
 - All verdicts from all agents feed back into the portfolio context automatically
 
 ### System
 - **Skills Management** — dedicated page (System → Skills) with CRUD for reusable prompt templates; AI-assisted generation
 - **Skills Integration** — optional user-selectable skills for WatchlistChecker, PortfolioStory, and other agents
 - **Per-agent Model Selection** — choose Ollama and Claude models individually at runtime
-- **Scheduled Tasks** — run cloud agents automatically on a schedule (daily / weekly / monthly)
+- **Scheduled Tasks** — run cloud agents automatically on a schedule (daily / weekly / monthly / yearly); dedicated Scheduler page with per-job run history
+- **Batch API** — optional 50% cost reduction for scheduled jobs via the Anthropic Batch API (`USE_BATCH_API=true`)
 - **Cost & Token Tracking** — per-agent/skill/model token counts and USD costs; split by manual vs. scheduled runs; daily trend chart; non-destructive per-row reset
 - **Cost Alerts** — configurable daily and monthly USD spending limits; warnings in sidebar and Statistics page
 - **Monthly Cost Forecast** — projects scheduled-job costs forward based on actual average tokens per call
@@ -67,7 +76,7 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 This project is a hands-on introduction to building real AI-powered applications. The exercises are not toy examples — the end result is your own personal wealth management tool. That is the point: learning agent architecture by building something you actually want to use.
 
 **Structured learning paths → [LEARNING_JOURNEYS.md](LEARNING_JOURNEYS.md)**
-Five journeys for different backgrounds: AI User, Developer, Agent Architect, Security Engineer, Product Thinker. Each includes step-by-step exercises with specific files to read, things to run, and questions to discuss. Includes workshop format suggestions for half-day, full-day, and lunch-and-learn sessions.
+Eight journeys for different backgrounds: AI User, Developer, Agent Architect, Security Engineer, Product Thinker, Performance Explorer, Real Data Setup, and MCP Builder. Each includes step-by-step exercises with specific files to read, things to run, and questions to discuss, plus a self-paced training format with kick-off and bi-weekly Q&A sessions.
 
 ### Running a local LLM with Ollama
 Install Ollama and pull a model (e.g. `qwen3:8b`). Learn what running an LLM on your own hardware means: model size vs. RAM, context windows, cold start latency, and when a local model is good enough vs. when you need a cloud API.
@@ -88,7 +97,7 @@ Portfolio data (quantities, prices, notes, investment thesis) is encrypted at re
 The Skills system lets you save and edit prompt templates for each agent. Learn that a well-written system prompt dramatically changes LLM output quality, and that externalising prompts from code makes them easier to iterate on.
 
 ### Agent design trade-offs
-The app has eleven agents with different characteristics: stateful vs. stateless, local vs. cloud, one-shot vs. conversational, agentic loop vs. single call. Comparing Portfolio Chat, Portfolio Story, Research Chat, News Digest, Story Checker, Fundamental Analyzer, Watchlist Checker, Structural Change Scanner, and Consensus Gap Analysis shows the practical trade-offs: privacy, cost, speed, and capability.
+The app has eighteen agents with different characteristics: stateful vs. stateless, local vs. cloud, one-shot vs. conversational, agentic loop vs. single call. Comparing Portfolio Chat, Portfolio Story, Research Chat, News Digest, Story Checker, Fundamental Analyzer, Watchlist Checker, Structural Change Scanner, Consensus Gap Analysis, Capital Allocator, Devil's Advocate, Sector Rotation, Portfolio Robustness, and Tax Loss Harvesting shows the practical trade-offs: privacy, cost, speed, and capability.
 
 ### Agentic loops and tool use
 The Structural Change Scanner runs an agentic loop: Claude decides when to call `web_search` and when to call the custom `add_structural_candidate` tool to populate your watchlist — no user interaction needed. Compare this to the simpler Research Chat (single call) to understand the cost/quality trade-off.
@@ -109,9 +118,11 @@ The Statistics page gives an indication of what each agent call costs in USD, br
 - Python 3.9+, Streamlit
 - SQLite (encrypted via cryptography/Fernet)
 - Ollama (local LLM, e.g. qwen3:8b)
-- Anthropic Claude API (optional, for Research/News/Search)
-- yfinance for market data
-- APScheduler for automated price fetching
+- Anthropic Claude API (optional, for Research/News/Search — OpenRouter and OpenAI-compatible providers also supported)
+- yfinance for market data, optional Tavily web search
+- APScheduler for automated price fetching and scheduled agent runs
+- watchdog file watcher for the Research Inbox ingest pipeline
+- MCP server (Python 3.11, separate venv) connecting Claude Code / Claude Desktop as a research client
 
 ## Quick Start
 
@@ -154,10 +165,16 @@ Copy `.env.example` to `.env` and fill in your values.
 | `BASE_CURRENCY` | Optional | Currency for display: EUR (default), CHF, GBP, USD, JPY |
 | `COWORK_OUTBOX_PATH` | Optional | Path to Research Inbox outbox directory. Default: `~/wealth-research/outbox` |
 | `COWORK_WATCH_ENABLED` | Optional | Set to `false` to disable the file watcher (files scanned on startup only). Default: `true` |
+| `APP_PASSWORD` | Optional | Enables a login gate (works with Apple Passwords / Keychain autofill). Empty = no login |
+| `USE_BATCH_API` | Optional | Set to `true` to run scheduled jobs via the Anthropic Batch API (50% cheaper; Anthropic direct only) |
+| `MCP_BEARER_TOKEN` | Optional | Bearer token for the MCP server's HTTP transport (only needed for sandboxed clients; stdio needs no token) |
+| `MCP_HTTP_PORT` | Optional | Port for the MCP HTTP transport. Default: `7890` |
+| `BACKUP_REPO_PATH` | Optional | restic repository path on an external drive — enables the Backup section in Settings |
+| `RESTIC_PASSWORD_FILE` | Optional | Path to the restic password file used by the backup script |
 
 *`LLM_API_KEY` is required for Research Chat, News Digest, Investment Search, Story Checker, Fundamental Analyzer, Structural Change Scanner, Consensus Gap Analysis — unless `OPENAI_BASE_URL` is configured, in which case `OPENAI_API_KEY` is used instead.
 
-**Note on model choice:** Claude Sonnet (or better) is required for agents that use `web_search` (Structural Change Scanner, Consensus Gap Analysis). Claude Haiku works for Research Chat, News Digest, Story Checker, and Fundamental Analyzer.
+**Note on model choice:** Claude Sonnet (or better) is required for agents that use `web_search` (Structural Change Scanner, Consensus Gap Analysis, Fundamental Analyzer, Capital Allocator, Devil's Advocate, Sector Rotation). Claude Haiku works for Research Chat, News Digest, and Story Checker. Models are selectable per agent in Settings.
 
 ### Provider Switch
 
