@@ -40,7 +40,9 @@ from pathlib import Path
 from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
+from mcp_server._helpers import BearerTokenMiddleware as _BearerTokenMiddleware
 from mcp_server._helpers import build_research_md as _build_research_md
+from mcp_server._helpers import validate_answer_input as _validate_answer_input
 from mcp_server._helpers import write_md_to_outbox as _write_md_to_outbox_helper
 
 # ---------------------------------------------------------------------------
@@ -314,14 +316,13 @@ def submit_research_answer(
     For watchlist candidates use propose_position() or propose_multiple() instead.
 
     Args:
-        answer_markdown: The full answer in Markdown format
+        answer_markdown: The full answer in Markdown format (max 100 KB)
         request_id: Optional — link to a specific request from get_research_queue()
-        ticker: Optional ticker this answer relates to
+        ticker: Optional ticker this answer relates to (max 20 chars)
     """
-    if not answer_markdown.strip():
-        return "Error: answer_markdown must not be empty"
-    if len(answer_markdown.encode()) > 100_000:
-        return "Error: answer_markdown exceeds 100 KB limit"
+    error = _validate_answer_input(answer_markdown, ticker)
+    if error:
+        return error
 
     try:
         conn = _get_conn()
@@ -348,36 +349,7 @@ def submit_research_answer(
 
 
 # ---------------------------------------------------------------------------
-# FEAT-53: HTTP Bearer-Token Auth Middleware
-# ---------------------------------------------------------------------------
-
-class _BearerTokenMiddleware:
-    """ASGI middleware — rejects HTTP requests without the correct Bearer token."""
-
-    def __init__(self, app, token: str) -> None:
-        self._app = app
-        self._token = token
-
-    async def __call__(self, scope, receive, send) -> None:
-        if scope["type"] == "http":
-            headers = {k.lower(): v for k, v in scope.get("headers", [])}
-            auth = headers.get(b"authorization", b"").decode()
-            if not (auth.lower().startswith("bearer ") and auth[7:] == self._token):
-                await send({
-                    "type": "http.response.start",
-                    "status": 401,
-                    "headers": [
-                        (b"content-type", b"application/json"),
-                        (b"www-authenticate", b'Bearer realm="wealth-research"'),
-                    ],
-                })
-                await send({"type": "http.response.body", "body": b'{"error":"unauthorized"}'})
-                return
-        await self._app(scope, receive, send)
-
-
-# ---------------------------------------------------------------------------
-# Entry point
+# Entry point — HTTP auth (FEAT-53) via _helpers.BearerTokenMiddleware
 # ---------------------------------------------------------------------------
 
 def _main() -> None:

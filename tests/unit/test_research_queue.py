@@ -206,3 +206,40 @@ class TestDeleteAnswer:
     def test_delete_nonexistent_returns_false(self, repo):
         result = repo.delete_answer(99999)
         assert result is False
+
+
+# ---------------------------------------------------------------------------
+# SEC-5 (e): Limits am Repo-Schreibpfad — synchron mit MCP-Server
+# ---------------------------------------------------------------------------
+
+class TestInputLimits:
+    def test_request_ticker_20_chars_ok(self, repo):
+        req = repo.create_request("test", ticker="A" * 20)
+        assert req.ticker == "A" * 20
+
+    def test_request_ticker_21_chars_raises(self, repo):
+        with pytest.raises(ValueError, match="ticker"):
+            repo.create_request("test", ticker="A" * 21)
+
+    def test_answer_exactly_100kb_ok(self, repo):
+        answer = repo.submit_answer("x" * 100_000)
+        assert answer.id is not None
+
+    def test_answer_over_100kb_raises(self, repo):
+        with pytest.raises(ValueError, match="answer_md"):
+            repo.submit_answer("x" * 100_001)
+
+    def test_answer_empty_raises(self, repo):
+        with pytest.raises(ValueError, match="answer_md"):
+            repo.submit_answer("   ")
+
+    def test_answer_ticker_21_chars_raises(self, repo):
+        with pytest.raises(ValueError, match="ticker"):
+            repo.submit_answer("ok", ticker="A" * 21)
+
+    def test_limits_match_mcp_server(self):
+        """Beide Schreibpfade (Repo + MCP-Server) müssen dieselben Limits haben."""
+        from core.storage import research_queue as rq
+        from mcp_server import _helpers as mcp_helpers
+        assert rq.MAX_TICKER_LEN == mcp_helpers.MAX_TICKER_LEN
+        assert rq.MAX_ANSWER_BYTES == mcp_helpers.MAX_ANSWER_BYTES

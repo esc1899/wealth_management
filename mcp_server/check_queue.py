@@ -11,6 +11,12 @@ import os
 import sqlite3
 import sys
 from pathlib import Path
+from xml.sax.saxutils import escape
+
+
+def _attr(value: str) -> str:
+    """Escape a value for use inside a double-quoted XML attribute (SEC-5)."""
+    return escape(value, {'"': "&quot;"})
 
 _PROJECT_ROOT = Path(__file__).parent.parent
 
@@ -50,10 +56,11 @@ lines = [f"\n<wealth_management_research_queue count=\"{len(rows)}\">\n"]
 for row in rows:
     rid, rtype, ticker, focus, created_at = row
     ts = created_at[:10] if created_at else ""
-    ticker_attr = ticker or ""
+    # Escaping verhindert Tag-Breakout aus der SEC-4-Rahmung (SEC-5 d)
     lines.append(
-        f"  <research_request id=\"{rid}\" type=\"{rtype}\" ticker=\"{ticker_attr}\" date=\"{ts}\">"
-        f"{focus}"
+        f"  <research_request id=\"{rid}\" type=\"{_attr(rtype or '')}\" "
+        f"ticker=\"{_attr(ticker or '')}\" date=\"{ts}\">"
+        f"{escape(focus or '')}"
         f"</research_request>"
     )
 lines.append("\n</wealth_management_research_queue>")

@@ -22,6 +22,11 @@ VALID_REQUEST_TYPES = {"watchlist_candidate", "research_question", "analysis_dee
 VALID_SOURCES = {"manual", "agent", "batch"}
 VALID_STATUSES = {"open", "in_progress", "done"}
 
+# SEC-5 (e): Limits müssen mit mcp_server/_helpers.py synchron bleiben
+# (zweiter Schreibpfad via MCP-Server, Raw-SQL — Test erzwingt Gleichstand).
+MAX_TICKER_LEN = 20
+MAX_ANSWER_BYTES = 100_000
+
 
 @dataclass
 class ResearchRequest:
@@ -74,6 +79,8 @@ class ResearchQueueRepository:
             raise ValueError("focus exceeds 500 characters")
         if context and len(context) > 2000:
             raise ValueError("context exceeds 2000 characters")
+        if ticker and len(ticker) > MAX_TICKER_LEN:
+            raise ValueError(f"ticker exceeds {MAX_TICKER_LEN} characters")
         now = datetime.now(timezone.utc).isoformat()
         cur = self._conn.execute(
             """INSERT INTO research_requests
@@ -133,6 +140,12 @@ class ResearchQueueRepository:
         request_id: Optional[int] = None,
         ticker: Optional[str] = None,
     ) -> ResearchAnswer:
+        if not answer_md.strip():
+            raise ValueError("answer_md must not be empty")
+        if len(answer_md.encode()) > MAX_ANSWER_BYTES:
+            raise ValueError("answer_md exceeds 100 KB limit")
+        if ticker and len(ticker) > MAX_TICKER_LEN:
+            raise ValueError(f"ticker exceeds {MAX_TICKER_LEN} characters")
         now = datetime.now(timezone.utc).isoformat()
         cur = self._conn.execute(
             "INSERT INTO research_answers (request_id, ticker, answer_md, created_at) VALUES (?, ?, ?, ?)",
