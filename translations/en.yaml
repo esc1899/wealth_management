@@ -941,6 +941,26 @@ position_dashboard:
   select_position: "Select position"
   no_ticker: "No ticker set for this position — price history not available."
 
+research_request:
+  header: "🔬 Request research"
+  caption: "Creates an open research request that Claude picks up automatically on next start."
+  focus_label: "What should be investigated?"
+  focus_placeholder: "e.g. 'Analyze the competitive position vs. Samsung after Q3 earnings'"
+  type_label: "Type"
+  type_research_question: "Research question"
+  type_analysis_deepdive: "Deepen analysis"
+  type_watchlist_candidate: "Check watchlist candidate"
+  type_general: "General"
+  ticker_label: "Ticker (optional)"
+  ticker_placeholder: "e.g. NVDA"
+  context_label: "Context (optional)"
+  context_placeholder: "e.g. current verdicts, occasion"
+  submit_btn: "📋 Request research"
+  focus_required: "Please enter a question."
+  created_success: "✅ Research request created. Claude will see it on next start."
+  created_success_ticker: "✅ Research request for {ticker} created. Claude will see it on next start."
+  tab_new: "➕ New request"
+
 cowork:
   page_title: "Research Inbox"
   page_caption: "AI-generated research from the Cowork outbox folder. All entries are AI Research — not investment advice."

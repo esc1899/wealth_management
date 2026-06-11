@@ -939,6 +939,26 @@ position_dashboard:
   select_position: "Position wählen"
   no_ticker: "Kein Ticker für diese Position hinterlegt — Kursverlauf nicht verfügbar."
 
+research_request:
+  header: "🔬 Research anfordern"
+  caption: "Erstellt einen offenen Research-Request, den Claude beim nächsten Start automatisch sieht."
+  focus_label: "Was soll untersucht werden?"
+  focus_placeholder: "z.B. 'Analysiere die Wettbewerbsposition gegenüber Samsung nach den Q3-Zahlen'"
+  type_label: "Typ"
+  type_research_question: "Recherche-Frage"
+  type_analysis_deepdive: "Analyse vertiefen"
+  type_watchlist_candidate: "Watchlist-Kandidat prüfen"
+  type_general: "Allgemein"
+  ticker_label: "Ticker (optional)"
+  ticker_placeholder: "z.B. NVDA"
+  context_label: "Kontext (optional)"
+  context_placeholder: "z.B. aktuelle Verdicts, Anlass"
+  submit_btn: "📋 Research anfordern"
+  focus_required: "Bitte eine Frage eingeben."
+  created_success: "✅ Research-Request erstellt. Claude sieht ihn beim nächsten Start."
+  created_success_ticker: "✅ Research-Request für {ticker} erstellt. Claude sieht ihn beim nächsten Start."
+  tab_new: "➕ Neue Anfrage"
+
 cowork:
   page_title: "Research Inbox"
   page_caption: "KI-generiertes Research aus dem Cowork-Outbox-Ordner. Alle Einträge sind AI Research — keine Anlageberatung."

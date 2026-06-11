@@ -134,6 +134,7 @@ pg = st.navigation({
         st.Page("pages/fundamental_analyzer.py", title="Fundamental Analyzer",   icon=":material/calculate:"),
         st.Page("pages/consensus_gap.py",        title=t("nav.consensus_gap"),   icon=":material/target:"),
         st.Page("pages/cowork_inbox.py",         title="Research Inbox",         icon=":material/inbox:"),
+        st.Page("pages/research_answers.py",     title="Research Answers",       icon=":material/question_answer:"),
     ],
     t("nav.group_claude_strategy"): [
         st.Page("pages/tax_loss_harvesting.py", title=t("nav.tax_loss_harvesting"), icon=":material/trending_down:"),

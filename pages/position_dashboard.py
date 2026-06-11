@@ -18,6 +18,7 @@ _NEGATIVE_VERDICTS = frozenset({"gefährdet", "eingeholt", "überbewertet"})
 from core.currency import symbol
 from core.i18n import t
 from core.ui.markdown import llm_markdown
+from core.ui.research_request_form import render_research_request_form
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge
 from state import (
     get_market_agent,
@@ -27,6 +28,7 @@ from state import (
     get_storychecker_agent,
     get_fundamental_analyzer_agent,
     get_consensus_gap_agent,
+    get_research_queue_repo,
 )
 
 st.set_page_config(
@@ -351,3 +353,13 @@ if selected_position.ticker:
         st.info("Kein News Digest vorhanden.")
 else:
     st.info("Position hat kein Ticker — keine News verfügbar.")
+
+st.divider()
+
+# ------------------------------------------------------------------
+# Section 4: Research anfordern (FEAT-50)
+# ------------------------------------------------------------------
+
+render_research_request_form(
+    get_research_queue_repo(), ticker=selected_position.ticker
+)

@@ -132,6 +132,12 @@ class TestPageLoadability:
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 
+    def test_research_answers_page_loads(self):
+        """Research Answers page (incl. new-request tab) should load without exceptions."""
+        at = AppTest.from_file("pages/research_answers.py")
+        at.run()
+        assert not at.exception, f"Page threw exception: {at.exception}"
+
     # System Pages
     def test_statistics_page_loads(self):
         """Statistics page should load without exceptions."""
