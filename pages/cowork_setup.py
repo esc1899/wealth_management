@@ -1,5 +1,9 @@
 """
-Cowork Setup — workflow documentation and system prompt for the Cowork Research Inbox.
+Cowork Setup — workflow documentation for the Cowork Research pipeline.
+
+Documents both ingest paths (MCP server FEAT-49–53 as the recommended way,
+Claude Projects system prompt as fallback) plus the research queue back
+channel (FEAT-50–52).
 
 Intentionally German-only: the system prompt instructs the AI to produce German-language
 output, so translating this setup page would create a confusing mismatch.
@@ -156,7 +160,7 @@ disclaimer: >
 6. **Maximal 5 Watchlist-Kandidaten** pro Datei. Qualität vor Quantität.
 7. **Keine Duplikate** (gleicher Ticker + Exchange) innerhalb einer Datei.
 8. **Modell-Identifier**: Tatsächlichen Modell-Identifier verwenden
-   (z.B. `claude-opus-4-7`, `claude-sonnet-4-6`), nicht „Claude".
+   (z.B. `claude-opus-4-8`, `claude-sonnet-4-6`), nicht „Claude".
 9. **`watchlist_candidates: []`** wenn keine Kandidaten — Feld nie weglassen.
 10. **`suggested_action: add`** nur bei `conviction: high` — sparsam einsetzen.
 11. **Primary immer in `watchlist_candidates`**: Bei `type: stock_analysis` muss
@@ -248,8 +252,8 @@ Exportbeschränkungen (China ~15% Umsatz, bereits eingeschränkt).
 
 st.title(":material/settings_suggest: Cowork Setup")
 st.caption(
-    "Wie du die KI-Research-Pipeline einrichtest — "
-    "vom Claude Projects System Prompt bis zur App."
+    "Wie du Claude mit der App verbindest — MCP-Server (empfohlen) "
+    "oder Claude Projects System Prompt (Fallback)."
 )
 
 # ---------------------------------------------------------------------------
@@ -258,22 +262,108 @@ st.caption(
 
 st.subheader("Wie funktioniert das Cowork-System?")
 st.markdown("""
+Es gibt **zwei Wege**, wie Claude Research in die App liefert. Beide enden im
+selben Outbox-Ordner — Watcher und Importer sind identisch:
+
 ```
-Claude Projects (System Prompt unten einfügen)
-        │
-        │  schreibt .md-Datei mit YAML-Frontmatter
-        ▼
-~/wealth-research/outbox/
-        │
-        │  CoworkWatcher (OS file events, 500ms debounce)
-        │  CoworkImporter (Parser + SQLite)
-        ▼
-Research Inbox (diese App)
-        │
-        │  du prüfst Kandidaten und wählst per Checkbox aus
-        ▼
-Watchlist ✅
+Weg 1 (empfohlen)                          Weg 2 (Fallback)
+Claude Code / Claude Desktop (Co-Work)     claude.ai Web / Claude Projects
+        │                                          │
+        │  MCP-Tool propose_position()             │  System Prompt (unten) befolgen,
+        │  erzeugt die .md-Datei automatisch       │  .md-Datei selbst speichern
+        ▼                                          ▼
+                    ~/wealth-research/outbox/
+                              │
+                              │  CoworkWatcher (OS file events, 500ms debounce)
+                              │  CoworkImporter (Parser + SQLite)
+                              ▼
+                    Research Inbox (diese App)
+                              │
+                              │  du prüfst Kandidaten und wählst per Checkbox aus
+                              ▼
+                          Watchlist ✅
 ```
+
+Zusätzlich gibt es einen **Rückkanal** (App → Claude): Research-Anfragen aus der App
+landen in einer Queue, die Claude Code automatisch sieht (Details unten).
+""")
+
+# ---------------------------------------------------------------------------
+# Weg 1: MCP-Server (empfohlen)
+# ---------------------------------------------------------------------------
+
+st.subheader("Weg 1 — MCP-Server (empfohlen)")
+st.markdown("""
+Der lokale MCP-Server (`mcp_server/wealth_mcp.py`) gibt Claude Code und der
+Claude Desktop App (Co-Work) direkte Tools. Claude muss das Dateiformat nicht
+kennen — das Tool-Schema übernimmt Validierung und Dateierzeugung.
+
+| Tool | Richtung | Zweck |
+|---|---|---|
+| `propose_position(...)` | Claude → App | Einen Watchlist-Kandidaten vorschlagen (schreibt `.md` in den Outbox) |
+| `propose_multiple(...)` | Claude → App | Mehrere Kandidaten auf einmal |
+| `get_research_queue()` | App → Claude | Offene Research-Anfragen aus der App lesen |
+| `submit_research_answer(...)` | Claude → App | Antwort auf eine Anfrage (erscheint unter **Research Answers**) |
+| `complete_research_request(id)` | Claude → App | Anfrage als erledigt markieren |
+
+**Setup (einmalig):**
+
+**1. Python-3.11-venv für den MCP-Server** (das MCP-SDK braucht ≥ 3.10, die App läuft auf 3.9):
+```bash
+/opt/homebrew/bin/python3.11 -m venv mcp_venv
+mcp_venv/bin/pip install -r mcp_server/requirements.txt
+```
+
+**2. Claude Code** — Registrierung liegt versioniert im Repo (`.mcp.json`),
+es ist nichts weiter zu tun. Prüfen: neue Claude-Code-Session im Projektordner
+starten und `/mcp` eingeben → `wealth-research` muss mit 5 Tools erscheinen.
+
+**3. Claude Desktop App (Co-Work)** — in
+`~/Library/Application Support/Claude/claude_desktop_config.json` eintragen:
+""")
+st.code(
+    """{
+  "mcpServers": {
+    "wealth-research": {
+      "command": "/Users/erik/Projects/wealth_management/mcp_venv/bin/python",
+      "args": ["-m", "mcp_server.wealth_mcp"],
+      "env": { "PYTHONPATH": "/Users/erik/Projects/wealth_management" }
+    }
+  }
+}""",
+    language="json",
+)
+st.caption(
+    "Wichtig: `PYTHONPATH` statt `cwd` — die Desktop App ignoriert `cwd`. "
+    "Logs bei Problemen: `~/Library/Logs/Claude/mcp-server-wealth-research.log`. "
+    "Vollständige Doku: `mcp_server/README.md`."
+)
+
+# ---------------------------------------------------------------------------
+# Rückkanal: Research Queue
+# ---------------------------------------------------------------------------
+
+st.subheader("Rückkanal — Research Queue (App → Claude)")
+st.markdown("""
+Anfragen aus der App (Seite **Research anfordern**, Position Dashboard oder
+Research-Answers-Tab) landen als offene Requests in der Queue:
+
+```
+App: "Research anfordern"  ──►  research_requests (Queue)
+                                       │
+              UserPromptSubmit-Hook ◄──┤   Claude Code sieht offene Anfragen
+              (mcp_server/check_queue.py)  automatisch bei jeder Nachricht
+                                       │
+Claude bearbeitet sie:                 ▼
+  Watchlist-Kandidat  ──► propose_position()        ──► Research Inbox
+  Frage / Vertiefung  ──► submit_research_answer()  ──► Research Answers
+                          + complete_research_request(id)
+```
+
+Der Hook ist in `.claude/settings.json` dieses Projekts registriert — offene
+Anfragen erscheinen damit ohne Zutun als Kontext in jeder Claude-Code-Session.
+Antworten tauchen unter **Research Answers** auf (und beim passenden Ticker
+direkt im Position Dashboard).
 """)
 
 # ---------------------------------------------------------------------------
@@ -281,6 +371,10 @@ Watchlist ✅
 # ---------------------------------------------------------------------------
 
 st.subheader("Status-Logik")
+st.caption(
+    "Gilt für `.md`-Dateien im Outbox. Die MCP-Tools schreiben immer "
+    "`ready_for_import` — `draft`/`failed` sind nur im Fallback-Weg relevant."
+)
 col_a, col_b, col_c = st.columns(3)
 with col_a:
     st.success(
@@ -328,8 +422,12 @@ st.caption(
 # Setup-Schritte
 # ---------------------------------------------------------------------------
 
-st.subheader("Einrichtung (Schritt für Schritt)")
+st.subheader("Weg 2 — Claude Projects System Prompt (Fallback)")
 st.markdown(f"""
+Für Umgebungen **ohne MCP-Zugriff** (claude.ai Web, Claude Projects): Claude
+erzeugt die `.md`-Datei nach dem System Prompt unten, du speicherst sie selbst
+in den Outbox-Ordner.
+
 **Schritt 1 — Outbox-Verzeichnis anlegen**
 
 ```bash
@@ -343,10 +441,11 @@ mkdir -p {outbox_path}/.tmp
 (z.B. „Wealth Research"), und füge den System Prompt weiter unten auf dieser Seite
 in das Feld **Instructions / System Prompt** ein.
 
-**Schritt 3 — App starten und testen**
+**Schritt 3 — Datei speichern und testen**
 
-Der File Watcher erkennt neue `.md`-Dateien automatisch sobald sie im Outbox-Ordner
-landen. Dateien mit `status: ready_for_import` erscheinen sofort im Research Inbox.
+Die `.md`-Ausgabe in den Outbox-Ordner speichern. Der File Watcher erkennt neue
+Dateien automatisch; Dateien mit `status: ready_for_import` erscheinen sofort
+im Research Inbox.
 
 **Schritt 4 (optional) — Outbox-Pfad anpassen**
 
@@ -365,8 +464,9 @@ st.divider()
 # System Prompt
 # ---------------------------------------------------------------------------
 
-st.subheader("System Prompt — zum Kopieren in Claude Projects")
+st.subheader("System Prompt — zum Kopieren in Claude Projects (nur Weg 2)")
 st.info(
+    "Nur für den Fallback-Weg nötig — die MCP-Tools erzeugen das Format selbst. "
     "Kopiere den gesamten Text in das Feld \"Instructions\" deines Claude-Projekts. "
     "Der Prompt enthält dein Investmentprofil, das Ausgabeformat und alle Feldregeln.",
     icon=":material/content_copy:",
