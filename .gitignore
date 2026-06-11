@@ -44,3 +44,4 @@ CHANGELOG.md
 .notes
 core/llm/TOKEN_COST_REVIEW.md
 core/llm/AGENT_EXPECTATIONS.md
+mcp_venv/

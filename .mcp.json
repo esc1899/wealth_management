@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "wealth-research": {
+      "command": "/Users/erik/Projects/wealth_management/mcp_venv/bin/python",
+      "args": ["-m", "mcp_server.wealth_mcp"],
+      "cwd": "/Users/erik/Projects/wealth_management"
+    }
+  }
+}

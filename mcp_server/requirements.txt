@@ -1,0 +1,6 @@
+# MCP Server dependencies (Python >= 3.10 required)
+# Setup: /opt/homebrew/bin/python3.11 -m venv mcp_venv
+#        mcp_venv/bin/pip install -r mcp_server/requirements.txt
+mcp[cli]>=1.0.0
+pyyaml>=6.0,<7.0.0
+uvicorn>=0.20.0   # required for --transport streamable-http (FEAT-53)

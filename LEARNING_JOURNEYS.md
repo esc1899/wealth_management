@@ -21,6 +21,7 @@
 | [E — The Product Thinker](#journey-e--the-product-thinker) | PM / analyst / anyone evaluating AI tools | 30–45 min | Demo Mode only |
 | [F — The Performance Explorer](#journey-f--the-performance-explorer) | Anyone who wants to understand cost and quality levers | 90–120 min | Python, personal API key |
 | [G — Real Data Setup](#journey-g--real-data-setup) | Anyone ready to use the app for real — on personal hardware | open-ended | Personal machine, ⚠️ read warning first |
+| [H — The MCP Builder](#journey-h--the-mcp-builder) | Developer who wants to understand MCP at the protocol level | 90–120 min | Python, Claude Code (optional for Steps 1–3) |
 
 Pick one journey. They overlap by design — people working through different paths will have different things to share at the end.
 
@@ -539,6 +540,148 @@ Review the privacy table in the README ("Agent design trade-offs" section). For 
 - Token costs are real spending — observability and alerts are not optional.
 - The privacy boundary between local and cloud agents exists for a reason; you will feel it when the data is yours.
 - A personal self-hosted setup on your own hardware, with your own API key, is meaningfully more private than any corporate AI tool.
+
+---
+
+## Journey H — The MCP Builder
+
+**Who this is for:** You want to understand how Claude Code integrates with external tools at the protocol level — not just "Claude can use tools" but how the MCP plumbing works, what the design decisions were, and how to add your own tools.
+
+**Goal:** Build a mental model of MCP as an integration pattern. Understand the transport, registration, dual-venv separation, and the bidirectional communication pattern this project uses.
+
+**Prerequisites:** Python basics, familiarity with JSON. No Claude Code usage required until Step 4.
+
+### Step 1 — Understand what MCP is (and isn't)
+
+Read [`mcp_server/README.md`](mcp_server/README.md) — the setup guide and conceptual overview.
+
+MCP is **not** a REST API. Key differences:
+- Transport: JSON-RPC 2.0 over **stdio** (not HTTP)
+- Discovery: Claude Code reads tool schemas at startup, not at call time
+- No ports, no auth, no server to keep running — the process is started on demand
+
+> **Question:** If there is no HTTP server, how does Claude Code "call" a tool? Draw the communication flow: Claude Code process → stdio → Python script → tool function → stdout → Claude Code.
+
+### Step 2 — Read the server code
+
+Open [`mcp_server/wealth_mcp.py`](mcp_server/wealth_mcp.py). Find:
+
+1. How are tools defined? (Look for `@mcp.tool()` decorators)
+2. What does the docstring do? (Hint: FastMCP uses it as the tool description shown to Claude)
+3. How does the server load `.env` without `python-dotenv`? Why avoid it?
+4. Where is `mcp.run()` called and what does it block on?
+
+Now open [`mcp_server/_helpers.py`](mcp_server/_helpers.py). This file has no MCP import.
+
+> **Key insight:** `_helpers.py` exists because `wealth_mcp.py` runs in Python 3.11 (`mcp_venv/`) but tests run in Python 3.9 (`.venv`). By extracting the logic into a pure-Python module, it becomes testable without the SDK dependency. This separation of concerns shows up in many tool integrations: the "what the tool does" is separate from "how it's called."
+
+### Step 3 — Trace the dual-venv architecture
+
+```bash
+ls -la .venv/pyvenv.cfg mcp_venv/pyvenv.cfg   # Compare Python versions
+cat mcp_server/requirements.txt               # Only mcp[cli] + pyyaml
+```
+
+Open [`tests/unit/test_mcp_tools.py`](tests/unit/test_mcp_tools.py). Note the imports:
+```python
+from mcp_server._helpers import build_research_md, write_md_to_outbox
+```
+— importing from `mcp_server` but **not** from `mcp_server.wealth_mcp`. The test doesn't import FastMCP at all.
+
+Run the tests:
+```bash
+pytest tests/unit/test_mcp_tools.py -v
+```
+
+> **Exercise:** Try `from mcp_server.wealth_mcp import propose_position` in the `.venv` Python. What error do you get? This is the version incompatibility that drives the dual-venv design.
+
+### Step 4 — Understand registration
+
+Read [`.mcp.json`](.mcp.json) and the `enabledMcpjsonServers` entry in [`.claude/settings.json`](.claude/settings.json).
+
+Two separate concerns:
+- **`.mcp.json`** — *where* is the server and *how* to start it (command + args + cwd)
+- **`enabledMcpjsonServers`** — *approval*: Claude Code won't auto-start unknown servers without user consent
+
+> **Question:** Why is `.mcp.json` a project file (checked into git) while `enabledMcpjsonServers` lives in `.claude/settings.json` (potentially local/personal)? What would break if you committed the approval into the project file?
+
+If you have Claude Code: start a new session in this project. Claude Code should connect to `wealth-research` automatically. Type `/mcp` to see the server status and available tools.
+
+### Step 5 — Trace the Research Queue (bidirectional communication)
+
+The Research Queue uses two patterns for two directions. Read `ARCHITECTURE.md` → "Bidirektionale Kommunikation" section.
+
+**Direction 1 — App → Claude (hook injection):**
+
+Open [`mcp_server/check_queue.py`](mcp_server/check_queue.py). Find:
+- How it reads `.env` and opens the DB
+- The `additionalContext` output format
+- Why it exits with code 0 on any error (hooks that error are visible to users — silent failure is better for a polling helper)
+
+Simulate what Claude Code sees:
+```bash
+# Create a test request first (requires running app or direct sqlite3)
+echo '{}' | /usr/bin/python3 mcp_server/check_queue.py
+# Empty queue → silence (exit 0, no output)
+
+# After adding a request via the Position Dashboard:
+echo '{}' | /usr/bin/python3 mcp_server/check_queue.py
+# → JSON with additionalContext showing the request
+```
+
+**Direction 2 — Claude → App (tool call):**
+
+Trace `submit_research_answer()` in `wealth_mcp.py` → `research_answers` table → `pages/research_answers.py`.
+
+> **Discussion:** This bidirectional pattern — hook for push notification, tool for write-back — avoids polling on the Claude side and avoids a webhook server on the app side. What are the trade-offs vs. a REST API + webhook approach?
+
+### Step 6 — Trace the Cowork proposal flow end-to-end
+
+Pick `propose_position()` in `wealth_mcp.py`. Trace the full path:
+
+1. MCP tool validates conviction + suggested_action
+2. Calls `_build_research_md()` in `_helpers.py` → YAML frontmatter `.md` string
+3. Calls `_write_md_to_outbox()` → atomic tmp/ → rename write
+4. App's `watchdog` file watcher fires `on_created` event
+5. `core/cowork/parser.py` parses YAML frontmatter
+6. Position Dashboard shows candidate for human review
+7. User clicks "Import" → position added to watchlist
+
+Find the test that covers steps 2–3: `tests/unit/test_mcp_tools.py`. Find the parser in `core/cowork/parser.py` — note that the same parser the file watcher uses is also used in the test to verify the generated `.md` is valid.
+
+> **Key design principle:** The MCP tool reuses the existing Cowork infrastructure unchanged. Adding the MCP integration required zero changes to the core app's import pipeline. New integration layers should not require changes to existing layers.
+
+### Step 7 — Add your own tool (optional exercise)
+
+Add a simple read-only tool to `wealth_mcp.py`:
+
+```python
+@mcp.tool()
+def get_portfolio_tickers() -> str:
+    """List all tickers currently in the portfolio (public data only)."""
+    try:
+        conn = _get_conn()
+        rows = conn.execute(
+            "SELECT DISTINCT ticker FROM positions WHERE ticker IS NOT NULL AND watchlist_only = 0"
+        ).fetchall()
+        conn.close()
+    except Exception as exc:
+        return f"Error: {exc}"
+    tickers = [r[0] for r in rows if r[0]]
+    return ", ".join(sorted(tickers)) or "No tickers found."
+```
+
+Install in `mcp_venv` (already set up) and restart Claude Code. Type `/mcp` — your new tool should appear.
+
+> **Note:** This tool reads from the DB directly. Is it safe for a cloud app? In this case: ticker symbols are already public data, the server runs locally, and the DB is only accessible on your machine. The privacy boundary in `CLAUDE.md` applies to which *agents* get which data — local MCP tools follow the same rule.
+
+### What you should understand at the end
+
+- MCP = JSON-RPC 2.0 over stdio. No HTTP, no auth, no persistent server — Claude Code spawns the process on demand.
+- Tool definitions are Python functions with docstrings. FastMCP handles the JSON-RPC plumbing.
+- Version incompatibility is a real constraint: isolate SDK-specific code and extract testable helpers into pure-Python modules.
+- `UserPromptSubmit` hooks inject context before every user message — useful for ambient awareness (queue monitoring, status checks) without requiring the user to ask.
+- Bidirectional communication patterns (hook for push, tool for write-back) work well for async notification without a running server.
 
 ---
 

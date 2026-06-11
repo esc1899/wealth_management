@@ -177,5 +177,19 @@
       "/Users/erik/Projects/wealth_management/htmlcov",
       "/private/tmp"
     ]
+  },
+  "enabledMcpjsonServers": ["wealth-research"],
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 /Users/erik/Projects/wealth_management/mcp_server/check_queue.py"
+          }
+        ]
+      }
+    ]
   }
 }

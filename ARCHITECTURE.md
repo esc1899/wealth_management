@@ -612,4 +612,170 @@ streamlit run app.py
 
 ---
 
-*Last updated: 2026-04-19*
+---
+
+## MCP Server Architecture (FEAT-49/50/51/52)
+
+### Was ist MCP?
+
+Das **Model Context Protocol** (MCP) ist ein offenes Protokoll von Anthropic, das LLM-Hosts (z.B. Claude Code, Claude Desktop) mit externen Tool-Servern verbindet. Das Protokoll ist JSON-RPC 2.0 über stdio — kein HTTP-Server, kein Port, kein Auth-Setup.
+
+```
+Claude Code  ──stdio──►  MCP Server (wealth_mcp.py)
+             ◄──stdio──   FastMCP SDK → Tool-Funktionen (Python)
+```
+
+Der Server deklariert Tools als normale Python-Funktionen mit `@mcp.tool()`. Claude Code entdeckt sie beim Start, zeigt sie als verfügbare Tools an, und ruft sie wie jeden anderen Tool-Call auf.
+
+### Duale Venv-Architektur
+
+Das MCP SDK erfordert Python ≥ 3.10, die Haupt-App läuft auf Python 3.9.6. Lösung: zwei separate virtuelle Umgebungen.
+
+```
+.venv/        (Python 3.9.6)  — Haupt-App, alle Tests, alle Imports
+mcp_venv/     (Python 3.11.15) — nur mcp_server/wealth_mcp.py
+```
+
+Die Trennung ist sauber: `mcp_server/_helpers.py` enthält die testbare Logik (kein MCP-Import), importierbar aus `.venv`. `wealth_mcp.py` importiert `_helpers` + FastMCP und läuft nur in `mcp_venv`.
+
+```
+mcp_server/
+├── _helpers.py       # Pure Python 3.9 — testbar aus .venv
+├── wealth_mcp.py     # FastMCP server — läuft in mcp_venv
+├── check_queue.py    # Hook-Script — /usr/bin/python3
+├── requirements.txt  # mcp[cli]>=1.0.0, pyyaml>=6.0
+└── __init__.py
+```
+
+### Registrierung und Auto-Approval
+
+```json
+// .mcp.json (project root — lädt bei Claude Code Startup)
+{
+  "mcpServers": {
+    "wealth-research": {
+      "command": "/Users/erik/Projects/wealth_management/mcp_venv/bin/python",
+      "args": ["-m", "mcp_server.wealth_mcp"],
+      "cwd": "/Users/erik/Projects/wealth_management"
+    }
+  }
+}
+```
+
+```json
+// .claude/settings.json
+{
+  "enabledMcpjsonServers": ["wealth-research"]
+}
+```
+
+`enabledMcpjsonServers` verhindert den manuellen Genehmigungsprompt bei jedem Session-Start.
+
+### Tool-Übersicht
+
+| Tool | Richtung | Was es tut |
+|---|---|---|
+| `propose_position()` | Claude → App | Schreibt `.md` in Cowork-Outbox, Filewatcher importiert |
+| `propose_multiple()` | Claude → App | Batch-Version, mehrere Kandidaten in einer Datei |
+| `get_research_queue()` | Claude ← App | Liest offene Research-Anfragen aus `research_requests` |
+| `complete_research_request(id)` | Claude → App | Markiert Anfrage als erledigt |
+| `submit_research_answer(md, ...)` | Claude → App | Schreibt Antwort in `research_answers`, markiert Anfrage done |
+
+### Bidirektionale Kommunikation (FEAT-50/51)
+
+Die Research Queue implementiert zwei komplementäre Kanäle:
+
+```
+App → Claude:  research_requests-Tabelle  +  UserPromptSubmit-Hook
+Claude → App:  research_answers-Tabelle   +  submit_research_answer()-Tool
+```
+
+**App → Claude (Anfragen stellen):**
+1. User füllt Formular auf der Position-Dashboard-Seite aus
+2. `ResearchQueueRepository.create_request()` schreibt Zeile in DB
+3. `mcp_server/check_queue.py` läuft vor jeder Claude-Code-Nachricht (Hook)
+4. Hook liest offene Anfragen und injiziert sie als `additionalContext`
+5. Claude sieht die Anfragen am Anfang jeder Session/Nachricht
+
+**Claude → App (Anfragen beantworten):**
+1. Claude ruft `get_research_queue()` für Details auf
+2. Beantwortet via `submit_research_answer(markdown, request_id)` 
+3. Antwort erscheint in `pages/research_answers.py` unter "Antworten"
+4. Anfrage wird automatisch als `done` markiert
+
+```mermaid
+sequenceDiagram
+    participant U as User (App)
+    participant DB as SQLite
+    participant H as check_queue.py (Hook)
+    participant CC as Claude Code
+    participant T as wealth_mcp.py (MCP Tools)
+
+    U->>DB: create_request("Analysiere Q3-Zahlen AAPL")
+    Note over H: Bei nächster CC-Nachricht
+    CC->>H: UserPromptSubmit fired
+    H->>DB: SELECT * FROM research_requests WHERE status='open'
+    H-->>CC: additionalContext mit offenen Anfragen
+    CC->>T: get_research_queue() [optional — für Details]
+    T->>DB: SELECT ...
+    T-->>CC: Liste mit Details
+    CC->>T: submit_research_answer("## AAPL Q3...", request_id=1)
+    T->>DB: INSERT research_answers + UPDATE status='done'
+    U->>DB: list_answers(ticker="AAPL")
+    DB-->>U: Antwort erscheint in Research Answers Seite
+```
+
+### UserPromptSubmit Hook
+
+```python
+# mcp_server/check_queue.py — Ausgabeformat
+output = {
+    "hookSpecificOutput": {
+        "hookEventName": "UserPromptSubmit",
+        "additionalContext": "📋 2 offene Anfragen...",
+    }
+}
+print(json.dumps(output))
+```
+
+`additionalContext` wird vor der Benutzernachricht in den Kontext injiziert — Claude sieht die Anfragen automatisch, ohne dass der User etwas tun muss.
+
+### Cowork-Outbox Pattern (FEAT-49)
+
+`propose_position()` schreibt `.md`-Dateien atomar in den Outbox-Ordner:
+
+```python
+# Atomic write: tmp/ → rename (verhindert partiellen File-Read durch Watcher)
+tmp_path.write_text(content, encoding="utf-8")
+tmp_path.rename(final_path)  # atomic on same filesystem
+```
+
+Der existierende Watchdog-Filewatcher in der App erkennt neue Dateien und importiert sie als Watchlist-Kandidaten für Human-Review — ohne Code-Änderungen an der App.
+
+### Neue Storage-Tabellen
+
+```sql
+CREATE TABLE research_requests (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_type TEXT NOT NULL DEFAULT 'research_question',  -- watchlist_candidate | research_question | analysis_deepdive | general
+    ticker       TEXT,
+    focus        TEXT NOT NULL,   -- Die eigentliche Frage/Anfrage
+    context      TEXT,            -- Zusätzlicher Kontext (optional)
+    source       TEXT NOT NULL DEFAULT 'manual',  -- manual | agent | batch
+    status       TEXT NOT NULL DEFAULT 'open',    -- open | in_progress | done
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE research_answers (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id INTEGER REFERENCES research_requests(id),
+    ticker     TEXT,
+    answer_md  TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+---
+
+*Last updated: 2026-06-09*

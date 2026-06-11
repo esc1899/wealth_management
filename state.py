@@ -36,6 +36,7 @@ from state_repos import (
     get_monthly_digest_repo,
     get_yearly_digest_repo,
     get_sector_rotation_repo,
+    get_research_queue_repo,
 )
 
 # Agents
@@ -99,6 +100,7 @@ __all__ = [
     "get_monthly_digest_repo",
     "get_yearly_digest_repo",
     "get_sector_rotation_repo",
+    "get_research_queue_repo",
     "get_portfolio_agent",
     "get_market_agent",
     "get_research_agent",

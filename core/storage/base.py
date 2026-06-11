@@ -652,6 +652,29 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         created_at     TEXT NOT NULL DEFAULT (datetime('now'))
     )""")
 
+    conn.execute("""CREATE TABLE IF NOT EXISTS research_requests (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        request_type TEXT NOT NULL DEFAULT 'research_question',
+        ticker       TEXT,
+        focus        TEXT NOT NULL,
+        context      TEXT,
+        source       TEXT NOT NULL DEFAULT 'manual',
+        status       TEXT NOT NULL DEFAULT 'open',
+        created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    )""")
+
+    conn.execute("""CREATE INDEX IF NOT EXISTS idx_research_requests_status
+        ON research_requests(status)""")
+
+    conn.execute("""CREATE TABLE IF NOT EXISTS research_answers (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        request_id INTEGER REFERENCES research_requests(id),
+        ticker     TEXT,
+        answer_md  TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )""")
+
     conn.commit()
 
 

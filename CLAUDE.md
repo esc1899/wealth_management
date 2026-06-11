@@ -33,6 +33,9 @@ launchctl load ~/Library/LaunchAgents/com.erik.wealth-management.plist
 
 # Scheduled job debugging — real tracebacks are here, not in the UI
 tail -100 /tmp/wm_streamlit.log | grep -A5 "Error\|Exception\|Traceback"
+
+# MCP in Claude Desktop App (Co-Work) — config: ~/Library/Application Support/Claude/claude_desktop_config.json
+# Claude Desktop App logs (MCP errors): ~/Library/Logs/Claude/mcp-server-wealth-research.log
 ```
 
 ---
@@ -96,7 +99,7 @@ DEMO_MODE=true                # optional — switches DB to data/demo.db
 - Bei `st.markdown()`: kein `unsafe_allow_html=True` ohne explizite Prüfung; keine f-Strings mit User-Daten
 - Alle Abhängigkeiten (requirements.txt) auf bekannte CVEs prüfen bevor sie hinzukommen
 
-**Bisherige Security Reviews:** 2026-04-24 (Red Team, alle HIGH/MEDIUM fixes), 2026-05-09 (Cowork ingest: URL-Injection, Markdown-Injection, Dateigrößen-Limit), 2026-05-11 (FEAT-34–39 + Sonnet-Switch: SQL-Injection, Privacy-Boundary, LLM-Prompt-Injection, XSS — alle clean)
+**Bisherige Security Reviews:** 2026-04-24 (Red Team, alle HIGH/MEDIUM fixes), 2026-05-09 (Cowork ingest: URL-Injection, Markdown-Injection, Dateigrößen-Limit), 2026-05-11 (FEAT-34–39 + Sonnet-Switch: SQL-Injection, Privacy-Boundary, LLM-Prompt-Injection, XSS — alle clean), 2026-06-09 (SEC-4, MCP-Tools FEAT-50/51/52: Path-Traversal in Outbox-Filename, Prompt-Injection im Hook, fehlende Längenlimits — alle gefixt)
 
 **LLM Prompt-Injection via Web Search**: Sonnet ist fähiger als Haiku und folgt komplexeren Anweisungen. Malicious web pages, die von SearchAgent/NewsAgent/StructuralChangeAgent indexiert werden, könnten versuchen, Instruktionen in die LLM-Antwort zu injizieren. Mitigation: Cloud-Agents haben keinen Schreibzugriff auf die DB (außer news_repo/analyses_repo) und sehen keine Private-Daten. Risiko ist begrenzt, aber bei neuen Web-Search-Agents auf diesen Vektor prüfen.
 
@@ -151,6 +154,15 @@ Vor dem ersten Commit prüfen:
 - [ ] `state.py` Factory-Funktion ergänzt?
 - [ ] Verdict-Config in `core/ui/verdicts.py` → `VERDICT_CONFIGS` dict ergänzt?
 - [ ] Tests: Unit + Integration + Page Smoke?
+
+### 6. Neue MCP-Tools: Checkliste
+
+Vor dem ersten Commit prüfen (SEC-4):
+- [ ] Tool greift **nur** auf `research_requests` und `research_answers` zu — keine anderen Tabellen
+- [ ] Kein Zugriff auf `positions`, `position_analyses`, `storychecker_*`, `fundamental_*` oder andere Agent-Tabellen
+- [ ] String-Inputs haben explizite Längenbegrenzung (focus ≤ 500, context ≤ 2000, answer_md ≤ 100 KB)
+- [ ] Kein User-Input landet ohne Rahmung als `additionalContext` im Hook (Self-Injection-Risiko)
+- [ ] Tool-Docstring beschreibt klar was in die DB geschrieben wird (sichtbar für User in `/mcp`)
 
 ---
 

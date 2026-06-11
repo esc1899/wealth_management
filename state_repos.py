@@ -25,6 +25,7 @@ from core.storage.dividend_snapshots import DividendSnapshotRepository
 from core.storage.cowork import CoworkRepository
 from core.storage.monthly_digest import MonthlyDigestRepository
 from core.storage.yearly_digest import YearlyDigestRepository
+from core.storage.research_queue import ResearchQueueRepository
 
 
 @st.cache_resource
@@ -169,3 +170,8 @@ def get_yearly_digest_repo() -> YearlyDigestRepository:
 def get_sector_rotation_repo():
     from core.storage.sector_rotation import SectorRotationRepository
     return SectorRotationRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_research_queue_repo() -> ResearchQueueRepository:
+    return ResearchQueueRepository(get_db_connection())

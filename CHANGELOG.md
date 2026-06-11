@@ -8,6 +8,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### FEAT-49/50/51/52: MCP Server + Research Queue — 2026-06-09
+
+**Wealth Management MCP Server (`mcp_server/`)**
+
+Ein eigenständiger MCP-Server der Claude Code als First-Class-Client in die App integriert. Claude Code kann direkt in die Wealth Management App schreiben und lesen, ohne die App-UI zu benutzen.
+
+**Architektur:**
+- `mcp_server/wealth_mcp.py` — MCP-Server (Python 3.11, läuft in separatem `mcp_venv/`)
+- `mcp_server/_helpers.py` — Reine Hilfsfunktionen ohne MCP-Import (Python 3.9 kompatibel, testbar aus `.venv`)
+- `mcp_server/check_queue.py` — `UserPromptSubmit`-Hook-Script
+- `.mcp.json` — Projektweite MCP-Server-Registrierung für Claude Code
+- `enabledMcpjsonServers: ["wealth-research"]` in `.claude/settings.json` — Auto-Approval
+
+**FEAT-49 — Cowork Ingest Tools (Claude → App)**
+- `propose_position(ticker, name, exchange, rationale, conviction, suggested_action, [isin, category, story, price, sources])` — Schlägt eine Watchlist-Kandidatur vor; schreibt `.md` atomar in den Cowork-Outbox-Ordner; App-Filewatcher importiert binnen Sekunden
+- `propose_multiple(candidates[], [body, sources])` — Batch-Vorschlag mehrerer Kandidaten in einer `.md`-Datei
+
+**FEAT-50 — Research Queue (App → Claude)**
+- Neue DB-Tabellen: `research_requests` (Status: open/done) + `research_answers`
+- `core/storage/research_queue.py` — `ResearchQueueRepository` mit vollem CRUD
+- MCP-Tools: `get_research_queue()`, `complete_research_request(id)`, `submit_research_answer(markdown, [request_id, ticker])`
+- Position Dashboard: neues "Research anfordern"-Formular (Typ: watchlist_candidate / research_question / analysis_deepdive / general)
+
+**FEAT-51 — UserPromptSubmit Hook**
+- `mcp_server/check_queue.py` läuft vor jeder Claude-Code-Nachricht
+- Schweigt wenn Queue leer; injiziert offene Anfragen als `additionalContext` wenn welche offen sind
+- Registriert als `UserPromptSubmit`-Hook in `.claude/settings.json`
+
+**FEAT-52 — Research Answers Page**
+- Neue Seite `pages/research_answers.py` unter Research-Navigation
+- Tab "Antworten": Ticker-Filter, aufklappbare Markdown-Antworten, Löschen-Button
+- Tab "Offene Anfragen": Queue-Management mit "Erledigt"- und Löschen-Buttons, erledigte Anfragen als Expander
+
+**Tests:** 23 neue Tests für `ResearchQueueRepository` + 8 für MCP-Helpers = 915 gesamt
+
 ### FEAT-41: Portfolio Checker Status Matrix + Navigation Refactoring — 2026-05-16
 
 **Status Matrix im Portfolio Checker (analog Watchlist Checker)**

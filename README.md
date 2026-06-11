@@ -41,6 +41,8 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Story Checker** — validates investment theses against current news and fundamentals (Claude API)
 - **Fundamental Analyzer** — in-depth fundamental analysis of individual positions with multi-turn chat (cloud, Claude)
 - **Research Inbox** — ingest AI-generated research from an external Claude Project; file watcher detects new `.md` files in `~/wealth-research/outbox/`, parses YAML frontmatter, and presents watchlist candidates for one-click review and import
+- **Research Queue** — bidirectional channel between app and Claude Code: the app posts open research questions; Claude Code answers via `submit_research_answer()` and the answers appear in a dedicated page
+- **Research Answers** — shows all answers submitted by Claude Code, filterable by ticker; includes queue management (mark done, delete)
 
 ### Claude Strategy (cloud, Claude Sonnet + web search)
 - **Structural Change Scanner** — identifies irreversible market shifts not yet priced by consensus; adds candidates directly to watchlist
@@ -93,6 +95,9 @@ The Structural Change Scanner runs an agentic loop: Claude decides when to call 
 
 ### File-based AI ingest pipeline (Research Inbox)
 The Research Inbox shows a different integration pattern: instead of calling an AI API from inside the app, you run research in an external Claude Project and the app ingests the results as structured `.md` files. Learn how to define a strict YAML contract that an LLM must follow, how to watch a filesystem directory for changes using `watchdog`, how to parse and validate AI output with confidence (rejecting malformed files to `.invalid/`), and how to design a human-in-the-loop review step before AI suggestions reach your data. The Security section of the inbox code also demonstrates input sanitization for an AI-generated file source: URL protocol validation, markdown injection prevention, and file size limits.
+
+### MCP Server — Claude Code as a first-class client
+The `mcp_server/` directory implements a [Model Context Protocol](https://modelcontextprotocol.io/) server that turns Claude Code into a direct write/read client of the app. Learn what MCP is and how it differs from the REST/webhook patterns you already know: tools are defined as Python functions, the transport is JSON-RPC 2.0 over stdio, and Claude Code discovers and calls them automatically. The `propose_position()` tool writes structured `.md` files that the existing file watcher imports — this shows how new integration layers can be added without changing the core app. The Research Queue pattern shows bidirectional communication: the app posts questions in a SQLite table, a `UserPromptSubmit` hook injects them as context before every Claude Code message, and the `submit_research_answer()` MCP tool writes answers back. The project also demonstrates why you sometimes need a second virtual environment (Python version incompatibility) and how to isolate testable helper logic from SDK-specific code.
 
 ### Tracking costs and controlling spending
 The Statistics page gives an indication of what each agent call costs in USD, broken down by agent, skill, and model. Configurable daily and monthly alert thresholds warn you before spending gets out of hand. The monthly forecast extrapolates from actual average token usage of your scheduled jobs — so you see the projected bill before it arrives. Learn what makes one agent 10× more expensive than another (hint: agentic loops with web search vs. a single-shot call), and how to use this to choose the right model for each task.
