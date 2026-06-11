@@ -484,29 +484,29 @@ See **BACKLOG.md § Technical Debt** for full inventory.
 
 ---
 
-## Recent Changes (Mai–Juni 2026)
+## Recent Changes (May–June 2026)
 
-✅ **MCP Research Loop komplett** (FEAT-49–55, 2026-06-09 bis 2026-06-11)
-   - MCP-Server (stdio + optional HTTP), Research Queue, UserPromptSubmit-Hook
-   - Research Answers UI, globales Request-Formular, Position-Dashboard-Integration
+✅ **MCP Research Loop complete** (FEAT-49–55, 2026-06-09 through 2026-06-11)
+   - MCP server (stdio + optional HTTP), research queue, UserPromptSubmit hook
+   - Research Answers UI, global request form, Position Dashboard integration
 
 ✅ **Security: SEC-4 + SEC-5** (2026-06-09 / 2026-06-11)
-   - Path-Traversal, Prompt-Injection-Rahmung, Längenlimits, constant-time Bearer,
-     XML-Escaping im Hook, Limit-Sync zwischen beiden Schreibpfaden
+   - Path traversal, prompt-injection framing, length limits, constant-time bearer
+     comparison, XML escaping in the hook, limit sync across both write paths
 
-✅ **Neue Agents** (Mai–Juni 2026)
+✅ **New agents** (May–June 2026)
    - DevilsAdvocateAgent + PortfolioRobustnessAgent (FEAT-47/48)
    - SectorRotationAgent (FEAT-46), TaxLossHarvestingAgent (FEAT-44), DividendCalendarAgent (FEAT-45)
 
-✅ **Batch API** (2026-06-07/08) — 50% günstigere Scheduled Jobs via `pending_batches` + Scheduler-Polling
+✅ **Batch API** (2026-06-07/08) — 50% cheaper scheduled jobs via `pending_batches` + scheduler polling
 
-✅ **Attribution & Digests** (FEAT-34–39, Mai 2026) — Monats-/Jahres-Attribution inkl. Dividenden, Digest-Reports, Makro-Chips
+✅ **Attribution & digests** (FEAT-34–39, May 2026) — monthly/yearly attribution incl. dividends, digest reports, macro chips
 
-✅ **Status-Matrix & Background Jobs** (FEAT-40/41) — `core/background_jobs.py` shared für SC/CG/FA/CA, Watchlist Cockpit
+✅ **Status matrix & background jobs** (FEAT-40/41) — `core/background_jobs.py` shared across SC/CG/FA/CA, watchlist cockpit
 
-✅ **Provider-Flexibilität** (Mai 2026) — OpenRouter/DeepSeek-Migration, Tavily-Search, `OpenAICompatibleProvider`
+✅ **Provider flexibility** (May 2026) — OpenRouter/DeepSeek migration, Tavily search, `OpenAICompatibleProvider`
 
-Ältere Änderungen: siehe CHANGELOG.md.
+For older changes see CHANGELOG.md.
 
 ---
 
@@ -550,60 +550,60 @@ verdicts = analysis_service.get_verdicts(ids, "storychecker")
 
 ## LLM Provider Configuration
 
-Der Public-LLM-Layer ist provider-agnostisch über Umgebungsvariablen konfigurierbar.
+The public LLM layer is provider-agnostic and configured via environment variables.
 
-### Konfigurationsvariablen
+### Configuration Variables
 
-| Variable | Zweck | Default |
+| Variable | Purpose | Default |
 |---|---|---|
-| `LLM_API_KEY` | API-Key des Providers | — (Pflicht) |
-| `LLM_BASE_URL` | Endpoint-URL | leer = Anthropic direkt |
-| `LLM_DEFAULT_MODEL` | Fallback-Modell wenn kein DB-Override | leer = `claude-haiku-4-5-20251001` |
-| `CLAUDE_MODELS` | Komma-Liste für Settings-Dropdown | `claude-haiku-4-5-20251001,claude-sonnet-4-6,claude-opus-4-6` |
+| `LLM_API_KEY` | Provider API key | — (required) |
+| `LLM_BASE_URL` | Endpoint URL | empty = Anthropic direct |
+| `LLM_DEFAULT_MODEL` | Fallback model when no DB override exists | empty = `claude-haiku-4-5-20251001` |
+| `CLAUDE_MODELS` | Comma-separated list for the Settings dropdown | `claude-haiku-4-5-20251001,claude-sonnet-4-6,claude-opus-4-6` |
 
-### Modell-Auflösungskette
+### Model Resolution Chain
 
 ```
-DB(agent-spezifisch) 
-  → DB(global) 
-  → LLM_DEFAULT_MODEL (falls gesetzt)
-  → Hardcoded Constant (CLAUDE_HAIKU/CLAUDE_SONNET)
+DB (agent-specific)
+  → DB (global)
+  → LLM_DEFAULT_MODEL (if set)
+  → hardcoded constant (CLAUDE_HAIKU/CLAUDE_SONNET)
 ```
 
-Die DB-Einträge werden per Settings-UI gespeichert. `LLM_DEFAULT_MODEL` ist als Fallback für Infrastruktur-Wechsel (Provider-Switch ohne Settings-Neuconfig).
+DB entries are written via the Settings UI. `LLM_DEFAULT_MODEL` serves as a fallback for infrastructure changes (provider switch without reconfiguring Settings).
 
 ### Web Search
 
-| Modus | Bedingung | Portabilität |
+| Mode | Condition | Portability |
 |---|---|---|
-| Anthropic built-in (`web_search_20250305`) | kein `TAVILY_API_KEY` | Nur Anthropic / OpenRouter |
-| Tavily (client-side) | `TAVILY_API_KEY` gesetzt | Alle Provider mit Tool Use |
+| Anthropic built-in (`web_search_20250305`) | no `TAVILY_API_KEY` | Anthropic / OpenRouter only |
+| Tavily (client-side) | `TAVILY_API_KEY` set | any provider with tool use |
 
-Agents mit Web Search (SearchAgent, StructuralChangeAgent, NewsAgent): Bei OpenRouter oder anderen Providern mit Tavily aktiviert. Oder Modelle wählen mit integrierter Suche (Perplexity Sonar).
+Agents with web search (SearchAgent, StructuralChangeAgent, NewsAgent): on OpenRouter or other providers, enable via Tavily — or pick models with built-in search (Perplexity Sonar).
 
-### Bekannte Provider-Konfigurationen
+### Known Provider Configurations
 
-#### Anthropic direkt (Default)
+#### Anthropic direct (default)
 ```env
 LLM_API_KEY=sk-ant-...
-# LLM_BASE_URL, LLM_DEFAULT_MODEL = leer
+# LLM_BASE_URL, LLM_DEFAULT_MODEL = empty
 ```
 
 #### OpenRouter  
-*Anthropic-SDK-kompatibel, 100+ Modelle (Claude, GPT-4o, Perplexity Sonar, etc.)*
+*Anthropic-SDK-compatible, 100+ models (Claude, GPT-4o, Perplexity Sonar, etc.)*
 
 ```env
 LLM_API_KEY=sk-or-...
 LLM_BASE_URL=https://openrouter.ai/api/v1
 LLM_DEFAULT_MODEL=anthropic/claude-sonnet-4-6
 CLAUDE_MODELS=anthropic/claude-haiku-4-5-20251001,anthropic/claude-sonnet-4-6,perplexity/sonar,openai/gpt-4o
-TAVILY_API_KEY=tvly-...  # Optional: für Web Search bei GPT-4o, etc.
+TAVILY_API_KEY=tvly-...  # optional: web search for GPT-4o, etc.
 ```
 
-**Perplexity Sonar über OpenRouter:** Sonar hat integrierte Websuche — keine separaten Web-Search-Tool-Calls nötig. Wähle Sonar über Settings → kein Tavily erforderlich.
+**Perplexity Sonar via OpenRouter:** Sonar has built-in web search — no separate web-search tool calls needed. Select Sonar in Settings → no Tavily required.
 
-#### Perplexity Sonar direkt  
-*OpenAI-API-Format, gebaut-in web search, keine Tools nötig*
+#### Perplexity Sonar direct  
+*OpenAI API format, built-in web search, no tools needed*
 
 ```env
 OPENAI_API_KEY=pplx-...
@@ -611,34 +611,34 @@ OPENAI_BASE_URL=https://api.perplexity.ai
 OPENAI_MODELS=sonar,sonar-pro,sonar-reasoning
 ```
 
-**Besonderheit:** Mit Sonar wird `OpenAICompatibleProvider` genutzt (nicht ClaudeProvider). Sonar hat interne Web Search → Agents arbeiten ohne Tavily/Tool-Use-Loop. Perfekt für "out of Anthropic tokens"-Szenarien.
+**Note:** With Sonar the `OpenAICompatibleProvider` is used (not ClaudeProvider). Sonar has internal web search → agents work without Tavily/tool-use loop. Ideal for "out of Anthropic tokens" scenarios.
 
-#### Weitere kompatible Endpoints (OpenAI-Format)
-Jeder Endpunkt der die OpenAI API-Format unterstützt nutzt `OpenAICompatibleProvider`:
+#### Other compatible endpoints (OpenAI format)
+Any endpoint supporting the OpenAI API format uses `OpenAICompatibleProvider`:
 - **Groq**: `OPENAI_BASE_URL=https://api.groq.com/openai/v1`
 - **Together AI**: `OPENAI_BASE_URL=https://api.together.xyz/v1`
-- Beliebige OpenAI-kompatible Proxies
+- any OpenAI-compatible proxy
 
-**Wichtig nach Provider-Wechsel:**  
-1. `OPENAI_MODELS` (oder `CLAUDE_MODELS` für Anthropic-kompatible) auf neue Modell-IDs setzen
-2. Settings-Seite öffnen → Modelle für jeden Agent neu wählen (schreibt in DB)
-3. DB-Einträge überschreiben dann alle Fallbacks
+**Important after a provider switch:**  
+1. Set `OPENAI_MODELS` (or `CLAUDE_MODELS` for Anthropic-compatible providers) to the new model IDs
+2. Open the Settings page → re-select models for each agent (writes to DB)
+3. DB entries then override all fallbacks
 
-### Provider-Wechsel Workflow (Beispiel: Anthropic → Sonar)
+### Provider Switch Workflow (example: Anthropic → Sonar)
 
 ```bash
-# 1. .env anpassen (kein Ändern von LLM_API_KEY nötig, bleibt für OpenRouter-Scenario)
+# 1. Adjust .env (no need to change LLM_API_KEY — keep it for the OpenRouter scenario)
 OPENAI_API_KEY=pplx-...
 OPENAI_BASE_URL=https://api.perplexity.ai
 OPENAI_MODELS=sonar,sonar-pro
 
-# 2. App starten
+# 2. Start the app
 streamlit run app.py
 
-# 3. Settings → Cloud Agents (zeigt jetzt "OpenAI-kompatibel 🌐" statt "Claude ☁️")
-# → Modelle für News, Search, etc. auf "sonar" setzen → Save
+# 3. Settings → Cloud Agents (now shows "OpenAI-compatible 🌐" instead of "Claude ☁️")
+# → set models for News, Search, etc. to "sonar" → Save
 
-# 4. Agent führen → verwendet automatisch Sonar mit integrierter Web Search
+# 4. Run an agent → automatically uses Sonar with built-in web search
 ```
 
 ---
@@ -647,41 +647,41 @@ streamlit run app.py
 
 ## MCP Server Architecture (FEAT-49/50/51/52)
 
-### Was ist MCP?
+### What is MCP?
 
-Das **Model Context Protocol** (MCP) ist ein offenes Protokoll von Anthropic, das LLM-Hosts (z.B. Claude Code, Claude Desktop) mit externen Tool-Servern verbindet. Das Protokoll ist JSON-RPC 2.0 über stdio — kein HTTP-Server, kein Port, kein Auth-Setup.
+The **Model Context Protocol** (MCP) is an open protocol by Anthropic that connects LLM hosts (e.g. Claude Code, Claude Desktop) to external tool servers. The transport is JSON-RPC 2.0 over stdio — no HTTP server, no port, no auth setup.
 
 ```
 Claude Code  ──stdio──►  MCP Server (wealth_mcp.py)
-             ◄──stdio──   FastMCP SDK → Tool-Funktionen (Python)
+             ◄──stdio──   FastMCP SDK → tool functions (Python)
 ```
 
-Der Server deklariert Tools als normale Python-Funktionen mit `@mcp.tool()`. Claude Code entdeckt sie beim Start, zeigt sie als verfügbare Tools an, und ruft sie wie jeden anderen Tool-Call auf.
+The server declares tools as plain Python functions with `@mcp.tool()`. Claude Code discovers them at startup, lists them as available tools, and calls them like any other tool call.
 
-### Duale Venv-Architektur
+### Dual-Venv Architecture
 
-Das MCP SDK erfordert Python ≥ 3.10, die Haupt-App läuft auf Python 3.9.6. Lösung: zwei separate virtuelle Umgebungen.
+The MCP SDK requires Python ≥ 3.10, the main app runs on Python 3.9.6. Solution: two separate virtual environments.
 
 ```
-.venv/        (Python 3.9.6)  — Haupt-App, alle Tests, alle Imports
-mcp_venv/     (Python 3.11.15) — nur mcp_server/wealth_mcp.py
+.venv/        (Python 3.9.6)  — main app, all tests, all imports
+mcp_venv/     (Python 3.11.15) — only mcp_server/wealth_mcp.py
 ```
 
-Die Trennung ist sauber: `mcp_server/_helpers.py` enthält die testbare Logik (kein MCP-Import) — YAML-Erzeugung, atomare File-Writes, Input-Validierung (`validate_answer_input`) und die `BearerTokenMiddleware` — importierbar aus `.venv`. `wealth_mcp.py` importiert `_helpers` + FastMCP und läuft nur in `mcp_venv`.
+The separation is clean: `mcp_server/_helpers.py` contains the testable logic (no MCP import) — YAML building, atomic file writes, input validation (`validate_answer_input`), and the `BearerTokenMiddleware` — importable from `.venv`. `wealth_mcp.py` imports `_helpers` + FastMCP and runs only in `mcp_venv`.
 
 ```
 mcp_server/
-├── _helpers.py       # Pure Python 3.9 — testbar aus .venv (inkl. Auth-Middleware + Validierung)
-├── wealth_mcp.py     # FastMCP server — läuft in mcp_venv
-├── check_queue.py    # Hook-Script — /usr/bin/python3
+├── _helpers.py       # pure Python 3.9 — testable from .venv (incl. auth middleware + validation)
+├── wealth_mcp.py     # FastMCP server — runs in mcp_venv
+├── check_queue.py    # hook script — /usr/bin/python3
 ├── requirements.txt  # mcp[cli]>=1.0.0, pyyaml>=6.0, uvicorn
 └── __init__.py
 ```
 
-### Registrierung und Auto-Approval
+### Registration and Auto-Approval
 
 ```json
-// .mcp.json (project root — lädt bei Claude Code Startup)
+// .mcp.json (project root — loaded at Claude Code startup)
 {
   "mcpServers": {
     "wealth-research": {
@@ -700,39 +700,39 @@ mcp_server/
 }
 ```
 
-`enabledMcpjsonServers` verhindert den manuellen Genehmigungsprompt bei jedem Session-Start.
+`enabledMcpjsonServers` suppresses the manual approval prompt on every session start.
 
-### Tool-Übersicht
+### Tool Overview
 
-| Tool | Richtung | Was es tut |
+| Tool | Direction | What it does |
 |---|---|---|
-| `propose_position()` | Claude → App | Schreibt `.md` in Cowork-Outbox, Filewatcher importiert |
-| `propose_multiple()` | Claude → App | Batch-Version, mehrere Kandidaten in einer Datei |
-| `get_research_queue()` | Claude ← App | Liest offene Research-Anfragen aus `research_requests` |
-| `complete_research_request(id)` | Claude → App | Markiert Anfrage als erledigt |
-| `submit_research_answer(md, ...)` | Claude → App | Schreibt Antwort in `research_answers`, markiert Anfrage done |
+| `propose_position()` | Claude → App | Writes `.md` to the Cowork outbox, file watcher imports it |
+| `propose_multiple()` | Claude → App | Batch version, several candidates in one file |
+| `get_research_queue()` | Claude ← App | Reads open research requests from `research_requests` |
+| `complete_research_request(id)` | Claude → App | Marks a request as done |
+| `submit_research_answer(md, ...)` | Claude → App | Writes an answer to `research_answers`, marks the request done |
 
-### Bidirektionale Kommunikation (FEAT-50/51)
+### Bidirectional Communication (FEAT-50/51)
 
-Die Research Queue implementiert zwei komplementäre Kanäle:
+The research queue implements two complementary channels:
 
 ```
-App → Claude:  research_requests-Tabelle  +  UserPromptSubmit-Hook
-Claude → App:  research_answers-Tabelle   +  submit_research_answer()-Tool
+App → Claude:  research_requests table  +  UserPromptSubmit hook
+Claude → App:  research_answers table   +  submit_research_answer() tool
 ```
 
-**App → Claude (Anfragen stellen):**
-1. User füllt Formular auf der Position-Dashboard-Seite aus
-2. `ResearchQueueRepository.create_request()` schreibt Zeile in DB
-3. `mcp_server/check_queue.py` läuft vor jeder Claude-Code-Nachricht (Hook)
-4. Hook liest offene Anfragen und injiziert sie als `additionalContext`
-5. Claude sieht die Anfragen am Anfang jeder Session/Nachricht
+**App → Claude (posting requests):**
+1. User fills in the form on the Position Dashboard page (or the global Research Request page)
+2. `ResearchQueueRepository.create_request()` writes a row to the DB
+3. `mcp_server/check_queue.py` runs before every Claude Code message (hook)
+4. The hook reads open requests and injects them as `additionalContext`
+5. Claude sees the requests at the start of every session/message
 
-**Claude → App (Anfragen beantworten):**
-1. Claude ruft `get_research_queue()` für Details auf
-2. Beantwortet via `submit_research_answer(markdown, request_id)` 
-3. Antwort erscheint in `pages/research_answers.py` unter "Antworten"
-4. Anfrage wird automatisch als `done` markiert
+**Claude → App (answering requests):**
+1. Claude calls `get_research_queue()` for details
+2. Answers via `submit_research_answer(markdown, request_id)` 
+3. The answer appears in `pages/research_answers.py` under "Answers"
+4. The request is automatically marked `done`
 
 ```mermaid
 sequenceDiagram
@@ -742,69 +742,69 @@ sequenceDiagram
     participant CC as Claude Code
     participant T as wealth_mcp.py (MCP Tools)
 
-    U->>DB: create_request("Analysiere Q3-Zahlen AAPL")
-    Note over H: Bei nächster CC-Nachricht
+    U->>DB: create_request("Analyze AAPL Q3 numbers")
+    Note over H: On next CC message
     CC->>H: UserPromptSubmit fired
     H->>DB: SELECT * FROM research_requests WHERE status='open'
-    H-->>CC: additionalContext mit offenen Anfragen
-    CC->>T: get_research_queue() [optional — für Details]
+    H-->>CC: additionalContext with open requests
+    CC->>T: get_research_queue() [optional — for details]
     T->>DB: SELECT ...
-    T-->>CC: Liste mit Details
+    T-->>CC: list with details
     CC->>T: submit_research_answer("## AAPL Q3...", request_id=1)
     T->>DB: INSERT research_answers + UPDATE status='done'
     U->>DB: list_answers(ticker="AAPL")
-    DB-->>U: Antwort erscheint in Research Answers Seite
+    DB-->>U: answer appears on the Research Answers page
 ```
 
 ### UserPromptSubmit Hook
 
 ```python
-# mcp_server/check_queue.py — Ausgabeformat
+# mcp_server/check_queue.py — output format
 output = {
     "hookSpecificOutput": {
         "hookEventName": "UserPromptSubmit",
-        "additionalContext": "📋 2 offene Anfragen...",
+        "additionalContext": "📋 2 open requests...",
     }
 }
 print(json.dumps(output))
 ```
 
-`additionalContext` wird vor der Benutzernachricht in den Kontext injiziert — Claude sieht die Anfragen automatisch, ohne dass der User etwas tun muss.
+`additionalContext` is injected into the context before the user message — Claude sees the requests automatically, without the user doing anything.
 
-### Cowork-Outbox Pattern (FEAT-49)
+### Cowork Outbox Pattern (FEAT-49)
 
-`propose_position()` schreibt `.md`-Dateien atomar in den Outbox-Ordner:
+`propose_position()` writes `.md` files atomically into the outbox directory:
 
 ```python
-# Atomic write: tmp/ → rename (verhindert partiellen File-Read durch Watcher)
+# Atomic write: tmp/ → rename (prevents partial file reads by the watcher)
 tmp_path.write_text(content, encoding="utf-8")
 tmp_path.rename(final_path)  # atomic on same filesystem
 ```
 
-Der existierende Watchdog-Filewatcher in der App erkennt neue Dateien und importiert sie als Watchlist-Kandidaten für Human-Review — ohne Code-Änderungen an der App.
+The app's existing watchdog file watcher detects new files and imports them as watchlist candidates for human review — with zero code changes to the app.
 
-### Security-Härtung (SEC-4 + SEC-5)
+### Security Hardening (SEC-4 + SEC-5)
 
-Der MCP-Server ist der erste externe Schreibpfad, der nicht durch die Streamlit-UI läuft. Mitigations:
+The MCP server is the first external write path that does not go through the Streamlit UI. Mitigations:
 
-| Vektor | Mitigation |
+| Vector | Mitigation |
 |---|---|
-| Path Traversal im Outbox-Filename | Slug-Sanitization (`[^A-Za-z0-9._-]` → `_`) + Datum-Präfix |
-| Prompt-Injection via Hook-Context | XML-Rahmung **und** Escaping (`xml.sax.saxutils`) — Tag-Breakout aus `focus`/`ticker` unmöglich, Output ist parsebares XML |
-| Oversize-Inputs | `focus` ≤ 500, `context` ≤ 2000, `ticker` ≤ 20 Zeichen, `answer_md` ≤ 100 KB |
-| Doppelte Schreibpfade (Repo vs. Raw-SQL) | Limits in `core/storage/research_queue.py` **und** `mcp_server/_helpers.py` definiert; Test erzwingt Gleichstand |
-| HTTP-Transport-Auth | Bearer-Token Pflicht, `hmac.compare_digest` (constant-time), Websocket-Scope abgelehnt, bind an `127.0.0.1` |
-| DB-Zugriff | Konvention + Checkliste (CLAUDE.md): Tools berühren nur `research_requests`/`research_answers` |
+| Path traversal in outbox filename | Slug sanitization (`[^A-Za-z0-9._-]` → `_`) + date prefix |
+| Prompt injection via hook context | XML framing **and** escaping (`xml.sax.saxutils`) — tag breakout from `focus`/`ticker` impossible, output is parseable XML |
+| Oversize inputs | `focus` ≤ 500, `context` ≤ 2000, `ticker` ≤ 20 chars, `answer_md` ≤ 100 KB |
+| Duplicate write paths (repo vs. raw SQL) | Limits defined in `core/storage/research_queue.py` **and** `mcp_server/_helpers.py`; a test enforces they stay in sync |
+| HTTP transport auth | Bearer token required, `hmac.compare_digest` (constant-time), websocket scope rejected, bound to `127.0.0.1` |
+| DB access | Convention + checklist (CLAUDE.md): tools touch only `research_requests`/`research_answers` |
 
-### Neue Storage-Tabellen
+### New Storage Tables
 
 ```sql
 CREATE TABLE research_requests (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     request_type TEXT NOT NULL DEFAULT 'research_question',  -- watchlist_candidate | research_question | analysis_deepdive | general
     ticker       TEXT,
-    focus        TEXT NOT NULL,   -- Die eigentliche Frage/Anfrage
-    context      TEXT,            -- Zusätzlicher Kontext (optional)
+    focus        TEXT NOT NULL,   -- the actual question/request
+    context      TEXT,            -- additional context (optional)
     source       TEXT NOT NULL DEFAULT 'manual',  -- manual | agent | batch
     status       TEXT NOT NULL DEFAULT 'open',    -- open | in_progress | done
     created_at   TEXT NOT NULL DEFAULT (datetime('now')),
