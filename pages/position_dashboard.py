@@ -363,7 +363,7 @@ st.divider()
 _rq_repo = get_research_queue_repo()
 
 if selected_position.ticker:
-    _answers = _rq_repo.list_answers(ticker=selected_position.ticker)
+    _answers = _rq_repo.list_answers_for_ticker(selected_position.ticker)
     if _answers:
         st.subheader(t("research_request.answers_header").format(n=len(_answers)))
         for _answer in _answers:

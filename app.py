@@ -133,21 +133,23 @@ pg = st.navigation({
         st.Page("pages/storychecker.py",         title=t("nav.storychecker"),     icon=":material/fact_check:"),
         st.Page("pages/fundamental_analyzer.py", title="Fundamental Analyzer",   icon=":material/calculate:"),
         st.Page("pages/consensus_gap.py",        title=t("nav.consensus_gap"),   icon=":material/target:"),
-        st.Page("pages/cowork_inbox.py",         title=t("nav.cowork_inbox"),    icon=":material/inbox:"),
-        st.Page("pages/research_request.py",     title=t("research_request.nav_title"), icon=":material/add_circle:"),
-        st.Page("pages/research_answers.py",     title=t("nav.research_answers"), icon=":material/question_answer:"),
     ],
     t("nav.group_claude_strategy"): [
         st.Page("pages/tax_loss_harvesting.py", title=t("nav.tax_loss_harvesting"), icon=":material/trending_down:"),
         st.Page("pages/structural_scan.py",     title=t("nav.structural_scan"),     icon=":material/radar:"),
         st.Page("pages/sector_rotation.py",     title=t("nav.sector_rotation"),     icon=":material/rotate_right:"),
     ],
+    t("nav.group_cowork"): [
+        st.Page("pages/cowork_inbox.py",     title=t("nav.cowork_inbox"),    icon=":material/inbox:"),
+        st.Page("pages/research_request.py", title=t("research_request.nav_title"), icon=":material/add_circle:"),
+        st.Page("pages/research_answers.py", title=t("nav.research_answers"), icon=":material/question_answer:"),
+        st.Page("pages/cowork_setup.py",     title="Cowork Setup",           icon=":material/settings_suggest:"),
+    ],
     t("nav.group_system"): [
         st.Page("pages/statistics.py",      title=t("nav.statistics"),       icon=":material/bar_chart:"),
         st.Page("pages/skills.py",          title="Skills",                  icon=":material/psychology:"),
         st.Page("pages/scheduler.py",       title="Scheduler",               icon=":material/schedule:"),
         st.Page("pages/settings.py",        title=t("nav.settings"),         icon=":material/settings:"),
-        st.Page("pages/cowork_setup.py",    title="Cowork Setup",            icon=":material/settings_suggest:"),
     ],
 })
 

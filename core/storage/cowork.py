@@ -38,6 +38,7 @@ class ResearchEntry:
     file_path: Optional[str] = None
     imported_at: Optional[datetime] = None
     failure_reason: Optional[str] = None
+    request_id: Optional[int] = None
     created_at: Optional[datetime] = None
 
 
@@ -93,6 +94,7 @@ class CoworkRepository:
         primary_confidence: Optional[str] = None,
         file_path: Optional[str] = None,
         failure_reason: Optional[str] = None,
+        request_id: Optional[int] = None,
     ) -> ResearchEntry:
         now = datetime.now(timezone.utc)
         imported_at = now if status == "imported" else None
@@ -103,8 +105,8 @@ class CoworkRepository:
                 primary_ticker, primary_name, primary_exchange,
                 primary_sentiment, primary_confidence,
                 body_markdown, sources, disclaimer,
-                file_path, imported_at, failure_reason, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                file_path, imported_at, failure_reason, request_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 research_id, type, date.isoformat(), model, status,
@@ -114,6 +116,7 @@ class CoworkRepository:
                 file_path,
                 imported_at.isoformat() if imported_at else None,
                 failure_reason,
+                request_id,
                 now.isoformat(),
             ),
         )
@@ -152,6 +155,14 @@ class CoworkRepository:
             (entry_id,),
         ).fetchone()
         return self._row_to_entry(row) if row else None
+
+    def list_entries_for_request(self, request_id: int) -> List[ResearchEntry]:
+        """Inbox-Einträge, die aus einer bestimmten Research-Anfrage entstanden sind."""
+        rows = self._conn.execute(
+            "SELECT * FROM cowork_research_entries WHERE request_id = ? ORDER BY created_at DESC",
+            (request_id,),
+        ).fetchall()
+        return [self._row_to_entry(r) for r in rows]
 
     def list_entries(
         self,
@@ -314,6 +325,7 @@ class CoworkRepository:
             file_path=d.get("file_path"),
             imported_at=datetime.fromisoformat(d["imported_at"]) if d.get("imported_at") else None,
             failure_reason=d.get("failure_reason"),
+            request_id=d.get("request_id"),
             created_at=datetime.fromisoformat(d["created_at"]) if d.get("created_at") else None,
         )
 

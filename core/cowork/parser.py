@@ -74,6 +74,7 @@ class ParsedResearch:
     sources: List[str]
     disclaimer: str
     body_markdown: str
+    request_id: Optional[int] = None  # auslösende Anfrage aus research_requests
 
 
 # ---------------------------------------------------------------------------
@@ -241,6 +242,15 @@ def _validate_and_build(data: dict, body: str, path: str) -> ParsedResearch:
         raise ParseError(f"{path}: 'sources' must be a list")
     ai_generated = bool(data.get("ai_generated", True))
 
+    request_id = data.get("request_id")
+    if request_id is not None:
+        try:
+            request_id = int(request_id)
+        except (TypeError, ValueError):
+            raise ParseError(f"{path}: 'request_id' must be an integer, got '{request_id}'")
+        if request_id < 1:
+            raise ParseError(f"{path}: 'request_id' must be a positive integer")
+
     primary = _parse_primary(data, path)
     candidates = _parse_candidates(data, path)
 
@@ -256,4 +266,5 @@ def _validate_and_build(data: dict, body: str, path: str) -> ParsedResearch:
         sources=[str(s) for s in sources],
         disclaimer=str(disclaimer).strip(),
         body_markdown=body,
+        request_id=request_id,
     )

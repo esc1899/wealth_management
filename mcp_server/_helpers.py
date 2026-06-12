@@ -19,6 +19,31 @@ import yaml
 MAX_TICKER_LEN = 20
 MAX_ANSWER_BYTES = 100_000
 
+# Statische Routing-Hinweise je Anfragetyp für get_research_queue()
+# (kein User-Input — SEC-4-konform). Verhindert, dass reine Fragen/Analysen
+# als Watchlist-Vorschlag enden.
+ROUTING_HINTS = {
+    "watchlist_candidate": (
+        "→ propose_position(request_id={id}) / propose_multiple(request_id={id}), "
+        "then complete_research_request({id})"
+    ),
+    "research_question": (
+        "→ submit_research_answer(request_id={id}) only — no watchlist proposal "
+        "unless research surfaces a genuinely new candidate"
+    ),
+    "analysis_deepdive": (
+        "→ submit_research_answer(request_id={id}) only — no watchlist proposal "
+        "unless research surfaces a genuinely new candidate"
+    ),
+    "general": "→ submit_research_answer(request_id={id})",
+}
+ROUTING_HINT_DEFAULT = "→ submit_research_answer(request_id={id})"
+
+
+def routing_hint(request_type: str, request_id) -> str:
+    """Return the static routing hint line for a queue request."""
+    return ROUTING_HINTS.get(request_type, ROUTING_HINT_DEFAULT).format(id=request_id)
+
 
 def validate_answer_input(answer_markdown: str, ticker: Optional[str]) -> Optional[str]:
     """Validate submit_research_answer input. Returns an error string or None."""
@@ -75,6 +100,7 @@ def build_research_md(
     primary_exchange: Optional[str] = None,
     body: str = "",
     sources: Optional[list] = None,
+    request_id: Optional[int] = None,
 ) -> str:
     """Build a valid cowork research .md file string."""
     frontmatter: dict = {
@@ -88,6 +114,8 @@ def build_research_md(
         "sources": sources or [],
         "watchlist_candidates": candidates,
     }
+    if request_id is not None:
+        frontmatter["request_id"] = int(request_id)
     if primary_ticker and primary_name and primary_exchange:
         frontmatter["primary"] = {
             "ticker": primary_ticker.upper(),

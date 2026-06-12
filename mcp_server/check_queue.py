@@ -64,7 +64,13 @@ for row in rows:
         f"</research_request>"
     )
 lines.append("\n</wealth_management_research_queue>")
-lines.append("\nNutze `get_research_queue()` für Details oder bearbeite sie direkt.\n")
+lines.append(
+    "\nNutze `get_research_queue()` für Details oder bearbeite sie direkt.\n"
+    "Routing nach Typ: watchlist_candidate → propose_position(request_id=N) / "
+    "propose_multiple(request_id=N); alle anderen Typen → submit_research_answer(request_id=N) "
+    "— dann ist kein Watchlist-Vorschlag nötig, außer die Recherche fördert einen "
+    "genuin neuen Kandidaten zutage.\n"
+)
 
 # UserPromptSubmit hook: inject context before the user's message
 output = {

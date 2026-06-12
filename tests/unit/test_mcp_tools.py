@@ -409,3 +409,58 @@ class TestValidateAnswerInput:
     def test_valid_input_passes(self):
         from mcp_server._helpers import validate_answer_input
         assert validate_answer_input("# Analyse\nAlles gut.", "AAPL") is None
+
+
+# ---------------------------------------------------------------------------
+# request_id passthrough + routing hints (Queue-Verzahnung)
+# ---------------------------------------------------------------------------
+
+_LINK_CANDIDATE = {
+    "ticker": "LIN",
+    "name": "Linde plc",
+    "exchange": "XETRA",
+    "rationale": "Industriegase-Oligopol.",
+    "conviction": "high",
+    "suggested_action": "watch",
+}
+
+
+class TestRequestIdPassthrough:
+    def test_request_id_in_frontmatter(self):
+        md = _build_research_md("test-link", [_LINK_CANDIDATE], request_id=4)
+        result = parse_research_string(md)
+        assert result.request_id == 4
+
+    def test_without_request_id_field_omitted(self):
+        md = _build_research_md("test-nolink", [_LINK_CANDIDATE])
+        assert "request_id" not in md
+        assert parse_research_string(md).request_id is None
+
+
+class TestRoutingHints:
+    def test_watchlist_candidate_routes_to_propose(self):
+        from mcp_server._helpers import routing_hint
+        hint = routing_hint("watchlist_candidate", 4)
+        assert "propose_position(request_id=4)" in hint
+        assert "submit_research_answer" not in hint
+
+    def test_research_question_routes_to_answer_only(self):
+        from mcp_server._helpers import routing_hint
+        hint = routing_hint("research_question", 5)
+        assert "submit_research_answer(request_id=5)" in hint
+        assert "no watchlist proposal" in hint
+
+    def test_analysis_deepdive_routes_to_answer_only(self):
+        from mcp_server._helpers import routing_hint
+        hint = routing_hint("analysis_deepdive", 6)
+        assert "submit_research_answer(request_id=6)" in hint
+        assert "no watchlist proposal" in hint
+
+    def test_unknown_type_falls_back_to_answer(self):
+        from mcp_server._helpers import routing_hint
+        assert "submit_research_answer(request_id=9)" in routing_hint("whatever", 9)
+
+    def test_all_valid_request_types_have_hints(self):
+        from core.storage.research_queue import VALID_REQUEST_TYPES
+        from mcp_server._helpers import ROUTING_HINTS
+        assert set(ROUTING_HINTS) == VALID_REQUEST_TYPES

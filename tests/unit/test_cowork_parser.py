@@ -219,3 +219,33 @@ class TestStructuralErrors:
     def test_missing_file_raises(self, tmp_path):
         with pytest.raises(ParseError, match="Cannot read"):
             parse_research_file(str(tmp_path / "nonexistent.md"))
+
+
+# ---------------------------------------------------------------------------
+# request_id (Verknüpfung zur Research-Queue)
+# ---------------------------------------------------------------------------
+
+class TestRequestId:
+    def test_request_id_parsed(self):
+        result = parse_research_string(_make_minimal({"request_id": 4}))
+        assert result.request_id == 4
+
+    def test_request_id_string_coerced(self):
+        result = parse_research_string(_make_minimal({"request_id": "7"}))
+        assert result.request_id == 7
+
+    def test_request_id_absent_is_none(self):
+        result = parse_research_string(_make_minimal())
+        assert result.request_id is None
+
+    def test_request_id_non_numeric_raises(self):
+        with pytest.raises(ParseError, match="request_id"):
+            parse_research_string(_make_minimal({"request_id": "abc"}))
+
+    def test_request_id_zero_raises(self):
+        with pytest.raises(ParseError, match="positive"):
+            parse_research_string(_make_minimal({"request_id": 0}))
+
+    def test_request_id_negative_raises(self):
+        with pytest.raises(ParseError, match="positive"):
+            parse_research_string(_make_minimal({"request_id": -3}))

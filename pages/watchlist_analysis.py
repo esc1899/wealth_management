@@ -25,15 +25,18 @@ from core.background_jobs import (
 from core.i18n import current_language, t
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge, verdict_icon
 from core.ui.markdown import llm_markdown
+from core.ui.research_request_form import render_research_request_form
 from state import (
     get_analysis_service,
     get_capital_allocator_repo,
     get_consensus_gap_agent,
+    get_cowork_repo,
     get_devils_advocate_agent,
     get_devils_advocate_repo,
     get_fundamental_analyzer_agent,
     get_market_agent,
     get_portfolio_service,
+    get_research_queue_repo,
     get_storychecker_agent,
 )
 
@@ -335,3 +338,54 @@ if da_verdict:
             pass
 else:
     st.info(t("devils_advocate.no_analysis"))
+
+st.divider()
+
+# ------------------------------------------------------------------
+# Section: Research Answers + Cowork-Research für diesen Ticker
+# (analog Position Dashboard FEAT-55 — Watchlist-Pendant)
+# ------------------------------------------------------------------
+
+_rq_repo = get_research_queue_repo()
+_cowork_repo = get_cowork_repo()
+
+if selected_position.ticker:
+    _answers = _rq_repo.list_answers_for_ticker(selected_position.ticker)
+    if _answers:
+        st.subheader(t("research_request.answers_header").format(n=len(_answers)))
+        for _answer in _answers:
+            _ts = _answer.created_at[:10] if _answer.created_at else ""
+            _req_label = f" · Request #{_answer.request_id}" if _answer.request_id else ""
+            _label = t("research_request.answer_label").format(id=_answer.id)
+            with st.expander(f"**{_label}** · {_ts}{_req_label}", expanded=False):
+                llm_markdown(_answer.answer_md)
+        st.divider()
+
+    # Ursprüngliches Cowork-Research, das diesen Ticker vorgeschlagen hat.
+    # Basis-Symbol-Vergleich: Vorschläge kommen meist ohne Börsensuffix (SAP vs SAP.DE).
+    _ticker_base = selected_position.ticker.split(".")[0].upper()
+    _research_ids = {
+        s.research_id
+        for s in _cowork_repo.list_suggestions()
+        if s.ticker and s.ticker.split(".")[0].upper() == _ticker_base
+    }
+    _entries = [
+        e for rid in _research_ids
+        if (e := _cowork_repo.get_by_research_id(rid)) and e.body_markdown
+    ]
+    _entries.sort(key=lambda e: e.date, reverse=True)
+    if _entries:
+        st.subheader(t("watchlist_analysis.cowork_research_header").format(n=len(_entries)))
+        for _entry in _entries:
+            with st.expander(
+                f"**{_entry.research_id}** · {_entry.date.isoformat()} · {_entry.model}",
+                expanded=False,
+            ):
+                llm_markdown(_entry.body_markdown)
+        st.divider()
+
+# ------------------------------------------------------------------
+# Section: Research anfordern (FEAT-50)
+# ------------------------------------------------------------------
+
+render_research_request_form(_rq_repo, ticker=selected_position.ticker)

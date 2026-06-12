@@ -44,6 +44,7 @@ nav:
   group_assistant_remote: "Assistant ⚠️"
   group_research: "Research ☁️"
   group_claude_strategy: "Strategy"
+  group_cowork: "Cowork ☁️"
   structural_scan: "Structural Change Scanner"
   consensus_gap: "Consensus Gap"
   fundamental: "Fundamental Value"
@@ -970,6 +971,8 @@ research_request:
 research_answers:
   title: "🔬 Research Answers"
   caption: "Answers from Claude Code to research requests from the app."
+  linked_inbox: "This request also produced {n} watchlist proposal(s)."
+  to_inbox_btn: "To Inbox"
   tab_answers: "💬 Answers"
   tab_queue: "📋 Open requests"
   no_answers: "No answers yet. Use `submit_research_answer()` in Claude Code."
@@ -1058,6 +1061,7 @@ capital_allocator:
 
 watchlist_analysis:
   page_subtitle: "All sub-check results for a watchlist position at a glance"
+  cowork_research_header: "📚 Cowork Research ({n})"
   select_position: "Select position"
   no_positions: "No watchlist positions available."
   no_position_id: "Position has no ID — no analysis available."

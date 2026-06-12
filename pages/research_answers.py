@@ -18,7 +18,7 @@ import streamlit as st
 from core.i18n import t
 from core.ui.markdown import llm_markdown
 from core.ui.research_request_form import REQUEST_TYPES, render_research_request_form
-from state import get_portfolio_service, get_research_queue_repo
+from state import get_cowork_repo, get_portfolio_service, get_research_queue_repo
 
 st.set_page_config(
     page_title="Research Answers",
@@ -33,8 +33,9 @@ rq_repo = get_research_queue_repo()
 
 # Ticker → Portfolio-Position für "Zur Position"-Deeplinks (FEAT-55).
 # Nur Portfolio-Positionen: das Position Dashboard zeigt keine Watchlist.
+# Keyed auf Basis-Symbol: Antworten kommen meist ohne Börsensuffix (SAP vs SAP.DE).
 _portfolio_by_ticker = {
-    p.ticker.upper(): p
+    p.ticker.split(".")[0].upper(): p
     for p in get_portfolio_service().get_portfolio_positions()
     if p.ticker
 }
@@ -43,7 +44,33 @@ _portfolio_by_ticker = {
 def _position_for_ticker(ticker):
     if not ticker:
         return None
-    return _portfolio_by_ticker.get(ticker.upper())
+    return _portfolio_by_ticker.get(ticker.split(".")[0].upper())
+
+
+_cowork_repo = get_cowork_repo()
+
+
+def _render_inbox_link(request_id, key_suffix):
+    """Hinweis + Deeplink, wenn dieselbe Anfrage auch Inbox-Vorschläge erzeugt hat."""
+    if not request_id:
+        return
+    entries = _cowork_repo.list_entries_for_request(request_id)
+    if not entries:
+        return
+    n_suggestions = sum(
+        len(_cowork_repo.list_suggestions(research_id=e.research_id)) for e in entries
+    )
+    if n_suggestions == 0:
+        return
+    col_hint, col_btn = st.columns([4, 1])
+    with col_hint:
+        st.info(t("research_answers.linked_inbox").format(n=n_suggestions))
+    with col_btn:
+        if st.button(
+            t("research_answers.to_inbox_btn"),
+            key=f"to_inbox_{key_suffix}",
+        ):
+            st.switch_page("pages/cowork_inbox.py")
 
 # ------------------------------------------------------------------
 # Tab layout
@@ -97,6 +124,7 @@ with tab_answers:
                 expanded=len(filtered) == 1,
             ):
                 llm_markdown(answer.answer_md)
+                _render_inbox_link(answer.request_id, f"ans_{answer.id}")
 
                 col_del, col_pos, col_spacer = st.columns([1, 1, 4])
                 with col_del:
@@ -160,6 +188,7 @@ with tab_queue:
                             expanded=False,
                         ):
                             llm_markdown(_ans.answer_md)
+                    _render_inbox_link(req.id, f"req_{req.id}")
 
         if done_requests:
             with st.expander(t("research_answers.done_expander").format(n=len(done_requests)), expanded=False):

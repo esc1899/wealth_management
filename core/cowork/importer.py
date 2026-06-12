@@ -154,6 +154,7 @@ class CoworkImporter:
                 sources=parsed.sources,
                 disclaimer=parsed.disclaimer,
                 file_path=str(path),
+                request_id=parsed.request_id,
             )
 
         if parsed.status == "failed":

@@ -122,6 +122,29 @@ class TestMigrateDb:
         cols = [row[1] for row in conn.execute("PRAGMA table_info(positions)").fetchall()]
         assert "analysis_excluded" in cols
 
+    def test_cowork_entries_request_id_column_exists_after_migrate(self, conn):
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(cowork_research_entries)").fetchall()]
+        assert "request_id" in cols
+
+    def test_cowork_entries_request_id_added_to_old_schema(self):
+        """Bestands-DB: Tabelle ohne request_id → migrate_db ergänzt die Spalte."""
+        c = sqlite3.connect(":memory:", check_same_thread=False)
+        c.row_factory = sqlite3.Row
+        # Alt-Schema anlegen, bevor init_db läuft (CREATE TABLE IF NOT EXISTS überspringt es dann)
+        c.execute("""CREATE TABLE cowork_research_entries (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            research_id TEXT NOT NULL UNIQUE,
+            type        TEXT NOT NULL,
+            date        TEXT NOT NULL,
+            model       TEXT NOT NULL,
+            status      TEXT NOT NULL,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        )""")
+        init_db(c)
+        migrate_db(c)
+        cols = [row[1] for row in c.execute("PRAGMA table_info(cowork_research_entries)").fetchall()]
+        assert "request_id" in cols
+
     def test_app_config_table_exists_after_init(self, conn):
         # app_config is created in init_db
         tables = [

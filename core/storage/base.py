@@ -331,6 +331,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             file_path         TEXT,
             imported_at       TEXT,
             failure_reason    TEXT,
+            request_id        INTEGER,
             created_at        TEXT NOT NULL DEFAULT (datetime('now'))
         )""",
         "CREATE INDEX IF NOT EXISTS idx_cowork_entries_status ON cowork_research_entries(status)",
@@ -674,6 +675,11 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         answer_md  TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )""")
+
+    # Cowork-Inbox-Einträge mit der auslösenden Research-Anfrage verknüpfen
+    existing_cowork = {row[1] for row in conn.execute("PRAGMA table_info(cowork_research_entries)")}
+    if "request_id" not in existing_cowork:
+        conn.execute("ALTER TABLE cowork_research_entries ADD COLUMN request_id INTEGER")
 
     conn.commit()
 

@@ -388,3 +388,87 @@ Body.
         )
         results = imp.scan_outbox()
         assert results == []
+
+
+# ---------------------------------------------------------------------------
+# request_id-Verknüpfung (Queue → Inbox)
+# ---------------------------------------------------------------------------
+
+_LINKED_MD = """---
+research_id: "2026-06-12-link-001"
+type: watchlist_scan
+date: 2026-06-12
+ai_generated: true
+model: test-model
+status: ready_for_import
+request_id: 4
+disclaimer: Test disclaimer.
+sources: []
+watchlist_candidates:
+  - ticker: LIN
+    name: Linde plc
+    exchange: XETRA
+    rationale: Industriegase-Oligopol.
+    conviction: high
+    suggested_action: watch
+---
+
+Body.
+"""
+
+
+class TestRequestIdLink:
+    def test_create_entry_stores_request_id(self, cowork_repo):
+        entry = cowork_repo.create_entry(
+            research_id="link-repo-001",
+            type="watchlist_scan",
+            date=date(2026, 6, 12),
+            model="m",
+            status="ready_for_import",
+            body_markdown="",
+            sources=[],
+            disclaimer="d",
+            request_id=7,
+        )
+        fetched = cowork_repo.get_entry(entry.id)
+        assert fetched.request_id == 7
+
+    def test_create_entry_request_id_defaults_to_none(self, cowork_repo):
+        entry = cowork_repo.create_entry(
+            research_id="link-repo-002",
+            type="watchlist_scan",
+            date=date(2026, 6, 12),
+            model="m",
+            status="draft",
+            body_markdown="",
+            sources=[],
+            disclaimer="d",
+        )
+        assert cowork_repo.get_entry(entry.id).request_id is None
+
+    def test_list_entries_for_request(self, cowork_repo):
+        for i, rid in enumerate(["link-a", "link-b", "link-c"]):
+            cowork_repo.create_entry(
+                research_id=rid,
+                type="watchlist_scan",
+                date=date(2026, 6, 12),
+                model="m",
+                status="ready_for_import",
+                body_markdown="",
+                sources=[],
+                disclaimer="d",
+                request_id=4 if i < 2 else 9,
+            )
+        entries = cowork_repo.list_entries_for_request(4)
+        assert {e.research_id for e in entries} == {"link-a", "link-b"}
+        assert cowork_repo.list_entries_for_request(123) == []
+
+    def test_importer_passes_request_id_through(self, importer, outbox, cowork_repo):
+        dest = outbox / "2026-06-12-link-001.md"
+        dest.write_text(_LINKED_MD, encoding="utf-8")
+
+        result = importer.process_file(str(dest))
+
+        assert result.success
+        entry = cowork_repo.get_by_research_id("2026-06-12-link-001")
+        assert entry.request_id == 4

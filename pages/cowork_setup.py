@@ -25,9 +25,37 @@ st.set_page_config(
 # System prompt constant (raw string — contains backticks and special chars)
 # ---------------------------------------------------------------------------
 
-_SYSTEM_PROMPT = r"""Du bist ein spezialisierter Investment-Research-Assistent. Deine einzige Aufgabe ist es,
-strukturierte Aktien-/Sektor-Research-Dateien im vorgeschriebenen Markdown-Format zu
-erstellen. Diese Dateien werden automatisch von einer Wealth-Management-App eingelesen.
+_SYSTEM_PROMPT = r"""Du bist ein spezialisierter Investment-Research-Assistent für eine Wealth-Management-App.
+Du lieferst zwei Arten von Ergebnissen: Watchlist-Vorschläge (strukturierte Research-Dateien
+bzw. MCP-Tools) und Text-Antworten auf Research-Fragen. Welcher Kanal gilt, bestimmt das
+Aufgaben-Routing unten — halte dich strikt daran.
+
+---
+
+# Aufgaben-Routing (zuerst lesen)
+
+**Anfragen aus der Research-Queue** (via `get_research_queue()` oder Hook-Kontext) werden
+nach ihrem Typ geroutet:
+
+| Anfragetyp | Kanal |
+|---|---|
+| `watchlist_candidate` | `propose_position(request_id=N)` bzw. `propose_multiple(request_id=N)` |
+| `research_question`, `analysis_deepdive`, `general` | **nur** `submit_research_answer(request_id=N)` — keine Research-Datei, kein Watchlist-Vorschlag |
+
+- Ein Watchlist-Vorschlag **zusätzlich** zur Text-Antwort ist nur erlaubt, wenn die Recherche
+  einen genuin neuen, profilkonformen Kandidaten zutage fördert — nie als Pflichtprogramm,
+  nie das bloße Analyse-Objekt erneut vorschlagen.
+- `request_id` immer mitgeben — die App verknüpft damit Antwort, Anfrage und Inbox-Eintrag.
+- Nach Bearbeitung: `complete_research_request(N)` aufrufen (entfällt bei
+  `submit_research_answer` mit `request_id` — das markiert die Anfrage automatisch als erledigt).
+
+**Freies Research ohne Queue-Bezug** (z.B. „such mir Dividenden-Aristokraten"): Watchlist-
+Kandidaten via `propose_position`/`propose_multiple` bzw. — ohne MCP-Tools — als Research-Datei
+im Format unten. Reine Wissensfragen ohne Kandidaten beantwortest du als normale Chat-Antwort.
+
+Das Datei-Format unten gilt **nur für Watchlist-/Kandidaten-Research** (Fallback ohne
+MCP-Tools). Bei Queue-Anfragen mit bekannter Anfragenummer: `request_id: <N>` ins
+Frontmatter aufnehmen.
 
 ---
 
@@ -42,6 +70,11 @@ erstellen. Diese Dateien werden automatisch von einer Wealth-Management-App eing
 - **Überzeugungen**: Wu-Wei (kein Market-Timing), Lindy+Potential, Long Term Investor
 - **Kein Wunsch nach**: Penny Stocks, Micro-Caps unter 500 Mio EUR Marktkapitalisierung,
   hochverschuldeten Unternehmen, Unternehmen ohne nachvollziehbares Geschäftsmodell
+
+**Anwendung des Profils**: Bei explizit allgemein oder breit gestellten Fragen das Profil
+als Tiebreaker verwenden, nicht als Filter — erst das gesamte relevante Universum betrachten,
+dann bei vergleichbaren Kandidaten profilkonforme bevorzugen. Harte Ausschlüsse
+(kein Hebel, keine Derivate, keine Micro-Caps) gelten immer.
 
 ---
 
@@ -68,6 +101,7 @@ date: YYYY-MM-DD
 ai_generated: true
 model: <dein tatsächlicher Modell-Identifier, z.B. claude-opus-4-7>
 status: <ready_for_import|draft|failed>
+request_id: <N>                   # nur bei Queue-Anfragen: Nummer aus get_research_queue()
 
 primary:                          # nur bei stock_analysis; bei sector_scan/watchlist_scan weglassen
   ticker: <TICKER>
@@ -354,9 +388,10 @@ App: "Research anfordern"  ──►  research_requests (Queue)
               UserPromptSubmit-Hook ◄──┤   Claude Code sieht offene Anfragen
               (mcp_server/check_queue.py)  automatisch bei jeder Nachricht
                                        │
-Claude bearbeitet sie:                 ▼
-  Watchlist-Kandidat  ──► propose_position()        ──► Research Inbox
-  Frage / Vertiefung  ──► submit_research_answer()  ──► Research Answers
+Claude bearbeitet sie (Routing nach Anfragetyp, request_id verknüpft alles):
+                                       ▼
+  Watchlist-Kandidat  ──► propose_position(request_id)        ──► Research Inbox
+  Frage / Vertiefung  ──► submit_research_answer(request_id)  ──► Research Answers
                           + complete_research_request(id)
 ```
 
@@ -464,11 +499,12 @@ st.divider()
 # System Prompt
 # ---------------------------------------------------------------------------
 
-st.subheader("System Prompt — zum Kopieren in Claude Projects (nur Weg 2)")
+st.subheader("System Prompt — für Claude Desktop Projekt & Claude Projects")
 st.info(
-    "Nur für den Fallback-Weg nötig — die MCP-Tools erzeugen das Format selbst. "
-    "Kopiere den gesamten Text in das Feld \"Instructions\" deines Claude-Projekts. "
-    "Der Prompt enthält dein Investmentprofil, das Ausgabeformat und alle Feldregeln.",
+    "Kopiere den gesamten Text in die Projekt-Instruktionen deines Cowork-Projekts "
+    "(Claude Desktop App oder claude.ai). Der Prompt enthält das Aufgaben-Routing "
+    "(Queue-Anfragen nach Typ), dein Investmentprofil, das Ausgabeformat und alle "
+    "Feldregeln. Nach Änderungen hier: Prompt im Projekt neu einfügen.",
     icon=":material/content_copy:",
 )
 st.code(_SYSTEM_PROMPT, language="markdown")

@@ -175,6 +175,24 @@ class ResearchQueueRepository:
             ).fetchall()
         return [_row_to_answer(r) for r in rows]
 
+    @staticmethod
+    def _base_symbol(ticker: str) -> str:
+        """Ticker ohne Börsensuffix: 'SAP.DE' → 'SAP', 'NOVO-B.CO' → 'NOVO-B'."""
+        return ticker.split(".")[0].upper()
+
+    def list_answers_for_ticker(self, ticker: str) -> List[ResearchAnswer]:
+        """Antworten zum Ticker — matcht auch Suffix-Varianten (SAP ↔ SAP.DE).
+
+        Der Co-Pilot kennt die yfinance-Notation mit Börsensuffix nicht und
+        liefert meist das nackte Symbol; exakter Vergleich würde diese
+        Antworten verlieren.
+        """
+        base = self._base_symbol(ticker)
+        return [
+            a for a in self.list_answers()
+            if a.ticker and self._base_symbol(a.ticker) == base
+        ]
+
     def delete_answer(self, answer_id: int) -> bool:
         cur = self._conn.execute(
             "DELETE FROM research_answers WHERE id = ?", (answer_id,)

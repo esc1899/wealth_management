@@ -42,6 +42,7 @@ from typing import Optional
 from mcp.server.fastmcp import FastMCP
 from mcp_server._helpers import BearerTokenMiddleware as _BearerTokenMiddleware
 from mcp_server._helpers import build_research_md as _build_research_md
+from mcp_server._helpers import routing_hint as _routing_hint
 from mcp_server._helpers import validate_answer_input as _validate_answer_input
 from mcp_server._helpers import write_md_to_outbox as _write_md_to_outbox_helper
 
@@ -109,11 +110,15 @@ def propose_position(
     story: Optional[str] = None,
     price: Optional[float] = None,
     sources: Optional[list[str]] = None,
+    request_id: Optional[int] = None,
 ) -> str:
     """Propose a single position for the watchlist.
 
     Creates a research .md file in the outbox — the app's file watcher
     picks it up automatically within seconds.
+
+    Use this only for watchlist candidates. For factual answers or deep-dive
+    analyses use submit_research_answer() instead.
 
     Args:
         ticker: Stock ticker symbol (e.g. "AAPL")
@@ -127,11 +132,15 @@ def propose_position(
         story: Optional full investment story / long-form thesis
         price: Optional current price at time of research
         sources: Optional list of source URLs used in research
+        request_id: Optional — ID from get_research_queue() if this proposal
+            answers a queue request (links it in the app's Research Answers view)
     """
     if conviction not in {"low", "medium", "high"}:
         return f"Error: conviction must be 'low', 'medium', or 'high', got '{conviction}'"
     if suggested_action not in {"add", "watch", "skip"}:
         return f"Error: suggested_action must be 'add', 'watch', or 'skip', got '{suggested_action}'"
+    if request_id is not None and (not isinstance(request_id, int) or request_id < 1):
+        return f"Error: request_id must be a positive integer, got '{request_id}'"
 
     _slug = re.sub(r"[^A-Za-z0-9._-]", "_", ticker.lower())
     research_id = f"{date.today().isoformat()}-{_slug}-{uuid.uuid4().hex[:6]}"
@@ -159,6 +168,7 @@ def propose_position(
         primary_exchange=exchange,
         body=body,
         sources=sources,
+        request_id=request_id,
     )
 
     filename = f"{research_id}.md"
@@ -175,6 +185,7 @@ def propose_multiple(
     candidates: list[dict],
     body: Optional[str] = None,
     sources: Optional[list[str]] = None,
+    request_id: Optional[int] = None,
 ) -> str:
     """Propose multiple watchlist candidates at once.
 
@@ -187,9 +198,13 @@ def propose_multiple(
         candidates: List of candidate dicts (see field list above)
         body: Optional research summary / markdown body text
         sources: Optional list of source URLs
+        request_id: Optional — ID from get_research_queue() if this proposal
+            answers a queue request (links it in the app's Research Answers view)
     """
     if not candidates:
         return "Error: candidates list is empty"
+    if request_id is not None and (not isinstance(request_id, int) or request_id < 1):
+        return f"Error: request_id must be a positive integer, got '{request_id}'"
 
     validated: list[dict] = []
     for i, c in enumerate(candidates):
@@ -224,6 +239,7 @@ def propose_multiple(
         primary_exchange=first["exchange"],
         body=body or "",
         sources=sources,
+        request_id=request_id,
     )
 
     filename = f"{research_id}.md"
@@ -247,6 +263,11 @@ def get_research_queue() -> str:
     Returns a formatted list of pending tasks — research questions,
     watchlist candidates to investigate, or analysis deep-dives
     requested by the app or user.
+
+    Each request carries a routing hint: watchlist_candidate requests are
+    answered via propose_position()/propose_multiple(), everything else via
+    submit_research_answer(). Pass the request id along so the app can link
+    the result to the request.
     """
     try:
         conn = _get_conn()
@@ -269,6 +290,7 @@ def get_research_queue() -> str:
         lines.append(
             f"  #{row['id']} [{row['request_type']}]{ticker_part} — {row['focus']}"
             f"\n   Source: {row['source']} | Created: {ts}{ctx_part}"
+            f"\n   Routing: {_routing_hint(row['request_type'], row['id'])}"
         )
     return "\n".join(lines)
 
@@ -318,7 +340,9 @@ def submit_research_answer(
     Args:
         answer_markdown: The full answer in Markdown format (max 100 KB)
         request_id: Optional — link to a specific request from get_research_queue()
-        ticker: Optional ticker this answer relates to (max 20 chars)
+        ticker: Optional ticker this answer relates to (max 20 chars).
+            If the request carries a ticker, reuse its exact notation
+            (e.g. "SAP.DE", not "SAP") so the app can link the answer.
     """
     error = _validate_answer_input(answer_markdown, ticker)
     if error:

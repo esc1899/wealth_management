@@ -243,3 +243,37 @@ class TestInputLimits:
         from mcp_server import _helpers as mcp_helpers
         assert rq.MAX_TICKER_LEN == mcp_helpers.MAX_TICKER_LEN
         assert rq.MAX_ANSWER_BYTES == mcp_helpers.MAX_ANSWER_BYTES
+
+
+class TestListAnswersForTicker:
+    """Basis-Symbol-Matching: Co-Pilot kennt die Börsensuffix-Notation nicht (SAP vs SAP.DE)."""
+
+    def test_plain_ticker_matches_suffixed_position(self, repo):
+        repo.submit_answer("SAP Deep-Dive.", ticker="SAP")
+        answers = repo.list_answers_for_ticker("SAP.DE")
+        assert len(answers) == 1
+
+    def test_suffixed_answer_matches_plain_lookup(self, repo):
+        repo.submit_answer("SAP Deep-Dive.", ticker="SAP.DE")
+        answers = repo.list_answers_for_ticker("SAP")
+        assert len(answers) == 1
+
+    def test_exact_match_still_works(self, repo):
+        repo.submit_answer("Antwort.", ticker="NOVO-B.CO")
+        assert len(repo.list_answers_for_ticker("NOVO-B.CO")) == 1
+
+    def test_hyphen_share_class_matches(self, repo):
+        repo.submit_answer("Antwort.", ticker="NOVO-B")
+        assert len(repo.list_answers_for_ticker("NOVO-B.CO")) == 1
+
+    def test_no_false_positive_on_different_base(self, repo):
+        repo.submit_answer("Antwort.", ticker="SAPX")
+        assert repo.list_answers_for_ticker("SAP.DE") == []
+
+    def test_case_insensitive(self, repo):
+        repo.submit_answer("Antwort.", ticker="sap")
+        assert len(repo.list_answers_for_ticker("SAP.DE")) == 1
+
+    def test_answers_without_ticker_excluded(self, repo):
+        repo.submit_answer("Antwort ohne Ticker.")
+        assert repo.list_answers_for_ticker("SAP.DE") == []
