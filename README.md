@@ -138,9 +138,17 @@ streamlit run app.py
 
 **Demo mode** (no encryption key required):
 ```bash
-python scripts/seed_demo.py
+python scripts/seed_demo.py        # (re)builds data/demo.db from scratch
 DEMO_MODE=true streamlit run app.py
 ```
+
+`data/demo.db` is a **regenerable build artifact** — the seeder
+(`scripts/seed_demo.py`) is the single source of truth and populates every
+surface (positions, prices, all agent verdicts, wealth-snapshot history,
+dividends, news, sector rotation, portfolio story, Cowork queue) with
+`[Demodaten]`-tagged fixtures. Don't hand-edit `demo.db`; change the seeder and
+re-run it. It only ever writes to `demo.db` (guarded against the real
+`portfolio.db`).
 
 ## Configuration
 

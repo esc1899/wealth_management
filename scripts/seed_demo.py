@@ -138,6 +138,46 @@ DEMO_CONSENSUS_GAP: dict[str, dict] = {
     ),
 }
 
+# capital_allocator: watchlist positions only (quality of capital allocation)
+DEMO_CAPITAL_ALLOCATOR: dict[str, dict] = {
+    "NVIDIA": dict(
+        verdict="exzellent",
+        summary=_D + "ROIC > 60%, F&E-Quote diszipliniert, Aktienrückkäufe wertschaffend. Kapitalallokation erstklassig.",
+    ),
+    "Eli Lilly": dict(
+        verdict="solide",
+        summary=_D + "Hohe Reinvestition in Pipeline, Dividende stabil. CapEx-Zyklus belastet kurzfristig FCF, langfristig sinnvoll.",
+    ),
+    "Berkshire Hathaway": dict(
+        verdict="exzellent",
+        summary=_D + "Kapitalallokation ist das Geschäftsmodell — opportunistische Rückkäufe, riesiges Cash-Polster, kein Dividenden-Dogma.",
+    ),
+    "Adobe": dict(
+        verdict="fragwürdig",
+        summary=_D + "Figma-Deal geplatzt, Rückkäufe auf Bewertungshöhepunkt. Kapitaldisziplin zuletzt fragwürdig.",
+    ),
+}
+
+# devils_advocate: watchlist positions only (bear case)
+DEMO_DEVILS_ADVOCATE: dict[str, dict] = {
+    "NVIDIA": dict(
+        verdict="angreifbar",
+        summary=_D + "Bear-Case: Hyperscaler-CapEx zyklisch, Custom-Silicon (TPU, Trainium) erodiert Marge, China-Exportbann. Bewertung preist Perfektion ein.",
+    ),
+    "Eli Lilly": dict(
+        verdict="robust",
+        summary=_D + "Bear-Case schwach: GLP-1-Nachfrage strukturell, Kapazität ausgebaut. Hauptrisiko Bewertung, nicht Geschäft.",
+    ),
+    "Berkshire Hathaway": dict(
+        verdict="robust",
+        summary=_D + "Bear-Case: Key-Person-Risiko (Nachfolge), Cash-Drag. Operativ aber extrem diversifiziert und robust.",
+    ),
+    "Adobe": dict(
+        verdict="fragil",
+        summary=_D + "Bear-Case stark: GenAI (Midjourney, Sora) bedroht Kernprodukt, Preissetzungsmacht schwindet, Wachstum verlangsamt sich.",
+    ),
+}
+
 # ---------------------------------------------------------------------------
 # Demo position definitions
 # ---------------------------------------------------------------------------
@@ -165,6 +205,12 @@ DEMO_POSITIONS = [
     dict(name="Silber (Gramm)",ticker="SI=F", asset_class="Edelmetall", investment_type="Edelmetalle", unit="g",       purchase_date="2022-02-14"),
     # Crypto
     dict(name="Bitcoin",       ticker="BTC-USD", asset_class="Kryptowährung", investment_type="Krypto", unit="Stück", purchase_date="2021-01-04", empfehlung="Halten", story="Digitales Gold — langfristiger Wertspeicher als Beimischung."),
+    # --- Watchlist-only positions (in_portfolio=0, in_watchlist=1) ---
+    # Needed so watchlist-only agents (CapitalAllocator, DevilsAdvocate, WatchlistChecker) have something to act on.
+    dict(name="NVIDIA",            ticker="NVDA",  asset_class="Aktie", investment_type="Wertpapiere", unit="Stück", purchase_date="2024-01-15", in_portfolio=0, in_watchlist=1, empfehlung="Beobachten", story="KI-Infrastruktur-Monopol — CUDA-Ökosystem als Burggraben."),
+    dict(name="Eli Lilly",         ticker="LLY",   asset_class="Aktie", investment_type="Wertpapiere", unit="Stück", purchase_date="2024-01-15", in_portfolio=0, in_watchlist=1, empfehlung="Beobachten"),
+    dict(name="Berkshire Hathaway",ticker="BRK-B", asset_class="Aktie", investment_type="Wertpapiere", unit="Stück", purchase_date="2024-01-15", in_portfolio=0, in_watchlist=1),
+    dict(name="Adobe",             ticker="ADBE",  asset_class="Aktie", investment_type="Wertpapiere", unit="Stück", purchase_date="2024-01-15", in_portfolio=0, in_watchlist=1, empfehlung="Beobachten"),
     # Fixed deposit (no ticker, no yfinance)
     dict(name="Festgeld DKB 3J", ticker=None, asset_class="Festgeld", investment_type="Geld", unit="Stück",
          purchase_date="2023-03-01", quantity=10.0, purchase_price=10000.0,
@@ -196,6 +242,10 @@ FALLBACK_PRICES_USD: dict[str, float] = {
     "GC=F":  1850.0,
     "SI=F":    24.0,
     "BTC-USD": 35000.0,
+    "NVDA":    480.0,
+    "LLY":     580.0,
+    "BRK-B":   360.0,
+    "ADBE":    560.0,
 }
 
 TROY_OZ_TO_GRAM = 31.1035
@@ -503,8 +553,8 @@ def seed(db_path: str = "data/demo.db", conn: Optional[sqlite3.Connection] = Non
                 None,         # recommendation_source
                 None,         # strategy
                 today,
-                1,            # in_portfolio
-                0,            # in_watchlist (demo positions are portfolio-only by default)
+                pos.get("in_portfolio", 1),   # default: portfolio position
+                pos.get("in_watchlist", 0),    # default: not on watchlist
                 empfehlung,
                 story,
             ),
@@ -554,20 +604,30 @@ def seed(db_path: str = "data/demo.db", conn: Optional[sqlite3.Connection] = Non
     from agents.market_data_fetcher import MarketDataFetcher
     from core.storage.market_data import MarketDataRepository
 
+    import math
+
     market_repo = MarketDataRepository(conn)
     fetcher = MarketDataFetcher()
     for ticker in seen_tickers:
         history = fetcher.fetch_historical(ticker, period="1y")
+        n_ok = 0
         for h in history:
+            # A missing FX rate can yield a NaN close, which SQLite stores as NULL
+            # (NOT NULL constraint violation). Skip those points.
+            if h.close_eur is None or math.isnan(h.close_eur):
+                continue
             market_repo.upsert_historical(h)
-        print(f"  {ticker}: {len(history)} Datenpunkte")
+            n_ok += 1
+        print(f"  {ticker}: {n_ok} Datenpunkte")
 
     # --- seed demo analyses (storychecker, fundamental, consensus_gap) ---
     print("\nSeeding demo analyses ...")
     _demo_agents = [
-        ("storychecker",  DEMO_STORYCHECKER),
-        ("fundamental",   DEMO_FUNDAMENTAL),
-        ("consensus_gap", DEMO_CONSENSUS_GAP),
+        ("storychecker",     DEMO_STORYCHECKER),
+        ("fundamental",      DEMO_FUNDAMENTAL),
+        ("consensus_gap",    DEMO_CONSENSUS_GAP),
+        ("capital_allocator", DEMO_CAPITAL_ALLOCATOR),
+        ("devils_advocate",   DEMO_DEVILS_ADVOCATE),
     ]
     for agent_name, demo_map in _demo_agents:
         for pos_name, data in demo_map.items():
@@ -588,6 +648,10 @@ def seed(db_path: str = "data/demo.db", conn: Optional[sqlite3.Connection] = Non
             print(f"  [{agent_name}] {pos_name}: {data['verdict']}")
         conn.commit()
 
+    # --- seed everything else (portfolio story, news, sector rotation,
+    #     structural change, dividends, wealth snapshots, cowork) ---
+    _seed_extras(conn)
+
     if own_conn:
         conn.close()
         print(f"\nDemo database seeded at {os.path.abspath(db_path)}")
@@ -596,8 +660,283 @@ def seed(db_path: str = "data/demo.db", conn: Optional[sqlite3.Connection] = Non
     return inserted
 
 
+# ---------------------------------------------------------------------------
+# Extra fixtures — every other persisted analysis surface
+# All marked [Demodaten] / skill_name "Demodaten", written as plaintext (demo).
+# ---------------------------------------------------------------------------
+
+# Forward annual dividend per share (EUR) + yield (decimal) for the payers.
+DEMO_DIVIDENDS: dict[str, tuple[float, float]] = {
+    "AAPL":    (1.00, 0.005),
+    "MSFT":    (2.80, 0.008),
+    "NESN.SW": (3.00, 0.030),
+    "SIE.DE":  (5.20, 0.026),
+    "TM":      (2.50, 0.018),
+    "TSM":     (2.20, 0.015),
+    "VWRL.AS": (1.40, 0.018),
+    "AGGG.L":  (0.12, 0.030),
+    "REET":    (0.60, 0.025),
+}
+
+# Asset classes whose value fluctuates with the market (used for the snapshot
+# time-series). Immobilie / Festgeld are held flat across months.
+_MARKET_CLASSES = {"Aktie", "Aktienfonds", "Rentenfonds", "Immobilienfonds",
+                   "Edelmetall", "Kryptowährung"}
+
+
+def _months_back(d: date, n: int) -> date:
+    """Return the 1st of the month n months before d's month."""
+    month0 = d.year * 12 + (d.month - 1) - n
+    return date(month0 // 12, month0 % 12 + 1, 1)
+
+
+def _portfolio_value_by_class(conn: sqlite3.Connection) -> dict[str, float]:
+    """Current EUR value of all in_portfolio positions, grouped by asset_class.
+
+    Uses current_prices (price_eur is per native unit; per troy oz for metals).
+    Falls back to cost basis (quantity × purchase_price) when no price is known.
+    """
+    import json as _json
+
+    prices = {
+        r["symbol"].upper(): r["price_eur"]
+        for r in conn.execute("SELECT symbol, price_eur FROM current_prices").fetchall()
+    }
+    breakdown: dict[str, float] = {}
+    rows = conn.execute(
+        "SELECT name, ticker, quantity, unit, purchase_price, asset_class, extra_data "
+        "FROM positions WHERE in_portfolio = 1"
+    ).fetchall()
+    for r in rows:
+        qty = float(r["quantity"] or 0)
+        cost = float(r["purchase_price"] or 0)
+        ticker = (r["ticker"] or "").upper()
+        unit = r["unit"]
+        value = qty * cost  # default: cost basis
+
+        if ticker and ticker in prices:
+            px = prices[ticker]
+            if unit == "g":
+                value = qty * (px / TROY_OZ_TO_GRAM)
+            else:  # "Stück" / "Troy Oz"
+                value = qty * px
+        elif not ticker and r["extra_data"]:
+            try:
+                est = _json.loads(r["extra_data"]).get("estimated_value")
+                if est:
+                    value = float(est)
+            except (ValueError, TypeError):
+                pass
+
+        breakdown[r["asset_class"]] = breakdown.get(r["asset_class"], 0.0) + value
+    return breakdown
+
+
+def _seed_wealth_snapshots(conn: sqlite3.Connection) -> None:
+    """Generate ~13 monthly wealth snapshots (deterministic gentle uptrend)."""
+    import math
+    from core.storage.wealth_snapshots import WealthSnapshotRepository
+
+    base = _portfolio_value_by_class(conn)
+    if not base:
+        print("  [wealth_snapshots] no portfolio value — skipping")
+        return
+
+    repo = WealthSnapshotRepository(conn)
+    today = date.today()
+    n = 0
+    # i = 0 → today (full value); i = 1..12 → 1st of each prior month, scaled down
+    for i in range(12, -1, -1):
+        snap_date = today if i == 0 else _months_back(today, i)
+        # Gentle uptrend: market classes ~1.8 %/month lower the further back,
+        # plus a small deterministic wave; non-market classes held flat.
+        factor = (1 - 0.018 * i) * (1 + 0.012 * math.sin(i))
+        bd: dict[str, float] = {}
+        for cls, val in base.items():
+            bd[cls] = round(val * (factor if cls in _MARKET_CLASSES else 1.0), 2)
+        total = round(sum(bd.values()), 2)
+        try:
+            repo.create(snap_date.isoformat(), total, bd, note=_D.strip())
+            n += 1
+        except ValueError:
+            pass  # duplicate date — skip
+    print(f"  [wealth_snapshots] {n} monthly snapshots")
+
+
+def _seed_dividends(conn: sqlite3.Connection) -> None:
+    from core.storage.market_data import MarketDataRepository
+    from core.storage.models import DividendRecord
+
+    repo = MarketDataRepository(conn)
+    now = datetime.now(timezone.utc)
+    for symbol, (rate_eur, yield_pct) in DEMO_DIVIDENDS.items():
+        repo.upsert_dividend(DividendRecord(
+            symbol=symbol, rate_eur=rate_eur, yield_pct=yield_pct,
+            currency="EUR", fetched_at=now,
+        ))
+    print(f"  [dividends] {len(DEMO_DIVIDENDS)} symbols")
+
+
+def _seed_portfolio_story(conn: sqlite3.Connection) -> None:
+    """Seed the narrative + one analysis + per-position fit roles (plaintext, demo)."""
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        """INSERT INTO portfolio_story
+               (story, target_year, liquidity_need, priority, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (
+            _D + "Langfristiger Vermögensaufbau mit Fokus auf Qualitätsunternehmen, "
+                 "ergänzt um breite ETFs, Edelmetalle als Absicherung und eine kleine "
+                 "Krypto-Beimischung. Ziel: finanzielle Unabhängigkeit bis 2040.",
+            2040, "2030: Modernisierung Immobilie ~80k", "Gemischt", now, now,
+        ),
+    )
+    conn.execute(
+        """INSERT INTO portfolio_story_analyses
+               (verdict, summary, perf_verdict, perf_summary,
+                stability_verdict, stability_summary, full_text, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            "intact", _D + "Portfolio deckt die Wachstums- und Sicherheitsziele konsistent ab.",
+            "on_track", _D + "Breite Diversifikation, Performance im Plan.",
+            "stabil", _D + "Edelmetall- und Anleihen-Anteil federt Drawdowns gut ab.",
+            _D + "## Portfolio Story-Check\n\nDie Allokation passt zur formulierten Strategie: "
+                 "Qualitätsaktien als Wachstumsmotor, ETFs als Basis, Gold/Anleihen als Stabilitätsanker.\n\n"
+                 "## Positions-Analyse\n\nKeine Fehlplatzierungen erkennbar.\n\n"
+                 "## Stabilität\n\nDefensiver Anteil ausreichend für den Anlagehorizont bis 2040.",
+            now,
+        ),
+    )
+    # Per-position fit roles for a handful of core holdings
+    fits = {
+        "Microsoft": ("Wachstumsmotor", "Cloud/KI treibt langfristiges Gewinnwachstum."),
+        "ASML": ("Wachstumsmotor", "Strukturelles Halbleiter-Wachstum, Monopolstellung."),
+        "Nestlé": ("Stabilitätsanker", "Defensiver Konsumwert mit verlässlicher Dividende."),
+        "iShares Global Aggregate Bond": ("Stabilitätsanker", "Anleihen dämpfen die Portfolio-Volatilität."),
+        "Gold (Unzen)": ("Diversifikationselement", "Unkorrelierte Absicherung gegen Marktstress."),
+        "Bitcoin": ("Diversifikationselement", "Asymmetrische Beimischung, kleine Positionsgröße."),
+    }
+    for name, (role, summary) in fits.items():
+        row = conn.execute("SELECT id FROM positions WHERE name = ? LIMIT 1", (name,)).fetchone()
+        if row is None:
+            continue
+        conn.execute(
+            """INSERT INTO portfolio_story_position_fits
+                   (position_id, fit_role, fit_summary, created_at)
+               VALUES (?, ?, ?, ?)""",
+            (row[0], role, _D + summary, now),
+        )
+    conn.commit()
+    print("  [portfolio_story] narrative + analysis + position fits")
+
+
+def _seed_news(conn: sqlite3.Connection) -> None:
+    from core.storage.news import NewsRepository
+
+    repo = NewsRepository(conn)
+    repo.save_run(
+        "Demodaten", ["AAPL", "MSFT", "NVDA"],
+        _D + "## Tech-News\n\n"
+             "- **Microsoft**: Copilot-Umsätze übertreffen Analystenerwartungen; Azure +29 % YoY.\n"
+             "- **Apple**: Neue Service-Rekorde, iPhone-Absatz in China stabilisiert sich.\n"
+             "- **NVIDIA**: Nächste GPU-Generation angekündigt, Lieferzeiten weiter lang.",
+    )
+    repo.save_run(
+        "Demodaten", ["NESN.SW", "NVO"],
+        _D + "## Health & Consumer\n\n"
+             "- **Nestlé**: Organisches Wachstum schwach, Preiserhöhungen greifen verzögert.\n"
+             "- **Novo Nordisk**: GLP-1-Kapazität ausgebaut, Konkurrenzdruck durch Eli Lilly steigt.",
+    )
+    print("  [news] 2 runs")
+
+
+def _seed_sector_rotation(conn: sqlite3.Connection) -> None:
+    from core.storage.sector_rotation import SectorRotationRepository
+
+    repo = SectorRotationRepository(conn)
+    run = repo.save_run(
+        "Demodaten",
+        _D + "## Sector Rotation Scan\n\nKapital fließt aktuell in Technologie und Healthcare, "
+             "raus aus defensiven Versorgern. Das Portfolio ist in Tech gut positioniert, "
+             "aber in Industrie leicht unterexponiert.",
+    )
+    verdicts = [
+        ("Technologie",          "aligned",       "inflow",  "Starke Zuflüsse — Portfolio gut positioniert."),
+        ("Healthcare",           "lagging",        "inflow",  "Sektor zieht an, Portfolio-Gewicht zu gering."),
+        ("Basiskonsum",          "overexposed",    "outflow", "Defensive Werte verlieren Momentum."),
+        ("Industrie",            "rotation_risk",  "neutral", "Rotationskandidat — Flows drehen uneinheitlich."),
+    ]
+    for sector, verdict, momentum, summary in verdicts:
+        repo.save_verdict(run.id, sector, verdict, momentum, _D + summary)
+    print("  [sector_rotation] 1 run + 4 verdicts")
+
+
+def _seed_structural_scan(conn: sqlite3.Connection) -> None:
+    now = datetime.now().isoformat()
+    cur = conn.execute(
+        "INSERT INTO structural_scan_runs (skill_name, user_focus, result, created_at) "
+        "VALUES (?, ?, ?, ?)",
+        (
+            "Demodaten", "KI-Disruption im Software-Sektor",
+            _D + "## Strukturelle Veränderungen\n\nGenerative KI verändert die Software-Wertschöpfung: "
+                 "SaaS-Anbieter ohne eigenes Modell geraten unter Margendruck, während "
+                 "Infrastruktur-Anbieter (Cloud, GPU) profitieren. Relevanz fürs Portfolio: "
+                 "Microsoft (positiv), Adobe (Watchlist, gefährdet).",
+            now,
+        ),
+    )
+    conn.execute(
+        "INSERT INTO structural_scan_messages (run_id, role, content, created_at) "
+        "VALUES (?, ?, ?, ?)",
+        (cur.lastrowid, "assistant",
+         _D + "Zusammenfassung: KI ist Rückenwind für Plattform-/Infrastruktur-Player, "
+              "Gegenwind für reine Applikations-SaaS.", now),
+    )
+    conn.commit()
+    print("  [structural_scan] 1 run + 1 message")
+
+
+def _seed_cowork(conn: sqlite3.Connection) -> None:
+    from core.storage.research_queue import ResearchQueueRepository
+
+    repo = ResearchQueueRepository(conn)
+    # One open request
+    repo.create_request(
+        _D + "Wie robust ist die Wettbewerbsposition von ASML gegenüber Canon/Nikon?",
+        request_type="research_question", ticker="ASML", source="manual",
+    )
+    # One answered request (linked answer)
+    req = repo.create_request(
+        _D + "Bear-Case für NVIDIA recherchieren.",
+        request_type="watchlist_candidate", ticker="NVDA", source="manual",
+    )
+    repo.submit_answer(
+        _D + "## NVIDIA — Bear-Case\n\nHauptrisiken: zyklische Hyperscaler-CapEx, "
+             "Custom-Silicon der Cloud-Anbieter, China-Exportbeschränkungen. "
+             "Bewertung preist anhaltend hohe Wachstumsraten ein.",
+        request_id=req.id, ticker="NVDA",
+    )
+    repo.complete_request(req.id)
+    print("  [cowork] 2 requests (1 open, 1 answered)")
+
+
+def _seed_extras(conn: sqlite3.Connection) -> None:
+    """Seed all remaining demo surfaces. Each helper is independent/idempotent-safe."""
+    print("\nSeeding extra demo data ...")
+    _seed_dividends(conn)
+    _seed_wealth_snapshots(conn)
+    _seed_portfolio_story(conn)
+    _seed_news(conn)
+    _seed_sector_rotation(conn)
+    _seed_structural_scan(conn)
+    _seed_cowork(conn)
+
+
 if __name__ == "__main__":
     import pandas as pd  # noqa: F401 — ensure available before seed()
     db_path = os.getenv("DEMO_DB_PATH", "data/demo.db")
+    # Safety guard: never seed over the real production DB.
+    if os.path.basename(os.path.abspath(db_path)) == "portfolio.db":
+        raise SystemExit("Refusing to seed: target resolves to portfolio.db (the real DB).")
     print(f"Seeding demo database: {db_path}\n")
     seed(db_path)

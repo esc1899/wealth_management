@@ -51,6 +51,10 @@ MOCK_PRICES: dict[str, float] = {
     "GC=F":  1850.0,
     "SI=F":    24.0,
     "BTC-USD": 35000.0,
+    "NVDA":    480.0,
+    "LLY":     580.0,
+    "BRK-B":   360.0,
+    "ADBE":    560.0,
     # FX pairs
     "EURUSD=X": 1.10,
     "GBPUSD=X": 1.28,
@@ -99,7 +103,7 @@ def in_memory_conn():
 class TestDemoSeed:
     @patch("yfinance.download", side_effect=_mock_download)
     @patch("yfinance.Ticker")
-    def test_all_17_positions_inserted(self, mock_ticker_cls, mock_download, in_memory_conn):
+    def test_all_positions_inserted(self, mock_ticker_cls, mock_download, in_memory_conn):
         mock_ticker_cls.return_value.fast_info = _mock_fast_info("AAPL")
 
         # Patch fast_info per ticker
@@ -113,7 +117,8 @@ class TestDemoSeed:
         from scripts.seed_demo import seed
         inserted = seed(conn=in_memory_conn)
 
-        assert len(inserted) == 20, f"Expected 20 positions, got {len(inserted)}"
+        # 20 portfolio + 4 watchlist-only positions
+        assert len(inserted) == 24, f"Expected 24 positions, got {len(inserted)}"
 
     @patch("yfinance.download", side_effect=_mock_download)
     @patch("yfinance.Ticker")
@@ -222,3 +227,75 @@ class TestDemoSeed:
         assert gold_g["quantity"] > gold_oz["quantity"]
         # Silver in grams: purchase price per gram should be much less than gold per troy oz
         assert silver_g["purchase_price"] < gold_oz["purchase_price"]
+
+    @patch("yfinance.download", side_effect=_mock_download)
+    @patch("yfinance.Ticker")
+    def test_watchlist_positions_seeded(self, mock_ticker_cls, mock_download, in_memory_conn):
+        """4 watchlist-only positions (in_portfolio=0, in_watchlist=1) exist."""
+        def _ticker_factory(t):
+            m = MagicMock()
+            m.fast_info = _mock_fast_info(t)
+            return m
+
+        mock_ticker_cls.side_effect = _ticker_factory
+
+        from scripts.seed_demo import seed
+        seed(conn=in_memory_conn)
+
+        n_watchlist = in_memory_conn.execute(
+            "SELECT COUNT(*) FROM positions WHERE in_watchlist = 1 AND in_portfolio = 0"
+        ).fetchone()[0]
+        assert n_watchlist == 4
+
+    @patch("yfinance.download", side_effect=_mock_download)
+    @patch("yfinance.Ticker")
+    def test_extra_surfaces_seeded(self, mock_ticker_cls, mock_download, in_memory_conn):
+        """Every demo surface beyond positions/prices/3-checks has rows."""
+        def _ticker_factory(t):
+            m = MagicMock()
+            m.fast_info = _mock_fast_info(t)
+            return m
+
+        mock_ticker_cls.side_effect = _ticker_factory
+
+        from scripts.seed_demo import seed
+        seed(conn=in_memory_conn)
+
+        def _count(sql: str) -> int:
+            return in_memory_conn.execute(sql).fetchone()[0]
+
+        # Watchlist-only agents
+        assert _count("SELECT COUNT(*) FROM position_analyses WHERE agent = 'capital_allocator'") == 4
+        assert _count("SELECT COUNT(*) FROM position_analyses WHERE agent = 'devils_advocate'") == 4
+        # Time-series + analysis surfaces
+        assert _count("SELECT COUNT(*) FROM wealth_snapshots") >= 12
+        assert _count("SELECT COUNT(*) FROM dividend_data") == 9
+        assert _count("SELECT COUNT(*) FROM portfolio_story_analyses") == 1
+        assert _count("SELECT COUNT(*) FROM portfolio_story_position_fits") >= 1
+        assert _count("SELECT COUNT(*) FROM portfolio_story") == 1
+        assert _count("SELECT COUNT(*) FROM news_runs") == 2
+        assert _count("SELECT COUNT(*) FROM sector_rotation_runs") == 1
+        assert _count("SELECT COUNT(*) FROM sector_verdicts") == 4
+        assert _count("SELECT COUNT(*) FROM structural_scan_runs") == 1
+        # Cowork
+        assert _count("SELECT COUNT(*) FROM research_requests") == 2
+        assert _count("SELECT COUNT(*) FROM research_answers") == 1
+
+    @patch("yfinance.download", side_effect=_mock_download)
+    @patch("yfinance.Ticker")
+    def test_wealth_snapshot_uptrend(self, mock_ticker_cls, mock_download, in_memory_conn):
+        """Latest snapshot value should exceed the oldest (gentle uptrend)."""
+        def _ticker_factory(t):
+            m = MagicMock()
+            m.fast_info = _mock_fast_info(t)
+            return m
+
+        mock_ticker_cls.side_effect = _ticker_factory
+
+        from scripts.seed_demo import seed
+        seed(conn=in_memory_conn)
+
+        rows = in_memory_conn.execute(
+            "SELECT total_eur FROM wealth_snapshots ORDER BY date ASC"
+        ).fetchall()
+        assert rows[-1]["total_eur"] > rows[0]["total_eur"]

@@ -24,6 +24,11 @@ streamlit run app.py
 # Start on the fixed Dock-app port
 streamlit run app.py --server.port 6655
 
+# Rebuild the demo DB (data/demo.db is a regenerable build artifact — seeder is
+# source of truth, populates every surface with [Demodaten] fixtures; guarded
+# against overwriting the real portfolio.db). Run with DEMO_MODE=true afterwards.
+python scripts/seed_demo.py
+
 # Restart after DB-schema, agent-signature, or repository-method changes
 kill $(pgrep -f "streamlit run") && streamlit run app.py
 
