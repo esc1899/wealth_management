@@ -159,6 +159,30 @@ async def test_chat_with_tools_validates_output(provider):
     assert result.content == "Analysis complete"
 
 
+@pytest.mark.asyncio
+async def test_native_web_search_passed_through(provider):
+    """Claude uses Anthropic's native server-side web_search — the tool must NOT be
+    replaced by Tavily, even when TAVILY_API_KEY is set."""
+    import os
+    captured = {}
+
+    async def mock_create(**kwargs):
+        captured.update(kwargs)
+        return make_claude_response("done")
+
+    provider._client.messages.create = mock_create
+
+    with patch.dict(os.environ, {"TAVILY_API_KEY": "tav_test"}):
+        await provider.chat_with_tools(
+            messages=[{"role": "user", "content": "Analyse"}],
+            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
+            system="Analyst.",
+        )
+
+    tool_types = [t.get("type") for t in captured["tools"]]
+    assert "web_search_20250305" in tool_types  # native tool passed through, not swapped for Tavily
+
+
 # ------------------------------------------------------------------
 # Message Batches API
 # ------------------------------------------------------------------

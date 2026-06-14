@@ -207,6 +207,10 @@ class OpenAICompatibleProvider(LLMProvider):
         _t0 = time.monotonic()
         total_input = total_output = 0
         total_web_search = 0
+        # Accumulate prose across ALL turns: the model often writes analysis text in the same
+        # turn it calls web_search, then only the verdict tool in the final turn — using the
+        # final message content alone would drop that prose.
+        content_parts: list[str] = []
 
         for _ in range(_MAX_SEARCH_ITERATIONS):
             response = await self._client.chat.completions.create(**kwargs)
@@ -216,6 +220,9 @@ class OpenAICompatibleProvider(LLMProvider):
             if response.usage:
                 total_input += response.usage.prompt_tokens
                 total_output += response.usage.completion_tokens
+
+            if msg.content:
+                content_parts.append(msg.content)
 
             # Separate web_search calls (handled here) from other tool calls (returned to caller)
             search_calls = []
@@ -282,7 +289,7 @@ class OpenAICompatibleProvider(LLMProvider):
 
             stop_reason = "tool_use" if other_calls else "end_turn"
             return _OAIResponse(
-                content=msg.content or "",
+                content="".join(content_parts),
                 tool_calls=other_calls,
                 stop_reason=stop_reason,
                 raw_blocks=[oai_assistant_msg],
@@ -291,4 +298,4 @@ class OpenAICompatibleProvider(LLMProvider):
         _duration_ms = int((time.monotonic() - _t0) * 1000)
         if self.on_usage:
             self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count, None, None, total_web_search or None)
-        return _OAIResponse(content="", tool_calls=[], stop_reason="end_turn", raw_blocks=[])
+        return _OAIResponse(content="".join(content_parts), tool_calls=[], stop_reason="end_turn", raw_blocks=[])

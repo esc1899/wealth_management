@@ -1,6 +1,6 @@
 import pytest
 import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from core.llm.openai_compatible import (
     OpenAICompatibleProvider,
     _to_openai_tools,
@@ -250,6 +250,34 @@ class TestChatWithTools:
         assert result.tool_calls[0].id == "call_123"
         assert result.tool_calls[0].name == "search"
         assert result.tool_calls[0].input == {"query": "AAPL"}
+
+    @pytest.mark.asyncio
+    async def test_tavily_loop_accumulates_prose_across_turns(self, provider, monkeypatch):
+        """Regression: prose written in the web_search turn must survive even when the model
+        only calls the verdict tool in the final turn (Tavily client-side loop)."""
+        monkeypatch.setenv("TAVILY_API_KEY", "tav_test")
+
+        # Turn 1: prose + a web_search call → provider runs Tavily and continues.
+        turn1 = make_oai_response("Teil 1. ", [make_tool_call("ws1", "web_search", {"query": "x"})])
+        # Turn 2: more prose + submit (non-web tool) → returns to caller.
+        turn2 = make_oai_response("Teil 2.", [make_tool_call("s1", "submit_fa_verdict", {"verdict": "fair"})])
+
+        provider._client.chat.completions.create = AsyncMock(side_effect=[turn1, turn2])
+
+        with patch("core.search.tavily.search", return_value="ergebnis"):
+            result = await provider.chat_with_tools(
+                messages=[{"role": "user", "content": "Analysiere"}],
+                tools=[
+                    {"type": "web_search_20250305", "name": "web_search", "max_uses": 3},
+                    {"name": "submit_fa_verdict", "description": "submit",
+                     "input_schema": {"type": "object", "properties": {}}},
+                ],
+                system="Analyst.",
+            )
+
+        # Without the cross-turn accumulation fix this would be just "Teil 2.".
+        assert result.content == "Teil 1. Teil 2."
+        assert any(tc.name == "submit_fa_verdict" for tc in result.tool_calls)
 
     @pytest.mark.asyncio
     async def test_system_message_prepended(self, provider):

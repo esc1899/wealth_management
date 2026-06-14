@@ -146,43 +146,16 @@ class ClaudeProvider(LLMProvider):
     ) -> ClaudeResponse:
         """
         Single API call with tool definitions.
-        Returns text content and any client-side tool calls.
 
-        Server-side web_search (Anthropic built-in) is handled transparently.
-        When TAVILY_API_KEY is set, web_search_20250305 is replaced with a
-        client-side Tavily tool — the search loop runs internally so callers
-        see no difference.
+        Anthropic's built-in server-side web_search is passed through natively: the
+        model runs any searches server-side within a single response, so there is no
+        client-side search loop. Returns the text content and any client tool calls.
         """
-        import os
-        from core.search import tavily as _tavily
-
-        tavily_key = os.getenv("TAVILY_API_KEY", "")
-        _WEB_SEARCH_SERVER = "web_search_20250305"
-
-        # Extract max_uses before replacement — max_uses is a server-side-only field
-        # that Anthropic enforces, but is lost when we replace the tool with Tavily.
-        _web_search_max_uses: Optional[int] = next(
-            (t.get("max_uses") for t in tools
-             if t.get("type") == _WEB_SEARCH_SERVER or t.get("name") == "web_search"),
-            None,
-        )
-
-        # Replace server-side web_search with Tavily client-side tool if configured
-        if tavily_key:
-            resolved_tools = [
-                _tavily.TAVILY_TOOL_DEFINITION
-                if t.get("type") == _WEB_SEARCH_SERVER or t.get("name") == "web_search"
-                else t
-                for t in tools
-            ]
-        else:
-            resolved_tools = tools
-
         kwargs: dict = {
             "model": self._model,
             "max_tokens": max_tokens,
-            "messages": list(messages),  # copy — we may extend it in the Tavily loop
-            "tools": resolved_tools,
+            "messages": list(messages),
+            "tools": tools,
         }
         if system:
             kwargs["system"] = [{"type": "text", "text": system}]
@@ -197,93 +170,37 @@ class ClaudeProvider(LLMProvider):
                 kwargs["thinking"] = {"type": "adaptive", "display": "summarized"}
 
         _t0 = time.monotonic()
-        total_input = 0
-        total_output = 0
-        total_cache_read = 0
-        total_cache_write = 0
-        total_web_search = 0
-        _tavily_call_count = 0
 
-        # Loop to handle Tavily tool calls (max 10 iterations as safety net)
-        for _ in range(10):
-            # Retry up to 3 times on rate limit errors
-            for attempt in range(3):
-                try:
-                    response = await self._client.messages.create(**kwargs)
-                    break
-                except anthropic.RateLimitError:
-                    if attempt < 2:
-                        await asyncio.sleep(60)
-                    else:
-                        raise
+        # Retry up to 3 times on rate limit errors
+        for attempt in range(3):
+            try:
+                response = await self._client.messages.create(**kwargs)
+                break
+            except anthropic.RateLimitError:
+                if attempt < 2:
+                    await asyncio.sleep(60)
+                else:
+                    raise
 
-            total_input += response.usage.input_tokens
-            total_output += response.usage.output_tokens
-            total_cache_read += getattr(response.usage, 'cache_read_input_tokens', 0) or 0
-            total_cache_write += getattr(response.usage, 'cache_creation_input_tokens', 0) or 0
-            # Anthropic built-in web_search: count from server_tool_use usage field
-            _stu = getattr(response.usage, 'server_tool_use', None)
-            total_web_search += getattr(_stu, 'web_search_requests', 0) or 0
-
-            # Collect web_search tool calls if Tavily is active
-            if tavily_key and response.stop_reason == "tool_use":
-                web_calls = [
-                    b for b in response.content
-                    if getattr(b, "type", None) == "tool_use"
-                    and getattr(b, "name", None) == "web_search"
-                ]
-                other_calls = [
-                    b for b in response.content
-                    if getattr(b, "type", None) == "tool_use"
-                    and getattr(b, "name", None) != "web_search"
-                ]
-
-                if web_calls:
-                    # Execute searches and inject results
-                    kwargs["messages"].append(
-                        {"role": "assistant", "content": list(response.content)}
-                    )
-                    tool_results = []
-                    for call in web_calls:
-                        query = call.input.get("query", "")
-                        if _web_search_max_uses is not None and _tavily_call_count >= _web_search_max_uses:
-                            result = f"[Search limit of {_web_search_max_uses} reached. Base your answer on the results already gathered.]"
-                        else:
-                            _tavily_call_count += 1
-                            total_web_search += 1
-                            try:
-                                result = _tavily.search(query, tavily_key, search_depth=self._tavily_search_depth)
-                            except Exception as e:
-                                result = f"Search failed: {e}"
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": call.id,
-                            "content": result,
-                        })
-                    kwargs["messages"].append(
-                        {"role": "user", "content": tool_results}
-                    )
-                    # If there are also non-web client tools, break out to caller
-                    if other_calls:
-                        break
-                    continue  # fetch next Claude response with search results injected
-
-            # No more Tavily calls — exit loop
-            break
+        total_input = response.usage.input_tokens
+        total_output = response.usage.output_tokens
+        total_cache_read = getattr(response.usage, 'cache_read_input_tokens', 0) or 0
+        total_cache_write = getattr(response.usage, 'cache_creation_input_tokens', 0) or 0
+        # Anthropic built-in web_search: count from the server_tool_use usage field.
+        _stu = getattr(response.usage, 'server_tool_use', None)
+        total_web_search = getattr(_stu, 'web_search_requests', 0) or 0
 
         content_text = ""
         tool_calls: List[ClaudeToolCall] = []
-
         for block in response.content:
             if hasattr(block, "text"):
                 content_text += block.text
             elif getattr(block, "type", None) == "tool_use":
-                if not tavily_key or block.name != "web_search":
-                    tool_calls.append(ClaudeToolCall(
-                        id=block.id,
-                        name=block.name,
-                        input=block.input,
-                    ))
+                tool_calls.append(ClaudeToolCall(
+                    id=block.id,
+                    name=block.name,
+                    input=block.input,
+                ))
 
         # Validate response for signs of prompt injection
         content_text = validate_llm_response(content_text)
