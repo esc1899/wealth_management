@@ -413,22 +413,25 @@ class AgentSchedulerService:
         return self._default_claude_model or ""
 
     def _make_scheduled_llm(self, agent_name: str, model: str, conn):
-        """Create a provider for a scheduled job.
+        """Create a provider for a scheduled job — routing delegated to core.llm.router.
 
-        Routes by model name prefix (same logic as state_llm._make_public_provider):
-        - claude-*  → ClaudeProvider (Anthropic direct)
-        - otherwise → OpenAICompatibleProvider (OpenRouter / custom base URL)
+        The scheduler has no DeepSeek-direct credentials, so deepseek-* models fall
+        through to the OpenAI-compatible (OpenRouter) path.
         """
         from core.llm.claude import ClaudeProvider
         from core.llm.openai_compatible import OpenAICompatibleProvider
+        from core.llm.router import resolve_provider_kind, tavily_news_mode, tavily_search_depth
         usage_repo = UsageRepository(conn)
-        tavily_agents = {"news", "structural_scan", "sector_rotation", "search_agent"}
-        if model.startswith("claude-") and self._anthropic_key:
-            llm = ClaudeProvider(api_key=self._anthropic_key, model=model, base_url=self._llm_base_url)
-        elif self._openai_base_url:
+        kind = resolve_provider_kind(
+            model,
+            has_anthropic=bool(self._anthropic_key),
+            has_deepseek=False,
+            has_openai_base=bool(self._openai_base_url),
+        )
+        if kind == "openai":
             llm = OpenAICompatibleProvider(
                 api_key=self._openai_api_key, model=model, base_url=self._openai_base_url,
-                tavily_news_mode=agent_name in tavily_agents,
+                tavily_news_mode=tavily_news_mode(agent_name), tavily_search_depth=tavily_search_depth(agent_name),
             )
         else:
             llm = ClaudeProvider(api_key=self._anthropic_key, model=model, base_url=self._llm_base_url)

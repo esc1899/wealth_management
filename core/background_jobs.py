@@ -48,30 +48,31 @@ def _resolve_model_from_conn(conn, agent_key: str, default: str) -> str:
 
 
 def _make_bg_llm(model: str, agent_name: str, usage_repo: UsageRepository):
-    """Create the correct LLM provider based on model prefix and available API keys.
+    """Create the correct LLM provider for a model — routing delegated to core.llm.router."""
+    from core.llm.router import resolve_provider_kind, tavily_news_mode, tavily_search_depth
 
-    Mirrors the routing logic in state_llm._make_public_provider:
-    claude-* + LLM_API_KEY  → Anthropic direct
-    anything + OPENAI_BASE_URL  → OpenRouter/OpenAI-compatible
-    fallback  → Anthropic direct
-    """
     def _on_usage(i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None):
         usage_repo.record(agent_name, model, i, o, skill=skill, source="manual", duration_ms=dur,
                           position_count=pos, cache_read_tokens=cache_read,
                           cache_write_tokens=cache_write, web_search_requests=web_search)
 
-    if model.startswith("claude-") and config.LLM_API_KEY:
+    kind = resolve_provider_kind(
+        model,
+        has_anthropic=bool(config.LLM_API_KEY),
+        has_deepseek=bool(config.DEEPSEEK_API_KEY),
+        has_openai_base=bool(config.OPENAI_BASE_URL),
+    )
+    if kind == "claude":
         llm = ClaudeProvider(api_key=config.LLM_API_KEY, model=model, base_url=config.LLM_BASE_URL)
-        llm.on_usage = _on_usage
-        return llm
-
-    if config.OPENAI_BASE_URL:
+    elif kind == "deepseek":
         from core.llm.openai_compatible import OpenAICompatibleProvider
-        llm = OpenAICompatibleProvider(api_key=config.OPENAI_API_KEY, model=model, base_url=config.OPENAI_BASE_URL)
-        llm.on_usage = _on_usage
-        return llm
-
-    llm = ClaudeProvider(api_key=config.LLM_API_KEY, model=model, base_url=config.LLM_BASE_URL)
+        llm = OpenAICompatibleProvider(api_key=config.DEEPSEEK_API_KEY, model=model, base_url=config.DEEPSEEK_BASE_URL)
+    else:
+        from core.llm.openai_compatible import OpenAICompatibleProvider
+        llm = OpenAICompatibleProvider(
+            api_key=config.OPENAI_API_KEY, model=model, base_url=config.OPENAI_BASE_URL,
+            tavily_news_mode=tavily_news_mode(agent_name), tavily_search_depth=tavily_search_depth(agent_name),
+        )
     llm.on_usage = _on_usage
     return llm
 

@@ -6,11 +6,8 @@ from config import config
 from core.llm.base import LLMProvider
 from core.llm.claude import ClaudeProvider
 from core.llm.local import OllamaProvider
+from core.llm.router import resolve_provider_kind, tavily_news_mode, tavily_search_depth
 from state_repos import get_usage_repo, get_app_config_repo
-
-
-_TAVILY_NEWS_AGENTS = {"news", "structural_scan"}
-_TAVILY_ADVANCED_AGENTS = {"fundamental_analyzer"}
 
 
 def _make_claude_provider(model: str, agent_name: str, enable_thinking: bool = False, tavily_search_depth: str = "basic") -> ClaudeProvider:
@@ -33,7 +30,7 @@ def _make_openai_provider(model: str, agent_name: str, tavily_search_depth: str 
         api_key=config.OPENAI_API_KEY,
         model=model,
         base_url=config.OPENAI_BASE_URL,
-        tavily_news_mode=agent_name in _TAVILY_NEWS_AGENTS,
+        tavily_news_mode=tavily_news_mode(agent_name),
         tavily_search_depth=tavily_search_depth,
         provider_order=config.OPENAI_PROVIDER or None,
     )
@@ -74,15 +71,19 @@ def _make_deepseek_provider(model: str, agent_name: str) -> "OpenAICompatiblePro
 
 
 def _make_public_provider(model: str, agent_name: str, enable_thinking: bool = False) -> LLMProvider:
-    """Route to the right provider based on model name prefix."""
-    search_depth = "advanced" if agent_name in _TAVILY_ADVANCED_AGENTS else "basic"
-    if model.startswith("claude-") and config.LLM_API_KEY:
-        return _make_claude_provider(model, agent_name, enable_thinking=enable_thinking, tavily_search_depth=search_depth)
-    if model.startswith("deepseek-") and config.DEEPSEEK_API_KEY:
+    """Route to the right provider for a model (see core.llm.router for the rule)."""
+    depth = tavily_search_depth(agent_name)
+    kind = resolve_provider_kind(
+        model,
+        has_anthropic=bool(config.LLM_API_KEY),
+        has_deepseek=bool(config.DEEPSEEK_API_KEY),
+        has_openai_base=bool(config.OPENAI_BASE_URL),
+    )
+    if kind == "claude":
+        return _make_claude_provider(model, agent_name, enable_thinking=enable_thinking, tavily_search_depth=depth)
+    if kind == "deepseek":
         return _make_deepseek_provider(model, agent_name)
-    if config.OPENAI_BASE_URL:
-        return _make_openai_provider(model, agent_name, tavily_search_depth=search_depth)
-    return _make_claude_provider(model, agent_name, enable_thinking=enable_thinking, tavily_search_depth=search_depth)
+    return _make_openai_provider(model, agent_name, tavily_search_depth=depth)
 
 
 def _get_public_agent_model(agent_key: str, default: str) -> str:
