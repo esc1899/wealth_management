@@ -229,6 +229,8 @@ rebalance_chat:
   past_sessions: "Past Analyses"
   no_sessions: "No analyses yet."
   no_skill: "No rebalance skills found. Add one in Settings."
+  neutral_label: "No strategy"
+  neutral_caption: "No strategy configured — the review runs without a strategy lens. Add your own optionally in config/private_skills.yaml (area: rebalance)."
   select_or_start: "Select a past analysis on the left or start a new one."
   thinking: "Analyzing…"
   chat_placeholder: "Ask a follow-up question about the analysis…"

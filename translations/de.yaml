@@ -228,6 +228,8 @@ rebalance_chat:
   past_sessions: "Vergangene Analysen"
   no_sessions: "Noch keine Analysen."
   no_skill: "Keine Rebalance-Skills gefunden. Bitte in den Einstellungen hinzufügen."
+  neutral_label: "Ohne Strategie"
+  neutral_caption: "Keine Strategie hinterlegt — die Analyse läuft ohne Strategie-Linse. Eigene Strategien optional in config/private_skills.yaml (Area: rebalance)."
   select_or_start: "Vergangene Analyse links auswählen oder neue starten."
   thinking: "Analysiere…"
   chat_placeholder: "Rückfrage zur Analyse…"

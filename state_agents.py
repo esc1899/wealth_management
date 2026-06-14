@@ -19,6 +19,7 @@ from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
 from agents.news_agent import NewsAgent
 from agents.portfolio_agent import PortfolioAgent
 from agents.portfolio_story_agent_v2 import PortfolioStoryAgentV2
+from agents.rebalance_agent import RebalanceAgent
 from agents.research_agent import ResearchAgent
 from agents.search_agent import SearchAgent
 from agents.storychecker_agent import StorycheckerAgent
@@ -184,6 +185,30 @@ def get_fundamental_analyzer_agent() -> FundamentalAnalyzerAgent:
         positions_repo=get_positions_repo(),
         analyses_repo=get_analyses_repo(),
         fa_repo=get_fundamental_analyzer_repo(),
+        llm=llm,
+        skills_repo=get_skills_repo(),
+    )
+
+
+@st.cache_resource
+def get_rebalance_repo():
+    from core.storage.rebalance import RebalanceRepository
+    return RebalanceRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_rebalance_agent() -> RebalanceAgent:
+    model = _get_agent_model("rebalance", "ollama", _DEFAULT_OLLAMA_MODEL)
+    # The rebalance prompt embeds the full portfolio snapshot (weights + per-position
+    # verdicts), which can run ~9–13k tokens. The default 8k context fills up entirely
+    # with the prompt, leaving no room to generate — so this agent needs a larger window.
+    _rebalance_num_ctx = max(config.OLLAMA_NUM_CTX, 24576)
+    llm = OllamaProvider(host=config.OLLAMA_HOST, model=model, num_ctx=_rebalance_num_ctx)
+    llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: get_usage_repo().record("rebalance", model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
+    return RebalanceAgent(
+        positions_repo=get_positions_repo(),
+        market_repo=get_market_repo(),
+        analyses_repo=get_analyses_repo(),
         llm=llm,
         skills_repo=get_skills_repo(),
     )

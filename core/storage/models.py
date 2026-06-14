@@ -491,6 +491,7 @@ class RebalanceSession(BaseModel):
     skill_prompt: str
     portfolio_snapshot: str   # pre-built text snapshot stored for follow-up messages
     created_at: datetime
+    first_message: Optional[str] = None  # first user message — used as a list label (not a DB column)
 
 
 class RebalanceMessage(BaseModel):

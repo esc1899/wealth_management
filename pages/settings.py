@@ -150,11 +150,13 @@ with col_o2:
 with col_o3:
     sel_watchlist_checker = _ollama_sel("watchlist_checker", "Watchlist Checker")
 
-col_o4, col_o5, _ = st.columns([1, 1, 1])
+col_o4, col_o5, col_o6 = st.columns([1, 1, 1])
 with col_o4:
     sel_portfolio_comment = _ollama_sel("portfolio_comment", "💬 KI-Kommentare")
 with col_o5:
     sel_portfolio_robustness = _ollama_sel("portfolio_robustness", "🐻 Portfolio Robustness")
+with col_o6:
+    sel_rebalance = _ollama_sel("rebalance", f"⚖️ {t('nav.rebalance_chat')}")
 
 _providers = []
 if _HAS_ANTHROPIC:
@@ -206,6 +208,7 @@ if st.button(t("settings.save_models_button"), key="_save_models_btn", use_conta
     app_config.set("model_public_sector_rotation", sel_sector_rotation)
     app_config.set("model_public_devils_advocate", sel_devils_advocate)
     app_config.set("model_ollama_portfolio_robustness", sel_portfolio_robustness)
+    app_config.set("model_ollama_rebalance", sel_rebalance)
     st.cache_resource.clear()
     st.success(t("settings.models_saved"))
 

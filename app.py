@@ -122,6 +122,9 @@ if _is_local:
     _assistant_pages.append(
         st.Page("pages/watchlist_checker.py", title="Watchlist Checker", icon=":material/check_circle:"),
     )
+_assistant_pages.append(
+    st.Page("pages/rebalance_chat.py",   title=t("nav.rebalance_chat"), icon=":material/balance:"),
+)
 
 pg = st.navigation({
     t("nav.group_portfolio"): _portfolio_pages,

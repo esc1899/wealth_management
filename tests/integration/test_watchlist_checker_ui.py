@@ -29,6 +29,12 @@ class TestPageLoadability:
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 
+    def test_rebalance_chat_page_loads(self):
+        """Invest / Rebalance page should load without exceptions."""
+        at = AppTest.from_file("pages/rebalance_chat.py")
+        at.run()
+        assert not at.exception, f"Page threw exception: {at.exception}"
+
     def test_tax_loss_harvesting_page_loads(self):
         """Tax Loss Harvesting page should load without exceptions."""
         at = AppTest.from_file("pages/tax_loss_harvesting.py")
