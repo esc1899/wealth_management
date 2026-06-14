@@ -20,7 +20,6 @@ from core.dividend_calendar import (
     get_top_contributors,
 )
 from core.i18n import t, current_language
-from core.services.portfolio_comment_service import get_style_by_id
 from core.ui.verdicts import cloud_notice
 from core.ui.markdown import llm_markdown
 from state import (
@@ -224,7 +223,6 @@ if _JOB["done"]:
     if _JOB["error"]:
         st.error(f"{t('common.agent_error')}: {_JOB['error']}")
     elif _JOB["result"]:
-        import hashlib
         _result = _JOB["result"]
         if _result.summary:
             st.info(f"**Fazit:** {_result.summary}")
@@ -232,25 +230,15 @@ if _JOB["done"]:
         st.caption(t("common.ai_disclaimer"))
 
         # KI-Kommentarstil
-        _comment_style_id = get_app_config_repo().get("comment_style") or "humorvoll"
-        _comment_style = get_style_by_id(_comment_style_id)
-        _comment_service = get_portfolio_comment_service(get_portfolio_comment_model())
-        _ctx = f"Dividenden-Portfolio Analyse:\n{_result.full_text}"
-        _ctx_hash = hashlib.md5((_ctx + _comment_style_id).encode()).hexdigest()
+        from core.ui.ai_comment import render_ai_comment
 
-        if st.session_state.get("_dc_comment_hash") != _ctx_hash:
-            with st.spinner(f"{_comment_style['emoji']} Kommentar wird generiert..."):
-                try:
-                    st.session_state["_dc_comment"] = _comment_service.generate_comment(_ctx, _comment_style_id)
-                    st.session_state["_dc_comment_hash"] = _ctx_hash
-                except Exception as _e:
-                    logger.warning("KI-Kommentar fehlgeschlagen: %s", _e)
-
-        if st.session_state.get("_dc_comment"):
-            st.divider()
-            with st.container(border=True):
-                st.caption(f"{_comment_style['emoji']} **{_comment_style['name']}**")
-                st.markdown(st.session_state["_dc_comment"])
+        render_ai_comment(
+            state_key="_dc",
+            ctx=f"Dividenden-Portfolio Analyse:\n{_result.full_text}",
+            style_id=get_app_config_repo().get("comment_style") or "humorvoll",
+            comment_service=get_portfolio_comment_service(get_portfolio_comment_model()),
+            section_title=t("dividend_calendar.ai_comment_section"),
+        )
 
     if st.button(t("dividend_calendar.run_analysis") + " ↺"):
         st.session_state["_dc_job"] = {

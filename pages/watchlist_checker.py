@@ -40,7 +40,6 @@ from state import (
     get_market_agent,
     get_positions_repo,
 )
-from core.services.portfolio_comment_service import get_style_by_id
 from config import config
 from core.storage.analyses import PositionAnalysesRepository
 from core.background_jobs import (
@@ -483,32 +482,17 @@ if st.session_state.get("_watchlist_check_result"):
                 with col2:
                     st.metric("Fit", fit.verdict.replace("_", " ").title())
 
-    # KI-Kommentar
-    import hashlib
-    _comment_style_id = get_app_config_repo().get("comment_style") or "humorvoll"
-    _comment_style = get_style_by_id(_comment_style_id)
-    comment_service = get_portfolio_comment_service(get_portfolio_comment_model())
+    # KI-Kommentar (on-demand)
+    from core.ui.ai_comment import render_ai_comment
 
     full_text = result.full_text if hasattr(result, 'full_text') else ""
-    _ctx = f"Watchlist-Check Ergebnis:\n{full_text}"
-    _ctx_hash = hashlib.md5((_ctx + _comment_style_id).encode()).hexdigest()
-
-    if st.session_state.get("_watchlist_comment_hash") != _ctx_hash:
-        st.session_state["_watchlist_comment_hash"] = _ctx_hash  # set first to prevent retry loops
-        with st.spinner(f"{_comment_style['emoji']} {t('watchlist_checker.ai_comment_spinner')}"):
-            try:
-                st.session_state["_watchlist_comment"] = comment_service.generate_comment(_ctx, _comment_style_id)
-            except Exception as _e:
-                logger.warning("KI-Kommentar fehlgeschlagen: %s", _e)
-                st.warning(t("watchlist_checker.ai_comment_unavailable"))
-
-    st.divider()
-    st.subheader(t("watchlist_checker.ai_comment_section"))
-
-    if st.session_state.get("_watchlist_comment"):
-        with st.container(border=True):
-            st.caption(f"{_comment_style['emoji']} **{_comment_style['name']}**")
-            st.markdown(st.session_state["_watchlist_comment"])
+    render_ai_comment(
+        state_key="_watchlist",
+        ctx=f"Watchlist-Check Ergebnis:\n{full_text}",
+        style_id=get_app_config_repo().get("comment_style") or "humorvoll",
+        comment_service=get_portfolio_comment_service(get_portfolio_comment_model()),
+        section_title=t("watchlist_checker.ai_comment_section"),
+    )
 
     st.divider()
     with st.expander(t("watchlist_checker.full_analysis_label")):

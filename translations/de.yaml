@@ -1,3 +1,10 @@
+ai_comment:
+  generate: "KI-Kommentar generieren"
+  regenerate: "🔄 KI-Kommentar neu generieren"
+  spinner: "Kommentar wird generiert…"
+  stale: "ℹ️ Das Ergebnis hat sich geändert — Kommentar ist evtl. veraltet, neu generieren."
+  failed: "KI-Kommentar fehlgeschlagen."
+
 common:
   save: "Speichern"
   delete: "Löschen"
@@ -61,6 +68,7 @@ nav:
 dividend_calendar:
   title: "Dividenden"
   subtitle: "Jahresprognose & Verteilung"
+  ai_comment_section: "💬 KI-Kommentar"
   total_annual: "Jährliche Dividende"
   monthly_avg: "Monatlicher Ø"
   coverage: "Abdeckung"

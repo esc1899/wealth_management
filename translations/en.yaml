@@ -1,3 +1,10 @@
+ai_comment:
+  generate: "Generate AI comment"
+  regenerate: "🔄 Regenerate AI comment"
+  spinner: "Generating comment…"
+  stale: "ℹ️ The result changed — the comment may be outdated, regenerate it."
+  failed: "AI comment failed."
+
 common:
   save: "Save"
   delete: "Delete"
@@ -61,6 +68,7 @@ nav:
 dividend_calendar:
   title: "Dividends"
   subtitle: "Annual Forecast & Distribution"
+  ai_comment_section: "💬 AI Comment"
   total_annual: "Annual Dividend"
   monthly_avg: "Monthly Average"
   coverage: "Coverage"
