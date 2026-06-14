@@ -27,6 +27,11 @@ AGENT_NAME = "fundamental_analyzer"
 
 VALID_VERDICTS = {"unterbewertet", "fair", "überbewertet", "unbekannt"}
 
+# Output budget for the initial analysis. The full multi-section German report plus the closing
+# **FAZIT:** line is verbose on OpenAI-compatible models (DeepSeek); 3000 truncated it mid-section
+# so the verdict line was never reached → "unbekannt". 4096 gives the conclusion room to land.
+_FA_MAX_TOKENS = 4096
+
 # Asset classes treated as funds/ETFs (different analysis dimensions than single stocks)
 _FUND_ASSET_CLASSES = {"Aktienfonds", "Immobilienfonds"}
 
@@ -108,13 +113,32 @@ Antworte IMMER in diesem Format:
 
 _VERDICT_TOOL_INSTRUCTION = "\n\nNach der geschriebenen Analyse: Rufe submit_fa_verdict auf mit Verdict und Ein-Satz-Zusammenfassung."
 
+# Text-based verdict for OpenAI-compatible models (DeepSeek etc.): given a submit tool they
+# collapse the whole answer into the tool call and skip the written analysis entirely. So for
+# those we drop the tool and require the verdict as a final line, parsed from the prose.
+_VERDICT_TEXT_INSTRUCTION = (
+    "\n\nSchreibe IMMER zuerst die vollständige Analyse als Text im obigen Format. "
+    "Schließe sie mit einer eigenen letzten Zeile ab — exakt so:\n"
+    "**FAZIT:** <unterbewertet|fair|überbewertet|unbekannt>\n"
+    "Wähle genau einen dieser vier Werte."
+)
 
-def _build_system_prompt(asset_class: str, language: str, include_verdict_tool: bool = False) -> str:
-    """Build asset-class-specific system prompt with optional verdict tool instruction."""
+
+def _build_system_prompt(asset_class: str, language: str, verdict_via: str = "none") -> str:
+    """Build asset-class-specific system prompt.
+
+    verdict_via:
+      "tool" — Anthropic models: write the prose analysis AND call submit_fa_verdict.
+      "text" — OpenAI-compatible models (DeepSeek): write the prose analysis ending in a
+               **FAZIT:** line; the verdict is parsed from the text (no submit tool).
+      "none" — follow-up chat turns: no verdict required.
+    """
     base = _SYSTEM_PROMPT_FONDS if asset_class in _FUND_ASSET_CLASSES else _SYSTEM_PROMPT_AKTIE
     system = current_date_context() + base
-    if include_verdict_tool:
+    if verdict_via == "tool":
         system += _VERDICT_TOOL_INSTRUCTION
+    elif verdict_via == "text":
+        system += _VERDICT_TEXT_INSTRUCTION
     system += "\n" + response_language_instruction(language)
     return system
 
@@ -148,6 +172,18 @@ class FundamentalAnalyzerAgent:
     def model(self) -> str:
         return self._llm.model
 
+    def _verdict_via(self) -> str:
+        """Anthropic models reliably write the prose analysis AND call the verdict tool.
+        OpenAI-compatible models (DeepSeek) collapse everything into the tool call and skip
+        the prose, so for them we drop the tool and parse the verdict from a **FAZIT:** line."""
+        return "tool" if isinstance(self._llm, ClaudeProvider) else "text"
+
+    def _initial_tools(self) -> list:
+        tools = [WEB_SEARCH_TOOL]
+        if isinstance(self._llm, ClaudeProvider):
+            tools.append(SUBMIT_FA_VERDICT_TOOL)
+        return tools
+
     # ------------------------------------------------------------------
     # Session management
     # ------------------------------------------------------------------
@@ -169,9 +205,9 @@ class FundamentalAnalyzerAgent:
         initial_msg = _build_initial_message(position, skill_name, resolved_prompt)
         self._fa_repo.add_message(session.id, "user", initial_msg)
 
-        system = _build_system_prompt(position.asset_class, language, include_verdict_tool=True)
+        system = _build_system_prompt(position.asset_class, language, verdict_via=self._verdict_via())
         cr = self._run_llm(session.id, language=language, system=system,
-                           tools=[WEB_SEARCH_TOOL, SUBMIT_FA_VERDICT_TOOL])
+                           tools=self._initial_tools())
         self._fa_repo.add_message(session.id, "assistant", cr.content)
 
         verdict = _extract_verdict_from_tools(cr.tool_calls) or _extract_verdict(cr.content)
@@ -230,7 +266,7 @@ class FundamentalAnalyzerAgent:
                 messages=api_messages,
                 tools=tools,
                 system=system,
-                max_tokens=3000,
+                max_tokens=_FA_MAX_TOKENS,
             )
         )
 
@@ -248,7 +284,7 @@ class FundamentalAnalyzerAgent:
             messages=api_messages,
             tools=tools,
             system=system,
-            max_tokens=3000,
+            max_tokens=_FA_MAX_TOKENS,
         )
 
     async def start_session_async(
@@ -277,9 +313,9 @@ class FundamentalAnalyzerAgent:
         initial_msg = _build_initial_message(position, skill_name, resolved_prompt)
         self._fa_repo.add_message(session.id, "user", initial_msg)
 
-        system = _build_system_prompt(position.asset_class, language, include_verdict_tool=True)
+        system = _build_system_prompt(position.asset_class, language, verdict_via=self._verdict_via())
         cr = await self._run_llm_async(session.id, language=language, system=system,
-                                        tools=[WEB_SEARCH_TOOL, SUBMIT_FA_VERDICT_TOOL])
+                                        tools=self._initial_tools())
         self._fa_repo.add_message(session.id, "assistant", cr.content)
 
         verdict = _extract_verdict_from_tools(cr.tool_calls) or _extract_verdict(cr.content)
@@ -406,14 +442,15 @@ def _extract_summary_from_tools(tool_calls) -> Optional[str]:
 
 
 def _extract_verdict(response: str) -> Optional[str]:
-    """Extract verdict from LLM response. Looks for **Fazit: <verdict>** pattern first."""
-    # Look for mandated format: **Fazit: unterbewertet/fair/überbewertet**
-    if "**Fazit:" in response or "**fazit:" in response.lower():
-        response_lower = response.lower()
-        for verdict in VALID_VERDICTS:
-            if verdict in response_lower:
-                return verdict
-    # Fallback: simple keyword search in entire response
+    """Extract verdict from LLM response. Prioritises an explicit **FAZIT:** line."""
+    # Primary: the verdict token on the explicit FAZIT line (text-verdict path for DeepSeek).
+    for line in response.split("\n"):
+        low = line.strip().lower()
+        if low.startswith("**fazit") or low.startswith("fazit:"):
+            for verdict in VALID_VERDICTS:
+                if verdict in low:
+                    return verdict
+    # Fallback: simple keyword search in entire response.
     response_lower = response.lower()
     for verdict in VALID_VERDICTS:
         if verdict in response_lower:

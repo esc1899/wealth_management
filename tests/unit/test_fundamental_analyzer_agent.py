@@ -9,7 +9,10 @@ from agents.fundamental_analyzer_agent import (
     _extract_verdict,
     _extract_summary,
     _build_initial_message,
+    _build_system_prompt,
+    SUBMIT_FA_VERDICT_TOOL,
 )
+from core.llm.claude import ClaudeProvider
 from core.storage.models import Position, FundamentalAnalyzerSession, FundamentalAnalyzerMessage
 
 
@@ -266,6 +269,44 @@ def test_extract_verdict_not_found():
     """Test extraction when no verdict is present. Defaults to 'unbekannt'."""
     result = _extract_verdict("Keine verwandten Wörter hier")
     assert result == "unbekannt"
+
+
+def test_extract_verdict_prefers_fazit_line():
+    """The explicit FAZIT line wins over verdict words appearing earlier in the prose."""
+    text = (
+        "## Bewertung\nDie Aktie wirkt fair bewertet, einige halten sie für unterbewertet.\n"
+        "## Risiken\n…\n**FAZIT:** überbewertet"
+    )
+    assert _extract_verdict(text) == "überbewertet"
+
+
+class TestVerdictVia:
+    """Structural fix: Anthropic uses the submit tool; OpenAI-compatible models use a text FAZIT line."""
+
+    def test_build_system_prompt_modes(self):
+        tool_p = _build_system_prompt("Aktie", "de", verdict_via="tool")
+        text_p = _build_system_prompt("Aktie", "de", verdict_via="text")
+        none_p = _build_system_prompt("Aktie", "de", verdict_via="none")
+        assert "submit_fa_verdict" in tool_p and "FAZIT" not in tool_p
+        assert "**FAZIT:**" in text_p and "submit_fa_verdict" not in text_p
+        assert "submit_fa_verdict" not in none_p and "FAZIT" not in none_p
+
+    def _agent(self, llm):
+        return FundamentalAnalyzerAgent(
+            positions_repo=MagicMock(), analyses_repo=MagicMock(),
+            fa_repo=MagicMock(), llm=llm,
+        )
+
+    def test_claude_provider_uses_tool(self):
+        agent = self._agent(ClaudeProvider(api_key="test", model="claude-haiku-4-5-20251001"))
+        assert agent._verdict_via() == "tool"
+        assert SUBMIT_FA_VERDICT_TOOL in agent._initial_tools()
+
+    def test_non_claude_provider_drops_tool(self):
+        # A DeepSeek/OpenAI-compatible provider stand-in (anything not a ClaudeProvider).
+        agent = self._agent(MagicMock())
+        assert agent._verdict_via() == "text"
+        assert SUBMIT_FA_VERDICT_TOOL not in agent._initial_tools()
 
 
 def test_extract_summary():
