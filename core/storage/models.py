@@ -523,7 +523,7 @@ class UsageRecord(BaseModel):
 
     id: Optional[int] = None
     agent: str          # e.g. 'portfolio_chat', 'news_agent'
-    model: str          # e.g. 'qwen3:8b', 'claude-haiku-4-5-20251001'
+    model: str          # e.g. 'qwen3.5:9b', 'claude-haiku-4-5-20251001'
     input_tokens: int
     output_tokens: int
     created_at: datetime
@@ -688,7 +688,7 @@ class WatchlistCheckerAnalysis(BaseModel):
     fit_counts: Optional[dict] = None          # {"sehr_passend": 2, "passend": 3, ...}
     position_fits_json: Optional[str] = None   # JSON: [{position_id, verdict, summary, fit_role}]
     skill_name: Optional[str] = None           # z.B. "Josef's Regel"
-    model: Optional[str] = None                # z.B. "qwen3:8b"
+    model: Optional[str] = None                # z.B. "qwen3.5:9b"
     created_at: datetime
 
 

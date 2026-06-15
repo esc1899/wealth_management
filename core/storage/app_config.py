@@ -77,7 +77,7 @@ class AppConfigRepository:
         # Mistral via OpenRouter, June 2026
         "mistralai/mistral-large-2512": {"input": 0.50,  "output": 1.50},
         # Local models are free
-        "qwen3:8b":     {"input": 0.0,   "output": 0.0},
+        "qwen3.5:9b":   {"input": 0.0,   "output": 0.0},
         "llama3.2":     {"input": 0.0,   "output": 0.0},
         "mistral-nemo:latest": {"input": 0.0, "output": 0.0},
         "mistral-nemo:12b":    {"input": 0.0, "output": 0.0},
