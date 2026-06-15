@@ -74,9 +74,13 @@ class AppConfigRepository:
         "deepseek/deepseek-v4-pro":     {"input": 0.90,  "output": 3.50},
         "deepseek/deepseek-chat":       {"input": 0.27,  "output": 1.10},
         "deepseek/deepseek-r1":         {"input": 0.55,  "output": 2.19},
+        # Mistral via OpenRouter, June 2026
+        "mistralai/mistral-large-2512": {"input": 0.50,  "output": 1.50},
         # Local models are free
         "qwen3:8b":     {"input": 0.0,   "output": 0.0},
         "llama3.2":     {"input": 0.0,   "output": 0.0},
+        "mistral-nemo:latest": {"input": 0.0, "output": 0.0},
+        "mistral-nemo:12b":    {"input": 0.0, "output": 0.0},
     }
 
     def get_model_prices(self) -> dict:
