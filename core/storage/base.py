@@ -463,6 +463,13 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     existing_analyses = {row[1] for row in conn.execute("PRAGMA table_info(position_analyses)")}
     if "analysis_text" not in existing_analyses:
         conn.execute("ALTER TABLE position_analyses ADD COLUMN analysis_text TEXT")
+    # FEAT-59 v2: survivorship insurance — snapshot ticker + scope at verdict time so a
+    # later-sold/deleted position stays evaluable in Verdict Hindsight (populated by
+    # PositionAnalysesRepository.save).
+    if "ticker_snapshot" not in existing_analyses:
+        conn.execute("ALTER TABLE position_analyses ADD COLUMN ticker_snapshot TEXT")
+    if "scope_snapshot" not in existing_analyses:
+        conn.execute("ALTER TABLE position_analyses ADD COLUMN scope_snapshot TEXT")
 
     existing_usage = {row[1] for row in conn.execute("PRAGMA table_info(llm_usage)")}
     if "skill" not in existing_usage:

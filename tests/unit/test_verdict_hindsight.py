@@ -143,6 +143,27 @@ def test_distinct_positions_reflects_concentration():
     assert row.distinct_positions == 2
 
 
+def test_excess_return_subtracts_benchmark():
+    rows = [_row("consensus_gap", "wächst", "2026-01-01", "AAA")]
+    prices = {("AAA", "2026-01-01"): 100.0, ("AAA", "2026-01-31"): 110.0}  # +10%
+    bench = {"2026-01-01": 1000.0, "2026-01-31": 1050.0}                    # +5%
+    report = compute_hindsight(
+        rows, _price_fn(prices), as_of=date(2026, 3, 1), benchmark_fn=bench.get
+    )
+    # Excess = verdict +10% minus benchmark +5% = +5%.
+    assert report.by_agent["consensus_gap"][0].horizons["1M"].median_pct == pytest.approx(5.0)
+
+
+def test_excess_drops_observation_when_benchmark_missing():
+    rows = [_row("consensus_gap", "wächst", "2026-01-01", "AAA")]
+    prices = {("AAA", "2026-01-01"): 100.0, ("AAA", "2026-01-31"): 110.0}
+    bench = {"2026-01-01": 1000.0}  # no benchmark at the +1M target → cannot grade
+    report = compute_hindsight(
+        rows, _price_fn(prices), as_of=date(2026, 3, 1), benchmark_fn=bench.get
+    )
+    assert report.by_agent["consensus_gap"][0].horizons["1M"].n == 0
+
+
 def test_empty_report():
     report = compute_hindsight([], _price_fn({}), as_of=date(2026, 3, 1))
     assert report.is_empty
@@ -195,6 +216,21 @@ def test_repo_feeds_empty_agents(conn):
     repo = PositionAnalysesRepository(conn)
     assert repo.get_verdicts_with_ticker([]) == []
     assert repo.count_directional_verdicts([]) == 0
+
+
+def test_survivorship_snapshot_keeps_deleted_position_evaluable(conn):
+    repo = PositionAnalysesRepository(conn)
+    _add_position(conn, 1, "AAA")
+    repo.save(1, "consensus_gap", "Standard", "wächst", "s1")  # snapshot captured here
+
+    # Position later sold/deleted — the INNER-JOIN era would lose this verdict entirely.
+    conn.execute("DELETE FROM positions WHERE id = 1")
+    conn.commit()
+
+    joined = repo.get_verdicts_with_ticker(["consensus_gap"])
+    assert len(joined) == 1
+    assert joined[0]["ticker"] == "AAA"        # recovered from ticker_snapshot
+    assert joined[0]["scope"] == "portfolio"   # recovered from scope_snapshot
 
 
 def test_migration_relabels_legacy_fundamental_agent(conn):

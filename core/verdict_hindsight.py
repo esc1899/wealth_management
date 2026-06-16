@@ -58,6 +58,10 @@ PRICE_WINDOW_DAYS = 7
 # Callable resolving (ticker, YYYY-MM-DD) → closing price in EUR, or None if unavailable.
 PriceFn = Callable[[str, str], Optional[float]]
 
+# Callable resolving a date (str) → benchmark level (portfolio value or index price).
+# When provided, forward returns become EXCESS returns (verdict minus benchmark).
+BenchmarkFn = Callable[[str], Optional[float]]
+
 
 @dataclass
 class HorizonStat:
@@ -139,6 +143,7 @@ def compute_hindsight(
     *,
     as_of: Optional[date] = None,
     total_emitted: Optional[int] = None,
+    benchmark_fn: Optional[BenchmarkFn] = None,
 ) -> HindsightReport:
     """Grade past directional verdicts against realized forward price moves.
 
@@ -151,6 +156,10 @@ def compute_hindsight(
         total_emitted: all verdicts ever emitted by these agents (incl. positions since
             sold/deleted). When given, ``excluded_survivorship`` reports the gap so the
             blind spot is visible. Defaults to the number of rows passed in.
+        benchmark_fn: optional date → benchmark level (portfolio value or index price).
+            When given, every forward return is reported as an EXCESS return (verdict
+            move minus benchmark move over the same window); observations whose benchmark
+            level is missing at entry or target are dropped from that horizon.
 
     Returns:
         A HindsightReport grouped by agent then verdict (display-ordered).
@@ -185,6 +194,11 @@ def compute_hindsight(
         evaluated += 1
         positions_seen.setdefault((agent, verdict), set()).add(ticker)
 
+        # Benchmark level at the verdict date (same for all horizons of this verdict).
+        bench_entry = benchmark_fn(entry_date.isoformat()) if benchmark_fn else None
+        if benchmark_fn and (not bench_entry or bench_entry <= 0):
+            continue  # excess mode but no benchmark anchor → cannot grade this verdict
+
         for horizon_key, days in HORIZONS:
             target = entry_date + timedelta(days=days)
             if target > as_of:
@@ -193,6 +207,11 @@ def compute_hindsight(
             if not fwd_price or fwd_price <= 0:
                 continue
             ret_pct = (fwd_price / entry_price - 1.0) * 100.0
+            if benchmark_fn:
+                bench_target = benchmark_fn(target.isoformat())
+                if not bench_target or bench_target <= 0:
+                    continue  # no benchmark at target → cannot compute excess
+                ret_pct -= (bench_target / bench_entry - 1.0) * 100.0
             buckets.setdefault((agent, verdict, horizon_key), []).append(ret_pct)
 
     by_agent: Dict[str, List[VerdictHindsight]] = {}

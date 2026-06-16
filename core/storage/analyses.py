@@ -31,13 +31,18 @@ class PositionAnalysesRepository:
     ) -> PositionAnalysis:
         """Insert a new analysis record and return it."""
         now = datetime.now(timezone.utc)
+        # Survivorship insurance (FEAT-59 v2): capture ticker + scope now, while the
+        # position still exists, so the verdict stays evaluable if it is later sold.
+        ticker_snapshot, scope_snapshot = self._position_snapshot(position_id)
         cur = self._conn.execute(
             """
             INSERT INTO position_analyses
-                (position_id, agent, skill_name, verdict, summary, session_id, analysis_text, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (position_id, agent, skill_name, verdict, summary, session_id, analysis_text,
+                 ticker_snapshot, scope_snapshot, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (position_id, agent, skill_name, verdict, summary, session_id, analysis_text, now.isoformat()),
+            (position_id, agent, skill_name, verdict, summary, session_id, analysis_text,
+             ticker_snapshot, scope_snapshot, now.isoformat()),
         )
         self._conn.commit()
         return PositionAnalysis(
@@ -51,6 +56,17 @@ class PositionAnalysesRepository:
             analysis_text=analysis_text,
             created_at=now,
         )
+
+    def _position_snapshot(self, position_id: int) -> tuple[Optional[str], Optional[str]]:
+        """Return (ticker, scope) for a position at save time, or (None, None) if gone."""
+        row = self._conn.execute(
+            "SELECT ticker, in_portfolio, in_watchlist FROM positions WHERE id = ?",
+            (position_id,),
+        ).fetchone()
+        if row is None:
+            return None, None
+        scope = "portfolio" if row["in_portfolio"] else "watchlist" if row["in_watchlist"] else "other"
+        return (row["ticker"] or None), scope
 
     def get_for_position(self, position_id: int, limit: int = 20) -> List[PositionAnalysis]:
         """Return analyses for a position, newest first."""
@@ -109,22 +125,31 @@ class PositionAnalysesRepository:
         if not agents:
             return []
         placeholders = ",".join("?" * len(agents))
+        # LEFT JOIN + COALESCE: a still-existing position uses its live ticker/scope; a
+        # sold/deleted one falls back to the snapshot captured at save time (FEAT-59 v2).
+        # Rows from before the snapshot columns existed and whose position is gone have
+        # neither → dropped (the residual, shrinking survivorship blind spot).
         rows = self._conn.execute(
             f"""
-            SELECT pa.agent, pa.verdict, pa.created_at, p.ticker,
-                   p.in_portfolio, p.in_watchlist
+            SELECT pa.agent, pa.verdict, pa.created_at,
+                   COALESCE(p.ticker, pa.ticker_snapshot) AS ticker,
+                   p.in_portfolio, p.in_watchlist, pa.scope_snapshot
             FROM position_analyses pa
-            JOIN positions p ON p.id = pa.position_id
+            LEFT JOIN positions p ON p.id = pa.position_id
             WHERE pa.agent IN ({placeholders})
               AND pa.verdict IS NOT NULL AND pa.verdict != ''
-              AND p.ticker IS NOT NULL AND p.ticker != ''
+              AND COALESCE(p.ticker, pa.ticker_snapshot) IS NOT NULL
+              AND COALESCE(p.ticker, pa.ticker_snapshot) != ''
             ORDER BY pa.created_at ASC
             """,
             list(agents),
         ).fetchall()
         result = []
         for r in rows:
-            scope = "portfolio" if r["in_portfolio"] else "watchlist" if r["in_watchlist"] else "other"
+            if r["in_portfolio"] is not None:  # position still exists → live scope
+                scope = "portfolio" if r["in_portfolio"] else "watchlist" if r["in_watchlist"] else "other"
+            else:  # deleted → snapshot scope (may be None for pre-v2 rows)
+                scope = r["scope_snapshot"] or "other"
             result.append({
                 "agent": r["agent"],
                 "verdict": r["verdict"],

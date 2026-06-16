@@ -127,6 +127,23 @@ class WealthSnapshotRepository:
         ).fetchone()
         return self._row_to_snapshot(row) if row else None
 
+    def value_near_date(self, date_str: str, window_days: int = 7) -> Optional[float]:
+        """Total wealth (EUR) of the snapshot closest to ``date_str`` within ±window.
+
+        Used as the Portfolio benchmark for Verdict Hindsight (FEAT-59 v2). Returns None
+        if no snapshot lies in the window.
+        """
+        row = self._conn.execute(
+            """
+            SELECT total_eur FROM wealth_snapshots
+            WHERE date BETWEEN date(?, '-' || ? || ' days') AND date(?, '+' || ? || ' days')
+            ORDER BY abs(julianday(date) - julianday(?)) ASC, date ASC
+            LIMIT 1
+            """,
+            (date_str, window_days, date_str, window_days, date_str),
+        ).fetchone()
+        return float(row["total_eur"]) if row else None
+
     def get_by_id(self, snapshot_id: int) -> Optional[WealthSnapshot]:
         """Get a snapshot by ID."""
         row = self._conn.execute(
