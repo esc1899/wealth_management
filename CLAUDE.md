@@ -118,15 +118,20 @@ Diese Regeln gelten für **jede** Änderung, unabhängig vom Task. Bei Unsicherh
 
 **Sensitive Portfolio-Daten verlassen niemals das lokale System.**
 
+Die drei Buckets entsprechen exakt der Klassifikation in `tests/unit/test_architecture_guards.py` (FEAT-60) — diese Tabelle und der Guard müssen synchron bleiben.
+
 | Provider | Agents | Darf sehen |
 |---|---|---|
-| **Ollama (lokal 🔒)** | PortfolioAgent, PortfolioStoryAgent, WatchlistCheckerAgent, MarketDataAgent | Alles — Positionen, Namen, Stories, Zahlen |
-| **Claude API (Cloud ☁️)** | ResearchAgent, NewsAgent, SearchAgent, StorycheckerAgent¹, ConsensusGapAgent, StructuralChangeAgent, FundamentalAnalyzerAgent, WealthSnapshotAgent, **CapitalAllocatorAgent** | Nur öffentliche Daten (Ticker, Marktdaten, News) |
+| **Ollama (lokal 🔒)** | PortfolioAgent, PortfolioStoryAgent, WatchlistCheckerAgent, PortfolioRobustnessAgent, RebalanceAgent, DividendCalendarAgent, TaxLossHarvestingAgent | Alles — Positionen, Namen, Stories, Zahlen |
+| **Claude API / OpenRouter (Cloud ☁️)** | ResearchAgent, NewsAgent, SearchAgent, StorycheckerAgent¹, ConsensusGapAgent, StructuralChangeAgent, FundamentalAnalyzerAgent, CapitalAllocatorAgent, DevilsAdvocateAgent, SectorRotationAgent | Nur öffentliche Daten (Ticker, Marktdaten, News) |
+| **Kein LLM (reine Berechnung 🔢)** | MarketDataAgent, WealthSnapshotAgent | Alles — sieht volle Positionen (Stückzahl, Kaufpreis), **sendet aber nichts**; schreibt nur Zahlen in die lokale DB |
 
 ¹ **StorycheckerAgent Ausnahme**: Sendet `position.name` + `position.story` an die Claude API — bewusstes Design, da der Storychecker die Investment-These braucht um sie zu prüfen. Stories verlassen also das lokale System. Das ist ein akzeptierter Privacy-Trade-off, aber keine neue Einführung ohne explizite Zustimmung.
 
 → Neuer Agent mit Portfolio-Zugriff? → **muss Ollama sein**
 → Neuer Cloud-Agent? → **kein Zugriff auf Positionen/Stories/Namen** (außer StorycheckerAgent-Muster mit expliziter Begründung)
+
+**Ausführbarer Guard (FEAT-60):** Diese Grenze ist seit 2026-06-16 kein Prosa-Versprechen mehr, sondern Code: `tests/unit/test_architecture_guards.py` zwingt jeden neuen Agent in genau einen Provider-Bucket (cloud/local/non-LLM) und lässt keinen Cloud-Agent ein `Position` (statt `PublicPosition`) als Methoden-Input annehmen. StorycheckerAgent ist die einzige whitelisted Ausnahme. Ein vergessener Bucket oder ein Cloud-Agent mit `Position`-Signatur scheitert in CI, nicht erst im Review.
 
 ### 2. Zweisprachigkeit (i18n)
 
@@ -152,7 +157,8 @@ Nie direkt als Plaintext schreiben — immer über das Repository-Layer.
 ### 5. Neue Agents: Checkliste
 
 Vor dem ersten Commit prüfen:
-- [ ] Richtiger Provider (Ollama vs. Cloud)? Privacy-Grenze beachtet?
+- [ ] **Agent in `tests/unit/test_architecture_guards.py` klassifizieren** (CLOUD_/LOCAL_/NON_LLM_AGENTS) — der Guard erzwingt das, sonst rote CI
+- [ ] Richtiger Provider (Ollama vs. Cloud)? Privacy-Grenze beachtet? → Guard prüft Cloud-Signaturen (`PublicPosition` statt `Position`) automatisch, ersetzt die alte Handprüfung
 - [ ] Cloud-Agent: `PublicPosition` statt `Position` verwenden (`core/storage/models.py`)
 - [ ] `language` Parameter vorhanden?
 - [ ] Session-Persistenz (wenn Chat)? DB-Repo erstellt?
