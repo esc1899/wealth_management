@@ -48,7 +48,7 @@ from state_repos import (
     get_watchlist_checker_repo,
     get_dividend_snapshot_repo,
 )
-from state_llm import _make_claude_provider, _make_ollama_provider, _get_agent_model, _make_public_provider, _get_public_agent_model
+from state_llm import _make_claude_provider, _make_ollama_provider, _get_agent_model, _make_public_provider, _get_public_agent_model, get_ollama_runtime_kwargs
 
 # Default model values (overridable via app_config)
 _DEFAULT_OLLAMA_MODEL = config.OLLAMA_MODEL
@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 @st.cache_resource
 def get_portfolio_agent() -> PortfolioAgent:
     model = _get_agent_model("portfolio", "ollama", _DEFAULT_OLLAMA_MODEL)
-    llm = OllamaProvider(host=config.OLLAMA_HOST, model=model, num_ctx=config.OLLAMA_NUM_CTX)
+    llm = OllamaProvider(host=config.OLLAMA_HOST, model=model, **get_ollama_runtime_kwargs(model))
     llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: get_usage_repo().record("portfolio_chat", model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
     fetcher = MarketDataFetcher(
         rate_limiter=RateLimiter(calls_per_second=config.RATE_LIMIT_RPS)
@@ -202,8 +202,7 @@ def get_rebalance_agent() -> RebalanceAgent:
     # The rebalance prompt embeds the full portfolio snapshot (weights + per-position
     # verdicts), which can run ~9–13k tokens. The default 8k context fills up entirely
     # with the prompt, leaving no room to generate — so this agent needs a larger window.
-    _rebalance_num_ctx = max(config.OLLAMA_NUM_CTX, 24576)
-    llm = OllamaProvider(host=config.OLLAMA_HOST, model=model, num_ctx=_rebalance_num_ctx)
+    llm = OllamaProvider(host=config.OLLAMA_HOST, model=model, **get_ollama_runtime_kwargs(model, num_ctx_floor=24576))
     llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: get_usage_repo().record("rebalance", model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
     return RebalanceAgent(
         positions_repo=get_positions_repo(),

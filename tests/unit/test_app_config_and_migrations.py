@@ -95,6 +95,86 @@ class TestAppConfigRepository:
 
 
 # ---------------------------------------------------------------------------
+# Model registry (FEAT-57): prices + provider + Ollama params
+# ---------------------------------------------------------------------------
+
+class TestModelRegistry:
+    def test_defaults_carry_provider(self, app_config_repo):
+        reg = app_config_repo.get_model_registry()
+        # Every default entry has a provider in the known set
+        for model_id, entry in reg.items():
+            assert entry["provider"] in {"claude", "openrouter", "deepseek", "ollama"}
+        assert reg["claude-opus-4-8"]["provider"] == "claude"
+        assert reg["qwen3.5:9b"]["provider"] == "ollama"
+        assert reg["mistralai/mistral-large-2512"]["provider"] == "openrouter"
+        # deepseek/… (slash form) routes via OpenRouter, so tagged openrouter
+        assert reg["deepseek/deepseek-v4-pro"]["provider"] == "openrouter"
+
+    def test_legacy_entry_without_provider_is_inferred(self, app_config_repo):
+        # Simulate a registry stored before the provider field existed
+        app_config_repo.set_model_prices({
+            "claude-sonnet-4-6": {"input": 3.0, "output": 15.0},
+            "deepseek/deepseek-chat": {"input": 0.27, "output": 1.10},  # slash → OpenRouter
+            "deepseek-chat": {"input": 0.27, "output": 1.10},           # prefix → direct DeepSeek
+            "some-router-model": {"input": 1.0, "output": 2.0},
+            "qwen3.5:9b": {"input": 0.0, "output": 0.0},
+        })
+        reg = app_config_repo.get_model_registry()
+        assert reg["claude-sonnet-4-6"]["provider"] == "claude"
+        assert reg["deepseek/deepseek-chat"]["provider"] == "openrouter"
+        assert reg["deepseek-chat"]["provider"] == "deepseek"
+        assert reg["some-router-model"]["provider"] == "openrouter"
+        assert reg["qwen3.5:9b"]["provider"] == "ollama"
+
+    def test_legacy_local_provider_normalised_to_ollama(self, app_config_repo):
+        app_config_repo.set_model_prices({
+            "qwen3.5:9b": {"input": 0.0, "output": 0.0, "provider": "local"},
+        })
+        reg = app_config_repo.get_model_registry()
+        assert reg["qwen3.5:9b"]["provider"] == "ollama"
+
+    def test_deleted_default_stays_removed(self, app_config_repo):
+        # Delete a seeded default — it must not reappear via the defaults merge
+        app_config_repo.set_deleted_models(["deepseek/deepseek-r1"])
+        reg = app_config_repo.get_model_registry()
+        assert "deepseek/deepseek-r1" not in reg
+        # Re-adding it (present in stored prices) clears the deletion at save time
+        app_config_repo.set_model_prices({"deepseek/deepseek-r1": {"input": 0.5, "output": 2.0, "provider": "openrouter"}})
+        app_config_repo.set_deleted_models([])
+        assert "deepseek/deepseek-r1" in app_config_repo.get_model_registry()
+
+    def test_get_model_prices_unchanged_for_cost(self, app_config_repo):
+        # Cost path only reads input/output — extra fields must not interfere
+        prices = app_config_repo.get_model_prices()
+        assert prices["claude-sonnet-4-6"]["input"] == 3.0
+        assert prices["claude-sonnet-4-6"]["output"] == 15.0
+
+    def test_ollama_params_defaults_to_none_ctx(self, app_config_repo):
+        params = app_config_repo.get_ollama_params("qwen3.5:9b")
+        assert params == {"think": False, "num_ctx": None}
+
+    def test_ollama_params_reads_overrides(self, app_config_repo):
+        app_config_repo.set_model_prices({
+            "qwen3.5:9b": {"input": 0.0, "output": 0.0, "provider": "local",
+                           "think": True, "num_ctx": 16384},
+        })
+        params = app_config_repo.get_ollama_params("qwen3.5:9b")
+        assert params == {"think": True, "num_ctx": 16384}
+
+    def test_ollama_params_unknown_model(self, app_config_repo):
+        params = app_config_repo.get_ollama_params("not-in-registry")
+        assert params == {"think": False, "num_ctx": None}
+
+    def test_provider_for_known_and_unknown(self, app_config_repo):
+        # Known registry entry → its provider
+        assert app_config_repo.provider_for("claude-sonnet-4-6") == "claude"
+        assert app_config_repo.provider_for("qwen3.5:9b") == "ollama"
+        # Unknown model (e.g. logged historically, since removed) → inferred
+        assert app_config_repo.provider_for("acme/router-x") == "openrouter"
+        assert app_config_repo.provider_for("some-tag:7b") == "ollama"
+
+
+# ---------------------------------------------------------------------------
 # migrate_db — idempotency
 # ---------------------------------------------------------------------------
 

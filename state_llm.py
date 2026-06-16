@@ -106,9 +106,20 @@ def _get_public_agent_model(agent_key: str, default: str) -> str:
     return default
 
 
+def get_ollama_runtime_kwargs(model: str, *, num_ctx_floor: int = 0) -> dict:
+    """Per-model Ollama kwargs (think / num_ctx) from the model registry.
+
+    Falls back to ``config.OLLAMA_NUM_CTX`` when the registry has no override, and
+    never drops below ``num_ctx_floor`` (used by context-hungry agents like rebalance).
+    """
+    params = get_app_config_repo().get_ollama_params(model)
+    num_ctx = params["num_ctx"] or config.OLLAMA_NUM_CTX
+    return {"think": params["think"], "num_ctx": max(num_ctx, num_ctx_floor)}
+
+
 def _make_ollama_provider(model: str, agent_name: str, timeout: float = 120.0) -> OllamaProvider:
     """Create and wire up an Ollama provider with usage tracking."""
-    provider = OllamaProvider(host=config.OLLAMA_HOST, model=model, timeout=timeout, num_ctx=config.OLLAMA_NUM_CTX)
+    provider = OllamaProvider(host=config.OLLAMA_HOST, model=model, timeout=timeout, **get_ollama_runtime_kwargs(model))
     provider.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
     return provider
 

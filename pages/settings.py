@@ -94,11 +94,19 @@ def _get_claude_model_list() -> list[str]:
 
 _CLAUDE_MODELS = _get_claude_model_list()
 
-# Combined public model list: DeepSeek first (cheapest), then OpenRouter, then Claude
+# Combined public model list: env-configured models + UI-registered cloud models
+# (registry ∪ env), so a model added in the registry below is immediately selectable
+# without editing .env. DeepSeek first (cheapest), then OpenRouter, then Claude.
 _HAS_ANTHROPIC = bool(config.LLM_API_KEY)
 _HAS_OPENROUTER = bool(config.OPENAI_BASE_URL and config.OPENAI_API_KEY)
 _HAS_DEEPSEEK = bool(config.DEEPSEEK_API_KEY)
-_ALL_PUBLIC_MODELS = list(dict.fromkeys(config.DEEPSEEK_MODELS + config.OPENAI_MODELS + _CLAUDE_MODELS))
+_registry_public = [
+    mid for mid, e in app_config.get_model_registry().items()
+    if e.get("provider") in app_config.PUBLIC_PROVIDERS
+]
+_ALL_PUBLIC_MODELS = list(dict.fromkeys(
+    config.DEEPSEEK_MODELS + config.OPENAI_MODELS + _CLAUDE_MODELS + _registry_public
+))
 
 # Fetch available Ollama models
 import requests as _requests
@@ -221,61 +229,137 @@ st.divider()
 st.subheader(t("settings.model_prices_header"))
 st.caption(t("settings.model_prices_caption"))
 
-_current_prices = app_config.get_model_prices()
-# Auto-add any configured OPENAI_MODELS not yet in the price table (with 0.0 as placeholder)
+_PROVIDERS = ["claude", "openrouter", "deepseek", app_config.OLLAMA_PROVIDER]
+
+_registry = app_config.get_model_registry()
+# Auto-add any configured OPENAI_MODELS not yet in the registry (placeholder price)
 for _m in config.OPENAI_MODELS:
-    if _m not in _current_prices:
-        _current_prices[_m] = {"input": 0.0, "output": 0.0}
+    if _m not in _registry:
+        _registry[_m] = {"input": 0.0, "output": 0.0, "provider": "openrouter"}
 
-# Header row
-_ph1, _ph2, _ph3 = st.columns([3, 1, 1])
-_ph1.caption("Modell")
-_ph2.caption(t("settings.model_prices_input_label") + " ($/Mio)")
-_ph3.caption(t("settings.model_prices_output_label") + " ($/Mio)")
+st.caption(t("settings.model_prices_provider_note"))
+st.caption(t("settings.model_prices_columns_legend"))
 
-# Render one row per model
-_price_edits: dict = {}
-for _model_id, _price in _current_prices.items():
-    _pc1, _pc2, _pc3 = st.columns([3, 1, 1])
-    _pc1.markdown(f"`{_model_id}`")
-    _price_edits[_model_id] = {
-        "input": _pc2.number_input(
-            t("settings.model_prices_input_label"),
-            value=float(_price.get("input", 0.0)),
-            min_value=0.0,
-            step=0.01,
-            format="%.4f",
-            key=f"_price_in_{_model_id}",
-            label_visibility="collapsed",
-        ),
-        "output": _pc3.number_input(
-            t("settings.model_prices_output_label"),
-            value=float(_price.get("output", 0.0)),
-            min_value=0.0,
-            step=0.01,
-            format="%.4f",
-            key=f"_price_out_{_model_id}",
-            label_visibility="collapsed",
-        ),
-    }
+_PROVIDER_GROUP_LABELS = {
+    "claude": "☁️ Claude (Anthropic)",
+    "openrouter": "☁️ OpenRouter",
+    "deepseek": "☁️ DeepSeek",
+    app_config.OLLAMA_PROVIDER: f"🔒 {t('settings.model_prices_ollama_label')}",
+}
 
-# Add a new model row
+# Group models by their current provider (provider can still be changed per row;
+# the model regroups after save).
+_grouped: dict[str, list] = {_p: [] for _p in _PROVIDERS}
+for _model_id, _entry in _registry.items():
+    _p = _entry.get("provider")
+    _grouped[_p if _p in _grouped else "openrouter"].append((_model_id, _entry))
+
+_registry_edits: dict = {}
+_delete_ids: set = set()
+
+
+def _render_registry_row(_model_id: str, _entry: dict, *, ollama: bool) -> None:
+    if ollama:
+        _rc1, _rc2, _rc3, _rc4, _rc5, _rc6 = st.columns([2.0, 0.9, 0.9, 1.2, 1.7, 0.6])
+    else:
+        _rc1, _rc2, _rc3, _rc4, _rc6 = st.columns([2.0, 0.9, 0.9, 1.2, 0.6])
+        _rc5 = None
+    _rc1.markdown(f"`{_model_id}`")
+    _in = _rc2.number_input(
+        t("settings.model_prices_input_label"), value=float(_entry.get("input", 0.0)),
+        min_value=0.0, step=0.01, format="%.4f", key=f"_price_in_{_model_id}", label_visibility="collapsed",
+    )
+    _out = _rc3.number_input(
+        t("settings.model_prices_output_label"), value=float(_entry.get("output", 0.0)),
+        min_value=0.0, step=0.01, format="%.4f", key=f"_price_out_{_model_id}", label_visibility="collapsed",
+    )
+    _prov = _rc4.selectbox(
+        t("settings.model_prices_provider_label"), options=_PROVIDERS,
+        index=_PROVIDERS.index(_entry.get("provider") if _entry.get("provider") in _PROVIDERS else "openrouter"),
+        key=f"_price_prov_{_model_id}", label_visibility="collapsed",
+    )
+    _new = {"input": _in, "output": _out, "provider": _prov}
+    if _prov == app_config.OLLAMA_PROVIDER and _rc5 is not None:
+        _think = _rc5.checkbox(
+            t("settings.model_prices_think_label"), value=bool(_entry.get("think", False)),
+            key=f"_price_think_{_model_id}",
+        )
+        _ctx = _rc5.number_input(
+            t("settings.model_prices_numctx_label"), value=int(_entry.get("num_ctx") or 0),
+            min_value=0, step=1024, key=f"_price_ctx_{_model_id}",
+            help=t("settings.model_prices_numctx_help"),
+        )
+        _new["think"] = _think
+        if _ctx:
+            _new["num_ctx"] = int(_ctx)
+    if _rc6.checkbox(t("settings.model_prices_delete"), key=f"_price_del_{_model_id}", label_visibility="collapsed"):
+        _delete_ids.add(_model_id)
+    _registry_edits[_model_id] = _new
+
+
+for _prov_key in _PROVIDERS:
+    _items = _grouped.get(_prov_key) or []
+    if not _items:
+        continue
+    st.markdown(f"**{_PROVIDER_GROUP_LABELS[_prov_key]}**")
+    for _model_id, _entry in _items:
+        _render_registry_row(_model_id, _entry, ollama=(_prov_key == app_config.OLLAMA_PROVIDER))
+
+# ── Add a new model — dropdown for discoverable models (Ollama + Claude), free text otherwise
+_MANUAL = "✏️ " + t("settings.model_prices_manual_entry")
+_discoverable: dict[str, str] = {}  # model_id -> provider
+for _m in _ollama_models:
+    if _m not in _registry:
+        _discoverable[_m] = app_config.OLLAMA_PROVIDER
+for _m in _CLAUDE_MODELS:
+    if _m not in _registry:
+        _discoverable.setdefault(_m, "claude")
+
 with st.expander(t("settings.model_prices_add_model")):
-    _new_model_id = st.text_input(t("settings.model_prices_model_id"), key="_new_price_model_id")
-    _nc1, _nc2 = st.columns(2)
+    _pick = st.selectbox(
+        t("settings.model_prices_pick_model"),
+        options=[_MANUAL] + list(_discoverable.keys()),
+        key="_new_price_pick",
+    )
+    _is_manual = _pick == _MANUAL
+    if _is_manual:
+        _new_model_id = st.text_input(t("settings.model_prices_model_id"), key="_new_price_model_id")
+        _default_prov_idx = 1  # openrouter
+    else:
+        _new_model_id = _pick
+        st.caption(f"`{_pick}`")
+        _default_prov_idx = _PROVIDERS.index(_discoverable[_pick])
+    _nc1, _nc2, _nc3 = st.columns([1, 1, 1])
     _new_price_in = _nc1.number_input(
         t("settings.model_prices_input_label"), min_value=0.0, step=0.01, format="%.4f", key="_new_price_in"
     )
     _new_price_out = _nc2.number_input(
         t("settings.model_prices_output_label"), min_value=0.0, step=0.01, format="%.4f", key="_new_price_out"
     )
+    _new_provider = _nc3.selectbox(
+        t("settings.model_prices_provider_label"), options=_PROVIDERS, index=_default_prov_idx, key="_new_price_provider"
+    )
+
+st.caption(t("settings.model_prices_delete_hint"))
+if _delete_ids:
+    st.warning(
+        t("settings.model_prices_delete_preview").format(models=", ".join(sorted(_delete_ids))),
+        icon=":material/delete:",
+    )
 
 if st.button(t("settings.model_prices_save"), key="_save_prices_btn"):
-    _saved_prices = dict(_price_edits)
+    _saved = {mid: e for mid, e in _registry_edits.items() if mid not in _delete_ids}
     if _new_model_id.strip():
-        _saved_prices[_new_model_id.strip()] = {"input": _new_price_in, "output": _new_price_out}
-    app_config.set_model_prices(_saved_prices)
-    st.success(t("settings.model_prices_saved"))
+        _saved[_new_model_id.strip()] = {
+            "input": _new_price_in, "output": _new_price_out, "provider": _new_provider,
+        }
+    # Persist deletions so seeded defaults stay gone; re-added ids drop off the list.
+    _deleted = (set(app_config.get_deleted_models()) | _delete_ids) - set(_saved.keys())
+    app_config.set_deleted_models(list(_deleted))
+    app_config.set_model_prices(_saved)
+    st.cache_resource.clear()
+    st.toast(t("settings.model_prices_saved"), icon="✅")
+    st.rerun()
 
 st.divider()
 

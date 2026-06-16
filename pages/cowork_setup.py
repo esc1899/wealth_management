@@ -99,7 +99,7 @@ research_id: "YYYY-MM-DD-<kürzel>-<laufnummer>"
 type: <stock_analysis|sector_scan|watchlist_scan>
 date: YYYY-MM-DD
 ai_generated: true
-model: <dein tatsächlicher Modell-Identifier, z.B. claude-opus-4-7>
+model: <dein tatsächlicher Modell-Identifier, z.B. claude-opus-4-8>
 status: <ready_for_import|draft|failed>
 request_id: <N>                   # nur bei Queue-Anfragen: Nummer aus get_research_queue()
 
@@ -217,7 +217,7 @@ research_id: "2026-05-08-asml-001"
 type: stock_analysis
 date: 2026-05-08
 ai_generated: true
-model: claude-opus-4-7
+model: claude-opus-4-8
 status: ready_for_import
 
 primary:
@@ -250,7 +250,7 @@ sources:
   - https://www.asml.com/en/investors/annual-report/2025
 
 disclaimer: >
-  KI-generiertes Research. Erstellt von claude-opus-4-7 am 2026-05-08.
+  KI-generiertes Research. Erstellt von claude-opus-4-8 am 2026-05-08.
   Ausschließlich zu Informationszwecken. Keine Anlageberatung.
 ---
 
