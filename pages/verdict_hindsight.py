@@ -1,0 +1,132 @@
+"""Verdict Hindsight — did the price-directed verdicts age well? (FEAT-59)
+
+Read-only feedback loop: realized forward price change after each Consensus-Gap,
+Devil's-Advocate and Fundamental-Analyzer (valuation) verdict, grouped by verdict label.
+Framed as a journal/directional signal, never a hit rate (see core.verdict_hindsight).
+"""
+
+import pandas as pd
+import streamlit as st
+
+from core.i18n import t
+from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge
+from core.verdict_hindsight import DIRECTIONAL_AGENTS, HORIZONS, compute_hindsight
+from state import get_analyses_repo, get_market_repo
+
+st.set_page_config(page_title="Verdict Hindsight", page_icon="🔭", layout="wide")
+st.title(f"🔭 {t('verdict_hindsight.title')}")
+st.caption(t("verdict_hindsight.subtitle"))
+
+analyses_repo = get_analyses_repo()
+market_repo = get_market_repo()
+
+agents = list(DIRECTIONAL_AGENTS)
+verdict_rows = analyses_repo.get_verdicts_with_ticker(agents)
+total_emitted = analyses_repo.count_directional_verdicts(agents)
+report = compute_hindsight(
+    verdict_rows,
+    price_fn=market_repo.get_price_near_date,
+    total_emitted=total_emitted,
+)
+
+# --- Framing: this is a journal, not a statistics claim --------------------------
+st.info(t("verdict_hindsight.framing"))
+
+# Headline metrics describe the whole corpus (scope-independent).
+m1, m2, m3, m4 = st.columns(4)
+m1.metric(t("verdict_hindsight.metric_total"), report.total_emitted)
+m2.metric(t("verdict_hindsight.metric_evaluated"), report.evaluated_verdicts)
+m3.metric(t("verdict_hindsight.metric_survivorship"), report.excluded_survivorship)
+m4.metric(t("verdict_hindsight.metric_excluded"), report.excluded_no_price)
+
+if report.excluded_survivorship > report.evaluated_verdicts:
+    st.warning(t("verdict_hindsight.survivorship_warning"))
+
+if report.is_empty:
+    st.warning(t("verdict_hindsight.empty"))
+    st.stop()
+
+# --- Scope filter: Portfolio vs Watchlist are different outcome questions ---------
+SCOPES = {
+    t("verdict_hindsight.scope_all"): None,
+    t("verdict_hindsight.scope_portfolio"): "portfolio",
+    t("verdict_hindsight.scope_watchlist"): "watchlist",
+}
+scope_label = st.radio(
+    t("verdict_hindsight.scope_label"), list(SCOPES), horizontal=True
+)
+scope = SCOPES[scope_label]
+if scope is None:
+    scoped_report = report
+else:
+    scoped_rows = [r for r in verdict_rows if r["scope"] == scope]
+    scoped_report = compute_hindsight(scoped_rows, price_fn=market_repo.get_price_near_date)
+st.caption(t("verdict_hindsight.scope_hint"))
+
+
+def _fmt_pct(value) -> str:
+    if value is None:
+        return "—"
+    return f"{value:+.1f} %"
+
+
+def _color_pct(value: str) -> str:
+    if not isinstance(value, str) or value == "—":
+        return "color: grey"
+    if value.startswith("+") and not value.startswith("+0.0"):
+        return "color: #1a7f37"  # green
+    if value.startswith("-"):
+        return "color: #cf222e"  # red
+    return "color: grey"
+
+
+median_cols = [t("verdict_hindsight.col_median").format(h=h) for h, _ in HORIZONS]
+
+if not scoped_report.by_agent:
+    st.info(t("verdict_hindsight.scope_empty"))
+    st.stop()
+
+for agent, rows in scoped_report.by_agent.items():
+    config = VERDICT_CONFIGS.get(agent, {})
+    st.subheader(t(f"verdict_hindsight.agent_{agent}"))
+
+    table = []
+    for row in rows:
+        record = {
+            t("verdict_hindsight.col_verdict"): verdict_badge(row.verdict, config),
+            t("verdict_hindsight.col_count"): row.total_verdicts,
+            t("verdict_hindsight.col_positions"): row.distinct_positions,
+        }
+        for horizon_key, _days in HORIZONS:
+            stat = row.horizons[horizon_key]
+            record[t("verdict_hindsight.col_median").format(h=horizon_key)] = _fmt_pct(stat.median_pct)
+            record[t("verdict_hindsight.col_n").format(h=horizon_key)] = stat.n
+        table.append(record)
+
+    df = pd.DataFrame(table)
+    styled = df.style.map(_color_pct, subset=median_cols)
+    st.dataframe(styled, hide_index=True, use_container_width=True)
+
+    # Mean / best / worst live in a detail expander to keep the main table calm.
+    with st.expander(t("verdict_hindsight.details")):
+        detail = []
+        for row in rows:
+            for horizon_key, _days in HORIZONS:
+                stat = row.horizons[horizon_key]
+                if stat.n == 0:
+                    continue
+                detail.append({
+                    t("verdict_hindsight.col_verdict"): verdict_badge(row.verdict, config),
+                    t("verdict_hindsight.col_horizon"): horizon_key,
+                    t("verdict_hindsight.col_n_plain"): stat.n,
+                    t("verdict_hindsight.col_median_plain"): _fmt_pct(stat.median_pct),
+                    t("verdict_hindsight.col_mean_plain"): _fmt_pct(stat.mean_pct),
+                    t("verdict_hindsight.col_best"): _fmt_pct(stat.best_pct),
+                    t("verdict_hindsight.col_worst"): _fmt_pct(stat.worst_pct),
+                })
+        if detail:
+            st.dataframe(pd.DataFrame(detail), hide_index=True, use_container_width=True)
+        else:
+            st.caption(t("verdict_hindsight.details_empty"))
+
+st.caption(t("verdict_hindsight.read_hint"))

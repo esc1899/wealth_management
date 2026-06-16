@@ -148,6 +148,25 @@ class MarketDataRepository:
         ).fetchone()
         return float(row["close_eur"]) if row else None
 
+    def get_price_near_date(self, symbol: str, date_str: str, window_days: int = 7) -> Optional[float]:
+        """Return the closing price for the trading day closest to ``date_str``.
+
+        Searches within ±``window_days`` and returns the nearest available close (ties
+        resolved toward the earlier date). Used for forward-return lookups where the
+        target date may fall on a weekend/holiday. Returns None if no close in window.
+        """
+        row = self._conn.execute(
+            """
+            SELECT close_eur FROM historical_prices
+            WHERE symbol = ?
+              AND date BETWEEN date(?, '-' || ? || ' days') AND date(?, '+' || ? || ' days')
+            ORDER BY abs(julianday(date) - julianday(?)) ASC, date ASC
+            LIMIT 1
+            """,
+            (symbol.upper(), date_str, window_days, date_str, window_days, date_str),
+        ).fetchone()
+        return float(row["close_eur"]) if row else None
+
     def get_all_symbols_historical(self, days: int = 90) -> dict[str, list[HistoricalPrice]]:
         """Return historical data for all symbols, grouped by symbol."""
         rows = self._conn.execute(

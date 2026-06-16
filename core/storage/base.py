@@ -424,6 +424,14 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     # Migrate Edelmetalle → Rohstoffe (2026-04-20)
     conn.execute("UPDATE positions SET investment_type='Rohstoffe' WHERE investment_type='Edelmetalle'")
 
+    # FEAT-59: Merge legacy 'fundamental' agent verdicts into 'fundamental_analyzer'
+    # (the agent was renamed during the 2026-04-29 consolidation; the old name froze on
+    # 2026-04-27). Unifies the valuation-verdict history under the live agent name so the
+    # Verdict-Hindsight loop sees the full series. Idempotent.
+    conn.execute(
+        "UPDATE position_analyses SET agent='fundamental_analyzer' WHERE agent='fundamental'"
+    )
+
     # FEAT-18: Split portfolio_story area into 3 separate areas (2026-04-20)
     conn.execute(
         "UPDATE skills SET area='portfolio_cash_rule' "

@@ -96,6 +96,64 @@ class PositionAnalysesRepository:
             result[row["position_id"]] = self._row_to_model(row)
         return result
 
+    def get_verdicts_with_ticker(self, agents: List[str]) -> List[dict]:
+        """Return every persisted verdict for ``agents``, joined to its position ticker.
+
+        Read-only feed for the Verdict-Hindsight analysis (FEAT-59). Positions that were
+        deleted/sold drop out of the INNER JOIN — that is the documented survivorship
+        blind spot, surfaced (not hidden) by the caller. Verdicts with a NULL verdict are
+        skipped. Each row: ``{agent, verdict, created_at, ticker, scope}`` where ``scope``
+        is ``portfolio`` / ``watchlist`` / ``other`` (current flag — a position may have
+        moved since the verdict, the documented approximation).
+        """
+        if not agents:
+            return []
+        placeholders = ",".join("?" * len(agents))
+        rows = self._conn.execute(
+            f"""
+            SELECT pa.agent, pa.verdict, pa.created_at, p.ticker,
+                   p.in_portfolio, p.in_watchlist
+            FROM position_analyses pa
+            JOIN positions p ON p.id = pa.position_id
+            WHERE pa.agent IN ({placeholders})
+              AND pa.verdict IS NOT NULL AND pa.verdict != ''
+              AND p.ticker IS NOT NULL AND p.ticker != ''
+            ORDER BY pa.created_at ASC
+            """,
+            list(agents),
+        ).fetchall()
+        result = []
+        for r in rows:
+            scope = "portfolio" if r["in_portfolio"] else "watchlist" if r["in_watchlist"] else "other"
+            result.append({
+                "agent": r["agent"],
+                "verdict": r["verdict"],
+                "created_at": r["created_at"],
+                "ticker": r["ticker"],
+                "scope": scope,
+            })
+        return result
+
+    def count_directional_verdicts(self, agents: List[str]) -> int:
+        """Count all non-empty verdicts for ``agents``, including deleted positions.
+
+        Companion to :meth:`get_verdicts_with_ticker`: the difference between this total
+        and the joined rows is the survivorship gap (verdicts whose position was sold or
+        deleted), which the hindsight page surfaces explicitly.
+        """
+        if not agents:
+            return 0
+        placeholders = ",".join("?" * len(agents))
+        row = self._conn.execute(
+            f"""
+            SELECT COUNT(*) AS n FROM position_analyses
+            WHERE agent IN ({placeholders})
+              AND verdict IS NOT NULL AND verdict != ''
+            """,
+            list(agents),
+        ).fetchone()
+        return int(row["n"]) if row else 0
+
     def get_latest(self, position_id: int, agent: str) -> Optional[PositionAnalysis]:
         """Return the most recent analysis for a position/agent combination."""
         row = self._conn.execute(

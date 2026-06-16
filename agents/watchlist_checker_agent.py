@@ -152,7 +152,7 @@ class WatchlistCheckerAgent:
         watchlist_ids = [pos.id for pos in watchlist_positions if pos.id]
         bulk_verdicts = {}
         if watchlist_ids:
-            for agent_name in ["storychecker", "fundamental", "consensus_gap", "capital_allocator"]:
+            for agent_name in ["storychecker", "fundamental_analyzer", "consensus_gap", "capital_allocator"]:
                 results = self._analyses.get_latest_bulk(watchlist_ids, agent_name)
                 for pos_id, verdict_obj in results.items():
                     if pos_id not in bulk_verdicts:
