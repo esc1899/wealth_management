@@ -97,7 +97,7 @@ AREA_OPTIONS = [
     "news",
     "consensus_gap",
     "search",
-    "fundamental",
+    "fundamental_analyzer",
     "storychecker",
     "portfolio_stability",
     "portfolio_cash_rule",

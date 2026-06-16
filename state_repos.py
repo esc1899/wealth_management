@@ -87,7 +87,7 @@ def _seed_default_skills(repo: SkillsRepository) -> None:
     _skills_data = data.get("skills") or {}
     repo.seed_new_skills("structural_scan", _skills_data.get("structural_scan", []))
     repo.seed_new_skills("consensus_gap", _skills_data.get("consensus_gap", []))
-    repo.seed_new_skills("fundamental", _skills_data.get("fundamental", []))
+    repo.seed_new_skills("fundamental_analyzer", _skills_data.get("fundamental_analyzer", []))
     repo.seed_new_skills("portfolio_story", _skills_data.get("portfolio_story", []))
     repo.seed_new_skills("watchlist_checker", _skills_data.get("watchlist_checker", []))
     repo.seed_new_skills("search", _skills_data.get("search", []))

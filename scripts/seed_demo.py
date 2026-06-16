@@ -624,7 +624,7 @@ def seed(db_path: str = "data/demo.db", conn: Optional[sqlite3.Connection] = Non
     print("\nSeeding demo analyses ...")
     _demo_agents = [
         ("storychecker",     DEMO_STORYCHECKER),
-        ("fundamental",      DEMO_FUNDAMENTAL),
+        ("fundamental_analyzer", DEMO_FUNDAMENTAL),
         ("consensus_gap",    DEMO_CONSENSUS_GAP),
         ("capital_allocator", DEMO_CAPITAL_ALLOCATOR),
         ("devils_advocate",   DEMO_DEVILS_ADVOCATE),

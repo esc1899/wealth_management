@@ -431,6 +431,15 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     conn.execute(
         "UPDATE position_analyses SET agent='fundamental_analyzer' WHERE agent='fundamental'"
     )
+    # Same consolidation across the remaining persisted identifiers, so the legacy
+    # 'fundamental' agent/job/skill-area name disappears entirely (runs before the lazy
+    # skill seeding, so the seed's INSERT OR IGNORE then dedups on UNIQUE(name, area)).
+    conn.execute("UPDATE llm_usage SET agent='fundamental_analyzer' WHERE agent='fundamental'")
+    conn.execute("UPDATE scheduled_jobs SET agent_name='fundamental_analyzer' WHERE agent_name='fundamental'")
+    conn.execute("UPDATE OR IGNORE skills SET area='fundamental_analyzer' WHERE area='fundamental'")
+    conn.execute(
+        "DELETE FROM app_config WHERE key IN ('model_claude_fundamental', 'model_openai_fundamental')"
+    )
 
     # FEAT-18: Split portfolio_story area into 3 separate areas (2026-04-20)
     conn.execute(

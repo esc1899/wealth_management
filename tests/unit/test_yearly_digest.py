@@ -92,7 +92,7 @@ class TestGenerateYearlyDigest:
             )
         """)
         conn.execute("INSERT INTO position_analyses (agent, verdict, created_at) VALUES ('storychecker', 'intact', '2026-03-15T10:00:00')")
-        conn.execute("INSERT INTO position_analyses (agent, verdict, created_at) VALUES ('fundamental', 'unterbewertet', '2026-07-20T10:00:00')")
+        conn.execute("INSERT INTO position_analyses (agent, verdict, created_at) VALUES ('fundamental_analyzer', 'unterbewertet', '2026-07-20T10:00:00')")
         conn.commit()
         repo = MagicMock()
         repo._conn = conn

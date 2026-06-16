@@ -120,7 +120,7 @@ class TestAgentRunsLineageIntegration:
         )
 
         # Ebene 1: analyst verdicts
-        for agent in ["storychecker", "fundamental"]:
+        for agent in ["storychecker", "fundamental_analyzer"]:
             agent_runs_repo.log_run(
                 agent_name=agent,
                 agent_deps=["portfolio_data"],
@@ -130,7 +130,7 @@ class TestAgentRunsLineageIntegration:
         # Ebene 2: investment compass (uses Ebene 1)
         agent_runs_repo.log_run(
             agent_name="investment_kompass",
-            agent_deps=["portfolio_data", "storychecker", "fundamental"],
+            agent_deps=["portfolio_data", "storychecker", "fundamental_analyzer"],
             output_summary="Full analysis",
         )
 
@@ -141,7 +141,7 @@ class TestAgentRunsLineageIntegration:
 
         # Get all runs at one level
         level1_runs = agent_runs_repo.get_runs_for_agents(
-            ["storychecker", "fundamental"]
+            ["storychecker", "fundamental_analyzer"]
         )
         assert len(level1_runs) == 2
 

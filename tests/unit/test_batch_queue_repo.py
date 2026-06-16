@@ -38,7 +38,7 @@ class TestBatchQueueRepository:
         assert len(pending) == 0
 
     def test_mark_error(self, repo):
-        repo.create("msgbatch_err", "fundamental", None, "de", 2)
+        repo.create("msgbatch_err", "fundamental_analyzer", None, "de", 2)
         repo.mark_error("msgbatch_err", "API timeout")
         pending = repo.get_pending()
         assert len(pending) == 0

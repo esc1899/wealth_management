@@ -354,7 +354,7 @@ class AgentSchedulerService:
             await self._run_consensus_gap_job(job, conn, _log)
         elif job.agent_name == "storychecker":
             await self._run_storychecker_job(job, conn, _log)
-        elif job.agent_name == "fundamental":
+        elif job.agent_name == "fundamental_analyzer":
             await self._run_fundamental_job(job, conn, _log)
         elif job.agent_name == "sector_rotation":
             await self._run_sector_rotation_job(job, conn, _log)
@@ -931,7 +931,7 @@ class AgentSchedulerService:
                     ok = self._process_sc_result(result, skill_name, conn)
                 elif agent_name == "consensus_gap":
                     ok = self._process_cg_result(result, skill_name, conn)
-                elif agent_name == "fundamental":
+                elif agent_name == "fundamental_analyzer":
                     ok = self._process_fa_result(result, skill_name, conn)
                 elif agent_name == "sector_rotation":
                     ok = self._process_sr_result(result, skill_name, conn)
@@ -1371,7 +1371,7 @@ class AgentSchedulerService:
         if not requests:
             return ""
         batch_id = await llm.submit_batch(requests)
-        BatchQueueRepository(conn).create(batch_id, "fundamental", skill_name, "de", len(requests))
+        BatchQueueRepository(conn).create(batch_id, "fundamental_analyzer", skill_name, "de", len(requests))
         return batch_id
 
     def _open_conn(self):

@@ -318,7 +318,7 @@ async def test_catchup_skips_monthly_job_already_ran_this_month():
     mock_jobs_repo = Mock()
     job = ScheduledJob(
         id=7,
-        agent_name="fundamental",
+        agent_name="fundamental_analyzer",
         skill_name="",
         skill_prompt="",
         frequency="monthly",
@@ -364,7 +364,7 @@ async def test_catchup_runs_monthly_job_that_missed_scheduled_day():
     mock_jobs_repo = Mock()
     job = ScheduledJob(
         id=8,
-        agent_name="fundamental",
+        agent_name="fundamental_analyzer",
         skill_name="",
         skill_prompt="",
         frequency="monthly",

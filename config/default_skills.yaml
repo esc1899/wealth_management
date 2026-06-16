@@ -271,7 +271,7 @@ skills:
   # ── Fundamentalwert-Analyse ─────────────────────────────────────────────────
   # Skills for the FundamentalAgent (Cloud ☁️, Claude API + web search).
 
-  fundamental:
+  fundamental_analyzer:
     - name: "Langfrist-Investor"
       description: "10+ Jahres-Horizont — Moat, konservative Bewertung, strukturelle Risiken"
       prompt: |

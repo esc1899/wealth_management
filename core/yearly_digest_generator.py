@@ -24,7 +24,7 @@ _MONTH_NAMES_DE = {
 
 _AGENT_LABELS = {
     "storychecker": "Storychecker",
-    "fundamental": "Fundamental-Analyse",
+    "fundamental_analyzer": "Fundamental-Analyse",
     "consensus_gap": "Consensus Gap",
 }
 
