@@ -231,11 +231,9 @@ st.caption(t("settings.model_prices_caption"))
 
 _PROVIDERS = ["claude", "openrouter", "deepseek", app_config.OLLAMA_PROVIDER]
 
-_registry = app_config.get_model_registry()
-# Auto-add any configured OPENAI_MODELS not yet in the registry (placeholder price)
-for _m in config.OPENAI_MODELS:
-    if _m not in _registry:
-        _registry[_m] = {"input": 0.0, "output": 0.0, "provider": "openrouter"}
+# Registry + configured OPENAI_MODELS (placeholder price), honouring the deleted list
+# so a model removed in the UI does not reappear from .env on reload.
+_registry = app_config.get_registry_with_configured(config.OPENAI_MODELS)
 
 st.caption(t("settings.model_prices_provider_note"))
 st.caption(t("settings.model_prices_columns_legend"))

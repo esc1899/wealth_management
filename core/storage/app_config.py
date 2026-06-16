@@ -150,6 +150,20 @@ class AppConfigRepository:
                 entry["provider"] = self.OLLAMA_PROVIDER
         return registry
 
+    def get_registry_with_configured(self, configured: list, provider: str = "openrouter") -> dict:
+        """Registry plus any configured (e.g. env OPENAI_MODELS) models not yet present.
+
+        Honours the deleted list: a model the user removed in the UI does NOT reappear
+        just because it is still listed in config/.env (FEAT-57 bug — a deleted model in
+        OPENAI_MODELS was re-added on every settings reload).
+        """
+        registry = self.get_model_registry()
+        deleted = set(self.get_deleted_models())
+        for model_id in configured:
+            if model_id and model_id not in registry and model_id not in deleted:
+                registry[model_id] = {"input": 0.0, "output": 0.0, "provider": provider}
+        return registry
+
     def provider_for(self, model: str) -> str:
         """Provider for a model id: registry entry if present, else inferred."""
         entry = self.get_model_registry().get(model)

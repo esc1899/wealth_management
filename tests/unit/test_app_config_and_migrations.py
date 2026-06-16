@@ -143,6 +143,18 @@ class TestModelRegistry:
         app_config_repo.set_deleted_models([])
         assert "deepseek/deepseek-r1" in app_config_repo.get_model_registry()
 
+    def test_configured_model_added_but_deleted_one_not_reappearing(self, app_config_repo):
+        # A configured (env OPENAI_MODELS) model not yet known is added with placeholder.
+        reg = app_config_repo.get_registry_with_configured(["openrouter/brand-new-model"])
+        assert reg["openrouter/brand-new-model"]["provider"] == "openrouter"
+        assert reg["openrouter/brand-new-model"]["input"] == 0.0
+
+        # But a model the user deleted must NOT reappear, even if still in OPENAI_MODELS
+        # (regression: deepseek/deepseek-v4-flash could not be deleted).
+        app_config_repo.set_deleted_models(["deepseek/deepseek-v4-flash"])
+        reg = app_config_repo.get_registry_with_configured(["deepseek/deepseek-v4-flash"])
+        assert "deepseek/deepseek-v4-flash" not in reg
+
     def test_get_model_prices_unchanged_for_cost(self, app_config_repo):
         # Cost path only reads input/output — extra fields must not interfere
         prices = app_config_repo.get_model_prices()
