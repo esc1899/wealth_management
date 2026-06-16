@@ -41,6 +41,9 @@ report = compute_hindsight(
 # --- Framing: this is a journal, not a statistics claim --------------------------
 st.info(t("verdict_hindsight.framing"))
 
+with st.expander(t("verdict_hindsight.methodology_header")):
+    st.markdown(t("verdict_hindsight.methodology_body"))
+
 # Headline metrics describe the whole corpus (scope-independent).
 m1, m2, m3, m4 = st.columns(4)
 m1.metric(t("verdict_hindsight.metric_total"), report.total_emitted)

@@ -490,6 +490,19 @@ verdict_hindsight:
   col_worst: "Worst"
   details: "Details (mean, best/worst)"
   details_empty: "No matured verdicts for the detail view yet."
+  methodology_header: "How to read this (method & pitfalls)"
+  methodology_body: |
+    **Direction:** For calibrated verdicts, 🟢 should on average beat 🔴. If 🔴 leads, check the pitfalls below before concluding "the agent is bad".
+
+    **Horizon matters most.** Valuation (FA) and consensus-gap (CG) verdicts are **quarter-to-year theses**, not 1-month price calls. At 1M, **momentum** dominates over convergence to fair value — expensive/overvalued names often keep running short-term, cheap ones stay cheap. A 🔴>🟢 inversion at **1M is expected noise**; only if it **survives into the 3M/6M columns** is it a real warning sign.
+
+    **Raw vs. vs Portfolio vs. vs Index.** "Raw" = absolute price move. "vs Portfolio" = excess vs your own depot — the **cleanest lens for verdict quality** (neutralises your allocation/regime). "vs Index" mixes verdict quality with your allocation choice (single names vs the world market) — it says more about asset allocation than about the agents.
+
+    **Sample.** Small, private portfolio. The **Positions** column shows how many distinct names the verdicts come from — few names behind many (monthly) verdicts = autocorrelated, so fewer independent bets than "Verdicts" suggests.
+
+    **Survivorship.** Sold/deleted legacy positions drop out (metric above). New verdicts are insured against later sale; the blind spot shrinks over time but does not vanish retroactively.
+
+    **Fundamental "unknown"** is not graded (no directional claim).
   read_hint: "How to read: for well-calibrated verdicts, 🟢 verdicts should on average fare better than 🔴 ones. The \"Positions\" column shows how many distinct names the verdicts come from — few names behind many verdicts = weaker signal (overlapping windows are not independent). Fundamental \"unknown\" is not graded."
 
 statistics:

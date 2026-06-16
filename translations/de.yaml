@@ -489,6 +489,19 @@ verdict_hindsight:
   col_worst: "Schlechtestes"
   details: "Details (Ø, Bestes/Schlechtestes)"
   details_empty: "Noch keine gereiften Urteile für die Detailansicht."
+  methodology_header: "Wie ist das zu lesen? (Methodik & Fallstricke)"
+  methodology_body: |
+    **Richtung:** Bei kalibrierten Urteilen sollten 🟢-Urteile im Schnitt besser abschneiden als 🔴. Wenn 🔴 vorn liegt, zuerst die Fallstricke prüfen, bevor man „der Agent ist schlecht" schließt.
+
+    **Horizont ist entscheidend.** Bewertungs- (FA) und Konsens-Lücken-Urteile (CG) sind **Quartals- bis Jahres-Thesen**, keine 1-Monats-Kurscalls. Auf 1M dominiert **Momentum**, nicht die Annäherung an den fairen Wert — teure/überbewertete Titel laufen kurzfristig oft weiter, billige bleiben billig. Eine 🔴>🟢-Umkehr bei **1M ist erwartetes Rauschen**; erst wenn sie in den **3M/6M-Spalten überlebt**, ist sie ein echtes Warnsignal.
+
+    **Roh vs. vs Portfolio vs. vs Index.** „Roh" = absolute Kursbewegung. „vs Portfolio" = Überrendite ggü. dem eigenen Depot — die **sauberste Linse für Urteilsqualität** (neutralisiert deine Allokation/Regime). „vs Index" mischt Urteilsqualität mit deiner Allokationsentscheidung (Einzeltitel vs. Weltmarkt) — sagt mehr über Asset-Allocation als über die Agents.
+
+    **Stichprobe.** Kleines, privates Depot. Die Spalte **Positionen** zeigt, aus wie vielen verschiedenen Titeln die Urteile stammen — wenige Titel bei vielen (monatlichen) Urteilen = autokorreliert, real also weniger unabhängige Wetten als „Urteile" suggeriert.
+
+    **Survivorship.** Verkaufte/gelöschte Alt-Positionen fallen aus der Auswertung (Kennzahl oben). Neue Urteile werden gegen späteren Verkauf abgesichert; der Blind Spot schrumpft mit der Zeit, verschwindet aber nicht rückwirkend.
+
+    **Fundamental-„unbekannt"** wird nicht bewertet (keine Richtungsaussage).
   read_hint: "So lesen: bei kalibrierten Urteilen sollten 🟢-Urteile im Schnitt besser abschneiden als 🔴-Urteile. Spalte „Positionen\" zeigt, aus wie vielen verschiedenen Titeln die Urteile stammen — wenige Titel bei vielen Urteilen = schwächeres Signal (überlappende Fenster sind nicht unabhängig). Fundamental-„unbekannt\" wird nicht bewertet."
 
 statistics:
