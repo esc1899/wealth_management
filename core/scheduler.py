@@ -81,6 +81,18 @@ class AgentSchedulerService:
             )
             logger.info("Batch API polling job registered (every 15 min)")
 
+        # Reconcile real OpenRouter costs in the background so the Statistics page
+        # is display-only (no manual fetch needed). First run ~20s after startup.
+        if self._openai_api_key and self._openai_base_url:
+            self._scheduler.add_job(
+                func=self._dispatch_openrouter_cost_sync,
+                trigger=IntervalTrigger(minutes=30),
+                id="openrouter_cost_sync",
+                next_run_time=datetime.now() + timedelta(seconds=20),
+                replace_existing=True,
+            )
+            logger.info("OpenRouter cost sync job registered (every 30 min)")
+
         # Catch up any missed jobs in background (don't block app startup)
         import threading
         def _run_catchup():
@@ -861,6 +873,25 @@ class AgentSchedulerService:
             asyncio.run(self._poll_and_process_batches())
         except Exception:
             logger.exception("Batch poll failed")
+
+    def _dispatch_openrouter_cost_sync(self) -> None:
+        """Fetch real costs for any uncosted OpenRouter calls (runs in background)."""
+        try:
+            from core.llm.openrouter_costs import fetch_and_store_costs
+            conn = self._open_conn()
+            try:
+                repo = UsageRepository(conn)
+                uncosted = repo.get_uncosted_openrouter_records(limit=200)
+                if not uncosted:
+                    return
+                updated = fetch_and_store_costs(
+                    self._openai_api_key, self._openai_base_url, uncosted, repo
+                )
+                logger.info("OpenRouter cost sync: %d/%d records updated", updated, len(uncosted))
+            finally:
+                conn.close()
+        except Exception:
+            logger.exception("OpenRouter cost sync failed")
 
     async def _poll_and_process_batches(self) -> None:
         from core.llm.claude import ClaudeProvider

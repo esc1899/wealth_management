@@ -20,52 +20,24 @@ st.caption(t("statistics.subtitle"))
 
 repo = get_usage_repo()
 config_repo = get_app_config_repo()
-model_prices = config_repo.get_model_prices()
+# Registry is a superset of the price table (adds `provider`); usable directly for
+# cost estimation (compute_cost reads only input/output) and provider grouping.
+model_registry = config_repo.get_model_registry()
+model_prices = model_registry
 
-# ------------------------------------------------------------------
-# Section: Echte Kosten (OpenRouter)
-# ------------------------------------------------------------------
+# Provider display names (brand names — language-neutral).
+_PROVIDER_LABELS = {
+    "claude": "Anthropic",
+    "openrouter": "OpenRouter",
+    "deepseek": "DeepSeek",
+    "ollama": "Ollama",
+}
+
+
+def _provider_for(model: str) -> str:
+    return config_repo.provider_for(model)
 
 _OR_ACTIVE = bool(config.OPENAI_BASE_URL and config.OPENAI_API_KEY)
-
-if _OR_ACTIVE:
-    st.subheader("💰 Echte Kosten (OpenRouter)")
-
-    actual_summary = repo.actual_costs_summary()
-    _ac_today = actual_summary.get("today") or 0.0
-    _ac_month = actual_summary.get("this_month") or 0.0
-    _ac_all = actual_summary.get("all_time") or 0.0
-    _pending = actual_summary.get("pending") or 0
-
-    _col1, _col2, _col3, _col4 = st.columns(4)
-    _col1.metric("Heute (real)", f"${_ac_today:.4f}")
-    _col2.metric("Diesen Monat (real)", f"${_ac_month:.4f}")
-    _col3.metric("Gesamt (real)", f"${_ac_all:.4f}")
-    _col4.metric("Ausstehend", str(_pending), help="Calls mit OpenRouter-ID, Kosten noch nicht abgerufen")
-
-    _fetch_col, _account_col = st.columns([1, 2])
-    with _fetch_col:
-        if st.button("🔄 Kosten abrufen", help="Holt echte Kosten von OpenRouter für alle ausstehenden Calls"):
-            _uncosted = repo.get_uncosted_openrouter_records(limit=200)
-            if _uncosted:
-                with st.spinner(f"Rufe Kosten für {len(_uncosted)} Calls ab…"):
-                    _updated = fetch_and_store_costs(
-                        config.OPENAI_API_KEY, config.OPENAI_BASE_URL, _uncosted, repo
-                    )
-                st.success(f"✅ {_updated}/{len(_uncosted)} Kosten aktualisiert")
-                st.rerun()
-            else:
-                st.info("Keine ausstehenden Calls.")
-
-    with _account_col:
-        if st.button("🔑 Account-Gesamtverbrauch abrufen"):
-            _total = fetch_account_usage(config.OPENAI_API_KEY, config.OPENAI_BASE_URL)
-            if _total is not None:
-                st.info(f"OpenRouter Account: **${_total:.4f}** Gesamtverbrauch seit Accounterstellung")
-            else:
-                st.warning("Konnte Account-Verbrauch nicht abrufen.")
-
-    st.divider()
 
 # ------------------------------------------------------------------
 # Source filter
@@ -142,12 +114,87 @@ last_month_calls = sum(r.get("calls", 0) for r in last_month_rows)
 # Header KPIs
 # ------------------------------------------------------------------
 
-st.subheader("📊 Geschätzte Kosten")
-st.caption("Basis: konfigurierte Preise × Token-Zählung")
+st.subheader(f"💰 {t('statistics.costs_header')}")
+st.caption(t("statistics.costs_caption"))
 m1, m2, m3 = st.columns(3)
 m1.metric(t("statistics.today"), f"${today_cost:.4f}", delta=f"{today_calls} Calls", delta_color="off")
 m2.metric(t("statistics.this_month"), f"${this_month_cost:.4f}", delta=f"{this_month_calls} Calls", delta_color="off")
 m3.metric(t("statistics.last_month"), f"${last_month_cost:.4f}", delta=f"{last_month_calls} Calls", delta_color="off")
+
+# Per-provider breakdown of the cost (this month) — makes explicit that the total
+# spans Anthropic + OpenRouter + DeepSeek + Ollama, not just one provider.
+_provider_month: dict[str, float] = {}
+for r in this_month_rows:
+    p = _provider_for(r["model"])
+    _provider_month[p] = _provider_month.get(p, 0.0) + _row_cost(r)
+
+if _provider_month:
+    st.caption(t("statistics.by_provider_header"))
+    _ordered = [p for p in ("claude", "openrouter", "deepseek", "ollama") if p in _provider_month]
+    _pcols = st.columns(len(_ordered))
+    for _col, _p in zip(_pcols, _ordered):
+        _col.metric(_PROVIDER_LABELS.get(_p, _p), f"${_provider_month[_p]:.4f}")
+
+st.divider()
+
+# ------------------------------------------------------------------
+# Tokens
+# ------------------------------------------------------------------
+
+
+def _fmt_tokens(n: float) -> str:
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f} Mio"
+    if n >= 1_000:
+        return f"{n / 1_000:.0f}k"
+    return str(int(n))
+
+
+def _token_split(rows: list[dict]) -> tuple[int, int]:
+    """Return (input_incl_cache, output) token totals for the given rows."""
+    inp = sum(
+        int(r.get("input_tokens") or 0)
+        + int(r.get("cache_read_tokens") or 0)
+        + int(r.get("cache_write_tokens") or 0)
+        for r in rows
+    )
+    out = sum(int(r.get("output_tokens") or 0) for r in rows)
+    return inp, out
+
+
+_tok_today_in, _tok_today_out = _token_split(today_rows)
+_tok_month_in, _tok_month_out = _token_split(this_month_rows)
+
+st.subheader(f"🔢 {t('statistics.tokens_header')}")
+st.caption(t("statistics.tokens_caption"))
+_t1, _t2 = st.columns(2)
+_t1.metric(
+    t("statistics.today"), _fmt_tokens(_tok_today_in + _tok_today_out),
+    delta=f"In {_fmt_tokens(_tok_today_in)} · Out {_fmt_tokens(_tok_today_out)}", delta_color="off",
+)
+_t2.metric(
+    t("statistics.this_month"), _fmt_tokens(_tok_month_in + _tok_month_out),
+    delta=f"In {_fmt_tokens(_tok_month_in)} · Out {_fmt_tokens(_tok_month_out)}", delta_color="off",
+)
+
+# Per-provider token breakdown (this month) — symmetric to the cost breakdown.
+_provider_tokens: dict[str, tuple[int, int]] = {}
+for r in this_month_rows:
+    p = _provider_for(r["model"])
+    _in, _out = _token_split([r])
+    _prev_in, _prev_out = _provider_tokens.get(p, (0, 0))
+    _provider_tokens[p] = (_prev_in + _in, _prev_out + _out)
+
+if _provider_tokens:
+    st.caption(t("statistics.by_provider_header"))
+    _ordered_t = [p for p in ("claude", "openrouter", "deepseek", "ollama") if p in _provider_tokens]
+    _tcols = st.columns(len(_ordered_t))
+    for _col, _p in zip(_tcols, _ordered_t):
+        _pin, _pout = _provider_tokens[_p]
+        _col.metric(
+            _PROVIDER_LABELS.get(_p, _p), _fmt_tokens(_pin + _pout),
+            delta=f"In {_fmt_tokens(_pin)} · Out {_fmt_tokens(_pout)}", delta_color="off",
+        )
 
 st.divider()
 
@@ -338,3 +385,44 @@ with tab_calls:
         st.dataframe(df_recent[display_recent_cols], use_container_width=True, hide_index=True)
     else:
         st.info("Noch keine Aufrufe aufgezeichnet.")
+
+# ------------------------------------------------------------------
+# Provider-Abgleich (OpenRouter) — verification that estimate ≈ reality.
+# Costs are reconciled automatically by the scheduler; this is just the readout
+# plus a manual fallback.
+# ------------------------------------------------------------------
+
+if _OR_ACTIVE:
+    st.divider()
+    actual_summary = repo.actual_costs_summary()
+    _ac_month = actual_summary.get("this_month") or 0.0
+    _ac_all = actual_summary.get("all_time") or 0.0
+    _pending = actual_summary.get("pending") or 0
+
+    with st.expander(f"ℹ️ {t('statistics.reconcile_header')}"):
+        st.caption(t("statistics.reconcile_caption"))
+        _r1, _r2, _r3 = st.columns(3)
+        _r1.metric(t("statistics.this_month"), f"${_ac_month:.4f}")
+        _r2.metric(t("statistics.all_time"), f"${_ac_all:.4f}")
+        _r3.metric(t("statistics.reconcile_pending"), str(_pending))
+
+        _fcol, _acol = st.columns([1, 2])
+        with _fcol:
+            if st.button(t("statistics.reconcile_fetch"), key="_reconcile_fetch"):
+                _uncosted = repo.get_uncosted_openrouter_records(limit=200)
+                if _uncosted:
+                    with st.spinner(f"… {len(_uncosted)}"):
+                        _updated = fetch_and_store_costs(
+                            config.OPENAI_API_KEY, config.OPENAI_BASE_URL, _uncosted, repo
+                        )
+                    st.success(f"✅ {_updated}/{len(_uncosted)}")
+                    st.rerun()
+                else:
+                    st.info(t("statistics.reconcile_none"))
+        with _acol:
+            if st.button(t("statistics.reconcile_account"), key="_reconcile_account"):
+                _total = fetch_account_usage(config.OPENAI_API_KEY, config.OPENAI_BASE_URL)
+                if _total is not None:
+                    st.info(f"OpenRouter Account: **${_total:.4f}**")
+                else:
+                    st.warning("—")
