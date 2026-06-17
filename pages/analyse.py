@@ -21,7 +21,7 @@ from core.yearly_digest_generator import generate_yearly_digest
 from state import (
     get_market_agent, get_market_repo, get_portfolio_service,
     get_app_config_repo, get_analyses_repo, get_monthly_digest_repo,
-    get_yearly_digest_repo,
+    get_yearly_digest_repo, get_wealth_snapshot_repo,
 )
 
 st.set_page_config(page_title="Analyse", page_icon="🔍", layout="wide")
@@ -244,9 +244,11 @@ if _excluded_count:
     st.caption(f"ℹ️ {_excluded_count} Position{'en' if _excluded_count != 1 else ''} von der Analyse ausgeschlossen — Gesamtvermögen in der Vermögenshistorie kann abweichen.")
 
 _market_repo = get_market_repo()
-_attribution = compute_monthly_attribution(valuations, _market_repo, _sel_year, _sel_month)
+_wealth_repo = get_wealth_snapshot_repo()
+_attribution = compute_monthly_attribution(valuations, _market_repo, _sel_year, _sel_month, wealth_repo=_wealth_repo)
 
 if _attribution:
+    st.caption(f"ℹ️ {t('analysis.attribution_qty_note')}")
     _rows_with_data = [r for r in _attribution if r.delta_pct is not None]
 
     # Summary metric — numerator and denominator must use the same row set.
@@ -369,9 +371,10 @@ if _is_current_year:
 if _excluded_count:
     st.caption(f"ℹ️ {_excluded_count} Position{'en' if _excluded_count != 1 else ''} von der Analyse ausgeschlossen — Gesamtvermögen in der Vermögenshistorie kann abweichen.")
 
-_year_attribution = compute_yearly_attribution(valuations, _market_repo, _sel_year_val)
+_year_attribution = compute_yearly_attribution(valuations, _market_repo, _sel_year_val, wealth_repo=_wealth_repo)
 
 if _year_attribution:
+    st.caption(f"ℹ️ {t('analysis.attribution_qty_note')}")
     _year_rows_with_data = [r for r in _year_attribution if r.delta_pct is not None]
 
     # Summary metric — numerator and denominator must use the same row set.

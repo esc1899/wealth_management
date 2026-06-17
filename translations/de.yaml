@@ -204,6 +204,7 @@ market_data:
 
 analysis:
   title: "Analyse"
+  attribution_qty_note: "Beiträge basieren auf der zu Periodenbeginn gehaltenen Stückzahl (aus Snapshots). Für Perioden ohne gespeicherte Bestände dient die heutige Stückzahl als Näherung."
   pnl_chart: "Gewinn / Verlust je Position"
   price_history: "Kursverlauf"
   select_symbol: "Symbol auswählen"

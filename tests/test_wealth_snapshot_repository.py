@@ -227,3 +227,32 @@ class TestComplexScenarios:
         retrieved = repo.get_by_date("2026-04-10")
         assert retrieved.breakdown == breakdown
         assert retrieved.total_eur == 880_000
+
+
+class TestHoldingsNearDate:
+    def _holding(self, ticker, qty):
+        return {"name": ticker, "ticker": ticker, "asset_class": "Aktie",
+                "quantity": qty, "unit": "Stück", "price_eur": 10.0, "value_eur": qty * 10.0}
+
+    def test_returns_ticker_quantity_map_of_nearest(self, repo):
+        repo.create(date_str="2026-01-02", total_eur=100.0, breakdown={"Aktie": 100.0},
+                    holdings=[self._holding("AAPL", 5.0), self._holding("MSFT", 3.0)])
+        result = repo.holdings_near_date("2026-01-01", window_days=10)
+        assert result == {"AAPL": 5.0, "MSFT": 3.0}
+
+    def test_picks_closest_within_window(self, repo):
+        repo.create(date_str="2026-01-02", total_eur=50.0, breakdown={"Aktie": 50.0},
+                    holdings=[self._holding("AAPL", 5.0)])
+        repo.create(date_str="2026-01-09", total_eur=70.0, breakdown={"Aktie": 70.0},
+                    holdings=[self._holding("AAPL", 7.0)])
+        # Closest to 2026-01-03 is the 01-02 snapshot
+        assert repo.holdings_near_date("2026-01-03", window_days=10) == {"AAPL": 5.0}
+
+    def test_none_when_outside_window(self, repo):
+        repo.create(date_str="2026-01-02", total_eur=50.0, breakdown={"Aktie": 50.0},
+                    holdings=[self._holding("AAPL", 5.0)])
+        assert repo.holdings_near_date("2026-06-01", window_days=10) is None
+
+    def test_ignores_snapshots_without_holdings(self, repo):
+        repo.create(date_str="2026-01-02", total_eur=50.0, breakdown={"Aktie": 50.0})  # legacy, no holdings
+        assert repo.holdings_near_date("2026-01-01", window_days=10) is None

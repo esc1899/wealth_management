@@ -785,6 +785,8 @@ class AgentSchedulerService:
         analyses_repo = PositionAnalysesRepository(conn)
         app_config_repo = AppConfigRepository(conn)
         digest_repo = MonthlyDigestRepository(conn)
+        from core.storage.wealth_snapshots import WealthSnapshotRepository
+        wealth_repo = WealthSnapshotRepository(conn)
 
         from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
         from agents.market_data_agent import MarketDataAgent
@@ -813,6 +815,7 @@ class AgentSchedulerService:
             year=year,
             month=month,
             market_repo=market_repo,
+            wealth_repo=wealth_repo,
         )
         digest_repo.save(month_key, body)
         _log(f"Monatsdigest {month_key} gespeichert")
@@ -835,6 +838,8 @@ class AgentSchedulerService:
         app_config_repo = AppConfigRepository(conn)
         digest_repo = YearlyDigestRepository(conn)
         monthly_digest_repo = MonthlyDigestRepository(conn)
+        from core.storage.wealth_snapshots import WealthSnapshotRepository
+        wealth_repo = WealthSnapshotRepository(conn)
 
         from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
         from agents.market_data_agent import MarketDataAgent
@@ -860,6 +865,7 @@ class AgentSchedulerService:
             year=target_year,
             market_repo=market_repo,
             monthly_digest_repo=monthly_digest_repo,
+            wealth_repo=wealth_repo,
         )
         digest_repo.save(year_key, body)
         _log(f"Jahresdigest {year_key} gespeichert")

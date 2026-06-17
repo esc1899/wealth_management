@@ -41,6 +41,7 @@ def compute_monthly_attribution(
     year: int,
     month: int,
     today: Optional[date] = None,
+    wealth_repo=None,
 ) -> List[AttributionMonthRow]:
     """
     For each portfolio position (not watchlist, not excluded) with a ticker:
@@ -50,6 +51,11 @@ def compute_monthly_attribution(
     Unit handling mirrors market_data_agent.get_portfolio_valuation():
       unit="g"  → price is EUR/troy_oz, value = (price / 31.1035) * quantity_grams
       otherwise → value = price * quantity
+
+    Quantity source: when ``wealth_repo`` is given, the *actual* quantity held at the
+    start of the period is read from the nearest wealth snapshot's ``holdings`` (so a
+    later quantity change no longer distorts a past period). Falls back to today's
+    ``v.quantity`` when no snapshot carries composition near the period start.
 
     Purchase-date correction: if a position was bought after the month started,
     cost_basis_eur replaces the historical start price to avoid distorted returns.
@@ -71,6 +77,14 @@ def compute_monthly_attribution(
     prev_month_start = date(prev_year, prev_month_num, 1).isoformat()
     prev_month_end = date(prev_year, prev_month_num, calendar.monthrange(prev_year, prev_month_num)[1]).isoformat()
 
+    # Quantity held at the start of the period (forward-only; None → today's qty)
+    start_qty_map = wealth_repo.holdings_near_date(month_start) if wealth_repo is not None else None
+
+    def _start_qty(v):
+        if start_qty_map and start_qty_map.get(v.symbol) is not None:
+            return start_qty_map[v.symbol]
+        return v.quantity
+
     portfolio_vals = [
         v for v in valuations
         if v.in_portfolio and not getattr(v, "analysis_excluded", False)
@@ -85,7 +99,7 @@ def compute_monthly_attribution(
     # First pass: compute total start value for contribution_pct denominator
     total_start_value = 0.0
     for v in portfolio_vals:
-        sv = _get_start_value_monthly(market_repo, v, prev_month_start, prev_month_end, period_start)
+        sv = _get_start_value_monthly(market_repo, v, prev_month_start, prev_month_end, period_start, _start_qty(v))
         if sv:
             total_start_value += sv
 
@@ -93,7 +107,7 @@ def compute_monthly_attribution(
     rows: List[AttributionMonthRow] = []
     for v in portfolio_vals:
         unit = getattr(v, "unit", None) or ""
-        qty = v.quantity
+        qty = _start_qty(v)
 
         purchase_date = getattr(v, "purchase_date", None)
         bought_mid_period = purchase_date is not None and purchase_date > period_start
@@ -107,10 +121,10 @@ def compute_monthly_attribution(
 
         if is_current_month:
             end_price = v.current_price_eur
-            end_val = v.current_value_eur
         else:
             end_price = market_repo.get_last_price_in_range(v.symbol, month_start, month_end)
-            end_val = _to_value(end_price, qty, unit)
+        # Price-return on the quantity held entering the period (intra-period flows excluded)
+        end_val = _to_value(end_price, qty, unit)
 
         delta_pct: Optional[float] = None
         contribution_eur = 0.0
@@ -142,13 +156,14 @@ def compute_monthly_attribution(
     return rows
 
 
-def _get_start_value_monthly(market_repo, v, prev_month_start: str, prev_month_end: str, period_start: date) -> Optional[float]:
+def _get_start_value_monthly(market_repo, v, prev_month_start: str, prev_month_end: str, period_start: date, start_qty=None) -> Optional[float]:
     """Return start value for a valuation, using cost_basis_eur for mid-period purchases."""
     purchase_date = getattr(v, "purchase_date", None)
     if purchase_date is not None and purchase_date > period_start:
         return getattr(v, "cost_basis_eur", None)
+    qty = start_qty if start_qty is not None else v.quantity
     start_price = market_repo.get_last_price_in_range(v.symbol, prev_month_start, prev_month_end)
-    return _to_value(start_price, v.quantity, getattr(v, "unit", None))
+    return _to_value(start_price, qty, getattr(v, "unit", None))
 
 
 def _to_value(

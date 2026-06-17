@@ -147,6 +147,34 @@ class WealthSnapshotRepository:
         ).fetchone()
         return float(row["total_eur"]) if row else None
 
+    def holdings_near_date(
+        self, date_str: str, window_days: int = 10
+    ) -> Optional[Dict[str, float]]:
+        """Return ``{ticker: quantity}`` from the holdings-bearing snapshot closest to
+        ``date_str`` within ±window. Used by attribution to value a period against its
+        *actual* held quantities instead of today's. Returns None if no snapshot in the
+        window carries composition (legacy snapshots without ``holdings``).
+        """
+        row = self._conn.execute(
+            """
+            SELECT holdings FROM wealth_snapshots
+            WHERE holdings IS NOT NULL
+              AND date BETWEEN date(?, '-' || ? || ' days') AND date(?, '+' || ? || ' days')
+            ORDER BY abs(julianday(date) - julianday(?)) ASC, date ASC
+            LIMIT 1
+            """,
+            (date_str, window_days, date_str, window_days, date_str),
+        ).fetchone()
+        if not row or not row["holdings"]:
+            return None
+        qty_map: Dict[str, float] = {}
+        for h in json.loads(row["holdings"]):
+            ticker = h.get("ticker")
+            qty = h.get("quantity")
+            if ticker and qty is not None:
+                qty_map[ticker] = qty
+        return qty_map or None
+
     def get_by_id(self, snapshot_id: int) -> Optional[WealthSnapshot]:
         """Get a snapshot by ID."""
         row = self._conn.execute(

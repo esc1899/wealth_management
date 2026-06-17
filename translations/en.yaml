@@ -205,6 +205,7 @@ market_data:
 
 analysis:
   title: "Analysis"
+  attribution_qty_note: "Contributions are based on the quantity held at the start of the period (from snapshots). For periods without stored holdings, today's quantity is used as an approximation."
   pnl_chart: "Profit / Loss per Position"
   price_history: "Price History"
   select_symbol: "Select symbol"

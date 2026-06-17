@@ -36,6 +36,7 @@ def generate_yearly_digest(
     year: int,
     market_repo=None,
     monthly_digest_repo=None,
+    wealth_repo=None,
 ) -> str:
     """
     Generate a Markdown digest for the given year.
@@ -68,7 +69,7 @@ def generate_yearly_digest(
     attribution_rows: List[AttributionYearRow] = []
     if market_repo is not None:
         try:
-            attribution_rows = compute_yearly_attribution(valuations, market_repo, year)
+            attribution_rows = compute_yearly_attribution(valuations, market_repo, year, wealth_repo=wealth_repo)
         except Exception:
             pass
 

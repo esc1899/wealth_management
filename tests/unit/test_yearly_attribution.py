@@ -247,3 +247,30 @@ class TestComputeYearlyAttribution:
         assert len(rows) == 1
         assert rows[0].delta_pct is None
         assert rows[0].contribution_eur == 0.0
+
+
+class TestHoldingsBasedQuantityYearly:
+    def test_uses_snapshot_quantity_when_wealth_repo_given(self):
+        repo = _make_market_repo([
+            ("AAPL", "2024-12-31", 100.0),  # prev year end → start price
+            ("AAPL", "2025-12-31", 110.0),  # year end → end price
+        ])
+        v = _make_valuation("AAPL", current_price=200.0, quantity=10.0)
+        wealth_repo = MagicMock()
+        wealth_repo.holdings_near_date.return_value = {"AAPL": 5.0}
+        rows = compute_yearly_attribution([v], repo, 2025, wealth_repo=wealth_repo)
+        assert len(rows) == 1
+        assert rows[0].quantity == 5.0
+        assert rows[0].contribution_eur == pytest.approx(50.0)  # (110-100) * 5
+
+    def test_falls_back_to_current_quantity_without_snapshot(self):
+        repo = _make_market_repo([
+            ("AAPL", "2024-12-31", 100.0),
+            ("AAPL", "2025-12-31", 110.0),
+        ])
+        v = _make_valuation("AAPL", current_price=200.0, quantity=10.0)
+        wealth_repo = MagicMock()
+        wealth_repo.holdings_near_date.return_value = None
+        rows = compute_yearly_attribution([v], repo, 2025, wealth_repo=wealth_repo)
+        assert rows[0].quantity == 10.0
+        assert rows[0].contribution_eur == pytest.approx(100.0)
