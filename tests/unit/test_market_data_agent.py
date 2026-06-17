@@ -165,6 +165,23 @@ class TestGetPortfolioValuation:
         assert v.annual_dividend_eur == pytest.approx(20.0)   # 2.0 × 10
         assert v.dividend_yield_pct == pytest.approx(0.01)    # 2.0 / 200, recomputed
 
+    def test_gold_grams_uses_troy_oz_conversion(self, agent):
+        # Gold: price is EUR per troy ounce, quantity in grams → value = (price/31.1035)*g.
+        # Currency conversion (incl. GBp ÷100) happens earlier at fetch time and is tested
+        # separately (TestGBXPenceConversion); here price_eur is already EUR per troy oz.
+        gold = Position(
+            id=9, ticker="GC=F", name="Gold", asset_class="Edelmetall",
+            investment_type="Edelmetall", quantity=100.0, unit="g",
+            purchase_price=90.0, purchase_date=date(2024, 1, 1),
+            added_date=date(2024, 1, 1), in_portfolio=True,
+        )
+        agent._positions.get_portfolio.return_value = [gold]
+        agent._market.get_price.return_value = _make_price_record("GC=F", price_eur=3110.35)
+        v = agent.get_portfolio_valuation()[0]
+        # 3110.35 / 31.1035 = €100 per gram → × 100 g = €10,000
+        assert v.current_value_eur == pytest.approx(10000.0, abs=0.5)
+        assert v.current_price_eur == pytest.approx(3110.35)
+
     def test_returns_none_values_when_no_price(self, agent):
         agent._positions.get_portfolio.return_value = [_make_position("AAPL")]
         agent._market.get_price.return_value = None
