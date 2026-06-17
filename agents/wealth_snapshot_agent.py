@@ -26,6 +26,11 @@ from core.currency import is_cash_unit
 
 
 logger = logging.getLogger(__name__)
+
+# Troy ounce → gram (gold/commodity quantities stored in grams, prices per troy oz)
+TROY_OZ_TO_G = 31.1035
+
+
 @dataclass
 class SnapshotPreview:
     """Preview of data available for taking a snapshot."""
@@ -368,14 +373,84 @@ class WealthSnapshotAgent:
     # List and access
     # ------------------------------------------------------------------
 
+    def _compute_wealth_for_date(
+        self,
+        date_str: str,
+        positions: List[Position],
+        registry,
+        *,
+        max_days_back: int = 5,
+        fetch_if_missing: bool = False,
+    ) -> tuple:
+        """Compute (total_eur, breakdown, missing, approximated) for one date.
+
+        Shared core of backfill / recalculate / rebuild. Distinguishes an exact
+        historical close (max_days_back=0 hit) from a prior-date fallback so the
+        caller can report honest coverage. With fetch_if_missing=True, a ticker
+        whose exact date is absent triggers a one-off 1y history re-fetch before
+        falling back — so a stale neighbouring price no longer masks a gap.
+
+        `approximated` counts auto-fetch positions priced from a neighbouring day.
+        """
+        breakdown: Dict[str, float] = {ac: 0.0 for ac in registry.all_names()}
+        total = 0.0
+        missing: List[str] = []
+        approximated = 0
+
+        for pos in positions:
+            cfg = registry.get(pos.asset_class)
+            is_auto = cfg.auto_fetch if cfg else False
+
+            if not is_auto:
+                # Manual / non-tradeable: use stored estimated_value
+                est_val = (pos.extra_data or {}).get("estimated_value")
+                if est_val is not None:
+                    v = float(est_val)
+                    total += v
+                    breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + v
+                else:
+                    missing.append(pos.name)
+                continue
+
+            if is_cash_unit(pos.unit) and pos.quantity is not None:
+                # Cash: quantity IS the EUR value
+                total += pos.quantity
+                breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + pos.quantity
+                continue
+
+            if not pos.ticker or pos.quantity is None:
+                missing.append(pos.name)
+                continue
+
+            # Exact-date lookup first (max_days_back=0 returns the price only on an exact hit)
+            price = self._market.get_price_for_date_or_prior(pos.ticker, date_str, max_days_back=0)
+            if price is None and fetch_if_missing:
+                self._market_data_agent.fetch_historical_for_symbol(pos.ticker)
+                price = self._market.get_price_for_date_or_prior(pos.ticker, date_str, max_days_back=0)
+
+            is_exact = price is not None
+            if price is None:
+                price = self._market.get_price_for_date_or_prior(
+                    pos.ticker, date_str, max_days_back=max_days_back
+                )
+            if price is None:
+                missing.append(pos.name)
+                continue
+            if not is_exact:
+                approximated += 1
+
+            value = (price / TROY_OZ_TO_G) * pos.quantity if pos.unit == "g" else price * pos.quantity
+            total += value
+            breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + value
+
+        return total, breakdown, missing, approximated
+
     def backfill_snapshots(self, days: int = 14) -> int:
         """
         Create snapshots for missing trading days using stored historical prices.
         Uses current positions as approximation (accurate when no trades occurred).
         Returns number of snapshots created.
         """
-
-        TROY_OZ_TO_G = 31.1035
         today = date.today()
         positions = self._positions.get_portfolio()
         if not positions:
@@ -392,45 +467,9 @@ class WealthSnapshotAgent:
             if self._wealth.get_by_date(target_str) is not None:
                 continue
 
-            breakdown: Dict[str, float] = {ac: 0.0 for ac in registry.all_names()}
-            total = 0.0
-            missing = []
-
-            for pos in positions:
-                cfg = registry.get(pos.asset_class)
-                is_auto = cfg.auto_fetch if cfg else False
-
-                if not is_auto:
-                    # Manual / non-tradeable: use stored estimated_value
-                    extra = pos.extra_data or {}
-                    est_val = extra.get("estimated_value")
-                    if est_val is not None:
-                        v = float(est_val)
-                        total += v
-                        breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + v
-                    else:
-                        missing.append(pos.name)
-                    continue
-
-                if is_cash_unit(pos.unit) and pos.quantity is not None:
-                    # Cash: quantity IS the EUR value
-                    total += pos.quantity
-                    breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + pos.quantity
-                    continue
-
-                if not pos.ticker or pos.quantity is None:
-                    missing.append(pos.name)
-                    continue
-
-                price = self._market.get_price_for_date_or_prior(pos.ticker, target_str, max_days_back=3)
-                if price is None:
-                    missing.append(pos.name)
-                    continue
-
-                value = (price / TROY_OZ_TO_G) * pos.quantity if pos.unit == "g" else price * pos.quantity
-                total += value
-                breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + value
-
+            total, breakdown, missing, _ = self._compute_wealth_for_date(
+                target_str, positions, registry, max_days_back=3
+            )
             if total <= 0:
                 continue  # no data for this day (e.g. market holiday with no stored prices)
 
@@ -452,59 +491,19 @@ class WealthSnapshotAgent:
 
     def recalculate_snapshot(self, date_str: str) -> Optional[WealthSnapshot]:
         """
-        Recalculate an existing snapshot using stored historical prices for that date.
-        Uses the same logic as backfill_snapshots() but for a single specific date.
-        Overwrites the existing snapshot if one exists.
-
-        Returns the updated snapshot, or None if no price data is available for that date.
+        Recalculate an existing snapshot using historical prices for that date.
+        Forces a 1y history re-fetch for any ticker whose exact date is missing,
+        so a stale neighbouring price no longer silently stands in. Overwrites the
+        existing snapshot. Returns the updated snapshot, or None if no data.
         """
-        TROY_OZ_TO_G = 31.1035
         positions = self._positions.get_portfolio()
         if not positions:
             return None
 
         registry = get_asset_class_registry()
-        breakdown: Dict[str, float] = {ac: 0.0 for ac in registry.all_names()}
-        total = 0.0
-        missing = []
-
-        for pos in positions:
-            cfg = registry.get(pos.asset_class)
-            is_auto = cfg.auto_fetch if cfg else False
-
-            if not is_auto:
-                extra = pos.extra_data or {}
-                est_val = extra.get("estimated_value")
-                if est_val is not None:
-                    v = float(est_val)
-                    total += v
-                    breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + v
-                else:
-                    missing.append(pos.name)
-                continue
-
-            if is_cash_unit(pos.unit) and pos.quantity is not None:
-                total += pos.quantity
-                breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + pos.quantity
-                continue
-
-            if not pos.ticker or pos.quantity is None:
-                missing.append(pos.name)
-                continue
-
-            price = self._market.get_price_for_date_or_prior(pos.ticker, date_str)
-            if price is None:
-                # Price not in DB yet — fetch 1y history for this ticker and retry
-                self._market_data_agent.fetch_historical_for_symbol(pos.ticker)
-                price = self._market.get_price_for_date_or_prior(pos.ticker, date_str)
-            if price is None:
-                missing.append(pos.name)
-                continue
-
-            value = (price / TROY_OZ_TO_G) * pos.quantity if pos.unit == "g" else price * pos.quantity
-            total += value
-            breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + value
-
+        total, breakdown, missing, _ = self._compute_wealth_for_date(
+            date_str, positions, registry, fetch_if_missing=True
+        )
         if total <= 0:
             return None
 
@@ -523,6 +522,80 @@ class WealthSnapshotAgent:
             is_manual=True,
             note="recalculated",
         )
+
+    def rebuild_wealth_history(self, refetch: bool = True) -> Dict:
+        """
+        Rebuild every existing wealth snapshot from fresh market data.
+
+        One-click alternative to recalculating row by row: re-fetches current
+        prices + 1y history for all portfolio tickers (and dividends) once, then
+        recomputes each stored snapshot date plus today's live snapshot.
+
+        Returns a summary dict: {recomputed, low_coverage_dates, missing_dates, failed}.
+        """
+        summary: Dict = {
+            "recomputed": 0,
+            "low_coverage_dates": [],
+            "missing_dates": [],
+            "failed": [],
+        }
+
+        if refetch:
+            # Single bulk fetch refreshes current_prices + historical_prices for all
+            # tickers; dividends are refreshed for today's snapshot.
+            result = self._market_data_agent.fetch_all_now(
+                fetch_history=True, include_watchlist=False
+            )
+            summary["failed"] = list(result.failed)
+            try:
+                self._market_data_agent.fetch_dividends_now()
+            except Exception:
+                logger.warning("rebuild: dividend re-fetch failed", exc_info=True)
+
+        positions = self._positions.get_portfolio()
+        registry = get_asset_class_registry()
+
+        # Recompute every stored historical snapshot from the freshly fetched data.
+        for snap in self._wealth.list(days=None) or []:
+            if snap.date == date.today().isoformat():
+                continue  # handled by take_snapshot below
+            total, breakdown, missing, _ = self._compute_wealth_for_date(
+                snap.date, positions, registry
+            )
+            if total <= 0:
+                summary["missing_dates"].append(snap.date)
+                continue
+            coverage = (len(positions) - len(missing)) / len(positions) * 100 if positions else 0.0
+            existing = self._wealth.get_by_date(snap.date)
+            if existing is not None:
+                self._wealth.delete(existing.id)
+            self._wealth.create(
+                date_str=snap.date,
+                total_eur=total,
+                breakdown=breakdown,
+                coverage_pct=coverage,
+                missing_pos=missing if missing else None,
+                is_manual=True,
+                note="rebuilt",
+            )
+            summary["recomputed"] += 1
+            if coverage < 100.0:
+                summary["low_coverage_dates"].append(snap.date)
+
+        # Refresh today's live snapshot + dividend snapshot from current prices.
+        try:
+            self.take_snapshot(is_manual=True, overwrite=True)
+            summary["recomputed"] += 1
+            if self._dividend is not None:
+                self.take_dividend_snapshot(is_manual=True, overwrite=True)
+        except Exception:
+            logger.warning("rebuild: today's snapshot failed", exc_info=True)
+
+        logger.info(
+            "Rebuilt wealth history: %d snapshots (%d low coverage, %d no data)",
+            summary["recomputed"], len(summary["low_coverage_dates"]), len(summary["missing_dates"]),
+        )
+        return summary
 
     def get_latest_snapshot(self) -> Optional[WealthSnapshot]:
         """Get the most recent snapshot."""

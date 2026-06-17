@@ -801,7 +801,7 @@ class TestRecalculateSnapshot:
         pos_repo = Mock(spec=PositionsRepository)
         pos_repo.get_portfolio.return_value = positions
         market_repo = Mock(spec=MarketDataRepository)
-        market_repo.get_price_for_date_or_prior.side_effect = lambda sym, d: price_map.get(d)
+        market_repo.get_price_for_date_or_prior.side_effect = lambda sym, d, max_days_back=5: price_map.get(d)
         wealth_repo = Mock(spec=WealthSnapshotRepository)
         wealth_repo.get_by_date.return_value = existing_snapshot
         wealth_repo.create.return_value = Mock(coverage_pct=100.0)
@@ -853,7 +853,7 @@ class TestRecalculateSnapshot:
         pos_repo = Mock(spec=PositionsRepository)
         pos_repo.get_portfolio.return_value = [pos_with_price, pos_no_price]
         market_repo = Mock(spec=MarketDataRepository)
-        market_repo.get_price_for_date_or_prior.side_effect = lambda sym, d: price_map_by_ticker.get(sym)
+        market_repo.get_price_for_date_or_prior.side_effect = lambda sym, d, max_days_back=5: price_map_by_ticker.get(sym)
         wealth_repo = Mock(spec=WealthSnapshotRepository)
         wealth_repo.get_by_date.return_value = None
         wealth_repo.create.return_value = Mock(coverage_pct=50.0)
@@ -968,3 +968,113 @@ class TestTakeDividendSnapshot:
         )
         with pytest.raises(ValueError, match="not initialized"):
             agent.take_dividend_snapshot()
+
+
+class TestComputeWealthForDate:
+    """Helper must distinguish an exact historical close from a prior-day fallback."""
+
+    def _agent(self, market_repo, market_agent=None):
+        return WealthSnapshotAgent(
+            positions_repo=Mock(spec=PositionsRepository),
+            market_repo=market_repo,
+            wealth_repo=Mock(spec=WealthSnapshotRepository),
+            market_data_agent=market_agent or Mock(),
+        )
+
+    def test_exact_price_not_approximated(self):
+        from core.asset_class_config import get_asset_class_registry
+        market_repo = Mock(spec=MarketDataRepository)
+        market_repo.get_price_for_date_or_prior.side_effect = lambda sym, d, max_days_back=5: 100.0
+        agent = self._agent(market_repo)
+        total, _, missing, approximated = agent._compute_wealth_for_date(
+            "2026-01-15", [_make_position(quantity=10.0)], get_asset_class_registry()
+        )
+        assert total == pytest.approx(1000.0)
+        assert missing == []
+        assert approximated == 0
+
+    def test_prior_fallback_counts_as_approximated(self):
+        from core.asset_class_config import get_asset_class_registry
+        market_repo = Mock(spec=MarketDataRepository)
+        # Exact lookup (max_days_back=0) misses; prior-day fallback hits.
+        market_repo.get_price_for_date_or_prior.side_effect = (
+            lambda sym, d, max_days_back=5: None if max_days_back == 0 else 100.0
+        )
+        agent = self._agent(market_repo)
+        total, _, missing, approximated = agent._compute_wealth_for_date(
+            "2026-01-15", [_make_position(quantity=10.0)], get_asset_class_registry()
+        )
+        assert total == pytest.approx(1000.0)
+        assert missing == []
+        assert approximated == 1
+
+    def test_recalculate_forces_refetch_when_exact_missing(self):
+        # The bug: a stale neighbouring price let recalc skip the re-fetch.
+        market_repo = Mock(spec=MarketDataRepository)
+        market_repo.get_price_for_date_or_prior.side_effect = (
+            lambda sym, d, max_days_back=5: None if max_days_back == 0 else 100.0
+        )
+        market_agent = Mock()
+        pos_repo = Mock(spec=PositionsRepository)
+        pos_repo.get_portfolio.return_value = [_make_position(quantity=10.0)]
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        wealth_repo.get_by_date.return_value = None
+        wealth_repo.create.return_value = Mock(coverage_pct=100.0)
+        agent = WealthSnapshotAgent(
+            positions_repo=pos_repo, market_repo=market_repo,
+            wealth_repo=wealth_repo, market_data_agent=market_agent,
+        )
+        agent.recalculate_snapshot("2026-01-15")
+        market_agent.fetch_historical_for_symbol.assert_called_once_with("AAPL")
+
+
+class TestRebuildWealthHistory:
+    def _agent(self, snaps, *, failed=None):
+        pos_repo = Mock(spec=PositionsRepository)
+        pos_repo.get_portfolio.return_value = [_make_position(quantity=10.0)]
+        market_repo = Mock(spec=MarketDataRepository)
+        market_repo.get_price_for_date_or_prior.side_effect = lambda sym, d, max_days_back=5: 100.0
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        wealth_repo.list.return_value = snaps
+        wealth_repo.get_by_date.return_value = None
+        wealth_repo.create.return_value = Mock(coverage_pct=100.0)
+        dividend_repo = Mock(spec=DividendSnapshotRepository)
+        dividend_repo.get_by_date.return_value = None
+        dividend_repo.create.return_value = Mock()
+        market_agent = Mock()
+        market_agent.fetch_all_now.return_value = Mock(failed=failed or [])
+        market_agent.get_portfolio_valuation.return_value = []  # today's snapshot
+        agent = WealthSnapshotAgent(
+            positions_repo=pos_repo, market_repo=market_repo,
+            wealth_repo=wealth_repo, market_data_agent=market_agent,
+            dividend_repo=dividend_repo,
+        )
+        return agent, market_agent, wealth_repo
+
+    def test_refetches_once_and_recomputes_all_plus_today(self):
+        snaps = [Mock(date="2026-01-14"), Mock(date="2026-01-15")]
+        agent, market_agent, wealth_repo = self._agent(snaps)
+        summary = agent.rebuild_wealth_history()
+        market_agent.fetch_all_now.assert_called_once()
+        market_agent.fetch_dividends_now.assert_called_once()
+        assert summary["recomputed"] == 3  # 2 historical + today
+        assert summary["failed"] == []
+        assert summary["low_coverage_dates"] == []
+
+    def test_skips_today_in_loop_to_avoid_double_count(self):
+        today = date.today().isoformat()
+        snaps = [Mock(date=today), Mock(date="2026-01-15")]
+        agent, _, _ = self._agent(snaps)
+        summary = agent.rebuild_wealth_history()
+        # today handled once via take_snapshot, the historical date once → 2
+        assert summary["recomputed"] == 2
+
+    def test_propagates_failed_symbols(self):
+        agent, _, _ = self._agent([Mock(date="2026-01-15")], failed=["SSU.F"])
+        summary = agent.rebuild_wealth_history()
+        assert summary["failed"] == ["SSU.F"]
+
+    def test_no_refetch_when_disabled(self):
+        agent, market_agent, _ = self._agent([Mock(date="2026-01-15")])
+        agent.rebuild_wealth_history(refetch=False)
+        market_agent.fetch_all_now.assert_not_called()
