@@ -543,7 +543,15 @@ def _render_edit_form(pos_id: int | None, readonly: bool = False):
             if div_rec:
                 rate_str = f"{div_rec.rate_eur:.4f}€/Aktie" if div_rec.rate_eur is not None else "Kurs n/a"
                 date_str = div_rec.fetched_at.strftime('%d.%m.%Y') if div_rec.fetched_at else "—"
-                st.info(f"ℹ️ Aktuell von yfinance: {(div_rec.yield_pct or 0) * 100:.2f}% ({rate_str}, Stand: {date_str})")
+                # yfinance's yield is unreliable for cross-currency listings (then stored as
+                # None) → derive it from rate_eur / current price so the hint shows a value
+                # consistent with the rate instead of a misleading 0.00%.
+                display_yield = div_rec.yield_pct
+                if display_yield is None and div_rec.rate_eur is not None:
+                    _price_rec = _market_repo.get_price(ticker_for_div)
+                    if _price_rec and _price_rec.price_eur:
+                        display_yield = div_rec.rate_eur / _price_rec.price_eur
+                st.info(f"ℹ️ Aktuell von yfinance: {(display_yield or 0) * 100:.2f}% ({rate_str}, Stand: {date_str})")
             existing_override = existing_extra.get("dividend_yield_override", 0.0)
             if existing_override and existing_override > 0:
                 st.info(f"⚠️ Override aktiv: {existing_override:.2f}% → yfinance-Wert wird ignoriert")
