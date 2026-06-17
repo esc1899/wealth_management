@@ -68,7 +68,7 @@ class Config:
 
     # Market data
     MARKET_DATA_FETCH_HOUR: int = int(os.getenv("MARKET_DATA_FETCH_HOUR", "18"))
-    RATE_LIMIT_RPS: float = float(os.getenv("RATE_LIMIT_RPS", "2.0"))
+    RATE_LIMIT_RPS: float = float(os.getenv("RATE_LIMIT_RPS", "5.0"))
 
     # Available Claude models — restrict per environment via CLAUDE_MODELS env var
     CLAUDE_MODELS: list = [
