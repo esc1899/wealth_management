@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 from core.i18n import t
+from core.composition_drift import concentration_series, asset_class_mix_series
 from state import get_wealth_snapshot_agent, get_dividend_snapshot_repo, get_market_agent
 
 
@@ -160,6 +161,54 @@ if wealth_snapshots:
             template="plotly_white",
         )
         st.plotly_chart(fig_breakdown, use_container_width=True)
+
+    # Optional: relative asset-class mix (%) over time — complements the absolute stack
+    if st.checkbox(t("wealth_history.mix_pct_section")):
+        mix_dates, mix = asset_class_mix_series(wealth_snapshots)
+        fig_mix = go.Figure()
+        for asset_class, series in mix.items():
+            fig_mix.add_trace(
+                go.Scatter(
+                    x=mix_dates,
+                    y=series,
+                    mode="lines",
+                    name=asset_class,
+                    stackgroup="one",
+                    hovertemplate="<b>%{x}</b><br>" + asset_class + ": %{y:.1f}%<extra></extra>",
+                )
+            )
+        fig_mix.update_layout(
+            hovermode="x unified", height=400, margin=dict(l=50, r=50, t=20, b=50),
+            xaxis_title=t("wealth_history.date_label"), yaxis_title="%", template="plotly_white",
+        )
+        st.plotly_chart(fig_mix, use_container_width=True)
+
+    # Optional: position concentration over time (from holdings; forward-only)
+    if st.checkbox(t("wealth_history.concentration_section"), help=t("wealth_history.concentration_help")):
+        conc = concentration_series(wealth_snapshots)
+        if not conc:
+            st.info(t("wealth_history.concentration_building"))
+        else:
+            conc_dates = [r["date"] for r in conc]
+            fig_conc = go.Figure()
+            for key, top_n in (("top1_pct", 1), ("top3_pct", 3), ("top5_pct", 5)):
+                fig_conc.add_trace(
+                    go.Scatter(
+                        x=conc_dates,
+                        y=[r[key] for r in conc],
+                        mode="lines",
+                        name=t("wealth_history.concentration_top").format(n=top_n),
+                        hovertemplate="<b>%{x}</b><br>%{y:.1f}%<extra></extra>",
+                    )
+                )
+            fig_conc.update_layout(
+                hovermode="x unified", height=350, margin=dict(l=50, r=50, t=20, b=50),
+                xaxis_title=t("wealth_history.date_label"), yaxis_title="%", template="plotly_white",
+            )
+            st.plotly_chart(fig_conc, use_container_width=True)
+            latest = conc[-1]
+            st.caption(t("wealth_history.concentration_hhi").format(
+                hhi=f"{latest['hhi']:.3f}", n=f"{latest['effective_n']:.1f}"))
 
 else:
     st.warning(t("wealth_history.no_wealth_snapshots"))
