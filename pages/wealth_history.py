@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 from core.i18n import t
-from core.composition_drift import concentration_series, asset_class_mix_series
+from core.composition_drift import concentration_series, asset_class_mix_series, sold_positions_summary
 from state import get_wealth_snapshot_agent, get_dividend_snapshot_repo, get_market_agent
 
 
@@ -209,6 +209,28 @@ if wealth_snapshots:
             latest = conc[-1]
             st.caption(t("wealth_history.concentration_hhi").format(
                 hhi=f"{latest['hhi']:.3f}", n=f"{latest['effective_n']:.1f}"))
+
+    # Positions no longer held — make the survivorship blind spot visible (forward-only)
+    _sold = sold_positions_summary(wealth_snapshots)
+    st.markdown(f"#### {t('wealth_history.sold_section')}")
+    st.caption(t("wealth_history.sold_help"))
+    if not _sold:
+        st.info(t("wealth_history.sold_building"))
+    else:
+        _sold_rows = [
+            {
+                t("common.name"): f"{r['name']} ({r['ticker']})",
+                t("wealth_history.sold_col_period"): f"{r['first_date']} – {r['last_date']}",
+                t("wealth_history.sold_col_last_value"): (
+                    round(r["last_value_eur"], 2) if r["last_value_eur"] is not None else None
+                ),
+                t("wealth_history.sold_col_change"): (
+                    f"{r['price_change_pct']:+.1f}%" if r["price_change_pct"] is not None else "—"
+                ),
+            }
+            for r in _sold
+        ]
+        st.dataframe(_sold_rows, use_container_width=True, hide_index=True)
 
 else:
     st.warning(t("wealth_history.no_wealth_snapshots"))

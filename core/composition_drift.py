@@ -74,6 +74,60 @@ def dividend_history_series(snapshots) -> Dict[str, dict]:
     return out
 
 
+def sold_positions_summary(snapshots) -> List[dict]:
+    """Positions that appear in past holdings but are no longer currently held.
+
+    "Currently held" = tickers in the most recent snapshot WITH holdings (self-contained).
+    For every ticker seen in earlier holdings but absent from that set, summarise its held
+    window from the stored points: {ticker, name, first_date, last_date, last_value_eur,
+    first_price_eur, last_price_eur, price_change_pct}. price_change_pct is the per-share
+    change from first→last recorded price while held (None if a price is missing).
+    Returns [] when fewer than two holdings-bearing snapshots exist or none were sold.
+    Sorted by last_date descending.
+    """
+    holding_snaps = [s for s in snapshots if getattr(s, "holdings", None)]
+    if len(holding_snaps) < 2:
+        return []
+
+    current = {h.get("ticker") for h in (holding_snaps[-1].holdings or []) if h.get("ticker")}
+
+    # Collect per-ticker points across all but the latest snapshot
+    seen: Dict[str, dict] = {}
+    for snap in holding_snaps:
+        for h in snap.holdings or []:
+            ticker = h.get("ticker")
+            if not ticker or ticker in current:
+                continue
+            entry = seen.setdefault(ticker, {"name": h.get("name") or ticker, "points": []})
+            entry["points"].append({
+                "date": snap.date,
+                "price_eur": h.get("price_eur"),
+                "value_eur": h.get("value_eur"),
+            })
+
+    summary: List[dict] = []
+    for ticker, data in seen.items():
+        pts = data["points"]
+        first, last = pts[0], pts[-1]
+        first_price, last_price = first.get("price_eur"), last.get("price_eur")
+        change_pct = None
+        if first_price and last_price and first_price > 0:
+            change_pct = (last_price / first_price - 1) * 100
+        summary.append({
+            "ticker": ticker,
+            "name": data["name"],
+            "first_date": first["date"],
+            "last_date": last["date"],
+            "last_value_eur": last.get("value_eur"),
+            "first_price_eur": first_price,
+            "last_price_eur": last_price,
+            "price_change_pct": change_pct,
+        })
+
+    summary.sort(key=lambda r: r["last_date"], reverse=True)
+    return summary
+
+
 def asset_class_mix_series(snapshots) -> Tuple[List[str], Dict[str, List[float]]]:
     """Relative asset-class weights (%) per snapshot, from `breakdown`.
 

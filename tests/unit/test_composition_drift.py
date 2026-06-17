@@ -8,6 +8,7 @@ from core.composition_drift import (
     concentration_series,
     asset_class_mix_series,
     dividend_history_series,
+    sold_positions_summary,
 )
 
 
@@ -111,3 +112,45 @@ class TestDividendHistorySeries:
 
     def test_empty_input(self):
         assert dividend_history_series([]) == {}
+
+
+class TestSoldPositionsSummary:
+    def _ph(self, ticker, name, price, value):
+        return {"ticker": ticker, "name": name, "price_eur": price, "value_eur": value}
+
+    def test_detects_position_no_longer_held(self):
+        snaps = [
+            _snap("2026-01-01", holdings=[self._ph("AAPL", "Apple", 100.0, 1000.0),
+                                          self._ph("OLD", "OldCo", 50.0, 500.0)]),
+            _snap("2026-02-01", holdings=[self._ph("AAPL", "Apple", 110.0, 1100.0),
+                                          self._ph("OLD", "OldCo", 60.0, 600.0)]),
+            _snap("2026-03-01", holdings=[self._ph("AAPL", "Apple", 120.0, 1200.0)]),  # OLD sold
+        ]
+        out = sold_positions_summary(snaps)
+        assert len(out) == 1
+        row = out[0]
+        assert row["ticker"] == "OLD"
+        assert row["first_date"] == "2026-01-01"
+        assert row["last_date"] == "2026-02-01"
+        assert row["last_value_eur"] == pytest.approx(600.0)
+        assert row["price_change_pct"] == pytest.approx(20.0)  # 50 → 60
+
+    def test_currently_held_not_listed(self):
+        snaps = [
+            _snap("2026-01-01", holdings=[self._ph("AAPL", "Apple", 100.0, 1000.0)]),
+            _snap("2026-02-01", holdings=[self._ph("AAPL", "Apple", 110.0, 1100.0)]),
+        ]
+        assert sold_positions_summary(snaps) == []
+
+    def test_ignores_snapshots_without_holdings(self):
+        snaps = [
+            _snap("2026-01-01", holdings=None),
+            _snap("2026-02-01", holdings=[self._ph("OLD", "OldCo", 50.0, 500.0)]),
+            _snap("2026-03-01", holdings=[self._ph("AAPL", "Apple", 100.0, 1000.0)]),
+        ]
+        out = sold_positions_summary(snaps)
+        assert [r["ticker"] for r in out] == ["OLD"]
+
+    def test_fewer_than_two_holdings_snapshots(self):
+        snaps = [_snap("2026-01-01", holdings=[self._ph("OLD", "OldCo", 50.0, 500.0)])]
+        assert sold_positions_summary(snaps) == []
