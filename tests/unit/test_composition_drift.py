@@ -4,7 +4,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from core.composition_drift import concentration_series, asset_class_mix_series
+from core.composition_drift import (
+    concentration_series,
+    asset_class_mix_series,
+    dividend_history_series,
+)
 
 
 def _snap(date_str, breakdown=None, holdings=None):
@@ -75,3 +79,35 @@ class TestAssetClassMixSeries:
         snaps = [_snap("2026-01-01", breakdown={"Aktie": 0.0})]
         _, mix = asset_class_mix_series(snaps)
         assert mix["Aktie"] == pytest.approx([0.0])
+
+
+class TestDividendHistorySeries:
+    def _div_h(self, ticker, name, div, yld=None):
+        return {"ticker": ticker, "name": name, "annual_dividend_eur": div, "dividend_yield_pct": yld}
+
+    def test_builds_per_ticker_series_in_order(self):
+        snaps = [
+            _snap("2026-01-01", holdings=[self._div_h("AAPL", "Apple", 100.0, 0.02)]),
+            _snap("2026-02-01", holdings=[self._div_h("AAPL", "Apple", 110.0, 0.021)]),
+        ]
+        out = dividend_history_series(snaps)
+        assert set(out.keys()) == {"AAPL"}
+        assert out["AAPL"]["name"] == "Apple"
+        pts = out["AAPL"]["points"]
+        assert [p["date"] for p in pts] == ["2026-01-01", "2026-02-01"]
+        assert [p["annual_dividend_eur"] for p in pts] == [100.0, 110.0]
+        assert pts[0]["dividend_yield_pct"] == 0.02
+
+    def test_skips_snapshots_without_holdings_and_none_dividends(self):
+        snaps = [
+            _snap("2026-01-01", holdings=None),
+            _snap("2026-02-01", holdings=[
+                self._div_h("AAPL", "Apple", 100.0),
+                self._div_h("BRK", "Berkshire", None),  # no dividend → omitted
+            ]),
+        ]
+        out = dividend_history_series(snaps)
+        assert set(out.keys()) == {"AAPL"}
+
+    def test_empty_input(self):
+        assert dividend_history_series([]) == {}

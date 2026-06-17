@@ -10,6 +10,7 @@ import logging
 import threading
 
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ from core.dividend_calendar import (
     compute_coverage_pct,
     get_top_contributors,
 )
+from core.composition_drift import dividend_history_series
 from core.i18n import t, current_language
 from core.ui.verdicts import cloud_notice
 from core.ui.markdown import llm_markdown
@@ -30,6 +32,7 @@ from state import (
     get_app_config_repo,
     get_portfolio_comment_model,
     get_portfolio_comment_service,
+    get_wealth_snapshot_repo,
 )
 
 st.set_page_config(
@@ -135,6 +138,53 @@ if _forecasts and _forecasts[0].contributions:
         )
     ]
     st.dataframe(_rows, use_container_width=True, hide_index=True)
+
+st.divider()
+
+# ------------------------------------------------------------------
+# Dividend development per position (from snapshot holdings; forward-only)
+# ------------------------------------------------------------------
+
+st.subheader(t("dividend_calendar.history_section"))
+st.caption(t("dividend_calendar.history_help"))
+
+_snapshots = get_wealth_snapshot_repo().list(days=None) or []
+_div_hist = dividend_history_series(_snapshots)
+if not _div_hist:
+    st.info(t("dividend_calendar.history_building"))
+else:
+    _current_div = {
+        c.symbol: c.annual_dividend_eur
+        for c in (_forecasts[0].contributions if _forecasts else [])
+    }
+    _avail = sorted(_div_hist.keys(), key=lambda tk: _current_div.get(tk, 0.0), reverse=True)
+    _labels = {tk: f"{_div_hist[tk]['name']} ({tk})" for tk in _avail}
+    _sel = st.multiselect(
+        t("dividend_calendar.history_select"),
+        options=_avail,
+        default=_avail[:5],
+        format_func=lambda tk: _labels.get(tk, tk),
+    )
+    if _sel:
+        _fig_hist = go.Figure()
+        for tk in _sel:
+            _pts = _div_hist[tk]["points"]
+            _fig_hist.add_trace(
+                go.Scatter(
+                    x=[p["date"] for p in _pts],
+                    y=[p["annual_dividend_eur"] for p in _pts],
+                    mode="lines+markers",
+                    name=_labels.get(tk, tk),
+                    hovertemplate="<b>%{x}</b><br>%{y:,.0f} €<extra></extra>",
+                )
+            )
+        _fig_hist.update_layout(
+            hovermode="x unified", height=400, margin=dict(l=50, r=50, t=20, b=50),
+            xaxis_title=t("wealth_history.date_label"),
+            yaxis_title=t("dividend_calendar.history_yaxis"),
+            template="plotly_white",
+        )
+        st.plotly_chart(_fig_hist, use_container_width=True)
 
 st.divider()
 

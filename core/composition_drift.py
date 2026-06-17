@@ -47,6 +47,33 @@ def concentration_series(snapshots) -> List[dict]:
     return series
 
 
+def dividend_history_series(snapshots) -> Dict[str, dict]:
+    """Per-position annual dividend over time, from snapshot holdings.
+
+    Returns {ticker: {"name": str, "points": [{date, annual_dividend_eur,
+    dividend_yield_pct}, ...]}}. Only snapshots WITH holdings contribute; per position
+    only points where annual_dividend_eur is not None are kept. Tickers that never carry
+    a dividend data point are omitted. Points follow snapshot order (ascending date).
+    """
+    out: Dict[str, dict] = {}
+    for snap in snapshots:
+        holdings = getattr(snap, "holdings", None)
+        if not holdings:
+            continue
+        for h in holdings:
+            ticker = h.get("ticker")
+            div = h.get("annual_dividend_eur")
+            if not ticker or div is None:
+                continue
+            entry = out.setdefault(ticker, {"name": h.get("name") or ticker, "points": []})
+            entry["points"].append({
+                "date": snap.date,
+                "annual_dividend_eur": div,
+                "dividend_yield_pct": h.get("dividend_yield_pct"),
+            })
+    return out
+
+
 def asset_class_mix_series(snapshots) -> Tuple[List[str], Dict[str, List[float]]]:
     """Relative asset-class weights (%) per snapshot, from `breakdown`.
 
