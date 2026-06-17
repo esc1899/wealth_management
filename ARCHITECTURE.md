@@ -416,6 +416,29 @@ Each position has ONE ROLE describing its contribution:
 - 🟣 **Diversifikationselement** — low correlation (gold, commodities)
 - 🔴 **Fehlplatzierung** — doesn't fit story
 
+### Self-Contained Wealth Snapshots (2026-06-17)
+`wealth_snapshots.holdings` (JSON, nullable) stores the full portfolio composition **at
+capture time** — per position `{name, ticker, asset_class, quantity, unit, price_eur,
+value_eur, annual_dividend_eur, dividend_yield_pct}`. Written by `take_snapshot`.
+
+Rationale: there is **no transaction/holdings history** in the DB (the `positions` table
+holds only the current state). Any recompute that uses *current* holdings × *historical*
+prices distorts the past whenever the portfolio changed (buys, sells, quantity changes).
+Storing each snapshot's own composition makes it self-contained: a date can be re-priced
+against its *actual* holdings (`WealthSnapshotAgent._reprice_holdings`), and it is the
+foundation for composition-aware analytics (weight/sector drift, per-position dividend
+growth, contribution of since-sold positions).
+
+**Limitation — forward-only**: snapshots taken before this change have `holdings = NULL`
+and cannot be reconstructed accurately. `rebuild_wealth_history` re-prices only
+holdings-bearing snapshots and reports legacy ones under `skipped_legacy`; the per-row
+🔄 falls back to a current-portfolio approximation (note `recalculated`) for legacy dates.
+
+**Caveat for analytics**: `core/monthly_attribution.py` / `yearly_attribution.py` still
+use *current* `quantity` across the period (same distortion class). Migrating them to read
+snapshot `holdings` at period boundaries is the natural next step once enough snapshots
+have accumulated.
+
 ---
 
 ## Currency System
