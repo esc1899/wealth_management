@@ -148,6 +148,23 @@ class TestGetPortfolioValuation:
         assert v.pnl_eur == 300.0
         assert abs(v.pnl_pct - 20.0) < 0.01
 
+    def test_recomputes_dividend_yield_when_unreliable(self, agent):
+        # Cross-currency listing: DividendRecord has rate_eur but yield_pct=None →
+        # valuation derives the yield from rate_eur / price_eur (both EUR per share).
+        from core.storage.models import DividendRecord
+        pos = _make_position("AAPL", quantity=10, price=150.0)
+        agent._positions.get_portfolio.return_value = [pos]
+        agent._market.get_price.return_value = _make_price_record("AAPL", price_eur=200.0)
+        agent._market.get_all_dividends.return_value = {
+            "AAPL": DividendRecord(
+                symbol="AAPL", rate_eur=2.0, yield_pct=None, currency="USD",
+                fetched_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+            )
+        }
+        v = agent.get_portfolio_valuation()[0]
+        assert v.annual_dividend_eur == pytest.approx(20.0)   # 2.0 × 10
+        assert v.dividend_yield_pct == pytest.approx(0.01)    # 2.0 / 200, recomputed
+
     def test_returns_none_values_when_no_price(self, agent):
         agent._positions.get_portfolio.return_value = [_make_position("AAPL")]
         agent._market.get_price.return_value = None

@@ -360,7 +360,12 @@ class MarketDataAgent:
                 div_record = dividend_records[pos.ticker]
                 if div_record.rate_eur is not None and pos.quantity is not None:
                     annual_dividend_eur = div_record.rate_eur * pos.quantity
-                    dividend_yield_pct = div_record.yield_pct
+                    if div_record.yield_pct is not None:
+                        dividend_yield_pct = div_record.yield_pct
+                    elif current_price and current_price > 0 and pos.unit != "g":
+                        # Cross-currency listing: yfinance yield was unreliable, derive
+                        # it from the EUR rate & EUR price (both per share, same currency)
+                        dividend_yield_pct = div_record.rate_eur / current_price
                     dividend_source = "yfinance"
 
             valuations.append(PortfolioValuation(

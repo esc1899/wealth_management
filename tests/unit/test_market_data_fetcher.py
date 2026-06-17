@@ -373,3 +373,83 @@ class TestGBXPenceConversion:
         assert len(history) == 1
         # 5000p → £50 → £50 * 1.17 EUR/GBP = €58.50
         assert abs(history[0].close_eur - 58.5) < 0.01
+
+
+# ------------------------------------------------------------------
+# fetch_dividend — dividend currency (financialCurrency) handling
+# ------------------------------------------------------------------
+
+class TestFetchDividendCurrency:
+    """
+    Regression: yfinance reports trailingAnnualDividendRate in the financial/reporting
+    currency, not the listing's quote currency. For ADRs/foreign listings (e.g. TSMC
+    TSFA.F quotes EUR but declares dividends in TWD) converting with the listing currency
+    produced grossly wrong figures (~6.5% instead of ~1%).
+    """
+
+    @patch("agents.market_data_fetcher.yf.Ticker")
+    def test_foreign_listing_uses_financial_currency(self, mock_ticker_cls):
+        def side_effect(symbol):
+            m = MagicMock()
+            if symbol == "TSFA.F":
+                m.info = {"trailingAnnualDividendRate": 24.0, "trailingAnnualDividendYield": 0.065,
+                          "currency": "EUR", "financialCurrency": "TWD"}
+            else:  # TWDEUR=X
+                m.fast_info = _make_fx_fast_info(rate=0.0285)
+            return m
+        mock_ticker_cls.side_effect = side_effect
+
+        rec = MarketDataFetcher(RateLimiter(calls_per_second=1000)).fetch_dividend("TSFA.F")
+        assert rec.currency == "TWD"
+        assert rec.rate_eur == pytest.approx(24.0 * 0.0285, abs=0.01)  # ~0.68, not 24
+        assert rec.yield_pct is None  # currency mismatch → yfinance yield not trusted
+
+    @patch("agents.market_data_fetcher.yf.Ticker")
+    def test_usd_reporting_eur_listing_converts(self, mock_ticker_cls):
+        def side_effect(symbol):
+            m = MagicMock()
+            if symbol == "MSF.DE":
+                m.info = {"trailingAnnualDividendRate": 3.56, "trailingAnnualDividendYield": 0.01,
+                          "currency": "EUR", "financialCurrency": "USD"}
+            else:  # USDEUR=X
+                m.fast_info = _make_fx_fast_info(rate=0.92)
+            return m
+        mock_ticker_cls.side_effect = side_effect
+
+        rec = MarketDataFetcher(RateLimiter(calls_per_second=1000)).fetch_dividend("MSF.DE")
+        assert rec.rate_eur == pytest.approx(3.56 * 0.92, abs=0.01)
+        assert rec.yield_pct is None
+
+    @patch("agents.market_data_fetcher.yf.Ticker")
+    def test_matching_currency_keeps_yield(self, mock_ticker_cls):
+        def side_effect(symbol):
+            m = MagicMock()
+            m.info = {"trailingAnnualDividendRate": 2.5, "trailingAnnualDividendYield": 0.018,
+                      "currency": "EUR", "financialCurrency": "EUR"}
+            return m
+        mock_ticker_cls.side_effect = side_effect
+
+        rec = MarketDataFetcher(RateLimiter(calls_per_second=1000)).fetch_dividend("SAP.DE")
+        assert rec.currency == "EUR"
+        assert rec.rate_eur == pytest.approx(2.5)
+        assert rec.yield_pct == pytest.approx(0.018)
+
+    @patch("agents.market_data_fetcher.yf.Ticker")
+    def test_uk_pence_listing_converts_from_pounds(self, mock_ticker_cls):
+        # REL.L quotes in pence (GBp) but declares dividends in GBP (pounds). The rate is
+        # in pounds → convert GBP→EUR, NO /100, and yfinance's yield (pounds rate ÷ pence
+        # price) is unreliable → dropped (valuation recomputes from rate_eur / price_eur).
+        def side_effect(symbol):
+            m = MagicMock()
+            if symbol == "REL.L":
+                m.info = {"trailingAnnualDividendRate": 0.675, "trailingAnnualDividendYield": 0.000279,
+                          "currency": "GBp", "financialCurrency": "GBP"}
+            else:  # GBPEUR=X
+                m.fast_info = _make_fx_fast_info(rate=1.17)
+            return m
+        mock_ticker_cls.side_effect = side_effect
+
+        rec = MarketDataFetcher(RateLimiter(calls_per_second=1000)).fetch_dividend("REL.L")
+        assert rec.currency == "GBP"
+        assert rec.rate_eur == pytest.approx(0.675 * 1.17, abs=0.01)  # pounds, not pence
+        assert rec.yield_pct is None  # GBp listing vs GBP dividend → not trusted

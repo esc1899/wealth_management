@@ -189,7 +189,7 @@ class MarketDataFetcher:
             # Extract dividend data from info
             rate_native = info.get("trailingAnnualDividendRate")
             yield_pct = info.get("trailingAnnualDividendYield")
-            currency = info.get("currency", "USD").upper()
+            currency_raw = info.get("currency") or "USD"   # listing quote currency/unit
 
             # If no dividend data, return None (not an error — many stocks don't pay dividends)
             if rate_native is None or rate_native <= 0:
@@ -197,24 +197,31 @@ class MarketDataFetcher:
                     symbol=symbol,
                     rate_eur=None,
                     yield_pct=None,
-                    currency=currency,
+                    currency=currency_raw.upper(),
                     fetched_at=datetime.now(timezone.utc),
                 )
 
-            # GBp handling for UK pence-traded stocks
-            if currency == "GBp":
-                rate_native = rate_native / 100
-                currency = "GBP"
+            # The dividend rate is denominated in the financial/reporting currency
+            # (financialCurrency), NOT necessarily the listing's quote currency. For ADRs,
+            # foreign listings and UK pence lines these differ — e.g. TSMC's Frankfurt line
+            # TSFA.F quotes EUR but declares dividends in TWD; REL.L quotes pence (GBp) but
+            # declares in GBP (pounds). Converting with the listing currency produced grossly
+            # wrong figures (TSMC ~6.5% instead of ~1%). We always convert from the dividend's
+            # own currency. yfinance's trailingAnnualDividendYield is only reliable when that
+            # currency matches the listing's quote currency/unit (it otherwise pairs a
+            # native-currency rate with the quote-currency price); when it doesn't, the
+            # valuation layer recomputes the yield from rate_eur / price_eur.
+            div_currency = (info.get("financialCurrency") or currency_raw).upper()
+            yield_reliable = (info.get("financialCurrency") or currency_raw) == currency_raw
 
-            # Convert to EUR
-            eur_rate = self._get_eur_rate(currency)
+            eur_rate = self._get_eur_rate(div_currency)
             rate_eur = rate_native * eur_rate
 
             return DividendRecord(
                 symbol=symbol,
                 rate_eur=round(rate_eur, 6),
-                yield_pct=round(yield_pct, 6) if yield_pct else None,
-                currency=currency,
+                yield_pct=round(yield_pct, 6) if (yield_pct and yield_reliable) else None,
+                currency=div_currency,
                 fetched_at=datetime.now(timezone.utc),
             )
         except Exception as e:
