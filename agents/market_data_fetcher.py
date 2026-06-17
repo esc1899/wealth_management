@@ -79,12 +79,27 @@ class MarketDataFetcher:
         """
         valid = [s.upper().strip() for s in symbols if validate_symbol(s)]
         invalid = [s for s in symbols if not validate_symbol(s)]
-        if invalid:
-            # Log but do not raise — partial success is acceptable
-            pass
 
+        records, failed_valid = self._fetch_batch(valid)
+
+        # One retry pass for the symbols that didn't make it. yfinance is flaky
+        # for illiquid listings (e.g. Frankfurt foreign quotes), so a single
+        # retry recovers most transient failures instead of leaving the DB price
+        # silently stale until the next scheduled run.
+        if failed_valid:
+            retry_records, failed_valid = self._fetch_batch(failed_valid)
+            records.extend(retry_records)
+
+        return records, list(invalid) + failed_valid
+
+    def _fetch_batch(
+        self, symbols: list[str]
+    ) -> tuple[list[PriceRecord], list[str]]:
+        """Fetch one batch concurrently. Returns (records, failed_symbols)."""
         records: list[PriceRecord] = []
-        failed: list[str] = list(invalid)
+        failed: list[str] = []
+        if not symbols:
+            return records, failed
 
         def _fetch_one(symbol: str) -> tuple[str, Optional[PriceRecord]]:
             try:
@@ -92,9 +107,15 @@ class MarketDataFetcher:
             except Exception:
                 return symbol, None
 
-        with ThreadPoolExecutor(max_workers=min(20, len(valid) or 1)) as pool:
-            futs = {pool.submit(_fetch_one, s): s for s in valid}
-            done, not_done = futures_wait(futs, timeout=15)
+        # Wall-clock budget scales with batch size. Effective throughput through
+        # the rate limiter is only ~1.5-2 symbols/sec, so the old fixed 15s
+        # starved larger portfolios: slower symbols were cut off, marked failed,
+        # and their stale prices were never overwritten. Budget ~2s/symbol, min 30s.
+        timeout = max(30.0, len(symbols) * 2.0)
+
+        with ThreadPoolExecutor(max_workers=min(20, len(symbols))) as pool:
+            futs = {pool.submit(_fetch_one, s): s for s in symbols}
+            done, not_done = futures_wait(futs, timeout=timeout)
             for fut in done:
                 try:
                     _, record = fut.result()

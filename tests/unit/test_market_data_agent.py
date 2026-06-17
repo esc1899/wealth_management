@@ -2,13 +2,18 @@
 Unit tests for MarketDataAgent — repos and fetcher are mocked.
 """
 
-from datetime import date, datetime, timezone
+import threading
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from agents.market_data_agent import MarketDataAgent
 from core.storage.models import PriceRecord, Position
+
+# CEST = Berlin summer time (UTC+2), matches June (the user's scenario)
+CEST = timezone(timedelta(hours=2))
 
 
 def _make_position(ticker: str = "AAPL", quantity: float = 10.0, price: float = 150.0) -> Position:
@@ -297,3 +302,61 @@ class TestSetupScheduler:
         assert scheduler is not None
         jobs = scheduler.get_jobs()
         assert any(j.id == "daily_market_fetch" for j in jobs)
+
+
+class TestFetchOverdue:
+    """Pure decision logic for the daily-fetch catchup (no threads, no tz lookup)."""
+
+    def test_before_fire_hour_not_overdue(self):
+        now = datetime(2026, 6, 17, 17, 30, tzinfo=CEST)  # 17:30, before 18:00
+        last = datetime(2026, 6, 16, 16, 42, tzinfo=timezone.utc)
+        assert MarketDataAgent._is_fetch_overdue(now, last, 18) is False
+
+    def test_last_fetch_yesterday_is_overdue(self):
+        # Exactly the Samsung scenario: last fetch was yesterday 18:42 Berlin.
+        now = datetime(2026, 6, 17, 19, 0, tzinfo=CEST)
+        last = datetime(2026, 6, 16, 16, 42, tzinfo=timezone.utc)
+        assert MarketDataAgent._is_fetch_overdue(now, last, 18) is True
+
+    def test_already_fetched_after_fire_today_not_overdue(self):
+        now = datetime(2026, 6, 17, 19, 0, tzinfo=CEST)
+        last = datetime(2026, 6, 17, 16, 30, tzinfo=timezone.utc)  # 18:30 Berlin today
+        assert MarketDataAgent._is_fetch_overdue(now, last, 18) is False
+
+    def test_manual_fetch_before_fire_is_still_overdue(self):
+        # A manual refresh at 15:32 Berlin is not the EOD fetch.
+        now = datetime(2026, 6, 17, 19, 0, tzinfo=CEST)
+        last = datetime(2026, 6, 17, 13, 32, tzinfo=timezone.utc)  # 15:32 Berlin today
+        assert MarketDataAgent._is_fetch_overdue(now, last, 18) is True
+
+    def test_no_prior_fetch_after_fire_is_overdue(self):
+        now = datetime(2026, 6, 17, 19, 0, tzinfo=CEST)
+        assert MarketDataAgent._is_fetch_overdue(now, None, 18) is True
+
+    def test_no_prior_fetch_before_fire_not_overdue(self):
+        now = datetime(2026, 6, 17, 8, 0, tzinfo=CEST)
+        assert MarketDataAgent._is_fetch_overdue(now, None, 18) is False
+
+
+class TestCatchupFetch:
+    def test_triggers_scheduled_fetch_when_overdue(self, agent):
+        agent.get_latest_fetch_time = MagicMock(
+            return_value=datetime(2026, 6, 16, 16, 42, tzinfo=timezone.utc)
+        )
+        done = threading.Event()
+        agent._scheduled_fetch = MagicMock(side_effect=lambda: done.set())
+        now = datetime(2026, 6, 17, 19, 0, tzinfo=ZoneInfo("Europe/Berlin"))
+
+        assert agent.catchup_fetch_if_missed(fetch_hour=18, now=now) is True
+        assert done.wait(timeout=2)
+        agent._scheduled_fetch.assert_called_once()
+
+    def test_no_trigger_when_already_fetched_today(self, agent):
+        agent.get_latest_fetch_time = MagicMock(
+            return_value=datetime(2026, 6, 17, 16, 30, tzinfo=timezone.utc)
+        )
+        agent._scheduled_fetch = MagicMock()
+        now = datetime(2026, 6, 17, 19, 0, tzinfo=ZoneInfo("Europe/Berlin"))
+
+        assert agent.catchup_fetch_if_missed(fetch_hour=18, now=now) is False
+        agent._scheduled_fetch.assert_not_called()

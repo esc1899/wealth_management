@@ -456,3 +456,57 @@ class MarketDataAgent:
             logger.warning("Post-fetch snapshot failed", exc_info=True)
 
         conn.close()
+
+    @staticmethod
+    def _is_fetch_overdue(
+        now_local: datetime, last_fetch: Optional[datetime], fetch_hour: int
+    ) -> bool:
+        """True if today's `fetch_hour:00` has passed and no fetch happened since.
+
+        `now_local` must be timezone-aware in the target timezone. `last_fetch`
+        may be None or tz-aware (any tz) and is compared in `now_local`'s zone.
+        """
+        fire_today = now_local.replace(
+            hour=fetch_hour, minute=0, second=0, microsecond=0
+        )
+        if now_local < fire_today:
+            return False  # today's fetch isn't due yet
+        if last_fetch is None:
+            return True
+        return last_fetch.astimezone(now_local.tzinfo) < fire_today
+
+    def catchup_fetch_if_missed(
+        self,
+        fetch_hour: int = 18,
+        timezone: str = "Europe/Berlin",
+        now: Optional[datetime] = None,
+    ) -> bool:
+        """Run the daily fetch now if today's scheduled fire was missed.
+
+        The daily CronTrigger does not fire if the process was asleep at
+        `fetch_hour` (macOS App Nap, app restart), and there is no APScheduler
+        catchup. Without a fresh fetch the day's prices — and the daily P&L
+        derived from them — stay stale. Called once at app startup. Returns
+        True if a catchup fetch was triggered (runs in a background thread).
+        """
+        try:
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(timezone)
+        except Exception:
+            logger.warning("catchup: timezone %s unavailable, skipping", timezone)
+            return False
+
+        if now is None:
+            now = datetime.now(tz)
+        last = self.get_latest_fetch_time()
+        if not self._is_fetch_overdue(now, last, fetch_hour):
+            return False
+
+        logger.info(
+            "catchup: daily %02d:00 fetch missed (last=%s), running now",
+            fetch_hour, last,
+        )
+        threading.Thread(
+            target=self._scheduled_fetch, daemon=True, name="market-catchup"
+        ).start()
+        return True

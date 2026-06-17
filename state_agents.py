@@ -115,6 +115,10 @@ def get_market_agent() -> MarketDataAgent:
     # Register post-fetch callback for automatic wealth snapshots
     agent.set_post_fetch_callback(lambda: _safe_take_snapshot())
 
+    # Catch up the daily fetch if the app was asleep at fetch_hour (no APScheduler
+    # catchup for daily triggers) — otherwise prices and daily P&L stay stale.
+    agent.catchup_fetch_if_missed(fetch_hour=config.MARKET_DATA_FETCH_HOUR)
+
     return agent
 
 

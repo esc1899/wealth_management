@@ -17,6 +17,68 @@ from agents.market_data_fetcher import (
 
 
 # ------------------------------------------------------------------
+# Batch resilience: timeout scaling + retry (regression for stale prices)
+# ------------------------------------------------------------------
+
+class TestBatchResilience:
+    """
+    Regression for the bug where a fixed 15s wall-clock budget starved larger
+    portfolios: symbols that lost the race were marked failed and their old DB
+    prices were silently left stale (e.g. SSU.F stuck a day behind).
+    """
+
+    @patch("agents.market_data_fetcher.futures_wait")
+    @patch("agents.market_data_fetcher.yf.Ticker")
+    def test_timeout_scales_with_batch_size(self, mock_ticker_cls, mock_wait):
+        ticker = MagicMock()
+        ticker.fast_info = _make_fast_info(price=100.0, currency="EUR")
+        mock_ticker_cls.return_value = ticker
+
+        captured = []
+
+        def fake_wait(futs, timeout=None):
+            captured.append(timeout)
+            return set(futs), set()  # pretend all finished
+
+        mock_wait.side_effect = fake_wait
+
+        fetcher = MarketDataFetcher(RateLimiter(calls_per_second=1000))
+        many = [f"SYM{i}.DE" for i in range(40)]
+        fetcher.fetch_current_prices(many)
+
+        # 40 symbols must get far more than the old fixed 15s budget.
+        assert captured[0] > 15
+        assert captured[0] >= 40 * 2.0
+
+    @patch("agents.market_data_fetcher.yf.Ticker")
+    def test_transient_failure_is_retried_and_succeeds(self, mock_ticker_cls):
+        attempts = {"SSU.F": 0}
+
+        def side_effect(symbol):
+            m = MagicMock()
+            if symbol == "SSU.F":
+                attempts["SSU.F"] += 1
+                if attempts["SSU.F"] == 1:
+                    # First attempt: transient failure (no price, empty fallback)
+                    m.fast_info = _make_fast_info(price=None, currency=None)
+                    m.fast_info.last_price = None
+                    m.history.return_value = pd.DataFrame()
+                else:
+                    m.fast_info = _make_fast_info(price=4860.0, currency="EUR")
+            return m
+
+        mock_ticker_cls.side_effect = side_effect
+
+        fetcher = MarketDataFetcher(RateLimiter(calls_per_second=1000))
+        records, failed = fetcher.fetch_current_prices(["SSU.F"])
+
+        assert failed == []
+        assert len(records) == 1
+        assert records[0].price_eur == 4860.0
+        assert attempts["SSU.F"] == 2  # retried exactly once
+
+
+# ------------------------------------------------------------------
 # Symbol validation
 # ------------------------------------------------------------------
 
