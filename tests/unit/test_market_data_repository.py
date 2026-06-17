@@ -266,6 +266,16 @@ class TestDividendData:
         assert result.rate_eur == pytest.approx(4.0)
         assert result.yield_pct == pytest.approx(0.025)
 
+    def test_upsert_with_none_yield_clears_stale_value(self, repo):
+        # Regression: a re-fetch that returns yield_pct=None (cross-currency listing →
+        # yfinance yield unreliable) must OVERWRITE the stored yield, not preserve the
+        # old value via COALESCE. Otherwise a stale wrong yield (e.g. TSMC 6.5%) sticks.
+        repo.upsert_dividend(make_dividend(rate_eur=24.0, yield_pct=0.065))
+        repo.upsert_dividend(make_dividend(rate_eur=0.66, yield_pct=None))
+        result = repo.get_dividend("AAPL")
+        assert result.rate_eur == pytest.approx(0.66)
+        assert result.yield_pct is None
+
     def test_get_dividend_unknown_symbol_returns_none(self, repo):
         assert repo.get_dividend("UNKNOWN") is None
 
