@@ -611,6 +611,10 @@ class WealthSnapshot(BaseModel):
     is_manual: bool = False         # True = manually created or corrected
     note: Optional[str] = None      # optional comment
     created_at: datetime
+    # Composition at capture time: list of {name, ticker, asset_class, quantity, unit,
+    # price_eur, value_eur, annual_dividend_eur, dividend_yield_pct}. None for legacy
+    # snapshots taken before this was stored — those cannot be re-priced accurately.
+    holdings: Optional[List[Dict]] = None
 
 
 class DividendSnapshot(BaseModel):

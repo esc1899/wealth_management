@@ -244,7 +244,8 @@ def init_db(conn: sqlite3.Connection) -> None:
             missing_pos   TEXT,
             is_manual     INTEGER NOT NULL DEFAULT 0,
             note          TEXT,
-            created_at    TEXT NOT NULL
+            created_at    TEXT NOT NULL,
+            holdings      TEXT
         )""",
         "CREATE INDEX IF NOT EXISTS idx_wealth_snapshots_date ON wealth_snapshots(date)",
         """CREATE TABLE IF NOT EXISTS dividend_snapshots (
@@ -704,6 +705,13 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     existing_cowork = {row[1] for row in conn.execute("PRAGMA table_info(cowork_research_entries)")}
     if "request_id" not in existing_cowork:
         conn.execute("ALTER TABLE cowork_research_entries ADD COLUMN request_id INTEGER")
+
+    # Snapshot-Zusammensetzung (Bestände + Dividenden-% pro Position) zum Aufnahmezeitpunkt.
+    # Macht jeden neuen Snapshot selbsttragend, sodass eine spätere Rückberechnung die
+    # echten damaligen Stückzahlen verwendet statt der heutigen (legacy-Zeilen = NULL).
+    existing_wealth_snap = {row[1] for row in conn.execute("PRAGMA table_info(wealth_snapshots)")}
+    if "holdings" not in existing_wealth_snap:
+        conn.execute("ALTER TABLE wealth_snapshots ADD COLUMN holdings TEXT")
 
     conn.commit()
 

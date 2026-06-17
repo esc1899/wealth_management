@@ -47,12 +47,15 @@ with col_rebuild:
             with st.spinner(t("wealth_history.rebuild_running")):
                 summary = get_wealth_snapshot_agent().rebuild_wealth_history()
             text = t("wealth_history.rebuild_summary").format(n=summary["recomputed"])
+            skipped = len(summary.get("skipped_legacy", []))
+            if skipped:
+                text += " " + t("wealth_history.rebuild_skipped").format(skipped=skipped)
             issues = len(summary["low_coverage_dates"]) + len(summary["missing_dates"])
             if issues:
                 text += " " + t("wealth_history.rebuild_issues").format(
                     low=len(summary["low_coverage_dates"]), missing=len(summary["missing_dates"])
                 )
-            st.session_state["wh_msg"] = {"kind": "warning" if issues else "success", "text": text}
+            st.session_state["wh_msg"] = {"kind": "warning" if (issues or skipped) else "success", "text": text}
             st.rerun()
         except Exception as e:
             st.error(t("wealth_history.update_error").format(error=e))

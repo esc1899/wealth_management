@@ -105,6 +105,7 @@ class WealthSnapshotAgent:
 
         missing_positions = []
         total = 0.0
+        holdings: List[Dict] = []
 
         for val in valuations:
             if val.current_value_eur is None:
@@ -113,6 +114,7 @@ class WealthSnapshotAgent:
                 total += val.current_value_eur
                 asset_class = val.asset_class
                 breakdown[asset_class] = breakdown.get(asset_class, 0) + val.current_value_eur
+            holdings.append(self._holding_from_valuation(val))
 
         # Calculate coverage
         coverage_pct = (
@@ -121,7 +123,8 @@ class WealthSnapshotAgent:
             else 100.0
         )
 
-        # Create snapshot
+        # Create snapshot — store composition so this date can be re-priced later
+        # against its actual holdings (not a future portfolio approximation).
         snapshot = self._wealth.create(
             date_str=date_str,
             total_eur=total,
@@ -130,9 +133,25 @@ class WealthSnapshotAgent:
             missing_pos=missing_positions if missing_positions else None,
             is_manual=is_manual,
             note=note,
+            holdings=holdings,
         )
 
         return snapshot
+
+    @staticmethod
+    def _holding_from_valuation(val) -> Dict:
+        """Serialise a PortfolioValuation into a stored snapshot holding."""
+        return {
+            "name": val.name,
+            "ticker": val.symbol,
+            "asset_class": val.asset_class,
+            "quantity": val.quantity,
+            "unit": val.unit,
+            "price_eur": val.current_price_eur,
+            "value_eur": val.current_value_eur,
+            "annual_dividend_eur": val.annual_dividend_eur,
+            "dividend_yield_pct": val.dividend_yield_pct,
+        }
 
     def prepare_snapshot(self, date_str: Optional[str] = None) -> SnapshotPreview:
         """
@@ -489,60 +508,129 @@ class WealthSnapshotAgent:
             logger.info("Backfilled %d wealth snapshots", created)
         return created
 
+    def _reprice_holdings(
+        self, holdings: List[Dict], date_str: str, *, fetch_if_missing: bool = True
+    ) -> tuple:
+        """Re-price a snapshot's stored holdings with the historical price of that date.
+
+        Uses the *recorded* quantities/composition — so an accurate snapshot is only
+        ever re-priced, never re-composed from today's portfolio. Cash / manual
+        positions (no ticker) keep their recorded value. Returns
+        (total, breakdown, missing, approximated, updated_holdings) where the updated
+        holdings carry the corrected price_eur / value_eur.
+        """
+        registry = get_asset_class_registry()
+        breakdown: Dict[str, float] = {ac: 0.0 for ac in registry.all_names()}
+        total = 0.0
+        missing: List[str] = []
+        approximated = 0
+        updated: List[Dict] = []
+
+        for raw in holdings:
+            h = dict(raw)
+            ac = h.get("asset_class")
+            ticker = h.get("ticker")
+            qty = h.get("quantity")
+
+            if not ticker or qty is None:
+                # Cash / manual / non-tradeable: keep the value recorded that day
+                val = h.get("value_eur")
+                if val is None:
+                    missing.append(h.get("name"))
+                else:
+                    total += val
+                    breakdown[ac] = breakdown.get(ac, 0.0) + val
+                updated.append(h)
+                continue
+
+            price = self._market.get_price_for_date_or_prior(ticker, date_str, max_days_back=0)
+            if price is None and fetch_if_missing:
+                self._market_data_agent.fetch_historical_for_symbol(ticker)
+                price = self._market.get_price_for_date_or_prior(ticker, date_str, max_days_back=0)
+            is_exact = price is not None
+            if price is None:
+                price = self._market.get_price_for_date_or_prior(ticker, date_str, max_days_back=5)
+            if price is None:
+                missing.append(h.get("name"))
+                updated.append(h)
+                continue
+            if not is_exact:
+                approximated += 1
+
+            value = (price / TROY_OZ_TO_G) * qty if h.get("unit") == "g" else price * qty
+            h["price_eur"] = price
+            h["value_eur"] = value
+            total += value
+            breakdown[ac] = breakdown.get(ac, 0.0) + value
+            updated.append(h)
+
+        return total, breakdown, missing, approximated, updated
+
     def recalculate_snapshot(self, date_str: str) -> Optional[WealthSnapshot]:
         """
-        Recalculate an existing snapshot using historical prices for that date.
-        Forces a 1y history re-fetch for any ticker whose exact date is missing,
-        so a stale neighbouring price no longer silently stands in. Overwrites the
-        existing snapshot. Returns the updated snapshot, or None if no data.
+        Recalculate an existing snapshot. If the snapshot stored its composition
+        (holdings), re-price exactly those holdings for the date — accurate even if
+        the portfolio has since changed. Legacy snapshots without holdings fall back
+        to an approximation using today's portfolio (note="recalculated"), forcing a
+        1y re-fetch when the exact date is missing. Returns the updated snapshot.
         """
+        existing = self._wealth.get_by_date(date_str)
+
+        if existing is not None and existing.holdings:
+            total, breakdown, missing, _, updated = self._reprice_holdings(
+                existing.holdings, date_str
+            )
+            if total <= 0:
+                return None
+            denom = len(existing.holdings) or 1
+            coverage = (denom - len(missing)) / denom * 100
+            self._wealth.delete(existing.id)
+            return self._wealth.create(
+                date_str=date_str, total_eur=total, breakdown=breakdown,
+                coverage_pct=coverage, missing_pos=missing or None,
+                is_manual=True, note="repriced", holdings=updated,
+            )
+
+        # Legacy fallback: no stored composition → approximate with current holdings
         positions = self._positions.get_portfolio()
         if not positions:
             return None
-
         registry = get_asset_class_registry()
         total, breakdown, missing, _ = self._compute_wealth_for_date(
             date_str, positions, registry, fetch_if_missing=True
         )
         if total <= 0:
             return None
-
         coverage = (len(positions) - len(missing)) / len(positions) * 100
-
-        existing = self._wealth.get_by_date(date_str)
         if existing is not None:
             self._wealth.delete(existing.id)
-
         return self._wealth.create(
-            date_str=date_str,
-            total_eur=total,
-            breakdown=breakdown,
-            coverage_pct=coverage,
-            missing_pos=missing if missing else None,
-            is_manual=True,
-            note="recalculated",
+            date_str=date_str, total_eur=total, breakdown=breakdown,
+            coverage_pct=coverage, missing_pos=missing if missing else None,
+            is_manual=True, note="recalculated",
         )
 
     def rebuild_wealth_history(self, refetch: bool = True) -> Dict:
         """
-        Rebuild every existing wealth snapshot from fresh market data.
+        Rebuild wealth snapshots from fresh market data — holdings-aware.
 
-        One-click alternative to recalculating row by row: re-fetches current
-        prices + 1y history for all portfolio tickers (and dividends) once, then
-        recomputes each stored snapshot date plus today's live snapshot.
+        Only snapshots that stored their composition (holdings) are re-priced, using
+        the *recorded* quantities so the result stays truthful even after portfolio
+        changes. Legacy snapshots without holdings are left untouched (reported under
+        ``skipped_legacy``) because they cannot be reconstructed accurately. Re-fetches
+        prices + 1y history (and dividends) once, then refreshes today's snapshot.
 
-        Returns a summary dict: {recomputed, low_coverage_dates, missing_dates, failed}.
+        Returns {recomputed, skipped_legacy, low_coverage_dates, missing_dates, failed}.
         """
         summary: Dict = {
             "recomputed": 0,
+            "skipped_legacy": [],
             "low_coverage_dates": [],
             "missing_dates": [],
             "failed": [],
         }
 
         if refetch:
-            # Single bulk fetch refreshes current_prices + historical_prices for all
-            # tickers; dividends are refreshed for today's snapshot.
             result = self._market_data_agent.fetch_all_now(
                 fetch_history=True, include_watchlist=False
             )
@@ -552,31 +640,28 @@ class WealthSnapshotAgent:
             except Exception:
                 logger.warning("rebuild: dividend re-fetch failed", exc_info=True)
 
-        positions = self._positions.get_portfolio()
-        registry = get_asset_class_registry()
-
-        # Recompute every stored historical snapshot from the freshly fetched data.
+        today = date.today().isoformat()
         for snap in self._wealth.list(days=None) or []:
-            if snap.date == date.today().isoformat():
+            if snap.date == today:
                 continue  # handled by take_snapshot below
-            total, breakdown, missing, _ = self._compute_wealth_for_date(
-                snap.date, positions, registry
+            if not snap.holdings:
+                summary["skipped_legacy"].append(snap.date)
+                continue
+            total, breakdown, missing, _, updated = self._reprice_holdings(
+                snap.holdings, snap.date
             )
             if total <= 0:
                 summary["missing_dates"].append(snap.date)
                 continue
-            coverage = (len(positions) - len(missing)) / len(positions) * 100 if positions else 0.0
+            denom = len(snap.holdings) or 1
+            coverage = (denom - len(missing)) / denom * 100
             existing = self._wealth.get_by_date(snap.date)
             if existing is not None:
                 self._wealth.delete(existing.id)
             self._wealth.create(
-                date_str=snap.date,
-                total_eur=total,
-                breakdown=breakdown,
-                coverage_pct=coverage,
-                missing_pos=missing if missing else None,
-                is_manual=True,
-                note="rebuilt",
+                date_str=snap.date, total_eur=total, breakdown=breakdown,
+                coverage_pct=coverage, missing_pos=missing or None,
+                is_manual=True, note="repriced", holdings=updated,
             )
             summary["recomputed"] += 1
             if coverage < 100.0:
@@ -592,8 +677,9 @@ class WealthSnapshotAgent:
             logger.warning("rebuild: today's snapshot failed", exc_info=True)
 
         logger.info(
-            "Rebuilt wealth history: %d snapshots (%d low coverage, %d no data)",
-            summary["recomputed"], len(summary["low_coverage_dates"]), len(summary["missing_dates"]),
+            "Rebuilt wealth history: %d repriced, %d legacy skipped, %d low coverage, %d no data",
+            summary["recomputed"], len(summary["skipped_legacy"]),
+            len(summary["low_coverage_dates"]), len(summary["missing_dates"]),
         )
         return summary
 

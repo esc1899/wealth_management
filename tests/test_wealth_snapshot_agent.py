@@ -815,7 +815,7 @@ class TestRecalculateSnapshot:
 
     def test_recalculate_overwrites_existing(self):
         pos = _make_position(quantity=10.0)
-        existing = Mock(id=42)
+        existing = Mock(id=42, holdings=None)  # legacy snapshot → approximation path
         agent, wealth_repo = self._make_agent([pos], {"2026-01-15": 200.0}, existing_snapshot=existing)
         result = agent.recalculate_snapshot("2026-01-15")
         wealth_repo.delete.assert_called_once_with(42)
@@ -1029,6 +1029,9 @@ class TestComputeWealthForDate:
 
 
 class TestRebuildWealthHistory:
+    HOLDING = {"name": "Apple", "ticker": "AAPL", "asset_class": "Aktie",
+               "quantity": 10.0, "unit": "Stück", "price_eur": 90.0, "value_eur": 900.0}
+
     def _agent(self, snaps, *, failed=None):
         pos_repo = Mock(spec=PositionsRepository)
         pos_repo.get_portfolio.return_value = [_make_position(quantity=10.0)]
@@ -1051,30 +1054,89 @@ class TestRebuildWealthHistory:
         )
         return agent, market_agent, wealth_repo
 
-    def test_refetches_once_and_recomputes_all_plus_today(self):
-        snaps = [Mock(date="2026-01-14"), Mock(date="2026-01-15")]
+    def _snap(self, date_str, holdings):
+        return Mock(id=1, date=date_str, holdings=holdings)
+
+    def test_reprices_snapshots_with_holdings_plus_today(self):
+        snaps = [self._snap("2026-01-14", [dict(self.HOLDING)]),
+                 self._snap("2026-01-15", [dict(self.HOLDING)])]
         agent, market_agent, wealth_repo = self._agent(snaps)
         summary = agent.rebuild_wealth_history()
         market_agent.fetch_all_now.assert_called_once()
         market_agent.fetch_dividends_now.assert_called_once()
-        assert summary["recomputed"] == 3  # 2 historical + today
+        assert summary["recomputed"] == 3  # 2 repriced + today
+        assert summary["skipped_legacy"] == []
         assert summary["failed"] == []
-        assert summary["low_coverage_dates"] == []
+        # Re-priced from stored quantity × historical price (10 × 100), not today's portfolio
+        first = wealth_repo.create.call_args_list[0][1]
+        assert first["total_eur"] == pytest.approx(1000.0)
+        assert first["note"] == "repriced"
 
-    def test_skips_today_in_loop_to_avoid_double_count(self):
-        today = date.today().isoformat()
-        snaps = [Mock(date=today), Mock(date="2026-01-15")]
+    def test_skips_legacy_snapshots_without_holdings(self):
+        snaps = [self._snap("2026-01-14", None), self._snap("2026-01-15", [dict(self.HOLDING)])]
         agent, _, _ = self._agent(snaps)
         summary = agent.rebuild_wealth_history()
-        # today handled once via take_snapshot, the historical date once → 2
-        assert summary["recomputed"] == 2
+        assert summary["skipped_legacy"] == ["2026-01-14"]
+        assert summary["recomputed"] == 2  # 1 repriced + today
+
+    def test_skips_today_in_loop(self):
+        today = date.today().isoformat()
+        snaps = [self._snap(today, [dict(self.HOLDING)]), self._snap("2026-01-15", [dict(self.HOLDING)])]
+        agent, _, _ = self._agent(snaps)
+        summary = agent.rebuild_wealth_history()
+        assert summary["recomputed"] == 2  # historical + today via take_snapshot
 
     def test_propagates_failed_symbols(self):
-        agent, _, _ = self._agent([Mock(date="2026-01-15")], failed=["SSU.F"])
+        agent, _, _ = self._agent([self._snap("2026-01-15", [dict(self.HOLDING)])], failed=["SSU.F"])
         summary = agent.rebuild_wealth_history()
         assert summary["failed"] == ["SSU.F"]
 
     def test_no_refetch_when_disabled(self):
-        agent, market_agent, _ = self._agent([Mock(date="2026-01-15")])
+        agent, market_agent, _ = self._agent([self._snap("2026-01-15", [dict(self.HOLDING)])])
         agent.rebuild_wealth_history(refetch=False)
         market_agent.fetch_all_now.assert_not_called()
+
+
+class TestRecalculateHoldingsAware:
+    def test_reprices_stored_holdings_without_touching_current_portfolio(self):
+        # Safety property: with stored holdings, recalc must NOT use today's portfolio.
+        market_repo = Mock(spec=MarketDataRepository)
+        market_repo.get_price_for_date_or_prior.side_effect = lambda sym, d, max_days_back=5: 100.0
+        holdings = [{"name": "Apple", "ticker": "AAPL", "asset_class": "Aktie",
+                     "quantity": 10.0, "unit": "Stück", "price_eur": 90.0, "value_eur": 900.0}]
+        existing = Mock(id=7, holdings=holdings)
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        wealth_repo.get_by_date.return_value = existing
+        wealth_repo.create.return_value = Mock(coverage_pct=100.0)
+        pos_repo = Mock(spec=PositionsRepository)
+        agent = WealthSnapshotAgent(
+            positions_repo=pos_repo, market_repo=market_repo,
+            wealth_repo=wealth_repo, market_data_agent=Mock(),
+        )
+        agent.recalculate_snapshot("2026-01-15")
+        pos_repo.get_portfolio.assert_not_called()
+        wealth_repo.delete.assert_called_once_with(7)
+        call = wealth_repo.create.call_args[1]
+        assert call["total_eur"] == pytest.approx(1000.0)  # 10 × 100, stored qty
+        assert call["note"] == "repriced"
+        assert call["holdings"] is not None
+
+    def test_cash_holding_keeps_recorded_value(self):
+        # Cash / manual holdings (no ticker) keep their recorded value on reprice.
+        market_repo = Mock(spec=MarketDataRepository)
+        holdings = [
+            {"name": "Tagesgeld", "ticker": None, "asset_class": "Bargeld",
+             "quantity": None, "unit": "€", "price_eur": None, "value_eur": 5000.0},
+        ]
+        existing = Mock(id=3, holdings=holdings)
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        wealth_repo.get_by_date.return_value = existing
+        wealth_repo.create.return_value = Mock(coverage_pct=100.0)
+        agent = WealthSnapshotAgent(
+            positions_repo=Mock(spec=PositionsRepository), market_repo=market_repo,
+            wealth_repo=wealth_repo, market_data_agent=Mock(),
+        )
+        agent.recalculate_snapshot("2026-01-15")
+        call = wealth_repo.create.call_args[1]
+        assert call["total_eur"] == pytest.approx(5000.0)
+        market_repo.get_price_for_date_or_prior.assert_not_called()

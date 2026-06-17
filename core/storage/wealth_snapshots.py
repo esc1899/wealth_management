@@ -31,21 +31,23 @@ class WealthSnapshotRepository:
         missing_pos: Optional[List[str]] = None,
         is_manual: bool = False,
         note: Optional[str] = None,
+        holdings: Optional[List[Dict]] = None,
     ) -> WealthSnapshot:
         """Create a new wealth snapshot for a given date."""
         now = datetime.now(timezone.utc)
         breakdown_json = json.dumps(breakdown)
         missing_pos_json = json.dumps(missing_pos or [])
+        holdings_json = json.dumps(holdings) if holdings is not None else None
 
         try:
             cur = self._conn.execute(
                 """
                 INSERT INTO wealth_snapshots
-                (date, total_eur, breakdown, coverage_pct, missing_pos, is_manual, note, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (date, total_eur, breakdown, coverage_pct, missing_pos, is_manual, note, created_at, holdings)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (date_str, total_eur, breakdown_json, coverage_pct, missing_pos_json,
-                 1 if is_manual else 0, note, now.isoformat()),
+                 1 if is_manual else 0, note, now.isoformat(), holdings_json),
             )
             self._conn.commit()
         except sqlite3.IntegrityError:
@@ -62,6 +64,7 @@ class WealthSnapshotRepository:
             is_manual=is_manual,
             note=note,
             created_at=now,
+            holdings=holdings,
         )
 
     def update(
@@ -189,6 +192,8 @@ class WealthSnapshotRepository:
 
     def _row_to_snapshot(self, row: sqlite3.Row) -> WealthSnapshot:
         """Convert a DB row to a WealthSnapshot object."""
+        keys = row.keys()
+        holdings_raw = row["holdings"] if "holdings" in keys else None
         return WealthSnapshot(
             id=row["id"],
             date=row["date"],
@@ -199,4 +204,5 @@ class WealthSnapshotRepository:
             is_manual=bool(row["is_manual"]),
             note=row["note"],
             created_at=datetime.fromisoformat(row["created_at"]),
+            holdings=json.loads(holdings_raw) if holdings_raw else None,
         )
