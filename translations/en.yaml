@@ -34,14 +34,15 @@ common:
   generated_at: "Generated:"
 
 accumulation:
-  section: "📈 Accumulation"
-  col: "Accumulation"
-  help: "Expectation whether share accumulation is worthwhile — from current yield + existing verdicts (story = thesis intact?, valuation = cheap/expensive). Deterministic, backward-looking: a screen, not a verdict."
+  section: "📈 Dividend accumulation"
+  col: "Div. acc."
+  help: "Expectation whether share accumulation via dividends is worthwhile — from current dividend yield + existing verdicts (story = thesis intact?, valuation = cheap/expensive). Names without a dividend (e.g. Amazon) are 'not applicable', not downgraded. Deterministic, backward-looking: a screen, not a verdict."
   verdict_akkumulieren: "Accumulate"
   verdict_halten: "Hold"
   verdict_pruefen: "Review"
   verdict_fallen_verdacht: "Trap suspected"
   verdict_ungeeignet: "Unsuitable"
+  verdict_na: "Not applicable"
   comp_engine: "Yield"
   comp_survival: "Story"
   comp_valuation: "Valuation"
@@ -53,6 +54,7 @@ accumulation:
   binding_engine: "Yield too weak — little income engine to accumulate."
   binding_valuation: "Valuation high — wait for a cheaper entry."
   binding_verdicts: "No verdicts yet — review story/valuation first."
+  binding_no_dividend: "No dividend — dividend accumulation not applicable."
 
 nav:
   dashboard: "Dashboard"

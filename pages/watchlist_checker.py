@@ -210,13 +210,13 @@ for pos in watchlist:
     matrix_rows.append({
         "name": pos.name,
         "ticker": pos.ticker or "—",
+        "acc": accumulation_matrix_cell(_acc),
         "sc": fmt_verdict_matrix(sc_verdicts.get(pos.id), "storychecker", stale_days=_STALE_DAYS),
         "fa": fmt_verdict_matrix(fund_verdicts.get(pos.id), "fundamental_analyzer", stale_days=_STALE_DAYS),
         "cg": fmt_verdict_matrix(cg_verdicts.get(pos.id), "consensus_gap", stale_days=_STALE_DAYS),
         "ca": fmt_verdict_matrix(ca_verdicts.get(pos.id), "capital_allocator", stale_days=_STALE_DAYS),
         "da": fmt_verdict_matrix(da_verdicts.get(pos.id), "devils_advocate", stale_days=_STALE_DAYS),
         "wc": (fmt_verdict_matrix(wc_fit, "watchlist_checker") if wc_fit else "⚪ —"),
-        "acc": accumulation_matrix_cell(_acc),
     })
 
 _matrix_selection = st.dataframe(
@@ -228,13 +228,13 @@ _matrix_selection = st.dataframe(
     column_config={
         "name": st.column_config.TextColumn("Position", width="medium"),
         "ticker": st.column_config.TextColumn("Ticker", width="small"),
+        "acc": st.column_config.TextColumn(t("accumulation.col"), width="medium"),
         "sc": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_sc"), width="medium"),
         "fa": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_fa"), width="medium"),
         "cg": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_cg"), width="medium"),
         "ca": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_ca"), width="medium"),
         "da": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_da"), width="medium"),
         "wc": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_wc"), width="medium"),
-        "acc": st.column_config.TextColumn(t("accumulation.col"), width="medium"),
     },
 )
 

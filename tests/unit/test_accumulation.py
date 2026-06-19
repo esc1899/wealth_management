@@ -47,13 +47,22 @@ class TestVerdictPaths:
         assert r.verdict == "fallen_verdacht"
         assert r.binding == "accumulation.binding_survival"
 
-    def test_ungeeignet_broken_story_no_yield(self):
+    def test_ungeeignet_broken_story_weak_yield(self):
         r = compute_accumulation(0.005, "gefährdet", "fair")
         assert r.verdict == "ungeeignet"
         assert r.binding == "accumulation.binding_survival"
 
-    def test_ungeeignet_broken_story_missing_yield(self):
-        assert compute_accumulation(None, "gefährdet", None).verdict == "ungeeignet"
+    def test_na_takes_precedence_over_broken_story(self):
+        # No dividend → indicator n/a regardless of story (story risk shown by other checkers).
+        r = compute_accumulation(None, "gefährdet", None)
+        assert r.verdict == "nicht_anwendbar"
+        assert r.binding == "accumulation.binding_no_dividend"
+
+    def test_na_for_non_payer(self):
+        for y in (None, 0.0):
+            r = compute_accumulation(y, "intact", "fair")
+            assert r.verdict == "nicht_anwendbar"
+            assert r.binding == "accumulation.binding_no_dividend"
 
     def test_pruefen_no_verdicts(self):
         r = compute_accumulation(0.03, None, None)
@@ -81,8 +90,8 @@ class TestEngineBands:
     def test_weak_below_threshold(self):
         assert _ratings(compute_accumulation(YIELD_WEAK - 0.001, "intact", "fair"))["engine"] == RED
 
-    def test_none_yield_is_red(self):
-        assert _ratings(compute_accumulation(None, "intact", "fair"))["engine"] == RED
+    def test_none_yield_is_grey(self):
+        assert _ratings(compute_accumulation(None, "intact", "fair"))["engine"] == GREY
 
 
 class TestComponentRatings:
@@ -114,19 +123,18 @@ class TestAccumulationForPosition:
         assert r.verdict == "akkumulieren"
 
     def test_missing_ticker_and_verdicts_graceful(self):
+        # no ticker → no yield → dividend indicator not applicable
         r = accumulation_for_position(None, None, None, {})
-        assert r.verdict == "prüfen"
-        assert r.binding == "accumulation.binding_verdicts"
+        assert r.verdict == "nicht_anwendbar"
 
     def test_ticker_not_in_yield_map(self):
         r = accumulation_for_position("XYZ", SimpleNamespace(verdict="intact"), None, {})
-        # no yield → engine weak → halten (intact)
-        assert r.verdict == "halten"
+        # no yield → non-payer → n/a, not a low score
+        assert r.verdict == "nicht_anwendbar"
 
     def test_none_yield_in_map(self):
-        # symbol present but yield is None (raw-table gap) → engine weak
         r = accumulation_for_position("ALV.DE", SimpleNamespace(verdict="intact"), None, {"ALV.DE": None})
-        assert r.verdict == "halten"
+        assert r.verdict == "nicht_anwendbar"
 
     def test_override_yield_makes_accumulate(self):
         # the bug fix: yield from valuation layer (0.045) flows through

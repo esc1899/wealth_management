@@ -262,10 +262,10 @@ for _p in _valid_portfolio:
     _matrix_rows.append({
         "name": _p.name,
         "ticker": _p.ticker or "—",
+        "acc": accumulation_matrix_cell(_acc),
         "sc": _sc_cell,
         "cg": _cg_cell,
         "fa": _fa_cell,
-        "acc": accumulation_matrix_cell(_acc),
     })
 
 _matrix_selection = st.dataframe(
@@ -277,10 +277,10 @@ _matrix_selection = st.dataframe(
     column_config={
         "name": st.column_config.TextColumn("Position", width="medium"),
         "ticker": st.column_config.TextColumn("Ticker", width="small"),
+        "acc": st.column_config.TextColumn(t("accumulation.col"), width="medium"),
         "sc": st.column_config.TextColumn(t("portfolio_story.cockpit_col_sc"), width="medium"),
         "cg": st.column_config.TextColumn(t("portfolio_story.cockpit_col_cg"), width="medium"),
         "fa": st.column_config.TextColumn(t("portfolio_story.cockpit_col_fa"), width="medium"),
-        "acc": st.column_config.TextColumn(t("accumulation.col"), width="medium"),
     },
 )
 

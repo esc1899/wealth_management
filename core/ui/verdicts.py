@@ -67,11 +67,12 @@ VERDICT_CONFIGS: Dict[str, Dict[str, Tuple[str, str]]] = {
         "kritisch":    ("🔴", t("portfolio_robustness.verdict_kritisch")),
     },
     "accumulation": {
-        "akkumulieren":    ("🟢", t("accumulation.verdict_akkumulieren")),
-        "halten":          ("🟡", t("accumulation.verdict_halten")),
-        "prüfen":          ("⚪", t("accumulation.verdict_pruefen")),
-        "fallen_verdacht": ("🟠", t("accumulation.verdict_fallen_verdacht")),
-        "ungeeignet":      ("🔴", t("accumulation.verdict_ungeeignet")),
+        "akkumulieren":     ("🟢", t("accumulation.verdict_akkumulieren")),
+        "halten":           ("🟡", t("accumulation.verdict_halten")),
+        "prüfen":           ("⚪", t("accumulation.verdict_pruefen")),
+        "fallen_verdacht":  ("🟠", t("accumulation.verdict_fallen_verdacht")),
+        "ungeeignet":       ("🔴", t("accumulation.verdict_ungeeignet")),
+        "nicht_anwendbar":  ("➖", t("accumulation.verdict_na")),
     },
 }
 

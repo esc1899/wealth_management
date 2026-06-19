@@ -51,7 +51,7 @@ class AccumulationResult:
 def _engine(yield_pct: Optional[float]) -> tuple[str, str]:
     """Return (value_str, rating) for the income engine."""
     if yield_pct is None:
-        return ("—", RED)
+        return ("—", GREY)
     value = f"{yield_pct * 100:.1f} %"
     if yield_pct >= YIELD_SOLID:
         return (value, GREEN)
@@ -100,6 +100,16 @@ def compute_accumulation(
         AccumulationComponent("accumulation.comp_survival", surv_val, surv_rating),
         AccumulationComponent("accumulation.comp_valuation", val_val, val_rating),
     ]
+
+    # No (meaningful) dividend → this is a dividend-accumulation indicator, so it simply does
+    # not apply (e.g. Amazon). Mark n/a instead of scoring it low — the position's story risk,
+    # if any, is surfaced by the other checkers.
+    if yield_pct is None or yield_pct <= 0:
+        return AccumulationResult(
+            verdict="nicht_anwendbar",
+            components=components,
+            binding="accumulation.binding_no_dividend",
+        )
 
     engine_present = eng_rating in (GREEN, YELLOW)
 

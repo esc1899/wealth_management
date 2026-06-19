@@ -34,14 +34,15 @@ common:
   generated_at: "Generiert:"
 
 accumulation:
-  section: "📈 Akkumulation"
-  col: "Akkumulation"
-  help: "Erwartung, ob sich die Anteilsakkumulation lohnt — aus aktueller Rendite + bestehenden Verdicts (Story = These intakt?, Bewertung = günstig/teuer). Deterministisch, rückwärtsgewandt: ein Screen, kein Urteil."
+  section: "📈 Dividenden-Akkumulation"
+  col: "Div.-Akk."
+  help: "Erwartung, ob sich die Anteilsakkumulation per Dividende lohnt — aus aktueller Dividendenrendite + bestehenden Verdicts (Story = These intakt?, Bewertung = günstig/teuer). Titel ohne Dividende (z.B. Amazon) sind ‚nicht anwendbar', keine Abwertung. Deterministisch, rückwärtsgewandt: ein Screen, kein Urteil."
   verdict_akkumulieren: "Akkumulieren"
   verdict_halten: "Halten"
   verdict_pruefen: "Prüfen"
   verdict_fallen_verdacht: "Fallen-Verdacht"
   verdict_ungeeignet: "Ungeeignet"
+  verdict_na: "Nicht anwendbar"
   comp_engine: "Rendite"
   comp_survival: "Story"
   comp_valuation: "Bewertung"
@@ -53,6 +54,7 @@ accumulation:
   binding_engine: "Rendite zu schwach — kaum Income-Motor zum Akkumulieren."
   binding_valuation: "Bewertung hoch — auf günstigeren Einstieg warten."
   binding_verdicts: "Keine Verdicts vorhanden — erst Story/Bewertung prüfen."
+  binding_no_dividend: "Keine Dividende — Dividenden-Akkumulation nicht anwendbar."
 
 nav:
   dashboard: "Dashboard"
