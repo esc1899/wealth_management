@@ -25,6 +25,7 @@ from core.storage.analyses import PositionAnalysesRepository
 from core.storage.models import Position, StorycheckerSession
 from core.storage.storychecker import StorycheckerRepository
 from agents.agent_language import response_language_instruction, current_date_context
+from core.asset_class_config import FUND_ASSET_CLASSES
 
 
 logger = logging.getLogger(__name__)
@@ -41,18 +42,7 @@ MAX_TOOL_ITERATIONS = 5
 # System prompt
 # ------------------------------------------------------------------
 
-BASE_SYSTEM_PROMPT = """Du bist ein kritischer Investment-Analyst der prüft ob eine Investment-These noch intakt ist.
-
-Du erhältst:
-- Name und Ticker des Unternehmens
-- Die ursprüngliche Investment-These (Story) des Nutzers
-- Optional: die verfolgte Anlage-Idee mit spezifischen Prüfkriterien
-
-Deine Aufgabe: Nutze web_search um aktuelle Informationen zur Firma zu finden
-(News, Quartalszahlen, Management-Aussagen, Wettbewerb). Beurteile dann ob die
-These noch hält — nicht ob sie theoretisch "gut" ist, sondern ob sie heute noch zutrifft.
-
-Antworte auf die erste Anfrage IMMER in diesem Format:
+_FORMAT_AND_RULES = """Antworte auf die erste Anfrage IMMER in diesem Format:
 
 ## Story-Check: {NAME} ({TICKER})
 **Urteil:** {AMPEL}
@@ -80,6 +70,48 @@ Ampel-Regeln (genau eines wählen):
 
 Sei direkt und konkret. Keine Allgemeinplätze.
 Bei Rückfragen im Chat: kurz und präzise antworten, kein neues Ampel-Urteil."""
+
+
+_SYSTEM_PROMPT_AKTIE = """Du bist ein kritischer Investment-Analyst der prüft ob eine Investment-These noch intakt ist.
+
+Du erhältst:
+- Name und Ticker des Unternehmens
+- Die ursprüngliche Investment-These (Story) des Nutzers
+- Optional: die verfolgte Anlage-Idee mit spezifischen Prüfkriterien
+
+Deine Aufgabe: Nutze web_search um aktuelle Informationen zur Firma zu finden
+(News, Quartalszahlen, Management-Aussagen, Wettbewerb). Beurteile dann ob die
+These noch hält — nicht ob sie theoretisch "gut" ist, sondern ob sie heute noch zutrifft.
+
+""" + _FORMAT_AND_RULES
+
+
+_SYSTEM_PROMPT_FONDS = """Du bist ein kritischer Fonds-Analyst der prüft ob eine Investment-These zu einem Fonds noch intakt ist.
+
+Du erhältst:
+- Name und Ticker eines FONDS (kein Einzelunternehmen)
+- Die ursprüngliche Investment-These (Story) des Nutzers
+- Optional: die verfolgte Anlage-Idee mit spezifischen Prüfkriterien
+
+Deine Aufgabe: Nutze web_search um aktuelle Informationen zum Fonds zu finden und beurteile
+die These an FONDS-fairen Maßstäben:
+- Anlagemandat & Strategie (passt der Fonds noch zur These?)
+- Zusammensetzung: Top-Positionen, Sektor-/Regionen-Exposure, Klumpenrisiken
+- Kosten (TER) und Performance NUR im Vergleich zur GLEICHEN Fonds-Kategorie
+- relevante Markt-/Zinsentwicklungen für genau dieses Segment
+
+WICHTIG: Miss den Fonds nicht an sachfremden Maßstäben — z.B. einen Infrastruktur- oder
+Rentenfonds NICHT mit einem Aktienfonds oder einer Einzelaktie vergleichen. Erfinde kein
+Risiko, das nur aus einem falschen Vergleich entsteht. Beurteile, ob die These heute noch
+zutrifft — nicht ob sie theoretisch "gut" ist.
+
+""" + _FORMAT_AND_RULES
+
+
+def _build_system_prompt(asset_class: str | None, language: str) -> str:
+    """Asset-class-aware system prompt: fund framing for fund vehicles, else company framing."""
+    base = _SYSTEM_PROMPT_FONDS if asset_class in FUND_ASSET_CLASSES else _SYSTEM_PROMPT_AKTIE
+    return current_date_context() + base + "\n" + response_language_instruction(language)
 
 
 # ------------------------------------------------------------------
@@ -290,13 +322,20 @@ Schreibe nur die These selbst, keine Einleitung oder Überschrift."""
 
     async def _run_llm_async(self, session_id: int, api_messages: list[dict], language: str = "de") -> str:
         messages = list(api_messages)
-        system_prompt = current_date_context() + BASE_SYSTEM_PROMPT + "\n" + response_language_instruction(language)
+        # Build an asset-class-aware system prompt (fund vs. company framing) from the session's
+        # position. Fallback to company framing if the position can't be resolved.
+        asset_class = None
+        session = self._storychecker.get_session(session_id)
+        if session:
+            pos = self._positions.get(session.position_id)
+            asset_class = pos.asset_class if pos else None
+        system_prompt = _build_system_prompt(asset_class, language)
         for _ in range(MAX_TOOL_ITERATIONS):
             response = await self._llm.chat_with_tools(
                 messages=messages,
                 tools=[WEB_SEARCH_TOOL],
                 system=system_prompt,
-                max_tokens=2048,
+                max_tokens=4096,
             )
             # Web search is server-side — no client tool calls to handle.
             # Loop exits when there are no remaining tool calls (stop_reason != "tool_use")
@@ -350,10 +389,11 @@ def _extract_summary(text: str) -> str | None:
 
 def _build_initial_message(position: Position, skill_name: str = "", skill_prompt: str = "") -> str:
     ticker_str = f" ({position.ticker})" if position.ticker else ""
+    _subject_label = "Fonds" if position.asset_class in FUND_ASSET_CLASSES else "Unternehmen"
     lines = [
         f"Bitte prüfe ob die folgende Investment-These noch intakt ist.",
         f"",
-        f"**Unternehmen:** {position.name}{ticker_str}",
+        f"**{_subject_label}:** {position.name}{ticker_str}",
         f"**Asset-Klasse:** {position.asset_class}",
     ]
     if position.empfehlung:

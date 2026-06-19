@@ -20,6 +20,7 @@ from core.storage.analyses import PositionAnalysesRepository
 from core.storage.fundamental_analyzer import FundamentalAnalyzerRepository
 from core.storage.models import PublicPosition, FundamentalAnalyzerSession, FundamentalAnalyzerMessage
 from agents.agent_language import response_language_instruction, current_date_context
+from core.asset_class_config import FUND_ASSET_CLASSES
 
 
 logger = logging.getLogger(__name__)
@@ -32,8 +33,9 @@ VALID_VERDICTS = {"unterbewertet", "fair", "überbewertet", "unbekannt"}
 # so the verdict line was never reached → "unbekannt". 4096 gives the conclusion room to land.
 _FA_MAX_TOKENS = 4096
 
-# Asset classes treated as funds/ETFs (different analysis dimensions than single stocks)
-_FUND_ASSET_CLASSES = {"Aktienfonds", "Immobilienfonds"}
+# Asset classes treated as funds/ETFs (different analysis dimensions than single stocks).
+# Single source of truth in core.asset_class_config (kept in sync with config/asset_classes.yaml).
+_FUND_ASSET_CLASSES = FUND_ASSET_CLASSES
 
 # ------------------------------------------------------------------
 # Tools

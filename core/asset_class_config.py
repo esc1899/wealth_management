@@ -22,6 +22,12 @@ ALL_FIELDS = [
     "recommendation_source", "strategy", "notes", "extra_data",
 ]
 
+# Asset classes that are diversified fund vehicles (analysed on fund terms — mandate,
+# holdings, costs, same-category peers — NOT as single companies). Single source of truth
+# shared by the FundamentalAnalyzer and Storychecker so a fund is never measured by
+# equity yardsticks. Matches the four "*fonds" classes in config/asset_classes.yaml.
+FUND_ASSET_CLASSES = {"Aktienfonds", "Rentenfonds", "Immobilienfonds", "Infrastrukturfonds"}
+
 
 class AssetClassConfig(BaseModel):
     name: str

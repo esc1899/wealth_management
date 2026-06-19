@@ -291,6 +291,15 @@ class TestVerdictVia:
         assert "**FAZIT:**" in text_p and "submit_fa_verdict" not in text_p
         assert "submit_fa_verdict" not in none_p and "FAZIT" not in none_p
 
+    def test_fund_classes_use_fund_prompt(self):
+        # Regression: the real fund classes (Infrastrukturfonds, Rentenfonds) were missing
+        # from _FUND_ASSET_CLASSES, so funds got the single-stock prompt → unfair valuation.
+        for ac in ("Infrastrukturfonds", "Rentenfonds", "Aktienfonds", "Immobilienfonds"):
+            assert "Fondsanalyst" in _build_system_prompt(ac, "de"), ac
+        # Single stocks keep the equity prompt
+        assert "Fondsanalyst" not in _build_system_prompt("Aktie", "de")
+        assert "Einzeltitel" in _build_system_prompt("Aktie", "de")
+
     def _agent(self, llm):
         return FundamentalAnalyzerAgent(
             positions_repo=MagicMock(), analyses_repo=MagicMock(),
