@@ -20,6 +20,7 @@ from core.i18n import t
 from core.ui.markdown import llm_markdown
 from core.ui.research_request_form import render_research_request_form
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge
+from core.accumulation import accumulation_for_position
 from state import (
     get_market_agent,
     get_portfolio_service,
@@ -316,6 +317,36 @@ _render_checker_card(
     if fa_verdict and fa_verdict.session_id
     else None,
 )
+
+st.write("")
+
+# Accumulation indicator (FEAT-68 B1) — deterministic, derived from yield + SC/FA verdicts.
+# Yield from the valuation layer (overrides + cross-currency), not the raw dividend_data table.
+_acc_yields = {
+    v.symbol.upper(): v.dividend_yield_pct
+    for v in market_agent.get_portfolio_valuation(include_watchlist=True)
+    if v.symbol
+}
+_acc = accumulation_for_position(
+    selected_position.ticker, sc_verdict, fa_verdict, _acc_yields
+)
+with st.container():
+    _badge = verdict_badge(_acc.verdict, VERDICT_CONFIGS["accumulation"])
+    st.markdown(f"**{t('accumulation.section')}** {_badge}", help=t("accumulation.help"))
+    st.dataframe(
+        [
+            {
+                t("accumulation.comp_col_name"): t(c.name),
+                t("accumulation.comp_col_value"): c.value,
+                t("accumulation.comp_col_rating"): c.rating,
+            }
+            for c in _acc.components
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    if _acc.binding:
+        st.caption(f"**{t('accumulation.binding_label')}** {t(_acc.binding)}")
 
 st.divider()
 

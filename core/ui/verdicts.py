@@ -66,6 +66,13 @@ VERDICT_CONFIGS: Dict[str, Dict[str, Tuple[str, str]]] = {
         "fragil":      ("🟠", t("portfolio_robustness.verdict_fragil")),
         "kritisch":    ("🔴", t("portfolio_robustness.verdict_kritisch")),
     },
+    "accumulation": {
+        "akkumulieren":    ("🟢", t("accumulation.verdict_akkumulieren")),
+        "halten":          ("🟡", t("accumulation.verdict_halten")),
+        "prüfen":          ("⚪", t("accumulation.verdict_pruefen")),
+        "fallen_verdacht": ("🟠", t("accumulation.verdict_fallen_verdacht")),
+        "ungeeignet":      ("🔴", t("accumulation.verdict_ungeeignet")),
+    },
 }
 
 
@@ -101,6 +108,18 @@ def fmt_verdict_matrix(verdict_obj, config_key: str, stale_days=None) -> str:
             if (datetime.now(timezone.utc) - created).days >= stale_days:
                 label += " ⚠️"
         return label
+    return "⚪ —"
+
+
+def accumulation_matrix_cell(result) -> str:
+    """Format an AccumulationResult as 'icon verdict' for dataframe matrix cells.
+
+    Analogous to fmt_verdict_matrix, but takes a core.accumulation.AccumulationResult
+    (not a PositionAnalysis). Returns '⚪ —' for a missing result.
+    """
+    if result and result.verdict:
+        icon = verdict_icon(result.verdict, VERDICT_CONFIGS["accumulation"])
+        return f"{icon} {result.verdict}"
     return "⚪ —"
 
 

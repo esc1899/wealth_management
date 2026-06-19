@@ -20,7 +20,8 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon, cloud_notice, fmt_verdict_matrix
+from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon, cloud_notice, fmt_verdict_matrix, accumulation_matrix_cell
+from core.accumulation import accumulation_for_position
 from core.i18n import t, current_language
 
 st.set_page_config(page_title="Watchlist Checker", layout="wide")
@@ -193,11 +194,19 @@ if cockpit_errors := st.session_state.pop("_cockpit_errors", None):
 st.subheader(t("watchlist_checker.cockpit_section"))
 
 # Build matrix
+_acc_yields = {
+    v.symbol.upper(): v.dividend_yield_pct
+    for v in get_market_agent().get_portfolio_valuation(include_watchlist=True)
+    if v.symbol
+}
 matrix_rows = []
 for pos in watchlist:
     if not pos.id:
         continue
     wc_fit = _wc_fits.get(pos.id)
+    _acc = accumulation_for_position(
+        pos.ticker, sc_verdicts.get(pos.id), fund_verdicts.get(pos.id), _acc_yields
+    )
     matrix_rows.append({
         "name": pos.name,
         "ticker": pos.ticker or "—",
@@ -207,6 +216,7 @@ for pos in watchlist:
         "ca": fmt_verdict_matrix(ca_verdicts.get(pos.id), "capital_allocator", stale_days=_STALE_DAYS),
         "da": fmt_verdict_matrix(da_verdicts.get(pos.id), "devils_advocate", stale_days=_STALE_DAYS),
         "wc": (fmt_verdict_matrix(wc_fit, "watchlist_checker") if wc_fit else "⚪ —"),
+        "acc": accumulation_matrix_cell(_acc),
     })
 
 _matrix_selection = st.dataframe(
@@ -224,6 +234,7 @@ _matrix_selection = st.dataframe(
         "ca": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_ca"), width="medium"),
         "da": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_da"), width="medium"),
         "wc": st.column_config.TextColumn(t("watchlist_checker.cockpit_col_wc"), width="medium"),
+        "acc": st.column_config.TextColumn(t("accumulation.col"), width="medium"),
     },
 )
 

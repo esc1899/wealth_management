@@ -21,8 +21,9 @@ from core.background_jobs import run_storychecker_job, run_consensus_gap_job, ru
 from core.currency import symbol
 from core.i18n import t, current_language
 from core.storage.models import PortfolioStory
-from core.ui.verdicts import cloud_notice, verdict_badge, VERDICT_CONFIGS, fmt_verdict_matrix
+from core.ui.verdicts import cloud_notice, verdict_badge, VERDICT_CONFIGS, fmt_verdict_matrix, accumulation_matrix_cell
 from core.ui.markdown import llm_markdown
+from core.accumulation import accumulation_for_position
 from state import (
     get_analysis_service,
     get_app_config_repo,
@@ -245,17 +246,26 @@ if cockpit_errors := st.session_state.pop("_pc_errors", None):
         st.error(f"❌ {_err}")
 
 # Build matrix rows (SC only for positions with story; all others get CG+FA cells)
+_acc_yields = {
+    v.symbol.upper(): v.dividend_yield_pct
+    for v in get_market_agent().get_portfolio_valuation(include_watchlist=True)
+    if v.symbol
+}
 _matrix_rows = []
 for _p in _valid_portfolio:
     _sc_cell = fmt_verdict_matrix(sc_verdicts.get(_p.id), "storychecker") if _p.story else "—"
     _cg_cell = fmt_verdict_matrix(cg_verdicts.get(_p.id), "consensus_gap")
     _fa_cell = fmt_verdict_matrix(fa_verdicts.get(_p.id), "fundamental_analyzer")
+    _acc = accumulation_for_position(
+        _p.ticker, sc_verdicts.get(_p.id), fa_verdicts.get(_p.id), _acc_yields
+    )
     _matrix_rows.append({
         "name": _p.name,
         "ticker": _p.ticker or "—",
         "sc": _sc_cell,
         "cg": _cg_cell,
         "fa": _fa_cell,
+        "acc": accumulation_matrix_cell(_acc),
     })
 
 _matrix_selection = st.dataframe(
@@ -270,6 +280,7 @@ _matrix_selection = st.dataframe(
         "sc": st.column_config.TextColumn(t("portfolio_story.cockpit_col_sc"), width="medium"),
         "cg": st.column_config.TextColumn(t("portfolio_story.cockpit_col_cg"), width="medium"),
         "fa": st.column_config.TextColumn(t("portfolio_story.cockpit_col_fa"), width="medium"),
+        "acc": st.column_config.TextColumn(t("accumulation.col"), width="medium"),
     },
 )
 

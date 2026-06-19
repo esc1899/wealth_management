@@ -9,6 +9,9 @@ from core.composition_drift import (
     asset_class_mix_series,
     dividend_history_series,
     sold_positions_summary,
+    share_count_series,
+    portfolio_income_series,
+    value_decomposition_series,
 )
 
 
@@ -154,3 +157,118 @@ class TestSoldPositionsSummary:
     def test_fewer_than_two_holdings_snapshots(self):
         snaps = [_snap("2026-01-01", holdings=[self._ph("OLD", "OldCo", 50.0, 500.0)])]
         assert sold_positions_summary(snaps) == []
+
+
+def _hq(ticker, quantity, name=None):
+    return {"ticker": ticker, "quantity": quantity, "name": name or ticker}
+
+
+class TestShareCountSeries:
+    def test_ratchet_grows(self):
+        snaps = [
+            _snap("2026-01-01", holdings=[_hq("AAPL", 10.0, "Apple")]),
+            _snap("2026-02-01", holdings=[_hq("AAPL", 10.5, "Apple")]),
+            _snap("2026-03-01", holdings=[_hq("AAPL", 11.2, "Apple")]),
+        ]
+        out = share_count_series(snaps)
+        assert out["AAPL"]["name"] == "Apple"
+        assert [p["quantity"] for p in out["AAPL"]["points"]] == [10.0, 10.5, 11.2]
+        assert [p["date"] for p in out["AAPL"]["points"]] == ["2026-01-01", "2026-02-01", "2026-03-01"]
+
+    def test_skips_snapshots_without_holdings(self):
+        snaps = [
+            _snap("2026-01-01", holdings=None),
+            _snap("2026-02-01", holdings=[_hq("AAPL", 5.0)]),
+        ]
+        out = share_count_series(snaps)
+        assert [p["date"] for p in out["AAPL"]["points"]] == ["2026-02-01"]
+
+    def test_ignores_none_quantity_and_omits_empty_ticker(self):
+        snaps = [_snap("2026-01-01", holdings=[
+            {"ticker": "AAPL", "quantity": None},
+            {"ticker": "MSFT", "quantity": 3.0},
+        ])]
+        out = share_count_series(snaps)
+        assert "AAPL" not in out
+        assert out["MSFT"]["points"][0]["quantity"] == 3.0
+
+    def test_empty_input(self):
+        assert share_count_series([]) == {}
+
+
+def _hd(ticker, value, div):
+    return {"ticker": ticker, "value_eur": value, "annual_dividend_eur": div}
+
+
+class TestPortfolioIncomeSeries:
+    def test_sums_income_and_value(self):
+        snaps = [_snap("2026-01-01", holdings=[_hd("A", 1000.0, 30.0), _hd("B", 1000.0, 10.0)])]
+        row = portfolio_income_series(snaps)[0]
+        assert row["total_annual_dividend_eur"] == pytest.approx(40.0)
+        assert row["total_value_eur"] == pytest.approx(2000.0)
+        assert row["yield_pct"] == pytest.approx(2.0)
+
+    def test_zero_value_yields_zero(self):
+        snaps = [_snap("2026-01-01", holdings=[_hd("A", 0.0, 0.0)])]
+        assert portfolio_income_series(snaps)[0]["yield_pct"] == 0.0
+
+    def test_missing_fields_treated_as_zero(self):
+        snaps = [_snap("2026-01-01", holdings=[{"ticker": "A", "value_eur": 500.0}])]
+        row = portfolio_income_series(snaps)[0]
+        assert row["total_annual_dividend_eur"] == 0.0
+        assert row["yield_pct"] == 0.0
+
+    def test_skips_snapshots_without_holdings(self):
+        snaps = [_snap("2026-01-01", holdings=None), _snap("2026-02-01", holdings=[_hd("A", 100.0, 5.0)])]
+        out = portfolio_income_series(snaps)
+        assert [r["date"] for r in out] == ["2026-02-01"]
+
+
+def _hp(ticker, quantity, price):
+    return {"ticker": ticker, "quantity": quantity, "price_eur": price}
+
+
+class TestValueDecomposition:
+    def test_invariant_sum_equals_value_change(self):
+        # AAPL: qty 10→12 (accumulation), price 100→110 (market)
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("AAPL", 10.0, 100.0)]),
+            _snap("2026-02-01", holdings=[_hp("AAPL", 12.0, 110.0)]),
+        ]
+        out = value_decomposition_series(snaps)
+        last = out[-1]
+        delta_value = 12.0 * 110.0 - 10.0 * 100.0  # 1320 - 1000 = 320
+        assert last["cum_price_effect"] + last["cum_quantity_effect"] == pytest.approx(delta_value)
+        # quantity_effect = (12-10)*110 = 220 ; price_effect = 10*(110-100) = 100
+        assert last["cum_quantity_effect"] == pytest.approx(220.0)
+        assert last["cum_price_effect"] == pytest.approx(100.0)
+
+    def test_starts_at_zero(self):
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("A", 1.0, 10.0)]),
+            _snap("2026-02-01", holdings=[_hp("A", 1.0, 11.0)]),
+        ]
+        out = value_decomposition_series(snaps)
+        assert out[0] == {"date": "2026-01-01", "cum_price_effect": 0.0, "cum_quantity_effect": 0.0}
+
+    def test_new_position_counts_as_accumulation(self):
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("A", 1.0, 10.0)]),
+            _snap("2026-02-01", holdings=[_hp("A", 1.0, 10.0), _hp("B", 5.0, 20.0)]),
+        ]
+        last = value_decomposition_series(snaps)[-1]
+        assert last["cum_quantity_effect"] == pytest.approx(100.0)  # B: 5*20 full value
+        assert last["cum_price_effect"] == pytest.approx(0.0)
+
+    def test_disappeared_ticker_dropped(self):
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("A", 1.0, 10.0), _hp("B", 1.0, 10.0)]),
+            _snap("2026-02-01", holdings=[_hp("A", 1.0, 12.0)]),
+        ]
+        last = value_decomposition_series(snaps)[-1]
+        assert last["cum_price_effect"] == pytest.approx(2.0)  # only A: 1*(12-10)
+        assert last["cum_quantity_effect"] == pytest.approx(0.0)
+
+    def test_fewer_than_two_holdings_snapshots(self):
+        assert value_decomposition_series([_snap("2026-01-01", holdings=[_hp("A", 1.0, 10.0)])]) == []
+        assert value_decomposition_series([]) == []

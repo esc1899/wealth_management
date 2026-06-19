@@ -20,7 +20,12 @@ from core.dividend_calendar import (
     compute_coverage_pct,
     get_top_contributors,
 )
-from core.composition_drift import dividend_history_series
+from core.composition_drift import (
+    dividend_history_series,
+    share_count_series,
+    portfolio_income_series,
+    value_decomposition_series,
+)
 from core.i18n import t, current_language
 from core.ui.verdicts import cloud_notice
 from core.ui.markdown import llm_markdown
@@ -73,10 +78,14 @@ if not _forecasts or _total_annual == 0:
 # Metrics row
 # ------------------------------------------------------------------
 
-col1, col2, col3 = st.columns(3)
+_portfolio_value = sum((v.current_value_eur or 0) for v in _valuations)
+_portfolio_yield = (_total_annual / _portfolio_value * 100) if _portfolio_value > 0 else 0.0
+
+col1, col2, col3, col4 = st.columns(4)
 col1.metric(t("dividend_calendar.total_annual"), f"{_total_annual:,.0f} EUR")
 col2.metric(t("dividend_calendar.monthly_avg"), f"{_monthly_avg:,.0f} EUR")
-col3.metric(t("dividend_calendar.coverage"), f"{_coverage:.0f}%")
+col3.metric(t("dividend_calendar.portfolio_yield"), f"{_portfolio_yield:.1f}%")
+col4.metric(t("dividend_calendar.coverage"), f"{_coverage:.0f}%")
 
 st.divider()
 
@@ -185,6 +194,107 @@ else:
             template="plotly_white",
         )
         st.plotly_chart(_fig_hist, use_container_width=True)
+
+st.divider()
+
+# ------------------------------------------------------------------
+# Accumulation — making the invisible iterations visible (forward-only)
+# ------------------------------------------------------------------
+
+st.subheader(t("dividend_calendar.accumulation_section"))
+
+_share_hist = share_count_series(_snapshots)
+_income_ts = portfolio_income_series(_snapshots)
+_decomp = value_decomposition_series(_snapshots)
+
+if not _share_hist and not _income_ts:
+    st.info(t("dividend_calendar.history_building"))
+else:
+    _cur_div = {
+        c.symbol: c.annual_dividend_eur
+        for c in (_forecasts[0].contributions if _forecasts else [])
+    }
+
+    # --- Share ratchet (per position) ---
+    st.markdown(f"**{t('dividend_calendar.shares_section')}**")
+    st.caption(t("dividend_calendar.shares_help"))
+    if _share_hist:
+        _sc_avail = sorted(_share_hist.keys(), key=lambda tk: _cur_div.get(tk, 0.0), reverse=True)
+        _sc_labels = {tk: f"{_share_hist[tk]['name']} ({tk})" for tk in _sc_avail}
+        _sc_sel = st.multiselect(
+            t("dividend_calendar.shares_select"),
+            options=_sc_avail,
+            default=_sc_avail[:5],
+            format_func=lambda tk: _sc_labels.get(tk, tk),
+            key="_div_shares_select",
+        )
+        if _sc_sel:
+            _fig_sc = go.Figure()
+            for tk in _sc_sel:
+                _pts = _share_hist[tk]["points"]
+                _fig_sc.add_trace(
+                    go.Scatter(
+                        x=[p["date"] for p in _pts],
+                        y=[p["quantity"] for p in _pts],
+                        mode="lines+markers",
+                        name=_sc_labels.get(tk, tk),
+                        hovertemplate="<b>%{x}</b><br>%{y:,.4g}<extra></extra>",
+                    )
+                )
+            _fig_sc.update_layout(
+                hovermode="x unified", height=400, margin=dict(l=50, r=50, t=20, b=50),
+                xaxis_title=t("wealth_history.date_label"),
+                yaxis_title=t("dividend_calendar.shares_yaxis"),
+                template="plotly_white",
+            )
+            st.plotly_chart(_fig_sc, use_container_width=True)
+
+    # --- Forward income over time (portfolio) ---
+    if _income_ts:
+        st.markdown(f"**{t('dividend_calendar.income_ts_section')}**")
+        st.caption(t("dividend_calendar.income_ts_help"))
+        _fig_inc = go.Figure()
+        _fig_inc.add_trace(
+            go.Scatter(
+                x=[p["date"] for p in _income_ts],
+                y=[p["total_annual_dividend_eur"] for p in _income_ts],
+                mode="lines+markers",
+                fill="tozeroy",
+                name=t("dividend_calendar.income_ts_section"),
+                hovertemplate="<b>%{x}</b><br>%{y:,.0f} €<extra></extra>",
+            )
+        )
+        _fig_inc.update_layout(
+            hovermode="x unified", height=360, margin=dict(l=50, r=50, t=20, b=50),
+            xaxis_title=t("wealth_history.date_label"),
+            yaxis_title=t("dividend_calendar.income_ts_yaxis"),
+            template="plotly_white", showlegend=False,
+        )
+        st.plotly_chart(_fig_inc, use_container_width=True)
+
+    # --- Value decomposition: price vs. share accumulation ---
+    if _decomp:
+        st.markdown(f"**{t('dividend_calendar.decomp_section')}**")
+        st.caption(t("dividend_calendar.decomp_help"))
+        _dates = [p["date"] for p in _decomp]
+        _fig_dec = go.Figure()
+        _fig_dec.add_trace(go.Scatter(
+            x=_dates, y=[p["cum_price_effect"] for p in _decomp],
+            mode="lines", stackgroup="one", name=t("dividend_calendar.decomp_price"),
+            hovertemplate="<b>%{x}</b><br>%{y:,.0f} €<extra></extra>",
+        ))
+        _fig_dec.add_trace(go.Scatter(
+            x=_dates, y=[p["cum_quantity_effect"] for p in _decomp],
+            mode="lines", stackgroup="one", name=t("dividend_calendar.decomp_quantity"),
+            hovertemplate="<b>%{x}</b><br>%{y:,.0f} €<extra></extra>",
+        ))
+        _fig_dec.update_layout(
+            hovermode="x unified", height=360, margin=dict(l=50, r=50, t=20, b=50),
+            xaxis_title=t("wealth_history.date_label"),
+            yaxis_title=t("dividend_calendar.decomp_yaxis"),
+            template="plotly_white",
+        )
+        st.plotly_chart(_fig_dec, use_container_width=True)
 
 st.divider()
 

@@ -74,6 +74,116 @@ def dividend_history_series(snapshots) -> Dict[str, dict]:
     return out
 
 
+def share_count_series(snapshots) -> Dict[str, dict]:
+    """Per-position share count over time, from snapshot holdings — the accumulation ratchet.
+
+    Returns {ticker: {"name": str, "points": [{date, quantity}, ...]}}. Only snapshots WITH
+    holdings contribute; per position only points where quantity is not None are kept. Tickers
+    that never carry a quantity are omitted. Points follow snapshot order (ascending date).
+
+    Unlike market value, the share count grows monotonically with reinvestment and is
+    price-independent — it makes the otherwise-invisible accumulation visible.
+    """
+    out: Dict[str, dict] = {}
+    for snap in snapshots:
+        holdings = getattr(snap, "holdings", None)
+        if not holdings:
+            continue
+        for h in holdings:
+            ticker = h.get("ticker")
+            qty = h.get("quantity")
+            if not ticker or qty is None:
+                continue
+            entry = out.setdefault(ticker, {"name": h.get("name") or ticker, "points": []})
+            entry["points"].append({"date": snap.date, "quantity": qty})
+    return out
+
+
+def portfolio_income_series(snapshots) -> List[dict]:
+    """Portfolio-level forward annual dividend over time — the aggregate income ratchet.
+
+    Per snapshot WITH holdings: {date, total_annual_dividend_eur, total_value_eur, yield_pct}.
+    Sums annual_dividend_eur / value_eur across positions (missing values treated as 0).
+    yield_pct = income / value * 100 (0.0 when value <= 0). Snapshots without holdings skipped.
+    """
+    series: List[dict] = []
+    for snap in snapshots:
+        holdings = getattr(snap, "holdings", None)
+        if not holdings:
+            continue
+        income = sum((h.get("annual_dividend_eur") or 0) for h in holdings)
+        value = sum((h.get("value_eur") or 0) for h in holdings)
+        series.append({
+            "date": snap.date,
+            "total_annual_dividend_eur": income,
+            "total_value_eur": value,
+            "yield_pct": (income / value * 100) if value > 0 else 0.0,
+        })
+    return series
+
+
+def value_decomposition_series(snapshots) -> List[dict]:
+    """Decompose cumulative portfolio value growth into price vs. share-accumulation effects.
+
+    Over consecutive holdings-bearing snapshots, for every ticker present in BOTH:
+      quantity_effect += (q1 - q0) * p1   (value of shares added, at the new price)
+      price_effect    += q0 * (p1 - p0)   (appreciation of the originally held shares)
+    This is the exact, residual-free two-factor split (their sum equals Δ(q*p)). A ticker new
+    to the later snapshot contributes its full value as quantity_effect (fresh position, not a
+    market move); a ticker that disappears is simply dropped from then on.
+
+    Returns [{date, cum_price_effect, cum_quantity_effect}] cumulated forward, starting at 0.0
+    on the first holdings-bearing date. Returns [] with fewer than two such snapshots.
+
+    Honest limit: quantity_effect captures EVERY share increase (purchases incl. reinvested
+    dividends) — the snapshots cannot separate reinvested dividends from fresh capital.
+    """
+    holding_snaps = [s for s in snapshots if getattr(s, "holdings", None)]
+    if len(holding_snaps) < 2:
+        return []
+
+    def _by_ticker(snap) -> Dict[str, dict]:
+        out: Dict[str, dict] = {}
+        for h in snap.holdings or []:
+            ticker = h.get("ticker")
+            if ticker:
+                out[ticker] = h
+        return out
+
+    cum_price = 0.0
+    cum_qty = 0.0
+    series: List[dict] = [{
+        "date": holding_snaps[0].date,
+        "cum_price_effect": 0.0,
+        "cum_quantity_effect": 0.0,
+    }]
+
+    prev = _by_ticker(holding_snaps[0])
+    for snap in holding_snaps[1:]:
+        cur = _by_ticker(snap)
+        for ticker, h in cur.items():
+            q1 = h.get("quantity")
+            p1 = h.get("price_eur")
+            if q1 is None or p1 is None:
+                continue
+            old = prev.get(ticker)
+            if old is None or old.get("quantity") is None or old.get("price_eur") is None:
+                # New position this interval — full value is accumulation, not a price move.
+                cum_qty += q1 * p1
+                continue
+            q0 = old["quantity"]
+            p0 = old["price_eur"]
+            cum_qty += (q1 - q0) * p1
+            cum_price += q0 * (p1 - p0)
+        series.append({
+            "date": snap.date,
+            "cum_price_effect": cum_price,
+            "cum_quantity_effect": cum_qty,
+        })
+        prev = cur
+    return series
+
+
 def sold_positions_summary(snapshots) -> List[dict]:
     """Positions that appear in past holdings but are no longer currently held.
 
