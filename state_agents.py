@@ -162,6 +162,7 @@ def get_storychecker_agent() -> StorycheckerAgent:
         analyses_repo=get_analyses_repo(),
         llm=llm,
         skills_repo=get_skills_repo(),
+        market_repo=get_market_repo(),
     )
 
 
@@ -191,6 +192,7 @@ def get_fundamental_analyzer_agent() -> FundamentalAnalyzerAgent:
         fa_repo=get_fundamental_analyzer_repo(),
         llm=llm,
         skills_repo=get_skills_repo(),
+        market_repo=get_market_repo(),
     )
 
 

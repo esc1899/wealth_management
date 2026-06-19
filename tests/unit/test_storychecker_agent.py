@@ -54,3 +54,10 @@ class TestBuildInitialMessage:
         msg = _build_initial_message(_pos("Aktie"))
         assert "**Unternehmen:**" in msg
         assert "**Fonds:**" not in msg
+
+    def test_metrics_block_appended_when_present(self):
+        msg = _build_initial_message(_pos("Aktie"), metrics_block="**Verifizierte Kennzahlen ...**")
+        assert "Verifizierte Kennzahlen" in msg
+
+    def test_no_metrics_block_by_default(self):
+        assert "Verifizierte Kennzahlen" not in _build_initial_message(_pos("Aktie"))

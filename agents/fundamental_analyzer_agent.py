@@ -21,6 +21,7 @@ from core.storage.fundamental_analyzer import FundamentalAnalyzerRepository
 from core.storage.models import PublicPosition, FundamentalAnalyzerSession, FundamentalAnalyzerMessage
 from agents.agent_language import response_language_instruction, current_date_context
 from core.asset_class_config import FUND_ASSET_CLASSES
+from core.position_metrics import build_metrics_block
 
 
 logger = logging.getLogger(__name__)
@@ -113,6 +114,12 @@ Antworte IMMER in diesem Format:
 ## Marktposition
 [1–2 Sätze: AUM-Größe, Emittent-Stabilität, Liquidität]"""
 
+_VERIFIED_METRICS_INSTRUCTION = (
+    "\n\nWenn 'Verifizierte Kennzahlen' in der Anfrage stehen: nutze für Performance-/Kurszahlen "
+    "AUSSCHLIESSLICH diese Werte, erfinde keine eigenen und behandle 'nicht verfügbar' als "
+    "fehlend (niemals als 0 %)."
+)
+
 _VERDICT_TOOL_INSTRUCTION = "\n\nNach der geschriebenen Analyse: Rufe submit_fa_verdict auf mit Verdict und Ein-Satz-Zusammenfassung."
 
 # Text-based verdict for OpenAI-compatible models (DeepSeek etc.): given a submit tool they
@@ -136,7 +143,7 @@ def _build_system_prompt(asset_class: str, language: str, verdict_via: str = "no
       "none" — follow-up chat turns: no verdict required.
     """
     base = _SYSTEM_PROMPT_FONDS if asset_class in _FUND_ASSET_CLASSES else _SYSTEM_PROMPT_AKTIE
-    system = current_date_context() + base
+    system = current_date_context() + base + _VERIFIED_METRICS_INSTRUCTION
     if verdict_via == "tool":
         system += _VERDICT_TOOL_INSTRUCTION
     elif verdict_via == "text":
@@ -163,16 +170,28 @@ class FundamentalAnalyzerAgent:
         fa_repo: FundamentalAnalyzerRepository,
         llm: ClaudeProvider,
         skills_repo=None,
+        market_repo=None,
     ) -> None:
         self._positions = positions_repo
         self._analyses = analyses_repo
         self._fa_repo = fa_repo
         self._llm = llm
         self._skills_repo = skills_repo
+        self._market = market_repo
 
     @property
     def model(self) -> str:
         return self._llm.model
+
+    def _metrics_block(self, position, language: str) -> str:
+        """Verified price-return metrics from our own data, or "" if unavailable."""
+        if not self._market or not position.ticker:
+            return ""
+        try:
+            hist = self._market.get_historical(position.ticker, days=400)
+        except Exception:
+            return ""
+        return build_metrics_block(hist, language=language)
 
     def _verdict_via(self) -> str:
         """Anthropic models reliably write the prose analysis AND call the verdict tool.
@@ -204,7 +223,7 @@ class FundamentalAnalyzerAgent:
             position_name=position.name,
             skill_name=skill_name,
         )
-        initial_msg = _build_initial_message(position, skill_name, resolved_prompt)
+        initial_msg = _build_initial_message(position, skill_name, resolved_prompt, self._metrics_block(position, language))
         self._fa_repo.add_message(session.id, "user", initial_msg)
 
         system = _build_system_prompt(position.asset_class, language, verdict_via=self._verdict_via())
@@ -312,7 +331,7 @@ class FundamentalAnalyzerAgent:
             position_name=position.name,
             skill_name=skill_name,
         )
-        initial_msg = _build_initial_message(position, skill_name, resolved_prompt)
+        initial_msg = _build_initial_message(position, skill_name, resolved_prompt, self._metrics_block(position, language))
         self._fa_repo.add_message(session.id, "user", initial_msg)
 
         system = _build_system_prompt(position.asset_class, language, verdict_via=self._verdict_via())
@@ -407,7 +426,7 @@ Gib eine prägnante, fokussierte Agenda (4–6 Punkte).
 # ------------------------------------------------------------------
 
 
-def _build_initial_message(position: PublicPosition, skill_name: Optional[str], skill_prompt: Optional[str]) -> str:
+def _build_initial_message(position: PublicPosition, skill_name: Optional[str], skill_prompt: Optional[str], metrics_block: str = "") -> str:
     """Build the initial analysis request message."""
     msg = f"Analysiere folgende Position tiefgehend:\n\n"
     msg += f"**Name:** {position.name}\n"
@@ -419,6 +438,9 @@ def _build_initial_message(position: PublicPosition, skill_name: Optional[str], 
 
     if skill_name and skill_prompt:
         msg += f"\n**Fokus-Bereich ({skill_name}):**\n{skill_prompt}\n"
+
+    if metrics_block:
+        msg += f"\n{metrics_block}\n"
 
     msg += "\nStarte mit einer strukturierten Analyse dieser Position. Nutze web_search um aktuelle Daten zu finden."
     return msg

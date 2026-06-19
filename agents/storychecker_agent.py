@@ -26,6 +26,7 @@ from core.storage.models import Position, StorycheckerSession
 from core.storage.storychecker import StorycheckerRepository
 from agents.agent_language import response_language_instruction, current_date_context
 from core.asset_class_config import FUND_ASSET_CLASSES
+from core.position_metrics import build_metrics_block
 
 
 logger = logging.getLogger(__name__)
@@ -69,6 +70,9 @@ Ampel-Regeln (genau eines wählen):
 - 🔴 **Gefährdet** — Wesentliche Thesen-Aspekte sind nicht mehr gültig oder neue Risiken
 
 Sei direkt und konkret. Keine Allgemeinplätze.
+Wenn „Verifizierte Kennzahlen" angegeben sind: nutze für Performance-/Kurszahlen
+AUSSCHLIESSLICH diese Werte, erfinde keine eigenen und behandle „nicht verfügbar" als fehlend
+(niemals als 0 %).
 Bei Rückfragen im Chat: kurz und präzise antworten, kein neues Ampel-Urteil."""
 
 
@@ -132,16 +136,28 @@ class StorycheckerAgent:
         analyses_repo: PositionAnalysesRepository,
         llm: ClaudeProvider,
         skills_repo=None,
+        market_repo=None,
     ) -> None:
         self._positions = positions_repo
         self._storychecker = storychecker_repo
         self._analyses = analyses_repo
         self._llm = llm
+        self._market = market_repo
         self._skills_repo = skills_repo
 
     @property
     def model(self) -> str:
         return self._llm.model
+
+    def _metrics_block(self, position: Position, language: str) -> str:
+        """Verified price-return metrics from our own data, or "" if unavailable."""
+        if not self._market or not position.ticker:
+            return ""
+        try:
+            hist = self._market.get_historical(position.ticker, days=400)
+        except Exception:
+            return ""
+        return build_metrics_block(hist, language=language)
 
     # ------------------------------------------------------------------
     # Session management
@@ -164,7 +180,7 @@ class StorycheckerAgent:
         )
         # Auto-send the initial analysis request
         self._llm.skill_context = skill_name or "storychecker"
-        initial_msg = _build_initial_message(position, skill_name, skill_prompt)
+        initial_msg = _build_initial_message(position, skill_name, skill_prompt, self._metrics_block(position, language))
         self._storychecker.add_message(session.id, "user", initial_msg)
         response = self._run_llm(session.id, [{"role": "user", "content": initial_msg}], language=language)
         # Persist structured result for trend tracking
@@ -194,7 +210,7 @@ class StorycheckerAgent:
             skill_prompt=skill_prompt,
         )
         self._llm.skill_context = skill_name or "storychecker"
-        initial_msg = _build_initial_message(position, skill_name, skill_prompt)
+        initial_msg = _build_initial_message(position, skill_name, skill_prompt, self._metrics_block(position, language))
         self._storychecker.add_message(session.id, "user", initial_msg)
         response = await self._run_llm_async(session.id, [{"role": "user", "content": initial_msg}], language=language)
         self._analyses.save(
@@ -387,7 +403,7 @@ def _extract_summary(text: str) -> str | None:
     return None
 
 
-def _build_initial_message(position: Position, skill_name: str = "", skill_prompt: str = "") -> str:
+def _build_initial_message(position: Position, skill_name: str = "", skill_prompt: str = "", metrics_block: str = "") -> str:
     ticker_str = f" ({position.ticker})" if position.ticker else ""
     _subject_label = "Fonds" if position.asset_class in FUND_ASSET_CLASSES else "Unternehmen"
     lines = [
@@ -411,6 +427,10 @@ def _build_initial_message(position: Position, skill_name: str = "", skill_promp
         lines.append(f"")
         lines.append(f"**Anlage-Idee:** {skill_name}")
         lines.append(f"**Prüfkriterien:** {skill_prompt}")
+
+    if metrics_block:
+        lines.append(f"")
+        lines.append(metrics_block)
 
     lines.append(f"")
     lines.append(f"Bitte suche aktuelle Informationen und erstelle deine Bewertung.")
