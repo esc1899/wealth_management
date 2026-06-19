@@ -109,6 +109,13 @@ Rentenfonds NICHT mit einem Aktienfonds oder einer Einzelaktie vergleichen. Erfi
 Risiko, das nur aus einem falschen Vergleich entsteht. Beurteile, ob die These heute noch
 zutrifft — nicht ob sie theoretisch "gut" ist.
 
+RENDITE-MASSSTAB: Bewerte die Performance am ERKLÄRTEN ZIEL DER THESE, nicht an einem
+absoluten Wachstumsbalken. Ist die These defensiv (Kapitalerhalt, Inflationsschutz, Stabilität),
+dann erfüllt eine moderate, stabile (Real-)Rendite das Ziel — eine zweistellige Rendite ist
+weder zu erwarten noch nötig. Werte eine moderate Rendite bei intakter defensiver These NICHT
+als Schwächung oder "Renditeenttäuschung". Nur wenn die Rendite das eigene Ziel der These klar
+verfehlt (z.B. negativer Realertrag trotz Inflationsschutz-Versprechen), ist das ein echtes Signal.
+
 """ + _FORMAT_AND_RULES
 
 

@@ -27,6 +27,12 @@ class TestBuildSystemPrompt:
     def test_rentenfonds_also_fund(self):
         assert "Fonds-Analyst" in _build_system_prompt("Rentenfonds", "de")
 
+    def test_fund_prompt_calibrates_return_expectation(self):
+        # A defensive thesis must not be judged by an equity-like absolute return bar.
+        p = _build_system_prompt("Infrastrukturfonds", "de")
+        assert "RENDITE-MASSSTAB" in p
+        assert "ERKLÄRTEN ZIEL DER THESE" in p
+
     def test_stock_class_gets_company_framing(self):
         p = _build_system_prompt("Aktie", "de")
         assert "Quartalszahlen" in p
