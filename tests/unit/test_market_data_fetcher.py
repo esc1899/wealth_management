@@ -435,6 +435,39 @@ class TestFetchDividendCurrency:
         assert rec.yield_pct == pytest.approx(0.018)
 
     @patch("agents.market_data_fetcher.yf.Ticker")
+    def test_forward_rate_fallback_when_trailing_zero(self, mock_ticker_cls):
+        # Regression: yfinance sometimes reports trailingAnnualDividendRate == 0.0 even though
+        # the stock pays a dividend (e.g. SAN.PA: trailing 0.0 but forward dividendRate 4.12).
+        # Falling back to the forward dividendRate keeps the position from showing "no dividend".
+        def side_effect(symbol):
+            m = MagicMock()
+            m.info = {
+                "trailingAnnualDividendRate": 0.0, "trailingAnnualDividendYield": 0.0,
+                "dividendRate": 4.12, "dividendYield": 5.45,
+                "currency": "EUR", "financialCurrency": "EUR",
+            }
+            return m
+        mock_ticker_cls.side_effect = side_effect
+
+        rec = MarketDataFetcher(RateLimiter(calls_per_second=1000)).fetch_dividend("SAN.PA")
+        assert rec.rate_eur == pytest.approx(4.12)
+        # trailing yield is 0.0 (unreliable) → dropped; valuation derives from rate_eur / price
+        assert rec.yield_pct is None
+
+    @patch("agents.market_data_fetcher.yf.Ticker")
+    def test_non_payer_stays_empty(self, mock_ticker_cls):
+        # No trailing and no forward rate → genuinely no dividend (e.g. Amazon).
+        def side_effect(symbol):
+            m = MagicMock()
+            m.info = {"trailingAnnualDividendRate": None, "dividendRate": None, "currency": "USD"}
+            return m
+        mock_ticker_cls.side_effect = side_effect
+
+        rec = MarketDataFetcher(RateLimiter(calls_per_second=1000)).fetch_dividend("AMZN")
+        assert rec.rate_eur is None
+        assert rec.yield_pct is None
+
+    @patch("agents.market_data_fetcher.yf.Ticker")
     def test_uk_pence_listing_converts_from_pounds(self, mock_ticker_cls):
         # REL.L quotes in pence (GBp) but declares dividends in GBP (pounds). The rate is
         # in pounds → convert GBP→EUR, NO /100, and yfinance's yield (pounds rate ÷ pence

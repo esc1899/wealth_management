@@ -358,8 +358,11 @@ class MarketDataAgent:
                     pass
             elif pos.ticker in dividend_records:
                 div_record = dividend_records[pos.ticker]
-                if div_record.rate_eur is not None and pos.quantity is not None:
-                    annual_dividend_eur = div_record.rate_eur * pos.quantity
+                if div_record.rate_eur is not None:
+                    # annual_dividend_eur needs the holding size; yield is per-share and
+                    # quantity-independent — derive it even for watchlist entries (quantity=None).
+                    if pos.quantity is not None:
+                        annual_dividend_eur = div_record.rate_eur * pos.quantity
                     if div_record.yield_pct is not None:
                         dividend_yield_pct = div_record.yield_pct
                     elif current_price and current_price > 0 and pos.unit != "g":

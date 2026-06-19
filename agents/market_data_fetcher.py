@@ -191,6 +191,13 @@ class MarketDataFetcher:
             yield_pct = info.get("trailingAnnualDividendYield")
             currency_raw = info.get("currency") or "USD"   # listing quote currency/unit
 
+            # yfinance sometimes zeroes trailingAnnualDividendRate even for dividend payers
+            # (e.g. SAN.PA: trailing 0.0 but forward dividendRate 4.12). Fall back to the
+            # forward rate so these positions don't look like non-payers. Same currency basis
+            # (financialCurrency), so the conversion below is unchanged.
+            if rate_native is None or rate_native <= 0:
+                rate_native = info.get("dividendRate")
+
             # If no dividend data, return None (not an error — many stocks don't pay dividends)
             if rate_native is None or rate_native <= 0:
                 return DividendRecord(

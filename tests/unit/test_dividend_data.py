@@ -226,6 +226,40 @@ class TestPortfolioValuationDividends:
         assert valuations[0].dividend_yield_pct == 0.015
         assert valuations[0].dividend_source == "yfinance"
 
+    def test_watchlist_no_quantity_still_derives_yield(self, memory_db):
+        """Regression: a watchlist entry (quantity=None) must still get a per-share yield.
+
+        Yield is per-share and quantity-independent — only annual_dividend_eur needs quantity.
+        Previously the derivation sat behind `quantity is not None`, so watchlist positions
+        (e.g. REL.L, KIT.OL) showed no yield and the accumulation indicator read '—'.
+        """
+        pos = self._make_position(
+            "KIT.OL", None, "Aktie", in_portfolio=False, in_watchlist=True
+        )
+        positions_repo = MagicMock()
+        positions_repo.get_portfolio.return_value = []
+        positions_repo.get_watchlist.return_value = [pos]
+
+        market_repo = MarketDataRepository(memory_db)
+        market_repo.upsert_price(PriceRecord(
+            symbol="KIT.OL", price_eur=10.0, currency_original="EUR",
+            price_original=10.0, exchange_rate=1.0, fetched_at=datetime.now(timezone.utc),
+        ))
+        # rate_eur present, yield_pct None → must be derived from rate_eur / price
+        market_repo.upsert_dividend(DividendRecord(
+            symbol="KIT.OL", rate_eur=0.5, yield_pct=None, currency="EUR",
+            fetched_at=datetime.now(timezone.utc),
+        ))
+
+        agent = MarketDataAgent(
+            positions_repo=positions_repo, market_repo=market_repo,
+            fetcher=MagicMock(), db_path=":memory:", encryption_key="test",
+        )
+        valuations = agent.get_portfolio_valuation(include_watchlist=True)
+        assert len(valuations) == 1
+        assert valuations[0].dividend_yield_pct == pytest.approx(0.05)  # 0.5 / 10.0
+        assert valuations[0].annual_dividend_eur is None  # no quantity → no total
+
     def test_portfolio_valuation_festgeld_interest(self, memory_db):
         """Calculate annual interest from Festgeld interest_rate."""
         pos = self._make_position(
