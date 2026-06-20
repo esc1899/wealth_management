@@ -34,6 +34,7 @@ from state_db import get_db_connection
 from state_repos import (
     get_positions_repo,
     get_market_repo,
+    get_app_config_repo,
     get_usage_repo,
     get_skills_repo,
     get_research_repo,
@@ -108,6 +109,7 @@ def get_market_agent() -> MarketDataAgent:
         fetcher=fetcher,
         db_path=config.DB_PATH,
         encryption_key=config.ENCRYPTION_KEY,
+        app_config_repo=get_app_config_repo(),
     )
     scheduler = agent.setup_scheduler(fetch_hour=config.MARKET_DATA_FETCH_HOUR)
     scheduler.start()

@@ -24,6 +24,15 @@ CLAUDE_MODEL_DEFAULTS = {
 CLAUDE_MODELS_DEFAULT_LIST = f"{CLAUDE_HAIKU},{CLAUDE_SONNET},{CLAUDE_OPUS}"
 
 # =========================================================================
+# Benchmark (Verdict Hindsight + Vermögenshistorie TWR)
+# =========================================================================
+
+# app_config key + default for the comparison index. Shared so the daily market
+# refresh keeps the benchmark history current (FEAT-73).
+BENCHMARK_SYMBOL_KEY = "hindsight_benchmark_symbol"
+DEFAULT_BENCHMARK_SYMBOL = "EUNL.DE"  # iShares Core MSCI World (acc, EUR)
+
+# =========================================================================
 # Agent Skill Defaults
 # =========================================================================
 

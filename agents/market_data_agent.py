@@ -73,13 +73,24 @@ class MarketDataAgent:
         fetcher: MarketDataFetcher,
         db_path: str,
         encryption_key: str,
+        app_config_repo=None,
     ):
         self._positions = positions_repo
         self._market = market_repo
         self._fetcher = fetcher
         self._db_path = db_path
         self._encryption_key = encryption_key
+        self._app_config = app_config_repo
         self._post_fetch_callback: Optional[Callable[[], None]] = None
+
+    def _benchmark_symbols(self) -> list[str]:
+        """Configured comparison index (FEAT-73) — fetched for history so the
+        Vermögenshistorie TWR vs. benchmark stays current. Empty if no config repo."""
+        if self._app_config is None:
+            return []
+        from core.constants import BENCHMARK_SYMBOL_KEY, DEFAULT_BENCHMARK_SYMBOL
+        symbol = (self._app_config.get(BENCHMARK_SYMBOL_KEY) or DEFAULT_BENCHMARK_SYMBOL).upper()
+        return [symbol] if symbol else []
 
     def set_post_fetch_callback(self, callback: Callable[[], None]) -> None:
         """Register an optional callback to be invoked after fetch_all_now() completes."""
@@ -128,8 +139,11 @@ class MarketDataAgent:
             def _fetch_hist(sym):
                 return self._fetcher.fetch_historical(sym, period="1y")
 
-            with ThreadPoolExecutor(max_workers=min(10, len(symbols))) as hist_pool:
-                futs = {hist_pool.submit(_fetch_hist, s): s for s in symbols}
+            # Include the comparison index (not a held position) so the TWR-vs-benchmark
+            # chart fills automatically — no manual backfill click (FEAT-73).
+            hist_symbols = list(dict.fromkeys(symbols + self._benchmark_symbols()))
+            with ThreadPoolExecutor(max_workers=min(10, len(hist_symbols))) as hist_pool:
+                futs = {hist_pool.submit(_fetch_hist, s): s for s in hist_symbols}
                 done, pending = futures_wait(futs, timeout=600)
             if pending:
                 logger.warning(

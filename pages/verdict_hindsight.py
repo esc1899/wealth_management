@@ -8,6 +8,7 @@ Framed as a journal/directional signal, never a hit rate (see core.verdict_hinds
 import pandas as pd
 import streamlit as st
 
+from core.constants import BENCHMARK_SYMBOL_KEY as _BENCHMARK_SYMBOL_KEY, DEFAULT_BENCHMARK_SYMBOL as _DEFAULT_BENCHMARK_SYMBOL
 from core.i18n import t
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge
 from core.verdict_hindsight import DIRECTIONAL_AGENTS, HORIZONS, compute_hindsight
@@ -18,9 +19,6 @@ from state import (
     get_market_repo,
     get_wealth_snapshot_repo,
 )
-
-_BENCHMARK_SYMBOL_KEY = "hindsight_benchmark_symbol"
-_DEFAULT_BENCHMARK_SYMBOL = "EUNL.DE"  # iShares Core MSCI World (EUR)
 
 st.set_page_config(page_title="Verdict Hindsight", page_icon="🔭", layout="wide")
 st.title(f"🔭 {t('verdict_hindsight.title')}")

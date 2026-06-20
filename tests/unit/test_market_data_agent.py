@@ -117,6 +117,32 @@ class TestFetchAllNow:
         agent.fetch_all_now(fetch_history=False)
         agent._fetcher.fetch_historical.assert_not_called()
 
+    def test_benchmark_included_in_history_fetch(self, agent):
+        # With an app_config repo, the configured comparison index is fetched for
+        # history (so the TWR-vs-benchmark chart fills automatically) — but NOT as a
+        # held position in the current-price fetch (FEAT-73).
+        cfg = MagicMock()
+        cfg.get.return_value = "EUNL.DE"
+        agent._app_config = cfg
+        agent._positions.get_portfolio.return_value = [_make_position("AAPL")]
+        agent._positions.get_watchlist.return_value = []
+        agent._fetcher.fetch_current_prices.return_value = ([], [])
+        agent._fetcher.fetch_historical.return_value = []
+        agent.fetch_all_now(fetch_history=True)
+        hist_symbols = {c.args[0] for c in agent._fetcher.fetch_historical.call_args_list}
+        assert hist_symbols == {"AAPL", "EUNL.DE"}
+        # benchmark is not treated as a held position in the price fetch
+        assert "EUNL.DE" not in set(agent._fetcher.fetch_current_prices.call_args[0][0])
+
+    def test_no_benchmark_without_config_repo(self, agent):
+        agent._positions.get_portfolio.return_value = [_make_position("AAPL")]
+        agent._positions.get_watchlist.return_value = []
+        agent._fetcher.fetch_current_prices.return_value = ([], [])
+        agent._fetcher.fetch_historical.return_value = []
+        agent.fetch_all_now(fetch_history=True)
+        hist_symbols = {c.args[0] for c in agent._fetcher.fetch_historical.call_args_list}
+        assert hist_symbols == {"AAPL"}
+
     def test_manual_types_excluded_from_fetch(self, agent):
         """Positions with auto_fetch=False (Immobilie, Festgeld) must not be fetched."""
         immobilie = Position(

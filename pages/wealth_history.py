@@ -15,6 +15,7 @@ from core.portfolio_twr import (
     drawdown_series,
     volatility_annualized,
 )
+from core.constants import BENCHMARK_SYMBOL_KEY as _BENCHMARK_SYMBOL_KEY, DEFAULT_BENCHMARK_SYMBOL as _DEFAULT_BENCHMARK_SYMBOL
 from state import (
     get_wealth_snapshot_agent,
     get_dividend_snapshot_repo,
@@ -22,9 +23,6 @@ from state import (
     get_market_repo,
     get_app_config_repo,
 )
-
-_BENCHMARK_SYMBOL_KEY = "hindsight_benchmark_symbol"  # shared with Verdict Hindsight
-_DEFAULT_BENCHMARK_SYMBOL = "EUNL.DE"  # iShares Core MSCI World (acc, EUR) — price == total return
 
 
 col_title, col_update, col_rebuild = st.columns([3, 1, 1])
