@@ -9,7 +9,22 @@ from datetime import datetime
 
 from core.i18n import t
 from core.composition_drift import concentration_series, asset_class_mix_series, sold_positions_summary
-from state import get_wealth_snapshot_agent, get_dividend_snapshot_repo, get_market_agent
+from core.portfolio_twr import (
+    portfolio_twr_series,
+    benchmark_twr_series,
+    drawdown_series,
+    volatility_annualized,
+)
+from state import (
+    get_wealth_snapshot_agent,
+    get_dividend_snapshot_repo,
+    get_market_agent,
+    get_market_repo,
+    get_app_config_repo,
+)
+
+_BENCHMARK_SYMBOL_KEY = "hindsight_benchmark_symbol"  # shared with Verdict Hindsight
+_DEFAULT_BENCHMARK_SYMBOL = "EUNL.DE"  # iShares Core MSCI World (acc, EUR) — price == total return
 
 
 col_title, col_update, col_rebuild = st.columns([3, 1, 1])
@@ -245,6 +260,121 @@ if wealth_snapshots:
             for r in _sold
         ]
         st.dataframe(_sold_rows, use_container_width=True, hide_index=True)
+
+    # ── Return vs. benchmark — time-weighted, cashflow-immune (FEAT-73) ──────────
+    st.markdown(f"#### {t('wealth_history.twr_section')}")
+    st.caption(t("wealth_history.twr_help"))
+
+    _market_repo = get_market_repo()
+    twr = portfolio_twr_series(
+        wealth_snapshots,
+        price_at=lambda tk, d: _market_repo.get_price_for_date_or_prior(tk, d),
+    )
+    if len(twr) < 2:
+        st.info(t("wealth_history.twr_building"))
+    else:
+        # Benchmark symbol — shared setting with Verdict Hindsight
+        _cfg_repo = get_app_config_repo()
+        _bench_symbol = (_cfg_repo.get(_BENCHMARK_SYMBOL_KEY) or _DEFAULT_BENCHMARK_SYMBOL).upper()
+        _bc1, _bc2 = st.columns([2, 1])
+        _new_symbol = _bc1.text_input(
+            t("wealth_history.twr_bench_label"), value=_bench_symbol
+        ).strip().upper()
+        if _new_symbol and _new_symbol != _bench_symbol:
+            _cfg_repo.set(_BENCHMARK_SYMBOL_KEY, _new_symbol)
+            _bench_symbol = _new_symbol
+
+        _twr_dates = [p["date"] for p in twr]
+        # Benchmark must reach into our TWR window — stale index history (latest close
+        # before the first holdings snapshot) would collapse to a flat 0% line.
+        _bench_hist = _market_repo.get_historical(_bench_symbol, days=800)
+        _latest_bench = str(_bench_hist[-1].date) if _bench_hist else None
+        _bench_stale = (_latest_bench is None) or (_latest_bench < _twr_dates[0])
+        if _bench_stale:
+            _msg_key = "twr_bench_no_history" if _latest_bench is None else "twr_bench_stale"
+            st.warning(t(f"wealth_history.{_msg_key}").format(
+                symbol=_bench_symbol, latest=_latest_bench, start=_twr_dates[0]))
+            if _bc2.button(t("wealth_history.twr_bench_load"), use_container_width=True):
+                with st.spinner(t("wealth_history.twr_bench_loading").format(symbol=_bench_symbol)):
+                    _n = get_market_agent().fetch_historical_for_symbol(_bench_symbol)
+                st.session_state["wh_msg"] = {
+                    "kind": "success",
+                    "text": t("wealth_history.twr_bench_loaded").format(n=_n, symbol=_bench_symbol),
+                }
+                st.rerun()
+            bench = None
+        else:
+            bench = benchmark_twr_series(
+                _twr_dates,
+                lambda d, _s=_bench_symbol: _market_repo.get_price_for_date_or_prior(_s, d, 7),
+            )
+
+        _port_last = twr[-1]["twr_pct"]
+        _dd_points, _max_dd = drawdown_series(twr)
+        _vol = volatility_annualized(twr)
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric(t("wealth_history.twr_metric_portfolio"), f"{_port_last:+.1f} %")
+        if bench is not None and bench[-1]["twr_pct"] is not None:
+            _bench_last = bench[-1]["twr_pct"]
+            m2.metric(t("wealth_history.twr_metric_index"), f"{_bench_last:+.1f} %")
+            m3.metric(
+                t("wealth_history.twr_metric_excess"),
+                f"{_port_last - _bench_last:+.1f} %",
+                help=t("wealth_history.twr_excess_help"),
+            )
+        else:
+            m2.metric(t("wealth_history.twr_metric_index"), "—")
+            m3.metric(t("wealth_history.twr_metric_excess"), "—")
+        m4.metric(
+            t("wealth_history.twr_metric_vol"),
+            f"{_vol:.1f} %" if _vol is not None else t("wealth_history.twr_maturing"),
+            help=t("wealth_history.twr_vol_help"),
+        )
+
+        fig_twr = go.Figure()
+        fig_twr.add_trace(
+            go.Scatter(
+                x=_twr_dates, y=[p["twr_pct"] for p in twr], mode="lines+markers",
+                name=t("wealth_history.twr_metric_portfolio"),
+                line=dict(color="#1f77b4", width=2),
+                hovertemplate="<b>%{x|%d.%m.%Y}</b><br>%{y:+.1f} %<extra></extra>",
+            )
+        )
+        if bench is not None:
+            fig_twr.add_trace(
+                go.Scatter(
+                    x=_twr_dates, y=[p["twr_pct"] for p in bench], mode="lines",
+                    name=f"{_bench_symbol}",
+                    line=dict(color="#888888", width=2, dash="dash"),
+                    hovertemplate="<b>%{x|%d.%m.%Y}</b><br>%{y:+.1f} %<extra></extra>",
+                )
+            )
+        fig_twr.update_layout(
+            hovermode="x unified", height=380, margin=dict(l=50, r=50, t=20, b=50),
+            xaxis_title=t("wealth_history.date_label"), yaxis_title="%", template="plotly_white",
+            xaxis_tickformat="%d.%m.%Y",
+        )
+        st.plotly_chart(fig_twr, use_container_width=True)
+
+        # Drawdown (underwater) — optional, from the cashflow-immune TWR index
+        if st.checkbox(t("wealth_history.twr_drawdown_section"),
+                       help=t("wealth_history.twr_drawdown_help")):
+            st.caption(t("wealth_history.twr_max_drawdown").format(dd=f"{_max_dd:.1f}"))
+            fig_dd = go.Figure()
+            fig_dd.add_trace(
+                go.Scatter(
+                    x=[p["date"] for p in _dd_points], y=[p["drawdown_pct"] for p in _dd_points],
+                    mode="lines", fill="tozeroy", line=dict(color="#cf222e", width=1),
+                    hovertemplate="<b>%{x|%d.%m.%Y}</b><br>%{y:.1f} %<extra></extra>",
+                )
+            )
+            fig_dd.update_layout(
+                hovermode="x unified", height=300, margin=dict(l=50, r=50, t=20, b=50),
+                xaxis_title=t("wealth_history.date_label"), yaxis_title="%", template="plotly_white",
+                xaxis_tickformat="%d.%m.%Y",
+            )
+            st.plotly_chart(fig_dd, use_container_width=True)
 
 else:
     st.warning(t("wealth_history.no_wealth_snapshots"))

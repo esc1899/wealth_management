@@ -13,6 +13,7 @@ import streamlit as st
 
 from core.currency import symbol
 from core.i18n import t, fmt_dt
+from core.trading_calendar import is_trading_day, last_trading_day
 from core.macro_context import load_or_refresh_macro
 from core.monthly_attribution import compute_monthly_attribution
 from core.monthly_digest_generator import generate_monthly_digest
@@ -30,7 +31,9 @@ st.title(f"🔍 {t('analysis.title')}")
 agent = get_market_agent()
 
 # ------------------------------------------------------------------
-# Auto-fetch: refresh prices if last fetch is older than 1 hour
+# Auto-fetch: on trading days refresh intraday (>1h stale); on non-trading days
+# (weekends) prices can't change — only fetch if the last session's close isn't
+# captured yet. No pointless weekend/evening-after-close refetch.
 # ------------------------------------------------------------------
 
 if "analyse_auto_fetched" not in st.session_state:
@@ -38,13 +41,18 @@ if "analyse_auto_fetched" not in st.session_state:
 
 if not st.session_state.analyse_auto_fetched:
     valuations_check = agent.get_portfolio_valuation()
-    prices_fresh = any(
-        v.fetched_at is not None
-        and (datetime.now(timezone.utc) - v.fetched_at.replace(tzinfo=timezone.utc)).total_seconds() < 3600
-        for v in valuations_check
-        if v.fetched_at is not None
+    _now = datetime.now(timezone.utc)
+    _latest_fetch = max(
+        (v.fetched_at.replace(tzinfo=timezone.utc) for v in valuations_check if v.fetched_at is not None),
+        default=None,
     )
-    if not prices_fresh:
+    if is_trading_day(_now.date()):
+        # Trading day: intraday prices move → keep the 1-hour staleness rule.
+        needs_fetch = _latest_fetch is None or (_now - _latest_fetch).total_seconds() >= 3600
+    else:
+        # Non-trading day: fetch only if we haven't captured the last trading close yet.
+        needs_fetch = _latest_fetch is None or _latest_fetch.date() < last_trading_day(_now.date())
+    if needs_fetch:
         with st.spinner(t("analysis.auto_fetch_notice")):
             agent.fetch_all_now(fetch_history=True)
     st.session_state.analyse_auto_fetched = True
