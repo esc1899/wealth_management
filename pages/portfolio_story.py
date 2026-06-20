@@ -24,6 +24,7 @@ from core.storage.models import PortfolioStory
 from core.ui.verdicts import cloud_notice, verdict_badge, VERDICT_CONFIGS, fmt_verdict_matrix, accumulation_matrix_cell
 from core.ui.markdown import llm_markdown
 from core.accumulation import accumulation_for_position
+from core.shareholder_yield import cached_buyback_yield_map
 from state import (
     get_analysis_service,
     get_app_config_repo,
@@ -251,13 +252,16 @@ _acc_yields = {
     for v in get_market_agent().get_portfolio_valuation(include_watchlist=True)
     if v.symbol
 }
+# Total Shareholder Yield: add net buyback yield to the engine (FEAT-71). Cached 1 day,
+# fetched concurrently; missing data degrades gracefully to dividend-only.
+_acc_buybacks = cached_buyback_yield_map(tuple(_p.ticker for _p in _valid_portfolio if _p.ticker))
 _matrix_rows = []
 for _p in _valid_portfolio:
     _sc_cell = fmt_verdict_matrix(sc_verdicts.get(_p.id), "storychecker") if _p.story else "—"
     _cg_cell = fmt_verdict_matrix(cg_verdicts.get(_p.id), "consensus_gap")
     _fa_cell = fmt_verdict_matrix(fa_verdicts.get(_p.id), "fundamental_analyzer")
     _acc = accumulation_for_position(
-        _p.ticker, sc_verdicts.get(_p.id), fa_verdicts.get(_p.id), _acc_yields
+        _p.ticker, sc_verdicts.get(_p.id), fa_verdicts.get(_p.id), _acc_yields, _acc_buybacks
     )
     _matrix_rows.append({
         "name": _p.name,

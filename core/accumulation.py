@@ -2,11 +2,12 @@
 Accumulation indicator (FEAT-68 B1) — deterministic, pure, no LLM / no network.
 
 Per position it derives an *accumulation expectation* verdict from data that already exists:
-the current dividend yield (the income engine) gated by the stored LLM verdicts as a
-quality/survival proxy — Storychecker ("is the thesis intact?") and Fundamental Analyzer
-("cheap / fair / expensive?"). The indicator only *reads* verdict codes + yield and applies
-a fixed rule; it never calls a model, so it is cheap, reproducible and carries no privacy or
-prompt-injection surface.
+the income engine — Total Shareholder Yield = dividend yield + net buyback yield (FEAT-71) —
+gated by the stored LLM verdicts as a quality/survival proxy — Storychecker ("is the thesis
+intact?") and Fundamental Analyzer ("cheap / fair / expensive?"). The indicator only *reads*
+yields + verdict codes and applies a fixed rule; it never calls a model, so it is cheap,
+reproducible and carries no privacy or prompt-injection surface. The buyback half makes
+buyback-driven compounders (Amazon, much of US-tech) measurable instead of "not applicable".
 
 Transparency is the design principle: every input is exposed as a component (raw value +
 traffic-light rating), and ``binding`` names the component that caps the verdict ("what holds
@@ -46,18 +47,34 @@ class AccumulationResult:
     verdict: str                          # akkumulieren/halten/prüfen/fallen_verdacht/ungeeignet
     components: List[AccumulationComponent]
     binding: Optional[str]                # i18n key of the limiting factor, or None
+    # Decomposition of the income engine into dividend + buyback (FEAT-71). Populated only
+    # when buyback data is available; informational rows (no own traffic light) so the user
+    # sees what makes up the rated Total Shareholder Yield. Empty when dividend-only.
+    engine_parts: List[AccumulationComponent] = None  # type: ignore[assignment]
+
+    def __post_init__(self):
+        if self.engine_parts is None:
+            self.engine_parts = []
 
 
-def _engine(yield_pct: Optional[float]) -> tuple[str, str]:
-    """Return (value_str, rating) for the income engine."""
-    if yield_pct is None:
-        return ("—", GREY)
-    value = f"{yield_pct * 100:.1f} %"
-    if yield_pct >= YIELD_SOLID:
-        return (value, GREEN)
-    if yield_pct >= YIELD_WEAK:
-        return (value, YELLOW)
-    return (value, RED)
+def _rate_yield(value: Optional[float]) -> str:
+    """Band a yield decimal to a traffic light (no string formatting)."""
+    if value is None:
+        return GREY
+    if value >= YIELD_SOLID:
+        return GREEN
+    if value >= YIELD_WEAK:
+        return YELLOW
+    return RED
+
+
+def _fmt_pct(value: Optional[float], dash: str = "—") -> str:
+    return dash if value is None else f"{value * 100:.1f} %"
+
+
+def _engine(total_yield: Optional[float]) -> tuple[str, str]:
+    """Return (value_str, rating) for the Total Shareholder Yield income engine."""
+    return (_fmt_pct(total_yield), _rate_yield(total_yield))
 
 
 def _survival(story_verdict: Optional[str]) -> tuple[str, str]:
@@ -80,8 +97,14 @@ def compute_accumulation(
     yield_pct: Optional[float],
     story_verdict: Optional[str],
     fa_verdict: Optional[str],
+    buyback_pct: Optional[float] = None,
 ) -> AccumulationResult:
-    """Derive the accumulation-expectation verdict from yield + Story + FA verdicts.
+    """Derive the accumulation-expectation verdict from Total Shareholder Yield + verdicts.
+
+    The engine is ``yield_pct`` (dividend) + ``buyback_pct`` (net buyback yield); either may
+    be ``None``. When ``buyback_pct`` is given, the engine is exposed as a Total Shareholder
+    Yield row plus dividend/buyback breakdown rows in ``engine_parts``; otherwise it stays a
+    plain dividend row (backward compatible).
 
     Deterministic rule (order = priority):
         survival gefährdet            → fallen_verdacht (engine not weak) | ungeeignet
@@ -91,24 +114,37 @@ def compute_accumulation(
         survival intakt AND engine solide (valuation günstig/fair/unbekannt) → akkumulieren
         else (gemischt / engine mäßig / valuation unbekannt)                 → prüfen
     """
-    eng_val, eng_rating = _engine(yield_pct)
+    # Total Shareholder Yield = sum of the present parts; None only if both are absent.
+    total = None if (yield_pct is None and buyback_pct is None) else (yield_pct or 0.0) + (buyback_pct or 0.0)
+
+    eng_val, eng_rating = _engine(total)
     surv_val, surv_rating = _survival(story_verdict)
     val_val, val_rating = _valuation(fa_verdict)
 
+    # Engine label: Total Shareholder Yield once a buyback figure exists, else plain dividend.
+    eng_key = "accumulation.comp_tsy" if buyback_pct is not None else "accumulation.comp_engine"
     components = [
-        AccumulationComponent("accumulation.comp_engine", eng_val, eng_rating),
+        AccumulationComponent(eng_key, eng_val, eng_rating),
         AccumulationComponent("accumulation.comp_survival", surv_val, surv_rating),
         AccumulationComponent("accumulation.comp_valuation", val_val, val_rating),
     ]
+    # Informational breakdown rows (no own light) — only when we actually have buyback data.
+    engine_parts: List[AccumulationComponent] = []
+    if buyback_pct is not None:
+        engine_parts = [
+            AccumulationComponent("accumulation.comp_dividend", _fmt_pct(yield_pct, dash="n/a"), ""),
+            AccumulationComponent("accumulation.comp_buyback", _fmt_pct(buyback_pct, dash="n/a"), ""),
+        ]
 
-    # No (meaningful) dividend → this is a dividend-accumulation indicator, so it simply does
-    # not apply (e.g. Amazon). Mark n/a instead of scoring it low — the position's story risk,
-    # if any, is surfaced by the other checkers.
-    if yield_pct is None or yield_pct <= 0:
+    # No capital return at all (no dividend, no buyback, or it nets to zero) → the indicator
+    # does not apply. Mark n/a instead of scoring it low — story risk, if any, is surfaced by
+    # the other checkers.
+    if total is None or total <= 0:
         return AccumulationResult(
             verdict="nicht_anwendbar",
             components=components,
             binding="accumulation.binding_no_dividend",
+            engine_parts=engine_parts,
         )
 
     engine_present = eng_rating in (GREEN, YELLOW)
@@ -138,19 +174,27 @@ def compute_accumulation(
         else:
             binding = "accumulation.binding_valuation"
 
-    return AccumulationResult(verdict=verdict, components=components, binding=binding)
+    return AccumulationResult(
+        verdict=verdict, components=components, binding=binding, engine_parts=engine_parts
+    )
 
 
-def accumulation_for_position(ticker, sc_verdict_obj, fa_verdict_obj, yield_map) -> AccumulationResult:
+def accumulation_for_position(
+    ticker, sc_verdict_obj, fa_verdict_obj, yield_map, buyback_map=None
+) -> AccumulationResult:
     """Convenience wrapper for pages: resolve yield + verdict codes, then compute.
 
     ``yield_map`` is a dict {symbol(upper) -> dividend_yield_pct (decimal) or None}. Build it
     from the *valuation* layer (``get_portfolio_valuation`` → ``v.dividend_yield_pct``), which
     applies overrides and cross-currency derivation — NOT from the raw ``dividend_data`` table,
-    whose ``yield_pct`` is often None even when a dividend exists. ``sc_verdict_obj`` /
-    ``fa_verdict_obj`` are PositionAnalysis-like (with .verdict) or None.
+    whose ``yield_pct`` is often None even when a dividend exists. ``buyback_map`` (optional)
+    is {symbol(upper) -> net buyback yield (decimal) or None} from ``core.shareholder_yield``;
+    when absent the engine is dividend-only. ``sc_verdict_obj`` / ``fa_verdict_obj`` are
+    PositionAnalysis-like (with .verdict) or None.
     """
-    yield_pct = yield_map.get(ticker.upper()) if ticker else None
+    key = ticker.upper() if ticker else None
+    yield_pct = yield_map.get(key) if key else None
+    buyback_pct = buyback_map.get(key) if (buyback_map and key) else None
     sc = sc_verdict_obj.verdict if sc_verdict_obj else None
     fa = fa_verdict_obj.verdict if fa_verdict_obj else None
-    return compute_accumulation(yield_pct, sc, fa)
+    return compute_accumulation(yield_pct, sc, fa, buyback_pct)

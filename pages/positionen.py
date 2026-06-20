@@ -30,6 +30,9 @@ st.caption(t("positionen.subtitle"))
 if st.session_state.pop("_pos_just_saved", None):
     st.toast(t("positionen.saved"), icon="✅")
 
+if _ticker_warn := st.session_state.pop("_pos_ticker_warning", None):
+    st.warning(_ticker_warn)
+
 registry = get_asset_class_registry()
 repo = get_positions_repo()
 app_config = get_app_config_repo()
@@ -609,6 +612,18 @@ def _render_edit_form(pos_id: int | None, readonly: bool = False):
             for e in errs:
                 st.error(e)
         else:
+            # Ticker validation (non-blocking) — warn if yfinance returns no price
+            if form_ticker is not None and cfg.auto_fetch:
+                _tv_ticker = (form_ticker or "").strip()
+                if _tv_ticker:
+                    from core.ticker_validator import COMMON_SUFFIXES, validate_ticker
+                    with st.spinner(t("positionen.validating_ticker")):
+                        if not validate_ticker(_tv_ticker):
+                            _suggestions = ", ".join(f"{_tv_ticker}{s}" for s in COMMON_SUFFIXES[:6])
+                            st.session_state["_pos_ticker_warning"] = t("positionen.ticker_not_found").format(
+                                ticker=_tv_ticker, suggestions=_suggestions
+                            )
+
             # Build extra_data
             extra: dict = dict(existing_extra)
             if selected_ac == "Festgeld":

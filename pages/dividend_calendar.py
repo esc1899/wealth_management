@@ -166,34 +166,71 @@ else:
         c.symbol: c.annual_dividend_eur
         for c in (_forecasts[0].contributions if _forecasts else [])
     }
-    _avail = sorted(_div_hist.keys(), key=lambda tk: _current_div.get(tk, 0.0), reverse=True)
-    _labels = {tk: f"{_div_hist[tk]['name']} ({tk})" for tk in _avail}
+    # All portfolio positions as fallback source for names and symbols
+    _val_by_ticker = {
+        v.symbol: v for v in _valuations if v.symbol
+    }
+    # Include ALL portfolio positions so positions without dividend config are still
+    # visible and the user understands why they're missing data
+    _all_tickers = (
+        set(_div_hist.keys())
+        | set(_current_div.keys())
+        | set(_val_by_ticker.keys())
+    )
+
+    def _ticker_div(tk: str) -> float:
+        return _current_div.get(tk) or (_val_by_ticker.get(tk) and _val_by_ticker[tk].annual_dividend_eur) or 0.0
+
+    def _ticker_label(tk: str) -> str:
+        name = (
+            (_div_hist.get(tk) or {}).get("name")
+            or (_val_by_ticker.get(tk) and _val_by_ticker[tk].name)
+            or tk
+        )
+        return f"{name} ({tk})"
+
+    _avail = sorted(_all_tickers, key=_ticker_div, reverse=True)
     _sel = st.multiselect(
         t("dividend_calendar.history_select"),
         options=_avail,
         default=_avail[:5],
-        format_func=lambda tk: _labels.get(tk, tk),
+        format_func=_ticker_label,
     )
     if _sel:
         _fig_hist = go.Figure()
+        _no_data: list[str] = []
         for tk in _sel:
-            _pts = _div_hist[tk]["points"]
+            if tk not in _div_hist:
+                _no_data.append(_ticker_label(tk))
+                continue
+            # Deduplicate: multiple snapshots on the same date → keep last value per date
+            _seen: dict = {}
+            for p in _div_hist[tk]["points"]:
+                _seen[str(p["date"])[:10]] = p
+            _pts = list(_seen.values())
             _fig_hist.add_trace(
                 go.Scatter(
                     x=[p["date"] for p in _pts],
                     y=[p["annual_dividend_eur"] for p in _pts],
                     mode="lines+markers",
-                    name=_labels.get(tk, tk),
+                    name=_ticker_label(tk),
                     hovertemplate="<b>%{x}</b><br>%{y:,.0f} €<extra></extra>",
                 )
+            )
+        if _no_data:
+            st.caption(
+                f"Keine Verlaufsdaten für: {', '.join(_no_data)}. "
+                "Dividendenrendite in den Positionsdetails als «Dividend Yield Override» hinterlegen."
             )
         _fig_hist.update_layout(
             hovermode="x unified", height=400, margin=dict(l=50, r=50, t=20, b=50),
             xaxis_title=t("wealth_history.date_label"),
             yaxis_title=t("dividend_calendar.history_yaxis"),
             template="plotly_white",
+            xaxis_tickformat="%d.%m.%Y",
         )
-        st.plotly_chart(_fig_hist, use_container_width=True)
+        if _fig_hist.data:
+            st.plotly_chart(_fig_hist, use_container_width=True)
 
 st.divider()
 
@@ -246,6 +283,7 @@ else:
                 xaxis_title=t("wealth_history.date_label"),
                 yaxis_title=t("dividend_calendar.shares_yaxis"),
                 template="plotly_white",
+                xaxis_tickformat="%d.%m.%Y",
             )
             st.plotly_chart(_fig_sc, use_container_width=True)
 
@@ -269,6 +307,7 @@ else:
             xaxis_title=t("wealth_history.date_label"),
             yaxis_title=t("dividend_calendar.income_ts_yaxis"),
             template="plotly_white", showlegend=False,
+            xaxis_tickformat="%d.%m.%Y",
         )
         st.plotly_chart(_fig_inc, use_container_width=True)
 
@@ -292,6 +331,7 @@ else:
             hovermode="x unified", height=360, margin=dict(l=50, r=50, t=20, b=50),
             xaxis_title=t("wealth_history.date_label"),
             yaxis_title=t("dividend_calendar.decomp_yaxis"),
+            xaxis_tickformat="%d.%m.%Y",
             template="plotly_white",
         )
         st.plotly_chart(_fig_dec, use_container_width=True)

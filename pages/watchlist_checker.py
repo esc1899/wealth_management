@@ -22,6 +22,7 @@ import pandas as pd
 
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon, cloud_notice, fmt_verdict_matrix, accumulation_matrix_cell
 from core.accumulation import accumulation_for_position
+from core.shareholder_yield import cached_buyback_yield_map
 from core.i18n import t, current_language
 
 st.set_page_config(page_title="Watchlist Checker", layout="wide")
@@ -199,13 +200,15 @@ _acc_yields = {
     for v in get_market_agent().get_portfolio_valuation(include_watchlist=True)
     if v.symbol
 }
+# Total Shareholder Yield: add net buyback yield to the engine (FEAT-71). Cached 1 day.
+_acc_buybacks = cached_buyback_yield_map(tuple(p.ticker for p in watchlist if p.ticker))
 matrix_rows = []
 for pos in watchlist:
     if not pos.id:
         continue
     wc_fit = _wc_fits.get(pos.id)
     _acc = accumulation_for_position(
-        pos.ticker, sc_verdicts.get(pos.id), fund_verdicts.get(pos.id), _acc_yields
+        pos.ticker, sc_verdicts.get(pos.id), fund_verdicts.get(pos.id), _acc_yields, _acc_buybacks
     )
     matrix_rows.append({
         "name": pos.name,

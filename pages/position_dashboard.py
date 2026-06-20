@@ -21,6 +21,7 @@ from core.ui.markdown import llm_markdown
 from core.ui.research_request_form import render_research_request_form
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge
 from core.accumulation import accumulation_for_position
+from core.shareholder_yield import cached_buyback_yield_map
 from state import (
     get_market_agent,
     get_portfolio_service,
@@ -327,12 +328,16 @@ _acc_yields = {
     for v in market_agent.get_portfolio_valuation(include_watchlist=True)
     if v.symbol
 }
+_acc_buybacks = cached_buyback_yield_map(
+    (selected_position.ticker,) if selected_position.ticker else ()
+)
 _acc = accumulation_for_position(
-    selected_position.ticker, sc_verdict, fa_verdict, _acc_yields
+    selected_position.ticker, sc_verdict, fa_verdict, _acc_yields, _acc_buybacks
 )
 with st.container():
     _badge = verdict_badge(_acc.verdict, VERDICT_CONFIGS["accumulation"])
     st.markdown(f"**{t('accumulation.section')}** {_badge}", help=t("accumulation.help"))
+    # Dividend + buyback breakdown rows (if any) precede the rated TSY/Story/Valuation rows.
     st.dataframe(
         [
             {
@@ -340,7 +345,7 @@ with st.container():
                 t("accumulation.comp_col_value"): c.value,
                 t("accumulation.comp_col_rating"): c.rating,
             }
-            for c in _acc.components
+            for c in (_acc.engine_parts + _acc.components)
         ],
         use_container_width=True,
         hide_index=True,

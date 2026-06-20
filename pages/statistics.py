@@ -223,19 +223,32 @@ with tab_trend:
             monthly_agg[m]["cost"] += _row_cost(r)
             monthly_agg[m]["calls"] += r.get("calls", 0)
 
+        _MONTH_SHORT = {
+            "01": "Jan", "02": "Feb", "03": "Mär", "04": "Apr", "05": "Mai", "06": "Jun",
+            "07": "Jul", "08": "Aug", "09": "Sep", "10": "Okt", "11": "Nov", "12": "Dez",
+        }
+
+        def _month_label(m: str) -> str:
+            year, mon = m.split("-")
+            return f"{_MONTH_SHORT[mon]} '{year[2:]}"
+
         sorted_months = sorted(monthly_agg.keys())[-12:]
         df_monthly = pd.DataFrame([monthly_agg[m] for m in sorted_months])
+        df_monthly["label"] = df_monthly["month"].apply(_month_label)
 
         fig = px.bar(
             df_monthly,
-            x="month",
+            x="label",
             y="cost",
-            labels={"month": "", "cost": "Kosten ($)"},
+            labels={"label": "", "cost": "Kosten ($)"},
             color_discrete_sequence=["#4C9BE8"],
             text=df_monthly["cost"].apply(lambda v: f"${v:.3f}"),
         )
         fig.update_traces(textposition="outside")
-        fig.update_layout(yaxis_title="Kosten ($)", showlegend=False, uniformtext_minsize=8)
+        fig.update_layout(
+            yaxis_title="Kosten ($)", showlegend=False, uniformtext_minsize=8,
+            xaxis_type="category",
+        )
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info(t("statistics.no_data"))

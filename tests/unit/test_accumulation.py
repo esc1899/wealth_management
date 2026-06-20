@@ -143,3 +143,65 @@ class TestAccumulationForPosition:
             {"ALV.DE": 0.045},
         )
         assert r.verdict == "akkumulieren"
+
+    def test_buyback_map_feeds_engine(self):
+        # dividend 1.0 % (weak alone) + buyback 2.0 % → TSY 3.0 % solid → accumulate
+        r = accumulation_for_position(
+            "AAPL", SimpleNamespace(verdict="intact"), SimpleNamespace(verdict="fair"),
+            {"AAPL": 0.010}, {"AAPL": 0.020},
+        )
+        assert r.verdict == "akkumulieren"
+
+
+class TestTotalShareholderYield:
+    """FEAT-71 — engine = dividend + net buyback yield."""
+
+    def test_tsy_sums_dividend_and_buyback(self):
+        # 1.5 % + 1.5 % = 3.0 % → solid → green engine
+        r = compute_accumulation(0.015, "intact", "fair", buyback_pct=0.015)
+        assert r.components[0].value == "3.0 %"
+        assert r.components[0].rating == GREEN
+        assert r.components[0].name == "accumulation.comp_tsy"
+
+    def test_buyback_only_no_dividend_is_applicable(self):
+        # Amazon-style: no dividend but real buybacks → measurable, not n/a
+        r = compute_accumulation(None, "intact", "fair", buyback_pct=0.028)
+        assert r.verdict == "akkumulieren"
+        assert r.components[0].value == "2.8 %"
+
+    def test_engine_parts_present_with_buyback(self):
+        r = compute_accumulation(0.045, "intact", "fair", buyback_pct=0.012)
+        keys = [p.name for p in r.engine_parts]
+        assert keys == ["accumulation.comp_dividend", "accumulation.comp_buyback"]
+        assert r.engine_parts[0].value == "4.5 %"
+        assert r.engine_parts[1].value == "1.2 %"
+        # informational rows carry no own traffic light
+        assert all(p.rating == "" for p in r.engine_parts)
+
+    def test_engine_parts_empty_without_buyback(self):
+        r = compute_accumulation(0.045, "intact", "fair")
+        assert r.engine_parts == []
+        assert r.components[0].name == "accumulation.comp_engine"
+
+    def test_buyback_part_na_when_missing(self):
+        # dividend present, buyback explicitly 0 → still shows both parts
+        r = compute_accumulation(0.045, "intact", "fair", buyback_pct=0.0)
+        assert r.engine_parts[1].value == "0.0 %"
+
+    def test_dividend_part_na_for_buyback_only(self):
+        r = compute_accumulation(None, "intact", "fair", buyback_pct=0.028)
+        assert r.engine_parts[0].value == "n/a"
+
+    def test_na_when_neither_dividend_nor_buyback(self):
+        r = compute_accumulation(None, "intact", "fair", buyback_pct=None)
+        assert r.verdict == "nicht_anwendbar"
+
+    def test_na_when_both_zero(self):
+        r = compute_accumulation(0.0, "intact", "fair", buyback_pct=0.0)
+        assert r.verdict == "nicht_anwendbar"
+
+    def test_dilution_negative_buyback_reduces_engine(self):
+        # 3.0 % dividend but 1.0 % dilution → TSY 2.0 % moderate, not solid → prüfen
+        r = compute_accumulation(0.030, "intact", "fair", buyback_pct=-0.010)
+        assert r.components[0].value == "2.0 %"
+        assert r.verdict == "prüfen"
