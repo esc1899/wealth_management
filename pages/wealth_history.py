@@ -84,8 +84,10 @@ if not wealth_snapshots and not dividend_snapshots:
 st.markdown(f"### {t('wealth_history.wealth_section')}")
 
 if wealth_snapshots:
-    col_date, col_total, col_coverage = st.columns(3)
     latest = wealth_snapshots[-1]
+
+    _eod_change = agent.compute_eod_day_change()
+    col_date, col_total, col_day, col_coverage = st.columns(4)
 
     with col_date:
         st.metric(
@@ -97,6 +99,18 @@ if wealth_snapshots:
             label=t("wealth_history.total_wealth"),
             value=f"€ {latest.total_eur:,.0f}",
         )
+    with col_day:
+        if _eod_change is not None:
+            _day_eur, _prev_eod = _eod_change
+            _day_pct = (_day_eur / _prev_eod * 100) if _prev_eod else None
+            _delta_str = f"{_day_pct:+.2f}%" if _day_pct is not None else None
+            st.metric(
+                label=t("wealth_history.day_change"),
+                value=f"€ {_day_eur:+,.0f}",
+                delta=_delta_str,
+            )
+        else:
+            st.metric(label=t("wealth_history.day_change"), value="—")
     with col_coverage:
         st.metric(
             label=t("wealth_history.data_coverage"),

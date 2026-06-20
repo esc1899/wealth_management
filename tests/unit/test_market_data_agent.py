@@ -330,6 +330,37 @@ class TestDailyPnL:
         assert v.day_pnl_eur is None
         assert v.day_pnl_pct is None
 
+    def test_historical_prev_close_overrides_price_record_prev_close(self, agent):
+        # historical_prices.get_prev_close() takes priority over fast_info stale value.
+        # Simulates the GC=F bug: yfinance returns 3783.70, historical has 3682.99.
+        pos = _make_position("AAPL", quantity=10, price=150.0)
+        agent._positions.get_portfolio.return_value = [pos]
+        # PriceRecord has stale previous_close_eur (analogous to GC=F 3783.70)
+        record = _make_price_record("AAPL", price_eur=180.0)
+        record = record.model_copy(update={"previous_close_eur": 200.0})
+        agent._market.get_price.return_value = record
+        # Historical close for yesterday (analogous to 3682.99 — the correct close)
+        agent._market.get_prev_close.return_value = 175.0
+
+        v = agent.get_portfolio_valuation()[0]
+        # prev_close should be 175 (historical), not 200 (stale yfinance)
+        # current: 10 * 180 = 1800, prev: 10 * 175 = 1750 → +50
+        assert v.day_pnl_eur == pytest.approx(50.0)
+
+    def test_falls_back_to_price_record_when_no_historical(self, agent):
+        # When get_prev_close() returns None, fall back to price_record.previous_close_eur.
+        pos = _make_position("AAPL", quantity=10, price=150.0)
+        agent._positions.get_portfolio.return_value = [pos]
+        record = _make_price_record("AAPL", price_eur=180.0)
+        record = record.model_copy(update={"previous_close_eur": 175.0})
+        agent._market.get_price.return_value = record
+        agent._market.get_prev_close.return_value = None  # no historical data
+
+        v = agent.get_portfolio_valuation()[0]
+        # fallback: 10 * (180 - 175) = +50
+        assert v.day_pnl_eur == pytest.approx(50.0)
+
+
 class TestSetupScheduler:
     def test_returns_scheduler(self, agent):
         scheduler = agent.setup_scheduler(fetch_hour=18)

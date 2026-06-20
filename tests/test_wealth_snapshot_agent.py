@@ -1140,3 +1140,113 @@ class TestRecalculateHoldingsAware:
         call = wealth_repo.create.call_args[1]
         assert call["total_eur"] == pytest.approx(5000.0)
         market_repo.get_price_for_date_or_prior.assert_not_called()
+
+
+class TestComputeEodDayChange:
+    """Tests for compute_eod_day_change() — Close-to-Close wealth change."""
+
+    def _make_agent(self, latest_snapshot, prev_close_map=None):
+        market_repo = Mock(spec=MarketDataRepository)
+        market_repo.get_prev_close.side_effect = lambda sym: (prev_close_map or {}).get(sym)
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        wealth_repo.latest.return_value = latest_snapshot
+        return WealthSnapshotAgent(
+            positions_repo=Mock(spec=PositionsRepository),
+            market_repo=market_repo,
+            wealth_repo=wealth_repo,
+            market_data_agent=Mock(),
+        )
+
+    def _snapshot(self, total_eur, holdings):
+        snap = Mock()
+        snap.total_eur = total_eur
+        snap.holdings = holdings
+        return snap
+
+    def test_basic_day_change(self):
+        # 10 shares at €180 today, prev_close €170 → +€100
+        snap = self._snapshot(
+            total_eur=1800.0,
+            holdings=[{"ticker": "AAPL", "quantity": 10, "unit": "st", "value_eur": 1800.0}],
+        )
+        agent = self._make_agent(snap, {"AAPL": 170.0})
+        result = agent.compute_eod_day_change()
+        assert result is not None
+        day_change, prev_eod = result
+        assert prev_eod == pytest.approx(1700.0)
+        assert day_change == pytest.approx(100.0)
+
+    def test_gold_unit_conversion(self):
+        # 311.035 g gold at €3800/oz → 10 oz today; prev €3700/oz → prev_value=10×3700
+        TROY = 31.1035
+        snap = self._snapshot(
+            total_eur=3800.0,  # 100g / TROY ≈ 3.215 oz × 3800 = 12_217, but simplify:
+            holdings=[{"ticker": "GC=F", "quantity": TROY, "unit": "g", "value_eur": 3800.0}],
+        )
+        agent = self._make_agent(snap, {"GC=F": 3700.0})
+        result = agent.compute_eod_day_change()
+        assert result is not None
+        day_change, prev_eod = result
+        # 31.1035 g / 31.1035 = 1 troy oz × 3700 = 3700
+        assert prev_eod == pytest.approx(3700.0)
+        assert day_change == pytest.approx(100.0)
+
+    def test_no_snapshot_returns_none(self):
+        market_repo = Mock(spec=MarketDataRepository)
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        wealth_repo.latest.return_value = None
+        agent = WealthSnapshotAgent(
+            positions_repo=Mock(spec=PositionsRepository),
+            market_repo=market_repo,
+            wealth_repo=wealth_repo,
+            market_data_agent=Mock(),
+        )
+        assert agent.compute_eod_day_change() is None
+
+    def test_no_holdings_returns_none(self):
+        snap = self._snapshot(total_eur=10000.0, holdings=None)
+        agent = self._make_agent(snap)
+        assert agent.compute_eod_day_change() is None
+
+    def test_no_prev_close_for_any_ticker_returns_none(self):
+        # All get_prev_close() return None → no tradeable positions priced
+        snap = self._snapshot(
+            total_eur=10000.0,
+            holdings=[{"ticker": "AAPL", "quantity": 10, "unit": "st", "value_eur": 1800.0}],
+        )
+        agent = self._make_agent(snap, {})  # empty map → None for all
+        assert agent.compute_eod_day_change() is None
+
+    def test_non_tradeable_position_unchanged(self):
+        # Cash/real-estate (no ticker) is treated as unchanged in delta
+        snap = self._snapshot(
+            total_eur=11800.0,
+            holdings=[
+                {"ticker": "AAPL", "quantity": 10, "unit": "st", "value_eur": 1800.0},
+                {"ticker": None, "quantity": None, "unit": "€", "value_eur": 10000.0},
+            ],
+        )
+        agent = self._make_agent(snap, {"AAPL": 170.0})
+        result = agent.compute_eod_day_change()
+        assert result is not None
+        day_change, prev_eod = result
+        # prev: 10×170 + 10_000 (unchanged) = 11_700
+        assert prev_eod == pytest.approx(11700.0)
+        assert day_change == pytest.approx(100.0)
+
+    def test_missing_prev_close_falls_back_to_current_value(self):
+        # If a ticker has no historical data, its value_eur is used (Δ=0 for that pos)
+        snap = self._snapshot(
+            total_eur=2800.0,
+            holdings=[
+                {"ticker": "AAPL", "quantity": 10, "unit": "st", "value_eur": 1800.0},
+                {"ticker": "NOHIST", "quantity": 5, "unit": "st", "value_eur": 1000.0},
+            ],
+        )
+        agent = self._make_agent(snap, {"AAPL": 170.0})  # NOHIST has no prev_close
+        result = agent.compute_eod_day_change()
+        assert result is not None
+        day_change, prev_eod = result
+        # AAPL: 10×170 = 1700; NOHIST: 1000 (no history → unchanged)
+        assert prev_eod == pytest.approx(2700.0)
+        assert day_change == pytest.approx(100.0)

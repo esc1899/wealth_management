@@ -330,8 +330,11 @@ class MarketDataAgent:
             pnl_eur = (current_value - cost_basis) if current_value is not None and cost_basis is not None else None
             pnl_pct = (pnl_eur / cost_basis * 100) if pnl_eur is not None and cost_basis is not None and cost_basis > 0 else None
 
-            # Daily P&L: current price vs. previous close fetched alongside current price
-            prev_close = price_record.previous_close_eur if price_record else None
+            # Daily P&L: prefer historical_prices (reliable exchange close) over
+            # fast_info.previous_close (can be stale — e.g. GC=F session artifacts).
+            prev_close = self._market.get_prev_close(pos.ticker) if pos.ticker else None
+            if prev_close is None and price_record:
+                prev_close = price_record.previous_close_eur
             if current_price is not None and prev_close is not None and pos.quantity is not None:
                 if pos.unit == "g":
                     prev_value = (prev_close / TROY_OZ_TO_G) * pos.quantity

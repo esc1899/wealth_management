@@ -694,3 +694,43 @@ class WealthSnapshotAgent:
     def get_snapshot_for_date(self, date_str: str) -> Optional[WealthSnapshot]:
         """Get snapshot for a specific date (YYYY-MM-DD)."""
         return self._wealth.get_by_date(date_str)
+
+    def compute_eod_day_change(self) -> Optional[tuple]:
+        """
+        Compute today's wealth change on Close-to-Close basis.
+
+        Uses the latest snapshot's stored holdings re-priced at yesterday's EOD close
+        (from historical_prices) so the result matches the Analyse-page day P&L.
+        Non-tradeable positions (no ticker / no prev_close) are assumed unchanged (Δ=0).
+
+        Returns (day_change_eur, yesterday_eod_total) or None if no snapshot / no holdings.
+        """
+        latest = self._wealth.latest()
+        if not latest or not latest.holdings:
+            return None
+
+        yesterday_total = 0.0
+        any_priced = False
+        for h in latest.holdings:
+            ticker = h.get("ticker")
+            quantity = h.get("quantity")
+            unit = h.get("unit", "")
+            value_eur = h.get("value_eur")
+
+            if ticker and quantity is not None:
+                prev_close = self._market.get_prev_close(ticker)
+                if prev_close is not None:
+                    if unit == "g":
+                        yesterday_total += (prev_close / TROY_OZ_TO_G) * quantity
+                    else:
+                        yesterday_total += prev_close * quantity
+                    any_priced = True
+                elif value_eur is not None:
+                    yesterday_total += value_eur  # no history → treat as unchanged
+            elif value_eur is not None:
+                yesterday_total += value_eur  # non-tradeable → treat as unchanged
+
+        if not any_priced:
+            return None
+
+        return latest.total_eur - yesterday_total, yesterday_total

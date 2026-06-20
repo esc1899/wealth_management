@@ -926,6 +926,7 @@ wealth_history:
   dividend_section: "Dividend Development"
   latest_snapshot_date: "Latest Snapshot"
   total_wealth: "Total Wealth"
+  day_change: "Day Change (EOD)"
   data_coverage: "Data Coverage"
   annual_dividend: "Annual Dividend"
   date_label: "Date"
