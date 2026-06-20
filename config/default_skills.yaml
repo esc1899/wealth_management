@@ -268,6 +268,43 @@ skills:
 
         No buy or sell recommendations. Narrative awareness only.
 
+    - name: "Accumulation Candidate Scanner"
+      description: "Mirrors the Accumulation Indicator — finds Total-Shareholder-Yield compounders (dividend + buyback) with an intact thesis at a fair price"
+      prompt: |
+        Find candidates that match the portfolio's *Accumulation Indicator* profile. The indicator
+        rewards the conjunction of THREE factors — screen for all three together, not just one:
+
+        1. **Income engine — Total Shareholder Yield (TSY)**, the signature filter:
+           TSY = dividend yield + NET buyback yield (net of dilution / new share issuance).
+           - Target: TSY ≥ 2.5% (solid). 1.2–2.5% is borderline; below 1.2% is weak.
+           - CRITICAL: do not stop at the dividend. A low- or no-dividend company that retires
+             3–5% of its shares per year (e.g. parts of US-tech) is a strong candidate. Equally,
+             a high headline dividend funded by issuing new shares is NOT — always use the NET figure.
+           - Report the two halves separately (dividend % and net buyback %) so the split is visible.
+
+        2. **Thesis intact (survival)**: the business should plausibly still be compounding in
+           5–10 years. Check moat, balance-sheet health, secular vs. cyclical demand. The indicator
+           treats a broken thesis as disqualifying regardless of yield.
+
+        3. **Valuation not expensive**: cheap or fair on P/E / FCF-yield / P/B vs. sector and own
+           history. A great compounder bought expensive is a "hold", not an "accumulate".
+
+        Universe: developed-market equities (US, Europe, optionally Japan). Mid/large cap (> €1bn)
+        for liquidity. Exclude pure funds/ETFs (the indicator scores single companies).
+
+        For each candidate output:
+        - Ticker, name, sector, country
+        - **TSY breakdown**: dividend % + net buyback % = TSY % (cite sources/numbers)
+        - Thesis note (1 sentence: why it survives) + Valuation note (1 sentence: cheap/fair/expensive)
+        - Accumulation read: `akkumulieren` (TSY solid + thesis intact + not expensive) /
+          `beobachten` (two of three) / `kein_fit` (engine weak or thesis broken)
+
+        IMPORTANT — this is a DISCOVERY funnel, not a verdict. The web numbers may be imprecise or
+        confabulated. Propose the best `akkumulieren`/`beobachten` names to the watchlist; the app's
+        deterministic Accumulation Indicator will recompute them from ground-truth data
+        (valuation-layer yield + Storychecker + Fundamental Analyzer) and confirm or reject. Flag any
+        figure you could not verify. No buy/sell advice — surfacing candidates only.
+
   # ── Fundamentalwert-Analyse ─────────────────────────────────────────────────
   # Skills for the FundamentalAgent (Cloud ☁️, Claude API + web search).
 
