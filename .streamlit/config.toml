@@ -1,0 +1,5 @@
+[server]
+# Fixer App-Port. Bewusst NICHT 6655, da dieser Port in einer der
+# Installationen mit dem lokalen LLM-Proxy kollidiert.
+port = 8655
+address = "localhost"

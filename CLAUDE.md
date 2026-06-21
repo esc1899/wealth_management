@@ -22,7 +22,7 @@ pytest tests/integration/
 streamlit run app.py
 
 # Start on the fixed Dock-app port
-streamlit run app.py --server.port 6655
+streamlit run app.py --server.port 8655
 
 # Rebuild the demo DB (data/demo.db is a regenerable build artifact — seeder is
 # source of truth, populates every surface with [Demodaten] fixtures; guarded
