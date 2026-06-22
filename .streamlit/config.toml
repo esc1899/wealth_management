@@ -3,3 +3,7 @@
 # Installationen mit dem lokalen LLM-Proxy kollidiert.
 port = 8655
 address = "localhost"
+# Unterdrückt den interaktiven Streamlit-Erststart-Dialog (E-Mail-Abfrage),
+# der sonst beim ersten "streamlit run" auf einem frischen Rechner den
+# Start blockiert. Browser muss dann von Hand geöffnet werden.
+headless = true
