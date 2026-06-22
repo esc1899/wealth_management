@@ -12,6 +12,7 @@ from config import config
 from core.health import Severity, check_ollama_connectivity, run_static_checks
 from core.i18n import SUPPORTED_LANGUAGES, current_language, set_language, t
 from core.llm.claude import fetch_available_models as _fetch_claude_models
+from core.llm.router import available_public_models
 from state import get_app_config_repo, get_skills_repo
 
 st.set_page_config(page_title="Einstellungen", page_icon="⚙️", layout="wide")
@@ -100,13 +101,21 @@ _CLAUDE_MODELS = _get_claude_model_list()
 _HAS_ANTHROPIC = bool(config.LLM_API_KEY)
 _HAS_OPENROUTER = bool(config.OPENAI_BASE_URL and config.OPENAI_API_KEY)
 _HAS_DEEPSEEK = bool(config.DEEPSEEK_API_KEY)
-_registry_public = [
-    mid for mid, e in app_config.get_model_registry().items()
-    if e.get("provider") in app_config.PUBLIC_PROVIDERS
-]
-_ALL_PUBLIC_MODELS = list(dict.fromkeys(
-    config.DEEPSEEK_MODELS + config.OPENAI_MODELS + _CLAUDE_MODELS + _registry_public
-))
+# Only offer models whose provider is actually configured — otherwise DeepSeek's
+# non-empty default leaks into the list and a pick 404s against an Anthropic proxy.
+_ALL_PUBLIC_MODELS = available_public_models(
+    claude_models=_CLAUDE_MODELS,
+    openrouter_models=config.OPENAI_MODELS,
+    deepseek_models=config.DEEPSEEK_MODELS,
+    registry={
+        mid: e.get("provider")
+        for mid, e in app_config.get_model_registry().items()
+        if e.get("provider") in app_config.PUBLIC_PROVIDERS
+    },
+    has_anthropic=_HAS_ANTHROPIC,
+    has_openrouter=_HAS_OPENROUTER,
+    has_deepseek=_HAS_DEEPSEEK,
+)
 
 # Fetch available Ollama models
 import requests as _requests

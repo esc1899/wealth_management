@@ -42,3 +42,39 @@ def resolve_provider_kind(
     if has_openai_base:
         return "openai"
     return "claude"
+
+
+# Maps a registry entry's ``provider`` to the credential flag that activates it.
+_REGISTRY_PROVIDER_FLAG = {"claude": "anthropic", "openrouter": "openrouter", "deepseek": "deepseek"}
+
+
+def available_public_models(
+    *,
+    claude_models: list[str],
+    openrouter_models: list[str],
+    deepseek_models: list[str],
+    registry: dict[str, str],
+    has_anthropic: bool,
+    has_openrouter: bool,
+    has_deepseek: bool,
+) -> list[str]:
+    """Ordered, deduplicated cloud-model list for the settings dropdown.
+
+    Only models whose provider is actually configured are offered. Without this
+    filter ``config.DEEPSEEK_MODELS`` (which has a non-empty default) leaks into the
+    list even with no DeepSeek key; picking such a model routes it to the Anthropic
+    proxy as a "claude" call → 404. ``registry`` maps model_id → provider.
+    """
+    active = {"anthropic": has_anthropic, "openrouter": has_openrouter, "deepseek": has_deepseek}
+    ordered: list[str] = []
+    if has_deepseek:
+        ordered += deepseek_models
+    if has_openrouter:
+        ordered += openrouter_models
+    if has_anthropic:
+        ordered += claude_models
+    ordered += [
+        mid for mid, prov in registry.items()
+        if active.get(_REGISTRY_PROVIDER_FLAG.get(prov, ""), False)
+    ]
+    return list(dict.fromkeys(ordered))
