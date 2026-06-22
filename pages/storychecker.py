@@ -135,6 +135,8 @@ if _BATCH["last_error"] and not _BATCH["running"]:
     logger = logging.getLogger(__name__)
     logger.error("Last batch error details: %s", _BATCH['last_error'])
     st.error("❌ Letzter Batch-Lauf fehlgeschlagen. Bitte versuchen Sie es später erneut.")
+    with st.expander("Details", expanded=False):
+        st.code(str(_BATCH["last_error"]))
     _BATCH["last_error"] = None
 
 st.divider()
@@ -185,6 +187,8 @@ with col_left:
             logger = logging.getLogger(__name__)
             logger.error("Story checker start error: %s", error_details)
             st.error(f"⚠️ {t('storychecker.error')} Die Story-Analyse konnte nicht gestartet werden.")
+            with st.expander("Details", expanded=False):
+                st.code(str(error_details))
 
         if submitted:
             with st.spinner(t("storychecker.thinking")):
