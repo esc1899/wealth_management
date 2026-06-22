@@ -14,6 +14,20 @@ from typing import List, Optional, Union
 from core.storage.models import PositionAnalysis
 
 
+def _parse_utc(value: str) -> datetime:
+    """Parse a stored timestamp and guarantee a timezone-aware UTC datetime.
+
+    The app writes ``datetime.now(timezone.utc)`` (aware), but legacy rows and the
+    demo seeder's ``datetime('now')`` produce naive strings. Returning a mix would
+    break any ``<``/``sort`` comparison ("can't compare offset-naive and offset-aware").
+    Naive values are assumed to be UTC.
+    """
+    dt = datetime.fromisoformat(value)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 class PositionAnalysesRepository:
 
     def __init__(self, conn: sqlite3.Connection):
@@ -212,5 +226,5 @@ class PositionAnalysesRepository:
             verdict=row["verdict"],
             summary=row["summary"],
             session_id=session_id,
-            created_at=datetime.fromisoformat(row["created_at"]),
+            created_at=_parse_utc(row["created_at"]),
         )

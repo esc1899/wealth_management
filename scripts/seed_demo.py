@@ -641,9 +641,10 @@ def seed(db_path: str = "data/demo.db", conn: Optional[sqlite3.Connection] = Non
                 """
                 INSERT INTO position_analyses
                     (position_id, agent, skill_name, verdict, summary, created_at)
-                VALUES (?, ?, ?, ?, ?, datetime('now'))
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (row[0], agent_name, "Demodaten", data["verdict"], data["summary"]),
+                (row[0], agent_name, "Demodaten", data["verdict"], data["summary"],
+                 datetime.now(timezone.utc).isoformat()),
             )
             print(f"  [{agent_name}] {pos_name}: {data['verdict']}")
         conn.commit()
