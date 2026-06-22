@@ -9,6 +9,7 @@
 #   ./app.sh update    git pull + deps + restart  (holt neue Stände vom Hauptrechner)
 #   ./app.sh models    welche Cloud-Modelle liefert der Proxy? (-> CLAUDE_MODELS)
 #   ./app.sh config    welche LLM-Konfig ist effektiv geladen? (Diagnose 404/Proxy)
+#   ./app.sh ping [m]  echter Test-Call: welche CLAUDE_MODELS akzeptiert der Proxy?
 #
 # Wichtig: stop/start fassen NUR den Streamlit-Prozess an, niemals Port 6655.
 #
@@ -96,6 +97,30 @@ cmd_update() {
     cmd_start
 }
 
+cmd_ping() {
+    activate_venv
+    echo "📡 Test-Call an /v1/messages${PROFILE_NOTE} — welche Modell-IDs akzeptiert der Proxy?"
+    PING_MODEL="${2:-}" python - <<'PY'
+import os
+import anthropic
+from config import config
+
+models = [os.environ["PING_MODEL"]] if os.environ.get("PING_MODEL") else (config.CLAUDE_MODELS or ["claude-haiku-4-5-20251001"])
+kwargs = {"api_key": config.LLM_API_KEY}
+if config.LLM_BASE_URL:
+    kwargs["base_url"] = config.LLM_BASE_URL
+client = anthropic.Anthropic(**kwargs)
+print(f"Endpoint: {config.LLM_BASE_URL or 'api.anthropic.com'}")
+for m in models:
+    try:
+        r = client.messages.create(model=m, max_tokens=5, messages=[{"role": "user", "content": "ok"}])
+        text = "".join(getattr(b, "text", "") for b in r.content)
+        print(f"  ✅ {m}: {text.strip()[:40] or '(leer)'}")
+    except Exception as e:
+        print(f"  ❌ {m}: {type(e).__name__} {str(e)[:200]}")
+PY
+}
+
 cmd_config() {
     activate_venv
     echo "🔧 Effektiv geladene LLM-Konfiguration${PROFILE_NOTE}:"
@@ -167,8 +192,9 @@ case "${1:-}" in
     update)  cmd_update ;;
     models)  cmd_models ;;
     config)  cmd_config ;;
+    ping)    cmd_ping "$@" ;;
     *)
-        echo "Benutzung: ./app.sh {start|stop|restart|status|deps|update|models|config}"
+        echo "Benutzung: ./app.sh {start|stop|restart|status|deps|update|models|config|ping [modell]}"
         exit 1
         ;;
 esac
