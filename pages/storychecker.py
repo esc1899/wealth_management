@@ -7,6 +7,7 @@ Uses built-in web search to find current news before assessing the thesis.
 """
 
 import asyncio
+import logging
 import threading
 import time
 from datetime import datetime, timezone
@@ -119,7 +120,6 @@ if _BATCH["running"]:
 if _BATCH["done"]:
     if _BATCH["error"]:
         # Log detailed error, show safe summary to user
-        import logging
         logger = logging.getLogger(__name__)
         logger.error("Batch error details: %s", _BATCH['error'])
         st.error("❌ Der Batch-Lauf ist fehlgeschlagen. Bitte versuchen Sie es später erneut.")
