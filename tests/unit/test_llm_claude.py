@@ -184,6 +184,100 @@ async def test_native_web_search_passed_through(provider):
 
 
 # ------------------------------------------------------------------
+# Web search behind a custom base_url (corporate proxy / OpenRouter)
+# ------------------------------------------------------------------
+
+
+class _TextBlock:
+    type = "text"
+
+    def __init__(self, text):
+        self.text = text
+
+
+class _ToolBlock:
+    type = "tool_use"
+
+    def __init__(self, name, id, inp):
+        self.name, self.id, self.input = name, id, inp
+
+
+def _resp(blocks, stop_reason="end_turn"):
+    r = MagicMock()
+    r.content = blocks
+    r.stop_reason = stop_reason
+    r.usage = MagicMock(
+        input_tokens=1, output_tokens=1,
+        cache_read_input_tokens=0, cache_creation_input_tokens=0, server_tool_use=None,
+    )
+    return r
+
+
+@pytest.fixture
+def proxy_provider():
+    """Provider behind a custom endpoint — native web_search is unavailable there."""
+    return ClaudeProvider(api_key="k", model="claude-sonnet-4-6", base_url="http://localhost:6655/anthropic")
+
+
+@pytest.mark.asyncio
+async def test_proxy_swaps_web_search_for_tavily(proxy_provider):
+    """Behind a proxy with TAVILY_API_KEY set: web_search_20250305 must NOT be sent;
+    Tavily runs the search client-side and prose from all turns is preserved."""
+    import os
+    calls = []
+
+    async def mock_create(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            return _resp(
+                [_TextBlock("Recherchiere AAPL…"), _ToolBlock("web_search", "s1", {"query": "AAPL news"})],
+                stop_reason="tool_use",
+            )
+        return _resp([_TextBlock("Fazit: solide.")])
+
+    proxy_provider._client.messages.create = mock_create
+
+    with patch.dict(os.environ, {"TAVILY_API_KEY": "tav"}), \
+         patch("core.search.tavily.search", return_value="SEARCH RESULTS") as mock_search:
+        result = await proxy_provider.chat_with_tools(
+            messages=[{"role": "user", "content": "Analyse AAPL"}],
+            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
+            system="Analyst.",
+        )
+
+    # native tool never sent; Tavily executed; prose accumulated across both turns
+    assert "web_search_20250305" not in [t.get("type") for t in calls[0]["tools"]]
+    mock_search.assert_called_once()
+    assert "Recherchiere AAPL" in result.content and "Fazit: solide." in result.content
+    assert result.web_search_requests == 1
+
+
+@pytest.mark.asyncio
+async def test_proxy_without_tavily_drops_web_search(proxy_provider):
+    """Behind a proxy WITHOUT a Tavily key: the unusable web_search tool is dropped
+    (so the call doesn't 400), and the request still goes through."""
+    import os
+    captured = {}
+
+    async def mock_create(**kwargs):
+        captured.update(kwargs)
+        return _resp([_TextBlock("done")])
+
+    proxy_provider._client.messages.create = mock_create
+
+    with patch.dict(os.environ, {}, clear=False):
+        os.environ.pop("TAVILY_API_KEY", None)
+        result = await proxy_provider.chat_with_tools(
+            messages=[{"role": "user", "content": "Analyse"}],
+            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
+            system="Analyst.",
+        )
+
+    assert captured["tools"] == []  # web_search dropped, nothing else to send
+    assert result.content == "done"
+
+
+# ------------------------------------------------------------------
 # Message Batches API
 # ------------------------------------------------------------------
 

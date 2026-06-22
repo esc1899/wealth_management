@@ -98,6 +98,7 @@ class ClaudeProvider(LLMProvider):
             kwargs["base_url"] = base_url
         self._client = anthropic.AsyncAnthropic(**kwargs)
         self._model = model
+        self._base_url = base_url
         self._enable_thinking = enable_thinking
         self._tavily_search_depth = tavily_search_depth
 
@@ -145,17 +146,47 @@ class ClaudeProvider(LLMProvider):
         tool_choice: Optional[dict] = None,
     ) -> ClaudeResponse:
         """
-        Single API call with tool definitions.
+        Tool-enabled call. Returns text content and any client-side tool calls.
 
-        Anthropic's built-in server-side web_search is passed through natively: the
-        model runs any searches server-side within a single response, so there is no
-        client-side search loop. Returns the text content and any client tool calls.
+        Web search: on a direct Anthropic endpoint, Anthropic's built-in server-side
+        web_search runs within a single response (native passthrough). Behind a custom
+        base_url (corporate proxy / OpenRouter) the upstream often rejects the
+        web_search_20250305 tool (HTTP 400) — there we route search through Tavily
+        client-side if TAVILY_API_KEY is set, looping internally so callers see no
+        difference; without a key we drop the tool so the call still succeeds.
         """
+        import os
+        from core.search import tavily as _tavily
+
+        _WEB_SEARCH_SERVER = "web_search_20250305"
+
+        def _is_web_search(t: dict) -> bool:
+            return t.get("type") == _WEB_SEARCH_SERVER or t.get("name") == "web_search"
+
+        tavily_key = os.getenv("TAVILY_API_KEY", "")
+        _has_web_search = any(_is_web_search(t) for t in tools)
+        _custom_endpoint = bool(self._base_url)
+        # Native server-side web_search only works on a direct Anthropic endpoint.
+        use_tavily = _has_web_search and _custom_endpoint and bool(tavily_key)
+
+        # max_uses is a server-side-only field; capture it before we swap the tool out.
+        _web_search_max_uses: Optional[int] = next(
+            (t.get("max_uses") for t in tools if _is_web_search(t)), None
+        )
+
+        if use_tavily:
+            resolved_tools = [_tavily.TAVILY_TOOL_DEFINITION if _is_web_search(t) else t for t in tools]
+        elif _has_web_search and _custom_endpoint:
+            # Proxy without native web_search and no Tavily key → drop the tool (no live search).
+            resolved_tools = [t for t in tools if not _is_web_search(t)]
+        else:
+            resolved_tools = tools
+
         kwargs: dict = {
             "model": self._model,
             "max_tokens": max_tokens,
-            "messages": list(messages),
-            "tools": tools,
+            "messages": list(messages),  # copy — extended in the Tavily loop
+            "tools": resolved_tools,
         }
         if system:
             kwargs["system"] = [{"type": "text", "text": system}]
@@ -170,40 +201,71 @@ class ClaudeProvider(LLMProvider):
                 kwargs["thinking"] = {"type": "adaptive", "display": "summarized"}
 
         _t0 = time.monotonic()
+        total_input = total_output = total_cache_read = total_cache_write = total_web_search = 0
+        _tavily_call_count = 0
+        # Accumulate prose across ALL turns: the model often writes analysis text in the
+        # same turn it calls web_search, then only e.g. the verdict tool in the final turn —
+        # using the final message alone would drop it (the bug that motivated f94abfd).
+        content_parts: list[str] = []
 
-        # Retry up to 3 times on rate limit errors
-        for attempt in range(3):
-            try:
-                response = await self._client.messages.create(**kwargs)
-                break
-            except anthropic.RateLimitError:
-                if attempt < 2:
-                    await asyncio.sleep(60)
-                else:
-                    raise
+        for _ in range(10):  # safety net; only the Tavily path iterates more than once
+            # Retry up to 3 times on rate limit errors
+            for attempt in range(3):
+                try:
+                    response = await self._client.messages.create(**kwargs)
+                    break
+                except anthropic.RateLimitError:
+                    if attempt < 2:
+                        await asyncio.sleep(60)
+                    else:
+                        raise
 
-        total_input = response.usage.input_tokens
-        total_output = response.usage.output_tokens
-        total_cache_read = getattr(response.usage, 'cache_read_input_tokens', 0) or 0
-        total_cache_write = getattr(response.usage, 'cache_creation_input_tokens', 0) or 0
-        # Anthropic built-in web_search: count from the server_tool_use usage field.
-        _stu = getattr(response.usage, 'server_tool_use', None)
-        total_web_search = getattr(_stu, 'web_search_requests', 0) or 0
+            total_input += response.usage.input_tokens
+            total_output += response.usage.output_tokens
+            total_cache_read += getattr(response.usage, 'cache_read_input_tokens', 0) or 0
+            total_cache_write += getattr(response.usage, 'cache_creation_input_tokens', 0) or 0
+            # Anthropic built-in web_search: count from the server_tool_use usage field.
+            _stu = getattr(response.usage, 'server_tool_use', None)
+            total_web_search += getattr(_stu, 'web_search_requests', 0) or 0
 
-        content_text = ""
+            for block in response.content:
+                if hasattr(block, "text"):
+                    content_parts.append(block.text)
+
+            if use_tavily and response.stop_reason == "tool_use":
+                web_calls = [b for b in response.content
+                             if getattr(b, "type", None) == "tool_use" and getattr(b, "name", None) == "web_search"]
+                other_calls = [b for b in response.content
+                               if getattr(b, "type", None) == "tool_use" and getattr(b, "name", None) != "web_search"]
+                if web_calls:
+                    kwargs["messages"].append({"role": "assistant", "content": list(response.content)})
+                    tool_results = []
+                    for call in web_calls:
+                        query = call.input.get("query", "")
+                        if _web_search_max_uses is not None and _tavily_call_count >= _web_search_max_uses:
+                            result = f"[Search limit of {_web_search_max_uses} reached. Base your answer on the results already gathered.]"
+                        else:
+                            _tavily_call_count += 1
+                            total_web_search += 1
+                            try:
+                                result = _tavily.search(query, tavily_key, search_depth=self._tavily_search_depth)
+                            except Exception as e:
+                                result = f"Search failed: {e}"
+                        tool_results.append({"type": "tool_result", "tool_use_id": call.id, "content": result})
+                    kwargs["messages"].append({"role": "user", "content": tool_results})
+                    if other_calls:
+                        break  # hand non-search client tools back to the caller
+                    continue  # fetch next response with search results injected
+            break
+
         tool_calls: List[ClaudeToolCall] = []
         for block in response.content:
-            if hasattr(block, "text"):
-                content_text += block.text
-            elif getattr(block, "type", None) == "tool_use":
-                tool_calls.append(ClaudeToolCall(
-                    id=block.id,
-                    name=block.name,
-                    input=block.input,
-                ))
+            if getattr(block, "type", None) == "tool_use":
+                if not (use_tavily and block.name == "web_search"):
+                    tool_calls.append(ClaudeToolCall(id=block.id, name=block.name, input=block.input))
 
         # Validate response for signs of prompt injection
-        content_text = validate_llm_response(content_text)
+        content_text = validate_llm_response("".join(content_parts))
 
         _duration_ms = int((time.monotonic() - _t0) * 1000)
         if self.on_usage:

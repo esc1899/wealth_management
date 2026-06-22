@@ -1,6 +1,8 @@
 """
 Tavily search client — drop-in replacement for Anthropic's server-side web_search.
-Used by ClaudeProvider when TAVILY_API_KEY is set in the environment.
+Used by the OpenAI-compatible provider, and by ClaudeProvider behind a custom base_url
+(corporate proxy / OpenRouter) where native web_search is unavailable, when
+TAVILY_API_KEY is set.
 """
 
 from __future__ import annotations
