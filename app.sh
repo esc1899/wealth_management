@@ -8,6 +8,7 @@
 #   ./app.sh deps      fehlende Python-Pakete nachinstallieren (requirements.txt)
 #   ./app.sh update    git pull + deps + restart  (holt neue Stände vom Hauptrechner)
 #   ./app.sh models    welche Cloud-Modelle liefert der Proxy? (-> CLAUDE_MODELS)
+#   ./app.sh config    welche LLM-Konfig ist effektiv geladen? (Diagnose 404/Proxy)
 #
 # Wichtig: stop/start fassen NUR den Streamlit-Prozess an, niemals Port 6655.
 #
@@ -95,6 +96,47 @@ cmd_update() {
     cmd_start
 }
 
+cmd_config() {
+    activate_venv
+    echo "🔧 Effektiv geladene LLM-Konfiguration${PROFILE_NOTE}:"
+    python - <<'PY'
+import os
+from config import config
+from core.llm.router import resolve_provider_kind
+
+def mask(v):
+    return f"gesetzt ({len(v)} Zeichen)" if v else "LEER"
+
+# 1) Welche relevanten Env-Variablen sind WIRKLICH geladen? (deckt Tippfehler/Klein-
+#    schreibung auf — Variablennamen sind case-sensitiv!)
+print("Geladene Env-Variablen (Name = Wert):")
+hits = [(k, v) for k, v in os.environ.items()
+        if any(s in k.upper() for s in ("BASE_URL", "ANTHROPIC", "LLM", "OPENAI", "DEEPSEEK"))]
+for k, v in sorted(hits):
+    shown = v if "URL" in k.upper() else mask(v)   # URLs sind nicht geheim, Keys maskieren
+    print(f"  {k} = {shown}")
+if not hits:
+    print("  (keine)")
+
+# 2) Was macht die App daraus?
+print("\nEffektiv in config:")
+print(f"  LLM_BASE_URL    = {config.LLM_BASE_URL or 'LEER -> Anthropic direkt (api.anthropic.com)'}")
+print(f"  LLM_API_KEY     = {mask(config.LLM_API_KEY)}")
+print(f"  LLM_DEFAULT     = {config.LLM_DEFAULT_MODEL or '(keins)'}")
+print(f"  CLAUDE_MODELS   = {', '.join(config.CLAUDE_MODELS) or '(leer)'}")
+print(f"  OPENAI_BASE_URL = {config.OPENAI_BASE_URL or 'LEER'}")
+
+# 3) Wohin geht der Default-Call?
+m = config.LLM_DEFAULT_MODEL or (config.CLAUDE_MODELS[0] if config.CLAUDE_MODELS else "claude-sonnet-4-6")
+kind = resolve_provider_kind(m, has_anthropic=bool(config.LLM_API_KEY),
+                             has_deepseek=bool(config.DEEPSEEK_API_KEY),
+                             has_openai_base=bool(config.OPENAI_BASE_URL))
+target = {"claude": config.LLM_BASE_URL or "api.anthropic.com",
+          "openai": config.OPENAI_BASE_URL, "deepseek": config.DEEPSEEK_BASE_URL}.get(kind)
+print(f"\n  -> Modell '{m}' geht an: {kind}  ({target})")
+PY
+}
+
 cmd_models() {
     activate_venv
     echo "🔎 Frage verfügbare Cloud-Modelle ab${PROFILE_NOTE} …"
@@ -124,8 +166,9 @@ case "${1:-}" in
     deps)    cmd_deps ;;
     update)  cmd_update ;;
     models)  cmd_models ;;
+    config)  cmd_config ;;
     *)
-        echo "Benutzung: ./app.sh {start|stop|restart|status|deps|update|models}"
+        echo "Benutzung: ./app.sh {start|stop|restart|status|deps|update|models|config}"
         exit 1
         ;;
 esac
