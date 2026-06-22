@@ -98,19 +98,24 @@ cmd_update() {
 }
 
 cmd_ping() {
+    # ./app.sh ping [modell] [base_url]
+    #   modell    : sonst alle CLAUDE_MODELS
+    #   base_url  : überschreibt LLM_BASE_URL nur für diesen Test (Pfade durchprobieren,
+    #               ohne die .env zu editieren), z.B. http://localhost:6655/anthropic
     activate_venv
     echo "📡 Test-Call an /v1/messages${PROFILE_NOTE} — welche Modell-IDs akzeptiert der Proxy?"
-    PING_MODEL="${2:-}" python - <<'PY'
+    PING_MODEL="${2:-}" PING_BASE="${3:-}" python - <<'PY'
 import os
 import anthropic
 from config import config
 
 models = [os.environ["PING_MODEL"]] if os.environ.get("PING_MODEL") else (config.CLAUDE_MODELS or ["claude-haiku-4-5-20251001"])
+base = os.environ.get("PING_BASE") or config.LLM_BASE_URL
 kwargs = {"api_key": config.LLM_API_KEY}
-if config.LLM_BASE_URL:
-    kwargs["base_url"] = config.LLM_BASE_URL
+if base:
+    kwargs["base_url"] = base
 client = anthropic.Anthropic(**kwargs)
-print(f"Endpoint: {config.LLM_BASE_URL or 'api.anthropic.com'}")
+print(f"Endpoint: {base or 'api.anthropic.com'}  (SDK ruft <base>/v1/messages)")
 for m in models:
     try:
         r = client.messages.create(model=m, max_tokens=5, messages=[{"role": "user", "content": "ok"}])
