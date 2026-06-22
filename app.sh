@@ -5,7 +5,8 @@
 #   ./app.sh stop      App stoppen (lässt den LLM-Proxy auf 6655 in Ruhe)
 #   ./app.sh restart   stop + start
 #   ./app.sh status    läuft die App? antwortet sie?
-#   ./app.sh update    git pull + restart  (holt neue Stände vom Hauptrechner)
+#   ./app.sh deps      fehlende Python-Pakete nachinstallieren (requirements.txt)
+#   ./app.sh update    git pull + deps + restart  (holt neue Stände vom Hauptrechner)
 #
 # Wichtig: stop/start fassen NUR den Streamlit-Prozess an, niemals Port 6655.
 
@@ -65,9 +66,17 @@ cmd_status() {
     fi
 }
 
+cmd_deps() {
+    activate_venv
+    echo "📦 Installiere/aktualisiere Python-Pakete aus requirements.txt …"
+    pip install -q -r requirements.txt
+    echo "✅ Pakete aktuell."
+}
+
 cmd_update() {
     echo "⬇️  git pull …"
     git pull
+    cmd_deps
     cmd_stop || true
     cmd_start
 }
@@ -77,9 +86,10 @@ case "${1:-}" in
     stop)    cmd_stop ;;
     restart) cmd_stop || true; cmd_start ;;
     status)  cmd_status ;;
+    deps)    cmd_deps ;;
     update)  cmd_update ;;
     *)
-        echo "Benutzung: ./app.sh {start|stop|restart|status|update}"
+        echo "Benutzung: ./app.sh {start|stop|restart|status|deps|update}"
         exit 1
         ;;
 esac
