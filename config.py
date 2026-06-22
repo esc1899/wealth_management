@@ -26,7 +26,9 @@ if _profile:
 class Config:
     # Public LLM — Anthropic-compatible endpoint
     LLM_API_KEY: str = os.getenv("LLM_API_KEY") or os.getenv("ANTHROPIC_API_KEY", "")
-    LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "")
+    # Mirror the key fallback: honour the SDK-standard ANTHROPIC_BASE_URL so a corporate
+    # proxy set that way is passed explicitly (the SDK's own env pickup is version-fragile).
+    LLM_BASE_URL: str = os.getenv("LLM_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL", "")
     LLM_DEFAULT_MODEL: str = os.getenv("LLM_DEFAULT_MODEL", "")
 
     # OpenAI-compatible provider (optional — OpenRouter, Perplexity, Groq, etc.)
