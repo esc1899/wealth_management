@@ -57,6 +57,10 @@ ENCRYPTION_KEY=your_fernet_key_here
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
+> **Behind a corporate LLM proxy** (no direct internet to Anthropic)? See the dedicated
+> [Corporate LLM Proxy setup guide](corporate-proxy-setup.md) — it covers `ANTHROPIC_BASE_URL`,
+> the vendor path, web search via Tavily, and terminal verification commands.
+
 ### Ollama
 
 ```env
@@ -178,6 +182,8 @@ streamlit run app.py              # migration runs automatically on startup
 
 **Research / News / Search Chat fails with API error**
 → Check that `ANTHROPIC_API_KEY` is set in `.env`.
+→ Behind a corporate proxy (401/404 path errors, or a `web_search_20250305` 400)? See the
+  [Corporate LLM Proxy setup guide](corporate-proxy-setup.md).
 
 **Prices not updating**
 → Click **Refresh Now** on the Market Data page. Check that tickers are valid yfinance symbols.

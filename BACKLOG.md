@@ -22,6 +22,7 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 |---|---|---|
 | NOTE-1 | 2026-06-06 | ~~**Tavily Monats-Limit erschöpft**~~ — Plan-Limit erhöht (2026-06-07). Verbrauch zusätzlich optimiert: search_depth=basic (alle außer FA), client-side max_uses-Enforcement, fehlende Limits nachgerüstet, NewsAgent-Formel gekappt. ✅ ERLEDIGT |
 | NOTE-2 | 2026-06-06 | **SCANFL delisted/nicht gefunden** — yfinance liefert 404 für Symbol SCANFL. Position prüfen: Ticker noch aktuell? Ggf. aus Portfolio/Watchlist entfernen oder Ticker korrigieren. |
+| NOTE-3 | 2026-06-23 | **Cloud-Modellauswahl (Settings) zeigt mehr als die konfigurierten Modelle** — auf dem Firmenrechner (nur Anthropic-Proxy aktiv) erscheinen im Dropdown mehr als die 3 `CLAUDE_MODELS`. Ursache vermutlich: der provider-aware Filter (commit 005efe3) lässt **Registry-/Preis-Tabellen-Einträge** durch, die als `claude` klassifiziert sind ([pages/settings.py](pages/settings.py) `_ALL_PUBLIC_MODELS` ∪ `_registry_public`); die sind nicht gegen den Proxy verifiziert → Risiko: unverfügbare ID wählen → 404. **Noch nicht bestätigt** (echte Dropdown-/Registry-Liste vom Firmenrechner steht aus). **Mögliche Lösung:** hinter custom base_url (Proxy) die Claude-Modelle auf genau `config.CLAUDE_MODELS` gaten (Registry-Claude-Einträge raus). **Verwandt:** [[second_install_company_machine]], Proxy-Anbindung 2026-06-22/23. |
 
 ---
 

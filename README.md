@@ -158,7 +158,8 @@ Copy `.env.example` to `.env` and fill in your values.
 |---|---|---|
 | `ENCRYPTION_KEY` | Yes | Fernet key — generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 | `LLM_API_KEY` | Yes* | API key for the cloud LLM provider (Anthropic Claude, or ANTHROPIC_API_KEY for backward compat) |
-| `LLM_BASE_URL` | Optional | Custom endpoint for LLM (e.g. OpenRouter). Default: empty = Anthropic direkt |
+| `LLM_BASE_URL` | Optional | Custom endpoint for LLM (e.g. OpenRouter, or a corporate proxy). Default: empty = Anthropic direkt. Falls back to `ANTHROPIC_BASE_URL` if unset |
+| `ANTHROPIC_BASE_URL` | Optional | SDK-standard base URL — used when `LLM_BASE_URL` is empty. Point it at a corporate Anthropic-compatible proxy (incl. vendor path). See [corporate proxy setup](docs/corporate-proxy-setup.md) |
 | `LLM_DEFAULT_MODEL` | Optional | Model override for public (cloud) agents. Default: empty = claude-haiku-4-5-20251001 |
 | `OPENAI_API_KEY` | Optional* | API key for OpenAI-compatible provider (Perplexity Sonar, Groq, Together, etc.) |
 | `OPENAI_BASE_URL` | Optional | Endpoint URL for OpenAI-compatible provider (e.g. https://api.perplexity.ai) |
@@ -196,6 +197,15 @@ LLM_DEFAULT_MODEL=sonar
 ```
 
 The Settings page will automatically show "OpenAI-compatible 🌐" instead of "Claude ☁️". Cloud agents route through the OpenAI provider; local agents (Ollama) are unaffected. This requires no code changes — configuration only.
+
+### Corporate LLM Proxy (no direct internet)
+
+Running inside a corporate network where cloud agents must go through an **internal
+Anthropic-compatible LLM proxy** (and direct Anthropic/OpenRouter access is blocked)?
+That's a configuration-only setup too — set `ANTHROPIC_BASE_URL` to the proxy's vendor path
+and `TAVILY_API_KEY` for web search. The full walkthrough, including the path/auth/web-search
+gotchas and terminal verification commands (useful when Claude Code isn't available),
+is in **[docs/corporate-proxy-setup.md](docs/corporate-proxy-setup.md)**.
 
 ### Multi-Environment Setup
 
