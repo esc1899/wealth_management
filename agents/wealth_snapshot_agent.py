@@ -421,10 +421,20 @@ class WealthSnapshotAgent:
             is_auto = cfg.auto_fetch if cfg else False
 
             if not is_auto:
-                # Manual / non-tradeable: use stored estimated_value
+                # Manual / non-tradeable: same value chain as get_portfolio_valuation —
+                # estimated_value > purchase_price×qty > purchase_price > cash quantity
                 est_val = (pos.extra_data or {}).get("estimated_value")
                 if est_val is not None:
                     v = float(est_val)
+                elif pos.purchase_price is not None and pos.quantity is not None:
+                    v = pos.purchase_price * pos.quantity
+                elif pos.purchase_price is not None:
+                    v = pos.purchase_price
+                elif is_cash_unit(pos.unit) and pos.quantity is not None:
+                    v = float(pos.quantity)
+                else:
+                    v = None
+                if v is not None:
                     total += v
                     breakdown[pos.asset_class] = breakdown.get(pos.asset_class, 0.0) + v
                 else:
@@ -531,9 +541,14 @@ class WealthSnapshotAgent:
             ac = h.get("asset_class")
             ticker = h.get("ticker")
             qty = h.get("quantity")
+            cfg = registry.get(ac)
+            is_auto = cfg.auto_fetch if cfg else True
 
-            if not ticker or qty is None:
-                # Cash / manual / non-tradeable: keep the value recorded that day
+            if not is_auto or not ticker or qty is None:
+                # Cash / manual / non-tradeable: keep the value recorded that day.
+                # The registry check is essential: manual positions can carry a
+                # pseudo-ticker (symbol = name) and quantity — they must never
+                # be routed through the market-price lookup.
                 val = h.get("value_eur")
                 if val is None:
                     missing.append(h.get("name"))
@@ -551,7 +566,15 @@ class WealthSnapshotAgent:
             if price is None:
                 price = self._market.get_price_for_date_or_prior(ticker, date_str, max_days_back=5)
             if price is None:
-                missing.append(h.get("name"))
+                # No price even after re-fetch: keep the recorded value — it was
+                # observed on that very day and beats dropping the position to 0.
+                val = h.get("value_eur")
+                if val is None:
+                    missing.append(h.get("name"))
+                else:
+                    approximated += 1
+                    total += val
+                    breakdown[ac] = breakdown.get(ac, 0.0) + val
                 updated.append(h)
                 continue
             if not is_exact:

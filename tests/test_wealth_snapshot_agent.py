@@ -695,15 +695,17 @@ class TestErrorHandling:
 
 
 def _make_position(ticker="AAPL", asset_class="Aktie", quantity=10.0, unit="Stück",
-                   auto_fetch=True, extra_data=None) -> Position:
+                   auto_fetch=True, extra_data=None, purchase_price=None,
+                   name="Test") -> Position:
     return Position(
         id=1,
-        name="Test",
+        name=name,
         asset_class=asset_class,
         investment_type=asset_class,
         ticker=ticker,
         quantity=quantity,
         unit=unit,
+        purchase_price=purchase_price,
         in_portfolio=True,
         added_date=date(2026, 1, 1),
         extra_data=extra_data or {},
@@ -893,6 +895,21 @@ class TestRecalculateSnapshot:
         agent.recalculate_snapshot("2026-01-15")
         call_kwargs = wealth_repo.create.call_args[1]
         assert call_kwargs["total_eur"] == pytest.approx(expected_value)
+
+    def test_recalculate_manual_position_falls_back_to_purchase_price(self):
+        # Regression („BB Bank - Festgeld"): a manual position without
+        # estimated_value must be valued like get_portfolio_valuation does
+        # (purchase_price fallback), not reported as missing.
+        pos = _make_position(
+            ticker=None, asset_class="Festgeld", quantity=None,
+            purchase_price=40_000.0, name="BB Bank - Festgeld",
+        )
+        agent, wealth_repo = self._make_agent([pos], price_map={})
+        agent.recalculate_snapshot("2026-01-15")
+        call_kwargs = wealth_repo.create.call_args[1]
+        assert call_kwargs["total_eur"] == pytest.approx(40_000.0)
+        assert call_kwargs["missing_pos"] is None
+        assert call_kwargs["coverage_pct"] == pytest.approx(100.0)
 
 
 class TestTakeDividendSnapshot:
@@ -1140,6 +1157,51 @@ class TestRecalculateHoldingsAware:
         call = wealth_repo.create.call_args[1]
         assert call["total_eur"] == pytest.approx(5000.0)
         market_repo.get_price_for_date_or_prior.assert_not_called()
+
+    def test_manual_class_holding_with_pseudo_ticker_keeps_recorded_value(self):
+        # Regression (2026-07-01 rebuild): manual positions carry a pseudo-ticker
+        # (symbol = name) and quantity=1.0 — they must be routed by asset class,
+        # never through the market-price lookup, or their value silently vanishes.
+        market_repo = Mock(spec=MarketDataRepository)
+        market_repo.get_price_for_date_or_prior.return_value = None
+        holdings = [
+            {"name": "Wohnung", "ticker": "Wohnung", "asset_class": "Immobilie",
+             "quantity": 1.0, "unit": "Stück", "price_eur": 500_000.0, "value_eur": 500_000.0},
+        ]
+        existing = Mock(id=5, holdings=holdings)
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        wealth_repo.get_by_date.return_value = existing
+        wealth_repo.create.return_value = Mock(coverage_pct=100.0)
+        agent = WealthSnapshotAgent(
+            positions_repo=Mock(spec=PositionsRepository), market_repo=market_repo,
+            wealth_repo=wealth_repo, market_data_agent=Mock(),
+        )
+        agent.recalculate_snapshot("2026-06-27")
+        call = wealth_repo.create.call_args[1]
+        assert call["total_eur"] == pytest.approx(500_000.0)
+        assert call["missing_pos"] is None
+        assert call["coverage_pct"] == pytest.approx(100.0)
+        market_repo.get_price_for_date_or_prior.assert_not_called()
+
+    def test_unpriceable_ticker_falls_back_to_recorded_value(self):
+        # A tradeable holding whose price cannot be found (even after re-fetch)
+        # keeps its recorded value instead of dropping out of the total.
+        market_repo = Mock(spec=MarketDataRepository)
+        market_repo.get_price_for_date_or_prior.return_value = None
+        holdings = [{"name": "Apple", "ticker": "AAPL", "asset_class": "Aktie",
+                     "quantity": 10.0, "unit": "Stück", "price_eur": 90.0, "value_eur": 900.0}]
+        existing = Mock(id=6, holdings=holdings)
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        wealth_repo.get_by_date.return_value = existing
+        wealth_repo.create.return_value = Mock(coverage_pct=100.0)
+        agent = WealthSnapshotAgent(
+            positions_repo=Mock(spec=PositionsRepository), market_repo=market_repo,
+            wealth_repo=wealth_repo, market_data_agent=Mock(),
+        )
+        agent.recalculate_snapshot("2026-01-15")
+        call = wealth_repo.create.call_args[1]
+        assert call["total_eur"] == pytest.approx(900.0)
+        assert call["missing_pos"] is None
 
 
 class TestComputeEodDayChange:
