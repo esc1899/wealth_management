@@ -778,6 +778,8 @@ health:
   sidebar_status_ok: "System OK"
   sidebar_status_warning: "Setup-Hinweise vorhanden — Details in den Einstellungen"
   sidebar_status_error: "Setup-Problem erkannt — Details in den Einstellungen"
+  sidebar_scheduler_failed: "Scheduler: {n} Job(s) fehlgeschlagen"
+  sidebar_scheduler_link: "Zur Ausführungshistorie"
   checks:
     ollama_remote:
       title: "Lokale Agents nicht privat"

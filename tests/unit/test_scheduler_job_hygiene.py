@@ -130,6 +130,67 @@ def test_start_closes_orphaned_runs(scheduler, conn, job_id):
 
 
 # ------------------------------------------------------------------
+# Sidebar warning: jobs whose latest run failed
+# ------------------------------------------------------------------
+
+def _add_job(conn, enabled: bool = True) -> int:
+    job = ScheduledJobsRepository(conn).add(
+        ScheduledJob(
+            agent_name="wealth_snapshot",
+            skill_name="",
+            skill_prompt="",
+            frequency="daily",
+            run_hour=20,
+            run_minute=0,
+            enabled=enabled,
+        )
+    )
+    if not enabled:
+        ScheduledJobsRepository(conn).set_enabled(job.id, False)
+    return job.id
+
+
+def test_failed_latest_run_counts(runs_repo, conn):
+    """Latest run failed → job counts once, regardless of older failures."""
+    job = _add_job(conn)
+    runs_repo.fail(runs_repo.create(job).id, "Boom 1")
+    runs_repo.fail(runs_repo.create(job).id, "Boom 2")
+
+    assert runs_repo.count_jobs_with_failed_latest_run() == 1
+
+
+def test_recovered_job_stops_warning(runs_repo, conn):
+    """Green run after red ones clears the warning — old failures don't linger."""
+    job = _add_job(conn)
+    runs_repo.fail(runs_repo.create(job).id, "Boom")
+    runs_repo.complete(runs_repo.create(job).id)
+
+    assert runs_repo.count_jobs_with_failed_latest_run() == 0
+
+
+def test_disabled_job_does_not_warn(runs_repo, conn):
+    """A deactivated job's failures are irrelevant."""
+    job = _add_job(conn, enabled=False)
+    runs_repo.fail(runs_repo.create(job).id, "Boom")
+
+    assert runs_repo.count_jobs_with_failed_latest_run() == 0
+
+
+def test_job_without_runs_does_not_warn(runs_repo, conn):
+    _add_job(conn)
+
+    assert runs_repo.count_jobs_with_failed_latest_run() == 0
+
+
+def test_running_job_does_not_warn(runs_repo, conn):
+    """An in-flight run is not a failure."""
+    job = _add_job(conn)
+    runs_repo.create(job)
+
+    assert runs_repo.count_jobs_with_failed_latest_run() == 0
+
+
+# ------------------------------------------------------------------
 # Daily wealth snapshot job
 # ------------------------------------------------------------------
 

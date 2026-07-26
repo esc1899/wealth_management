@@ -67,6 +67,7 @@ if config.DEMO_MODE:
 # Other agents are lazy-loaded when pages access them via @st.cache_resource
 from state import (  # noqa: E402
     get_portfolio_agent, get_market_agent, get_agent_scheduler, get_cowork_watcher,
+    get_scheduled_job_runs_repo,
 )
 get_portfolio_agent()  # Portfolio Chat critical path
 get_market_agent()      # Price auto-fetch scheduler
@@ -175,6 +176,19 @@ with st.sidebar:
         st.warning(t("health.sidebar_status_warning"), icon=":material/warning:")
     else:
         st.success(t("health.sidebar_status_ok"), icon=":material/check_circle:")
+
+    # Scheduler runtime status: only visible when the latest run of an enabled
+    # job failed — recovered jobs (green after red) clear the warning immediately.
+    try:
+        _failed_jobs = get_scheduled_job_runs_repo().count_jobs_with_failed_latest_run()
+    except Exception:
+        _failed_jobs = 0  # never block the app over a status query
+    if _failed_jobs:
+        st.warning(
+            t("health.sidebar_scheduler_failed").format(n=_failed_jobs),
+            icon=":material/schedule:",
+        )
+        st.page_link("pages/scheduler.py", label=t("health.sidebar_scheduler_link"))
 
 # Language switcher in sidebar
 with st.sidebar:

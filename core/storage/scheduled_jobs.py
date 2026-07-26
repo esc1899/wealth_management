@@ -170,6 +170,25 @@ class ScheduledJobRunsRepository:
         )
         self._conn.commit()
 
+    def count_jobs_with_failed_latest_run(self) -> int:
+        """Number of enabled jobs whose most recent run failed.
+
+        Feeds the sidebar warning: only the latest run per job counts, so a job
+        that has recovered (green run after red ones) stops warning immediately.
+        """
+        row = self._conn.execute(
+            """
+            SELECT COUNT(*) FROM scheduled_jobs j
+            JOIN scheduled_job_runs r ON r.id = (
+                SELECT id FROM scheduled_job_runs
+                WHERE job_id = j.id
+                ORDER BY started_at DESC, id DESC LIMIT 1
+            )
+            WHERE j.enabled = 1 AND r.status = 'failed'
+            """
+        ).fetchone()
+        return row[0]
+
     def get_for_job(self, job_id: int, limit: int = 10) -> List[ScheduledJobRun]:
         rows = self._conn.execute(
             "SELECT * FROM scheduled_job_runs WHERE job_id = ? ORDER BY started_at DESC LIMIT ?",
