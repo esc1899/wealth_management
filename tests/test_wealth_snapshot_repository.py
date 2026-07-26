@@ -160,6 +160,32 @@ class TestUpdate:
         assert updated.breakdown == {"Aktie": 270_000, "Immobilie": 250_000}
         assert updated.note == "Corrected Aktie valuation"
         assert updated.is_manual is True  # marked as manual after update
+        assert updated.is_edited is True  # hand-entered value, not computed
+
+    def test_update_marks_snapshot_as_hand_edited_in_db(self, repo):
+        """is_edited must survive a reload — the daily job reads it to decide
+        whether it may overwrite the day's snapshot."""
+        created = repo.create(
+            date_str="2026-04-10",
+            total_eur=500_000.0,
+            breakdown={"Aktie": 500_000},
+        )
+        assert repo.get_by_date("2026-04-10").is_edited is False
+
+        repo.update(created.id, total_eur=520_000.0, breakdown={"Aktie": 520_000})
+
+        assert repo.get_by_date("2026-04-10").is_edited is True
+
+    def test_computed_snapshot_is_not_marked_edited(self, repo):
+        """A recomputed snapshot ("Snapshot jetzt", Reprice) stays overwritable."""
+        snapshot = repo.create(
+            date_str="2026-04-11",
+            total_eur=500_000.0,
+            breakdown={"Aktie": 500_000},
+            is_manual=True,
+        )
+        assert snapshot.is_manual is True
+        assert snapshot.is_edited is False
 
     def test_update_nonexistent_snapshot_fails(self, repo):
         with pytest.raises(ValueError, match="not found"):

@@ -69,6 +69,7 @@ class AgentSchedulerService:
 
     def start(self) -> None:
         self._scheduler.start()
+        self._close_orphaned_runs()
         self._reload_jobs()
         logger.info("AgentSchedulerService started")
 
@@ -147,6 +148,18 @@ class AgentSchedulerService:
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
+
+    def _close_orphaned_runs(self) -> None:
+        """Mark runs left 'running' by a previous process as failed (see fail_orphaned)."""
+        conn = self._open_conn()
+        try:
+            closed = ScheduledJobRunsRepository(conn).fail_orphaned()
+            if closed:
+                logger.info("Closed %s orphaned job run(s) from a previous process", closed)
+        except Exception:
+            logger.exception("Closing orphaned job runs failed")
+        finally:
+            conn.close()
 
     def _reload_jobs(self) -> None:
         # Remove all existing agent jobs
@@ -766,8 +779,23 @@ class AgentSchedulerService:
             market_data_agent=market_data_agent,
         )
 
-        snapshot = agent.take_snapshot(is_manual=False)
-        _log(f"Snapshot: {snapshot.total_eur:,.0f} EUR ({int(snapshot.coverage_pct)}% Abdeckung)")
+        # This job owns the end-of-day value. There is almost always a snapshot for
+        # today already — from the post-fetch hook, or from an intraday "Snapshot
+        # jetzt" click — and an intraday value must not survive as the day's record,
+        # so overwrite it. Failing instead (the old behaviour) also turned the job
+        # permanently red and hid real errors. Only a hand-entered total is kept:
+        # that one cannot be recomputed from prices.
+        from datetime import date as _date
+
+        today = _date.today().isoformat()
+        existing = wealth_repo.get_by_date(today)
+        if existing is not None and existing.is_edited:
+            _log(f"Snapshot für {today} wurde von Hand gesetzt — nicht überschrieben")
+            return
+
+        snapshot = agent.take_snapshot(is_manual=False, overwrite=existing is not None)
+        prefix = "Snapshot aktualisiert" if existing is not None else "Snapshot"
+        _log(f"{prefix}: {snapshot.total_eur:,.0f} EUR ({int(snapshot.coverage_pct)}% Abdeckung)")
 
     async def _run_monthly_digest_job(self, job: ScheduledJob, conn, log_fn=None) -> None:
         """Generate and persist the monthly portfolio digest (no LLM required)."""

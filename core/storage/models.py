@@ -608,7 +608,8 @@ class WealthSnapshot(BaseModel):
     breakdown: Dict[str, float]     # {"Aktie": 120000, "Immobilie": 80000, ...}
     coverage_pct: float             # % of positions with valid value
     missing_pos: Optional[List[str]] = None  # position names without value
-    is_manual: bool = False         # True = manually created or corrected
+    is_manual: bool = False         # True = not created by the scheduler (button, reprice, chat)
+    is_edited: bool = False         # True = total was set by hand, not computed from prices
     note: Optional[str] = None      # optional comment
     created_at: datetime
     # Composition at capture time: list of {name, ticker, asset_class, quantity, unit,

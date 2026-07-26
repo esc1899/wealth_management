@@ -90,7 +90,7 @@ class WealthSnapshotRepository:
         self._conn.execute(
             """
             UPDATE wealth_snapshots
-            SET total_eur = ?, breakdown = ?, note = ?, is_manual = 1
+            SET total_eur = ?, breakdown = ?, note = ?, is_manual = 1, is_edited = 1
             WHERE id = ?
             """,
             (total_eur, breakdown_json, note, snapshot_id),
@@ -104,7 +104,8 @@ class WealthSnapshotRepository:
             breakdown=breakdown,
             coverage_pct=coverage_pct,
             missing_pos=json.loads(missing_pos_json),
-            is_manual=True,  # always mark as manual after update
+            is_manual=True,   # always mark as manual after update
+            is_edited=True,   # value came from a human, not from a price computation
             note=note,
             created_at=datetime.fromisoformat(
                 self._conn.execute(
@@ -230,6 +231,7 @@ class WealthSnapshotRepository:
             coverage_pct=row["coverage_pct"],
             missing_pos=json.loads(row["missing_pos"]) if row["missing_pos"] else None,
             is_manual=bool(row["is_manual"]),
+            is_edited=bool(row["is_edited"]) if "is_edited" in keys else False,
             note=row["note"],
             created_at=datetime.fromisoformat(row["created_at"]),
             holdings=json.loads(holdings_raw) if holdings_raw else None,

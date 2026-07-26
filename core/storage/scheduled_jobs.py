@@ -146,6 +146,23 @@ class ScheduledJobRunsRepository:
         )
         self._conn.commit()
 
+    def fail_orphaned(self, error_msg: str = "Abgebrochen (App-Neustart)") -> int:
+        """Close run rows left in 'running' by a killed process.
+
+        A run row only ever ends via complete()/fail() inside the executing process,
+        so a restart leaves in-flight runs stuck as 'running' forever. Call this once
+        at scheduler startup — before any job of this process can have started.
+        Returns the number of rows closed.
+        """
+        now = datetime.now(timezone.utc)
+        cur = self._conn.execute(
+            "UPDATE scheduled_job_runs SET status = 'failed', completed_at = ?, error_msg = ? "
+            "WHERE status = 'running'",
+            (now.isoformat(), error_msg[:500]),
+        )
+        self._conn.commit()
+        return cur.rowcount
+
     def append_log(self, run_id: int, msg: str) -> None:
         self._conn.execute(
             "UPDATE scheduled_job_runs SET log_output = COALESCE(log_output || char(10), '') || ? WHERE id = ?",

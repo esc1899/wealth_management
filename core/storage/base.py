@@ -243,6 +243,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             coverage_pct  REAL NOT NULL DEFAULT 100.0,
             missing_pos   TEXT,
             is_manual     INTEGER NOT NULL DEFAULT 0,
+            is_edited     INTEGER NOT NULL DEFAULT 0,
             note          TEXT,
             created_at    TEXT NOT NULL,
             holdings      TEXT
@@ -712,6 +713,14 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     existing_wealth_snap = {row[1] for row in conn.execute("PRAGMA table_info(wealth_snapshots)")}
     if "holdings" not in existing_wealth_snap:
         conn.execute("ALTER TABLE wealth_snapshots ADD COLUMN holdings TEXT")
+    # is_manual sagt nur "nicht vom Scheduler erzeugt" — das trifft auch auf jeden
+    # neu berechneten Snapshot zu (Button "Snapshot jetzt", Reprice, Recalculate).
+    # is_edited markiert nur den Fall, in dem ein Mensch den Wert selbst gesetzt hat;
+    # solche Zeilen darf der Tagesend-Job nicht überschreiben.
+    if "is_edited" not in existing_wealth_snap:
+        conn.execute(
+            "ALTER TABLE wealth_snapshots ADD COLUMN is_edited INTEGER NOT NULL DEFAULT 0"
+        )
 
     conn.commit()
 
