@@ -22,6 +22,13 @@ class SymbolDayPnL:
 
 
 @dataclass
+class SymbolContribution:
+    symbol: str
+    contribution_eur: float
+    delta_pct: Optional[float]
+
+
+@dataclass
 class SymbolPnL:
     symbol: str
     pnl_eur: float
@@ -102,9 +109,26 @@ def make_start_qty_resolver(valuations: Iterable, start_qty_map: Optional[dict])
     return resolve
 
 
-def sum_contributions_by_symbol(rows: Iterable) -> List[tuple[str, float]]:
-    """Sum ``contribution_eur`` of attribution rows per symbol, insertion-ordered."""
-    acc: dict[str, float] = {}
+def aggregate_contributions(rows: Iterable) -> List[SymbolContribution]:
+    """Sum attribution rows per symbol, insertion-ordered.
+
+    Percentage = summed contribution / summed start value, so a ticker held in two
+    depots reports the period return it actually had. Rows without a start value
+    (no historical data) still add their contribution but leave the percentage
+    undetermined for that share.
+    """
+    acc: dict[str, list[float]] = {}  # symbol -> [contribution_eur, start_value_eur]
     for r in rows:
-        acc[r.symbol] = acc.get(r.symbol, 0.0) + r.contribution_eur
-    return list(acc.items())
+        entry = acc.setdefault(r.symbol, [0.0, 0.0])
+        entry[0] += r.contribution_eur
+        start_value = getattr(r, "start_value_eur", None)
+        if start_value:
+            entry[1] += start_value
+    return [
+        SymbolContribution(
+            symbol=symbol,
+            contribution_eur=contribution,
+            delta_pct=(contribution / start_value * 100) if start_value > 0 else None,
+        )
+        for symbol, (contribution, start_value) in acc.items()
+    ]

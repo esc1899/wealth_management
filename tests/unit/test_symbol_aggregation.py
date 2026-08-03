@@ -7,11 +7,13 @@ sorted by the first position's value and the second stacked on top afterwards.
 from dataclasses import dataclass
 from typing import Optional
 
+import pytest
+
 from core.symbol_aggregation import (
+    aggregate_contributions,
     aggregate_day_pnl,
     aggregate_pnl,
     make_start_qty_resolver,
-    sum_contributions_by_symbol,
 )
 
 
@@ -31,6 +33,7 @@ class FakeValuation:
 class FakeAttributionRow:
     symbol: str
     contribution_eur: float
+    start_value_eur: Optional[float] = None
 
 
 class TestAggregateDayPnL:
@@ -108,14 +111,15 @@ class TestAggregatePnL:
         assert [s.symbol for s in aggregate_pnl(vals)] == ["A"]
 
 
-class TestSumContributionsBySymbol:
+class TestAggregateContributions:
     def test_duplicate_symbols_merged(self):
         rows = [
             FakeAttributionRow("SAP.DE", 100.0),
             FakeAttributionRow("AAPL", 500.0),
             FakeAttributionRow("SAP.DE", 200.0),
         ]
-        assert dict(sum_contributions_by_symbol(rows)) == {"SAP.DE": 300.0, "AAPL": 500.0}
+        result = {c.symbol: c.contribution_eur for c in aggregate_contributions(rows)}
+        assert result == {"SAP.DE": 300.0, "AAPL": 500.0}
 
     def test_preserves_first_appearance_order(self):
         rows = [
@@ -123,10 +127,22 @@ class TestSumContributionsBySymbol:
             FakeAttributionRow("A", 2.0),
             FakeAttributionRow("B", 3.0),
         ]
-        assert [sym for sym, _ in sum_contributions_by_symbol(rows)] == ["B", "A"]
+        assert [c.symbol for c in aggregate_contributions(rows)] == ["B", "A"]
+
+    def test_percentage_uses_summed_start_value(self):
+        # 300 gain on 2000 invested at period start -> 15 %
+        rows = [
+            FakeAttributionRow("SAP.DE", 100.0, start_value_eur=500.0),
+            FakeAttributionRow("SAP.DE", 200.0, start_value_eur=1500.0),
+        ]
+        assert aggregate_contributions(rows)[0].delta_pct == pytest.approx(15.0)
+
+    def test_percentage_none_without_start_value(self):
+        rows = [FakeAttributionRow("X", 100.0)]
+        assert aggregate_contributions(rows)[0].delta_pct is None
 
     def test_empty_input(self):
-        assert sum_contributions_by_symbol([]) == []
+        assert aggregate_contributions([]) == []
 
 
 class TestStartQtyResolver:

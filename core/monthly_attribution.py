@@ -35,6 +35,7 @@ class AttributionMonthRow:
     contribution_eur: float            # absolute €-gain/loss (unit-converted)
     contribution_pct: float            # contribution_eur / total_portfolio_start_value * 100
     dividend_contribution_eur: float = 0.0  # estimated: annual_dividend_eur / 12
+    start_value_eur: Optional[float] = None  # position value entering the period (delta_pct denominator)
 
 
 def compute_monthly_attribution(
@@ -160,6 +161,7 @@ def compute_monthly_attribution(
             contribution_eur=contribution_eur,
             contribution_pct=contribution_pct,
             dividend_contribution_eur=dividend_contribution_eur,
+            start_value_eur=start_val,
         ))
 
     rows.sort(key=lambda r: r.contribution_eur, reverse=True)

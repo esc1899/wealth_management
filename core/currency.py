@@ -38,6 +38,29 @@ def fmt(value: float, decimals: int = 2) -> str:
     return f"{sym} {value:,.{decimals}f}"
 
 
+def fmt_amount(value: float, decimals: int = 0, signed: bool = False) -> str:
+    """Format an amount in German notation with the currency symbol as suffix.
+
+    ``fmt()`` puts the symbol in front and leaves Python's ``1,234.56`` grouping in
+    place; chart labels and captions need the German ``1.234,56 €`` form, which is
+    why the swap was open-coded all over the pages.
+
+    Args:
+        value: The numeric value to format
+        decimals: Number of decimal places (default 0)
+        signed: Prefix a ``+`` for positive values (for gains/losses)
+    """
+    spec = f"{'+' if signed else ''},.{decimals}f"
+    formatted = format(value, spec).replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"{formatted} {symbol()}"
+
+
+def fmt_pct(value: float, decimals: int = 2, signed: bool = True) -> str:
+    """Format a percentage in German notation, e.g. ``+2,15 %``."""
+    spec = f"{'+' if signed else ''}.{decimals}f"
+    return f"{format(value, spec).replace('.', ',')} %"
+
+
 def is_cash_unit(unit: str) -> bool:
     """Check if a unit represents a monetary value (currency).
 

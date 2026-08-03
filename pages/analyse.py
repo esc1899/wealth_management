@@ -18,8 +18,9 @@ from core.macro_context import load_or_refresh_macro
 from core.monthly_attribution import compute_monthly_attribution
 from core.monthly_digest_generator import generate_monthly_digest
 from core.symbol_aggregation import (
-    aggregate_day_pnl, aggregate_pnl, sum_contributions_by_symbol,
+    aggregate_contributions, aggregate_day_pnl, aggregate_pnl,
 )
+from core.ui.charts import bar_label
 from core.yearly_attribution import compute_yearly_attribution
 from core.yearly_digest_generator import generate_yearly_digest
 from state import (
@@ -204,12 +205,7 @@ if day_rows:
         color=col_day_eur,
         color_continuous_scale=["red", "lightgrey", "green"],
         color_continuous_midpoint=0,
-        text=[
-            f"{row[col_day_pct]:+.2f}% ({'+' if row[col_day_eur] >= 0 else ''}{symbol()}{row[col_day_eur]:,.0f})"
-            .replace(",", "X").replace(".", ",").replace("X", ".")
-            if row[col_day_pct] is not None else ""
-            for _, row in df_day.iterrows()
-        ],
+        text=[bar_label(row[col_day_eur], row[col_day_pct]) for _, row in df_day.iterrows()],
     )
     fig_day.update_traces(textposition="outside")
     fig_day.update_layout(coloraxis_showscale=False, margin=dict(t=20))
@@ -279,15 +275,15 @@ if _attribution:
 
     if _rows_with_data:
         _df_attr = pd.DataFrame([
-            {"Symbol": sym, "Beitrag (€)": contrib}
-            for sym, contrib in sum_contributions_by_symbol(_rows_with_data)
+            {"Symbol": c.symbol, "Beitrag (€)": c.contribution_eur, "%": c.delta_pct}
+            for c in aggregate_contributions(_rows_with_data)
         ]).sort_values("Beitrag (€)")
         _fig_attr = px.bar(
             _df_attr, x="Symbol", y="Beitrag (€)",
             color="Beitrag (€)",
             color_continuous_scale=["red", "lightgrey", "green"],
             color_continuous_midpoint=0,
-            text=_df_attr["Beitrag (€)"].apply(lambda v: f"{v:+,.0f}€".replace(",", "X").replace(".", ",").replace("X", ".")),
+            text=[bar_label(row["Beitrag (€)"], row["%"]) for _, row in _df_attr.iterrows()],
         )
         _fig_attr.update_traces(textposition="outside")
         _fig_attr.update_layout(coloraxis_showscale=False, margin=dict(t=20))
@@ -405,15 +401,15 @@ if _year_attribution:
 
     if _year_rows_with_data:
         _df_year_attr = pd.DataFrame([
-            {"Symbol": sym, "Beitrag (€)": contrib}
-            for sym, contrib in sum_contributions_by_symbol(_year_rows_with_data)
+            {"Symbol": c.symbol, "Beitrag (€)": c.contribution_eur, "%": c.delta_pct}
+            for c in aggregate_contributions(_year_rows_with_data)
         ]).sort_values("Beitrag (€)")
         _fig_year_attr = px.bar(
             _df_year_attr, x="Symbol", y="Beitrag (€)",
             color="Beitrag (€)",
             color_continuous_scale=["red", "lightgrey", "green"],
             color_continuous_midpoint=0,
-            text=_df_year_attr["Beitrag (€)"].apply(lambda v: f"{v:+,.0f}€".replace(",", "X").replace(".", ",").replace("X", ".")),
+            text=[bar_label(row["Beitrag (€)"], row["%"]) for _, row in _df_year_attr.iterrows()],
         )
         _fig_year_attr.update_traces(textposition="outside")
         _fig_year_attr.update_layout(coloraxis_showscale=False, margin=dict(t=20))
@@ -505,7 +501,7 @@ if pnl_rows:
         color=col_pnl_eur,
         color_continuous_scale=["red", "lightgrey", "green"],
         color_continuous_midpoint=0,
-        text=df_pnl[col_pnl_pct].apply(lambda x: f"{x:+.1f}%" if x is not None else ""),
+        text=[bar_label(row[col_pnl_eur], row[col_pnl_pct]) for _, row in df_pnl.iterrows()],
     )
     fig_pnl.update_traces(textposition="outside")
     fig_pnl.update_layout(coloraxis_showscale=False, margin=dict(t=20))

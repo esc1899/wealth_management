@@ -32,6 +32,7 @@ class AttributionYearRow:
     contribution_eur: float
     contribution_pct: float
     dividend_contribution_eur: float = 0.0  # estimated: annual_dividend_eur (current rate, not actual payments)
+    start_value_eur: Optional[float] = None  # position value entering the period (delta_pct denominator)
 
 
 def compute_yearly_attribution(
@@ -145,6 +146,7 @@ def compute_yearly_attribution(
             contribution_eur=contribution_eur,
             contribution_pct=contribution_pct,
             dividend_contribution_eur=dividend_contribution_eur,
+            start_value_eur=start_val,
         ))
 
     rows.sort(key=lambda r: r.contribution_eur, reverse=True)
