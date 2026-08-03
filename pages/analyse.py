@@ -20,7 +20,7 @@ from core.monthly_digest_generator import generate_monthly_digest
 from core.symbol_aggregation import (
     aggregate_contributions, aggregate_day_pnl, aggregate_pnl,
 )
-from core.ui.charts import bar_label
+from core.ui.charts import bar_label, style_bar_chart
 from core.yearly_attribution import compute_yearly_attribution
 from core.yearly_digest_generator import generate_yearly_digest
 from state import (
@@ -207,8 +207,7 @@ if day_rows:
         color_continuous_midpoint=0,
         text=[bar_label(row[col_day_eur], row[col_day_pct]) for _, row in df_day.iterrows()],
     )
-    fig_day.update_traces(textposition="outside")
-    fig_day.update_layout(coloraxis_showscale=False, margin=dict(t=20))
+    style_bar_chart(fig_day)
     st.plotly_chart(fig_day, use_container_width=True)
 else:
     st.info(t("analysis.no_day_pnl"))
@@ -285,8 +284,7 @@ if _attribution:
             color_continuous_midpoint=0,
             text=[bar_label(row["Beitrag (€)"], row["%"]) for _, row in _df_attr.iterrows()],
         )
-        _fig_attr.update_traces(textposition="outside")
-        _fig_attr.update_layout(coloraxis_showscale=False, margin=dict(t=20))
+        style_bar_chart(_fig_attr)
         st.plotly_chart(_fig_attr, use_container_width=True)
 
     # Table
@@ -411,8 +409,7 @@ if _year_attribution:
             color_continuous_midpoint=0,
             text=[bar_label(row["Beitrag (€)"], row["%"]) for _, row in _df_year_attr.iterrows()],
         )
-        _fig_year_attr.update_traces(textposition="outside")
-        _fig_year_attr.update_layout(coloraxis_showscale=False, margin=dict(t=20))
+        style_bar_chart(_fig_year_attr)
         st.plotly_chart(_fig_year_attr, use_container_width=True)
 
     _year_table_rows = []
@@ -503,8 +500,7 @@ if pnl_rows:
         color_continuous_midpoint=0,
         text=[bar_label(row[col_pnl_eur], row[col_pnl_pct]) for _, row in df_pnl.iterrows()],
     )
-    fig_pnl.update_traces(textposition="outside")
-    fig_pnl.update_layout(coloraxis_showscale=False, margin=dict(t=20))
+    style_bar_chart(fig_pnl)
     st.plotly_chart(fig_pnl, use_container_width=True)
 else:
     st.info(t("analysis.no_pnl"))

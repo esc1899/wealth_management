@@ -5,7 +5,7 @@ first line, percentage on the second.
 """
 
 from core.currency import fmt_amount, fmt_pct
-from core.ui.charts import bar_label
+from core.ui.charts import bar_label, style_bar_chart
 
 
 class TestFmtAmount:
@@ -72,3 +72,49 @@ class TestLabelConsistencyAcrossCharts:
             assert amount_line.endswith(" €")
             assert pct_line.endswith(" %")
             assert amount_line[0] in "+-"
+
+
+class TestStyleBarChart:
+    """The two-line labels of the outermost bars were getting cut off — the charts
+    are sorted by value, so the first and last bar carry the extremes."""
+
+    def _fig(self, values):
+        import plotly.express as px
+        return px.bar(x=[f"S{i}" for i in range(len(values))], y=values)
+
+    def test_y_range_leaves_headroom_above_the_tallest_bar(self):
+        fig = self._fig([10.0, 500.0, 120.0])
+        style_bar_chart(fig)
+        low, high = fig.layout.yaxis.range
+        assert high > 500.0
+        assert low < 0.0  # baseline stays visible
+
+    def test_headroom_below_the_deepest_negative_bar(self):
+        fig = self._fig([-400.0, -20.0, 50.0])
+        style_bar_chart(fig)
+        low, high = fig.layout.yaxis.range
+        assert low < -400.0
+        assert high > 50.0
+
+    def test_labels_are_not_clipped_at_the_axis(self):
+        fig = self._fig([10.0, 20.0])
+        style_bar_chart(fig)
+        assert all(trace.cliponaxis is False for trace in fig.data)
+        assert all(trace.textposition == "outside" for trace in fig.data)
+
+    def test_all_zero_values_still_give_a_usable_range(self):
+        fig = self._fig([0.0, 0.0])
+        style_bar_chart(fig)
+        low, high = fig.layout.yaxis.range
+        assert low < high
+
+    def test_empty_chart_does_not_raise(self):
+        import plotly.graph_objects as go
+        fig = go.Figure(go.Bar(x=[], y=[]))  # px.bar rejects empty input
+        style_bar_chart(fig)  # no data → no explicit range, autorange stays
+        assert fig.layout.yaxis.range is None
+
+    def test_colorbar_is_hidden(self):
+        fig = self._fig([1.0, 2.0])
+        style_bar_chart(fig)
+        assert fig.layout.coloraxis.showscale is False
