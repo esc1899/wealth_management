@@ -290,3 +290,120 @@ class TestHoldingsBasedQuantity:
         rows = compute_monthly_attribution([v], repo, 2026, 1, today=date(2026, 3, 15), wealth_repo=wealth_repo)
         assert rows[0].quantity == 10.0
         assert rows[0].contribution_eur == pytest.approx(100.0)  # (110-100) * 10
+
+
+class TestTickerHeldInTwoDepots:
+    """Regression: snapshot holdings are keyed by ticker, so a ticker held twice
+    collapsed into one entry — both position rows then used a single depot's
+    quantity and the month's contribution came out far too small."""
+
+    def test_snapshot_quantity_is_split_across_positions(self):
+        repo = _make_market_repo([
+            ("SAP.DE", "2025-12-31", 100.0),  # start price
+            ("SAP.DE", "2026-01-31", 110.0),  # end price
+        ])
+        # Same ticker in two depots: 20 + 5 = 25 shares held
+        vals = [
+            _make_valuation("SAP.DE", current_price=200.0, quantity=20.0),
+            _make_valuation("SAP.DE", current_price=200.0, quantity=5.0),
+        ]
+        wealth_repo = MagicMock()
+        wealth_repo.holdings_near_date.return_value = {"SAP.DE": 25.0}  # summed by the repo
+        rows = compute_monthly_attribution(vals, repo, 2026, 1, today=date(2026, 3, 15), wealth_repo=wealth_repo)
+
+        assert sum(r.quantity for r in rows) == pytest.approx(25.0)
+        # (110-100) * 25 — not (110-100) * 25 counted twice, nor a single depot's share
+        assert sum(r.contribution_eur for r in rows) == pytest.approx(250.0)
+
+    def test_month_contribution_matches_full_holding(self):
+        """The gain must equal the one a single merged position would produce."""
+        repo = _make_market_repo([("X", "2025-12-31", 100.0), ("X", "2026-01-31", 110.0)])
+        wealth_repo = MagicMock()
+        wealth_repo.holdings_near_date.return_value = {"X": 25.0}
+
+        split = compute_monthly_attribution(
+            [_make_valuation("X", current_price=110.0, quantity=20.0),
+             _make_valuation("X", current_price=110.0, quantity=5.0)],
+            repo, 2026, 1, today=date(2026, 3, 15), wealth_repo=wealth_repo,
+        )
+        merged = compute_monthly_attribution(
+            [_make_valuation("X", current_price=110.0, quantity=25.0)],
+            repo, 2026, 1, today=date(2026, 3, 15), wealth_repo=wealth_repo,
+        )
+        assert sum(r.contribution_eur for r in split) == pytest.approx(
+            sum(r.contribution_eur for r in merged)
+        )
+
+    def test_excluded_position_drops_only_its_share(self):
+        repo = _make_market_repo([("X", "2025-12-31", 100.0), ("X", "2026-01-31", 110.0)])
+        v_keep = _make_valuation("X", current_price=110.0, quantity=20.0)
+        v_drop = _make_valuation("X", current_price=110.0, quantity=5.0)
+        v_drop.analysis_excluded = True
+        wealth_repo = MagicMock()
+        wealth_repo.holdings_near_date.return_value = {"X": 25.0}
+
+        rows = compute_monthly_attribution(
+            [v_keep, v_drop], repo, 2026, 1, today=date(2026, 3, 15), wealth_repo=wealth_repo,
+        )
+        assert len(rows) == 1
+        assert rows[0].quantity == pytest.approx(20.0)  # not the full 25
+        assert rows[0].contribution_eur == pytest.approx(200.0)
+
+
+class TestNotYetHeld:
+    """Regression: a position bought in April produced a contribution in January —
+    `bought_mid_period` used cost_basis as start value for every month before the
+    purchase, so months the position wasn't held at all showed a gain."""
+
+    def test_position_bought_after_month_contributes_nothing(self):
+        repo = _make_market_repo([
+            ("LATE", "2025-12-31", 100.0),
+            ("LATE", "2026-01-30", 150.0),
+        ])
+        v = _make_valuation("LATE", current_price=200.0, quantity=10.0,
+                            purchase_date=date(2026, 4, 29), cost_basis_eur=1800.0)
+        rows = compute_monthly_attribution([v], repo, 2026, 1, today=date(2026, 8, 3))
+        assert rows[0].contribution_eur == 0.0
+        assert rows[0].delta_pct is None
+
+    def test_purchase_month_still_uses_cost_basis(self):
+        repo = _make_market_repo([
+            ("LATE", "2026-03-31", 100.0),
+            ("LATE", "2026-04-30", 200.0),
+        ])
+        v = _make_valuation("LATE", current_price=200.0, quantity=10.0,
+                            purchase_date=date(2026, 4, 29), cost_basis_eur=1800.0)
+        rows = compute_monthly_attribution([v], repo, 2026, 4, today=date(2026, 8, 3))
+        assert rows[0].contribution_eur == pytest.approx(200.0)  # 200*10 - 1800
+
+    def test_month_after_purchase_uses_price_return(self):
+        repo = _make_market_repo([
+            ("LATE", "2026-04-30", 200.0),
+            ("LATE", "2026-05-29", 210.0),
+        ])
+        v = _make_valuation("LATE", current_price=210.0, quantity=10.0,
+                            purchase_date=date(2026, 4, 29), cost_basis_eur=1800.0)
+        rows = compute_monthly_attribution([v], repo, 2026, 5, today=date(2026, 8, 3))
+        assert rows[0].contribution_eur == pytest.approx(100.0)  # (210-200)*10
+
+    def test_monthly_contributions_sum_to_the_ytd_figure(self):
+        """Telescoping property: the months a position was held must add up to the
+        gain since purchase — that is what YTD reports."""
+        from core.yearly_attribution import compute_yearly_attribution
+        prices = [
+            ("X", "2025-12-31", 100.0),
+            ("X", "2026-01-30", 110.0), ("X", "2026-02-27", 120.0),
+            ("X", "2026-03-31", 130.0), ("X", "2026-04-30", 140.0),
+        ]
+        repo = _make_market_repo(prices)
+        v = _make_valuation("X", current_price=150.0, quantity=10.0,
+                            purchase_date=date(2026, 3, 11), cost_basis_eur=1250.0)
+        today = date(2026, 5, 15)
+        months = sum(
+            r.contribution_eur
+            for mo in range(1, 6)
+            for r in compute_monthly_attribution([v], repo, 2026, mo, today=today)
+        )
+        # 2026 is the running year, so YTD also ends on the live price
+        ytd = sum(r.contribution_eur for r in compute_yearly_attribution([v], repo, 2026))
+        assert months == pytest.approx(ytd)

@@ -17,6 +17,9 @@ from core.trading_calendar import is_trading_day, last_trading_day
 from core.macro_context import load_or_refresh_macro
 from core.monthly_attribution import compute_monthly_attribution
 from core.monthly_digest_generator import generate_monthly_digest
+from core.symbol_aggregation import (
+    aggregate_day_pnl, aggregate_pnl, sum_contributions_by_symbol,
+)
 from core.yearly_attribution import compute_yearly_attribution
 from core.yearly_digest_generator import generate_yearly_digest
 from state import (
@@ -172,14 +175,15 @@ st.subheader(t("analysis.day_pnl_header"))
 col_day_eur = t("analysis.day_pnl_col")
 col_day_pct = t("analysis.day_pnl_pct_col")
 
+# Aggregate per symbol first — the same ticker in two depots is one bar, and
+# sorting must use the merged value (see core/symbol_aggregation.py).
 day_rows = [
     {
-        "Symbol": v.symbol,
-        col_day_eur: v.day_pnl_eur,
-        col_day_pct: v.day_pnl_pct,
+        "Symbol": s.symbol,
+        col_day_eur: s.day_pnl_eur,
+        col_day_pct: s.day_pnl_pct,
     }
-    for v in valuations
-    if v.day_pnl_eur is not None
+    for s in aggregate_day_pnl(valuations)
 ]
 
 if day_rows:
@@ -275,8 +279,8 @@ if _attribution:
 
     if _rows_with_data:
         _df_attr = pd.DataFrame([
-            {"Symbol": r.symbol, "Beitrag (€)": r.contribution_eur}
-            for r in _rows_with_data
+            {"Symbol": sym, "Beitrag (€)": contrib}
+            for sym, contrib in sum_contributions_by_symbol(_rows_with_data)
         ]).sort_values("Beitrag (€)")
         _fig_attr = px.bar(
             _df_attr, x="Symbol", y="Beitrag (€)",
@@ -401,8 +405,8 @@ if _year_attribution:
 
     if _year_rows_with_data:
         _df_year_attr = pd.DataFrame([
-            {"Symbol": r.symbol, "Beitrag (€)": r.contribution_eur}
-            for r in _year_rows_with_data
+            {"Symbol": sym, "Beitrag (€)": contrib}
+            for sym, contrib in sum_contributions_by_symbol(_year_rows_with_data)
         ]).sort_values("Beitrag (€)")
         _fig_year_attr = px.bar(
             _df_year_attr, x="Symbol", y="Beitrag (€)",
@@ -490,8 +494,8 @@ col_pnl_pct = t("common.pnl_pct")
 col_value = t("common.value")
 
 pnl_rows = [
-    {"Symbol": v.symbol, col_pnl_eur: v.pnl_eur, col_pnl_pct: v.pnl_pct, col_value: v.current_value_eur}
-    for v in valuations if v.pnl_eur is not None
+    {"Symbol": s.symbol, col_pnl_eur: s.pnl_eur, col_pnl_pct: s.pnl_pct, col_value: s.value_eur}
+    for s in aggregate_pnl(valuations)
 ]
 
 if pnl_rows:
@@ -501,7 +505,7 @@ if pnl_rows:
         color=col_pnl_eur,
         color_continuous_scale=["red", "lightgrey", "green"],
         color_continuous_midpoint=0,
-        text=df_pnl[col_pnl_pct].apply(lambda x: f"{x:+.1f}%"),
+        text=df_pnl[col_pnl_pct].apply(lambda x: f"{x:+.1f}%" if x is not None else ""),
     )
     fig_pnl.update_traces(textposition="outside")
     fig_pnl.update_layout(coloraxis_showscale=False, margin=dict(t=20))

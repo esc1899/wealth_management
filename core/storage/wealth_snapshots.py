@@ -151,10 +151,14 @@ class WealthSnapshotRepository:
     def holdings_near_date(
         self, date_str: str, window_days: int = 10
     ) -> Optional[Dict[str, float]]:
-        """Return ``{ticker: quantity}`` from the holdings-bearing snapshot closest to
-        ``date_str`` within ±window. Used by attribution to value a period against its
+        """Return ``{ticker: total_quantity}`` from the holdings-bearing snapshot closest
+        to ``date_str`` within ±window. Used by attribution to value a period against its
         *actual* held quantities instead of today's. Returns None if no snapshot in the
         window carries composition (legacy snapshots without ``holdings``).
+
+        Holdings are stored per *position*, so a ticker held in two depots appears twice.
+        Quantities are summed into one entry — callers get the total held per ticker, not
+        an arbitrary single depot's share.
         """
         row = self._conn.execute(
             """
@@ -173,7 +177,7 @@ class WealthSnapshotRepository:
             ticker = h.get("ticker")
             qty = h.get("quantity")
             if ticker and qty is not None:
-                qty_map[ticker] = qty
+                qty_map[ticker] = qty_map.get(ticker, 0.0) + qty
         return qty_map or None
 
     def get_by_id(self, snapshot_id: int) -> Optional[WealthSnapshot]:

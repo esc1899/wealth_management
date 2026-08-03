@@ -282,3 +282,10 @@ class TestHoldingsNearDate:
     def test_ignores_snapshots_without_holdings(self, repo):
         repo.create(date_str="2026-01-02", total_eur=50.0, breakdown={"Aktie": 50.0})  # legacy, no holdings
         assert repo.holdings_near_date("2026-01-01", window_days=10) is None
+
+    def test_sums_quantity_of_ticker_held_in_two_depots(self, repo):
+        """Holdings are stored per position — the same ticker in two depots must add up,
+        not have one entry overwrite the other (attribution reads the total held)."""
+        repo.create(date_str="2026-01-02", total_eur=250.0, breakdown={"Aktie": 250.0},
+                    holdings=[self._holding("SAP.DE", 20.0), self._holding("SAP.DE", 5.0)])
+        assert repo.holdings_near_date("2026-01-01", window_days=10) == {"SAP.DE": 25.0}

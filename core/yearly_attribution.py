@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from datetime import date
 from typing import List, Optional
 
+from core.symbol_aggregation import make_start_qty_resolver
+
 
 _TROY_OZ_TO_G = 31.1035
 
@@ -64,13 +66,11 @@ def compute_yearly_attribution(
     prev_year_start = f"{year - 1:04d}-01-01"
     prev_year_end = f"{year - 1:04d}-12-31"
 
-    # Quantity held at the start of the year (forward-only; None → today's qty)
+    # Quantity held at the start of the year (forward-only; None → today's qty).
+    # Snapshot holdings are keyed by ticker — the resolver splits a ticker held in
+    # several depots back across its positions.
     start_qty_map = wealth_repo.holdings_near_date(year_start) if wealth_repo is not None else None
-
-    def _start_qty(v):
-        if start_qty_map and start_qty_map.get(v.symbol) is not None:
-            return start_qty_map[v.symbol]
-        return v.quantity
+    _start_qty = make_start_qty_resolver(valuations, start_qty_map)
 
     portfolio_vals = [
         v for v in valuations
@@ -83,9 +83,13 @@ def compute_yearly_attribution(
     if total_end_value == 0:
         return []
 
+    period_end_date = date(year, 12, 31)
     total_start_value = 0.0
     for v in portfolio_vals:
-        sv = _get_start_value_yearly(market_repo, v, prev_year_start, prev_year_end, period_start, _start_qty(v))
+        sv = _get_start_value_yearly(
+            market_repo, v, prev_year_start, prev_year_end, period_start,
+            _start_qty(v), period_end=period_end_date,
+        )
         if sv:
             total_start_value += sv
 
@@ -95,9 +99,15 @@ def compute_yearly_attribution(
         qty = _start_qty(v)
 
         purchase_date = getattr(v, "purchase_date", None)
+        # Not held during this year at all — a later purchase must not produce a
+        # contribution in years before it was bought.
+        not_yet_held = purchase_date is not None and purchase_date > period_end_date
         bought_mid_period = purchase_date is not None and purchase_date > period_start
 
-        if bought_mid_period and getattr(v, "cost_basis_eur", None):
+        if not_yet_held:
+            start_val = None
+            start_price = None
+        elif bought_mid_period and getattr(v, "cost_basis_eur", None):
             start_val = v.cost_basis_eur
             start_price = None
         else:
@@ -141,9 +151,15 @@ def compute_yearly_attribution(
     return rows
 
 
-def _get_start_value_yearly(market_repo, v, prev_year_start: str, prev_year_end: str, period_start: date, start_qty=None) -> Optional[float]:
-    """Return start value for a valuation, using cost_basis_eur for mid-period purchases."""
+def _get_start_value_yearly(market_repo, v, prev_year_start: str, prev_year_end: str, period_start: date, start_qty=None, period_end: Optional[date] = None) -> Optional[float]:
+    """Return start value for a valuation, using cost_basis_eur for mid-period purchases.
+
+    Positions bought after ``period_end`` weren't held yet and contribute nothing —
+    they must stay out of the ``contribution_pct`` denominator too.
+    """
     purchase_date = getattr(v, "purchase_date", None)
+    if period_end is not None and purchase_date is not None and purchase_date > period_end:
+        return None
     if purchase_date is not None and purchase_date > period_start:
         return getattr(v, "cost_basis_eur", None)
     qty = start_qty if start_qty is not None else v.quantity

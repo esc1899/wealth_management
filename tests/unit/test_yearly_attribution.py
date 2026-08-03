@@ -274,3 +274,56 @@ class TestHoldingsBasedQuantityYearly:
         rows = compute_yearly_attribution([v], repo, 2025, wealth_repo=wealth_repo)
         assert rows[0].quantity == 10.0
         assert rows[0].contribution_eur == pytest.approx(100.0)
+
+
+class TestTickerHeldInTwoDepotsYearly:
+    """Same regression as the monthly attribution: snapshot holdings are keyed by
+    ticker, so a ticker held in two depots must be split across its positions."""
+
+    def test_snapshot_quantity_is_split_across_positions(self):
+        repo = _make_market_repo([
+            ("SAP.DE", "2024-12-31", 100.0),
+            ("SAP.DE", "2025-12-31", 110.0),
+        ])
+        vals = [
+            _make_valuation("SAP.DE", current_price=200.0, quantity=20.0),
+            _make_valuation("SAP.DE", current_price=200.0, quantity=5.0),
+        ]
+        wealth_repo = MagicMock()
+        wealth_repo.holdings_near_date.return_value = {"SAP.DE": 25.0}
+        rows = compute_yearly_attribution(vals, repo, 2025, wealth_repo=wealth_repo)
+
+        assert sum(r.quantity for r in rows) == pytest.approx(25.0)
+        assert sum(r.contribution_eur for r in rows) == pytest.approx(250.0)
+
+    def test_excluded_position_drops_only_its_share(self):
+        repo = _make_market_repo([("X", "2024-12-31", 100.0), ("X", "2025-12-31", 110.0)])
+        v_keep = _make_valuation("X", current_price=110.0, quantity=20.0)
+        v_drop = _make_valuation("X", current_price=110.0, quantity=5.0)
+        v_drop.analysis_excluded = True
+        wealth_repo = MagicMock()
+        wealth_repo.holdings_near_date.return_value = {"X": 25.0}
+
+        rows = compute_yearly_attribution([v_keep, v_drop], repo, 2025, wealth_repo=wealth_repo)
+        assert len(rows) == 1
+        assert rows[0].quantity == pytest.approx(20.0)
+
+
+class TestNotYetHeldYearly:
+    def test_position_bought_after_the_year_contributes_nothing(self):
+        repo = _make_market_repo([
+            ("LATE", "2024-12-31", 100.0),
+            ("LATE", "2025-12-31", 150.0),
+        ])
+        v = _make_valuation("LATE", current_price=200.0, quantity=10.0,
+                            purchase_date=date(2026, 4, 29), cost_basis_eur=1800.0)
+        rows = compute_yearly_attribution([v], repo, 2025)
+        assert rows[0].contribution_eur == 0.0
+        assert rows[0].delta_pct is None
+
+    def test_purchase_year_uses_cost_basis(self):
+        repo = _make_market_repo([("LATE", "2024-12-31", 100.0), ("LATE", "2025-12-31", 200.0)])
+        v = _make_valuation("LATE", current_price=200.0, quantity=10.0,
+                            purchase_date=date(2025, 4, 29), cost_basis_eur=1800.0)
+        rows = compute_yearly_attribution([v], repo, 2025)
+        assert rows[0].contribution_eur == pytest.approx(200.0)  # 200*10 - 1800
