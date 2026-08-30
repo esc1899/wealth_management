@@ -4,6 +4,7 @@ and EUR conversion. This is the only module that imports yfinance.
 """
 
 import logging
+import math
 import re
 import time
 import threading
@@ -51,6 +52,21 @@ class RateLimiter:
 def validate_symbol(symbol: str) -> bool:
     """Return True if symbol passes format validation."""
     return bool(SYMBOL_PATTERN.match(symbol.upper().strip()))
+
+
+def _positive_finite(value) -> Optional[float]:
+    """Coerce a yfinance field to a usable price, else None.
+
+    fast_info returns NaN (not None) for fields an instrument doesn't have —
+    e.g. regular_market_previous_close on ETFs like EUNL.DE. NaN passes every
+    truthiness check and fails every comparison, so it has to be filtered
+    explicitly or it silently swallows the fallback.
+    """
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return f if math.isfinite(f) and f > 0 else None
 
 
 class MarketDataFetcher:
@@ -259,11 +275,18 @@ class MarketDataFetcher:
         eur_rate = self._get_eur_rate(currency)
         price_eur = price * eur_rate
 
-        # Fetch previous close from fast_info (reuses same ticker, no extra network request)
+        # Fetch previous close from fast_info (reuses same ticker, no extra network request).
+        # regular_market_previous_close is the official close of the last regular session;
+        # previous_close is the chart-metadata value and can be off by a session
+        # (SAP.DE on 2026-08-28: 190.58 instead of the real 189.88). Only use the latter
+        # as a fallback for symbols that don't expose the regular-market field.
         previous_close_eur: Optional[float] = None
         try:
-            raw_prev = getattr(ticker.fast_info, "previous_close", None)
-            if raw_prev and raw_prev > 0:
+            fi = ticker.fast_info
+            raw_prev = _positive_finite(getattr(fi, "regular_market_previous_close", None))
+            if raw_prev is None:
+                raw_prev = _positive_finite(getattr(fi, "previous_close", None))
+            if raw_prev is not None:
                 if currency == "GBP":  # was GBp before conversion above
                     raw_prev = raw_prev / 100
                 previous_close_eur = round(raw_prev * eur_rate, 6)

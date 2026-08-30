@@ -400,6 +400,7 @@ class WealthSnapshotAgent:
         *,
         max_days_back: int = 5,
         fetch_if_missing: bool = False,
+        refetched: Optional[set] = None,
     ) -> tuple:
         """Compute (total_eur, breakdown, missing, approximated) for one date.
 
@@ -408,6 +409,8 @@ class WealthSnapshotAgent:
         caller can report honest coverage. With fetch_if_missing=True, a ticker
         whose exact date is absent triggers a one-off 1y history re-fetch before
         falling back — so a stale neighbouring price no longer masks a gap.
+        ``refetched`` caps that at one re-fetch per ticker when a caller walks
+        several dates in a row (backfill).
 
         `approximated` counts auto-fetch positions priced from a neighbouring day.
         """
@@ -454,8 +457,11 @@ class WealthSnapshotAgent:
             # Exact-date lookup first (max_days_back=0 returns the price only on an exact hit)
             price = self._market.get_price_for_date_or_prior(pos.ticker, date_str, max_days_back=0)
             if price is None and fetch_if_missing:
-                self._market_data_agent.fetch_historical_for_symbol(pos.ticker)
-                price = self._market.get_price_for_date_or_prior(pos.ticker, date_str, max_days_back=0)
+                if refetched is None or pos.ticker.upper() not in refetched:
+                    if refetched is not None:
+                        refetched.add(pos.ticker.upper())
+                    self._market_data_agent.fetch_historical_for_symbol(pos.ticker)
+                    price = self._market.get_price_for_date_or_prior(pos.ticker, date_str, max_days_back=0)
 
             is_exact = price is not None
             if price is None:
@@ -488,6 +494,10 @@ class WealthSnapshotAgent:
         registry = get_asset_class_registry()
 
         created = 0
+        # One history re-fetch per ticker for the whole run: a day the app missed
+        # (app down, demo mode) otherwise gets priced from the previous close and
+        # the gap is never noticed — that is how 2026-08-27 ended up 7.7 k€ short.
+        refetched: set = set()
         for days_back in range(1, days + 1):
             target_date = today - timedelta(days=days_back)
             if target_date.weekday() >= 5:  # skip weekends
@@ -497,7 +507,8 @@ class WealthSnapshotAgent:
                 continue
 
             total, breakdown, missing, _ = self._compute_wealth_for_date(
-                target_str, positions, registry, max_days_back=3
+                target_str, positions, registry, max_days_back=3,
+                fetch_if_missing=True, refetched=refetched,
             )
             if total <= 0:
                 continue  # no data for this day (e.g. market holiday with no stored prices)

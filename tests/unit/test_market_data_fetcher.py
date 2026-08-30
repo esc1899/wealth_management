@@ -144,10 +144,17 @@ class TestRateLimiter:
 # fetch_current_prices
 # ------------------------------------------------------------------
 
-def _make_fast_info(price: float = 150.0, currency: str = "USD"):
+def _make_fast_info(
+    price: float = 150.0,
+    currency: str = "USD",
+    previous_close=None,
+    regular_market_previous_close=None,
+):
     info = MagicMock()
     info.last_price = price
     info.currency = currency
+    info.previous_close = previous_close
+    info.regular_market_previous_close = regular_market_previous_close
     return info
 
 
@@ -155,7 +162,90 @@ def _make_fx_fast_info(rate: float = 0.92):
     info = MagicMock()
     info.last_price = rate
     info.currency = "EUR"
+    info.previous_close = None
+    info.regular_market_previous_close = None
     return info
+
+
+class TestPreviousClose:
+    """previous_close (chart metadata) can be off by a session — SAP.DE reported
+    190.58 on 2026-08-28 while the real previous close was 189.88. The official
+    regular_market_previous_close wins."""
+
+    @patch("agents.market_data_fetcher.yf.Ticker")
+    def test_prefers_regular_market_previous_close(self, mock_ticker_cls):
+        ticker = MagicMock()
+        ticker.fast_info = _make_fast_info(
+            price=188.82, currency="EUR",
+            previous_close=190.58, regular_market_previous_close=189.88,
+        )
+        mock_ticker_cls.return_value = ticker
+
+        fetcher = MarketDataFetcher(RateLimiter(calls_per_second=1000))
+        records, _ = fetcher.fetch_current_prices(["SAP.DE"])
+
+        assert records[0].previous_close_eur == pytest.approx(189.88)
+
+    @patch("agents.market_data_fetcher.yf.Ticker")
+    def test_falls_back_to_previous_close(self, mock_ticker_cls):
+        ticker = MagicMock()
+        ticker.fast_info = _make_fast_info(
+            price=100.0, currency="EUR",
+            previous_close=99.0, regular_market_previous_close=None,
+        )
+        mock_ticker_cls.return_value = ticker
+
+        fetcher = MarketDataFetcher(RateLimiter(calls_per_second=1000))
+        records, _ = fetcher.fetch_current_prices(["ANY.DE"])
+
+        assert records[0].previous_close_eur == pytest.approx(99.0)
+
+    @patch("agents.market_data_fetcher.yf.Ticker")
+    def test_nan_regular_market_falls_back_to_previous_close(self, mock_ticker_cls):
+        # ETFs (EUNL.DE, EXHA.DE, …) report NaN, not None — NaN is truthy and fails
+        # every comparison, so it must not swallow the fallback.
+        ticker = MagicMock()
+        ticker.fast_info = _make_fast_info(
+            price=127.89, currency="EUR",
+            previous_close=127.15, regular_market_previous_close=float("nan"),
+        )
+        mock_ticker_cls.return_value = ticker
+
+        fetcher = MarketDataFetcher(RateLimiter(calls_per_second=1000))
+        records, _ = fetcher.fetch_current_prices(["EUNL.DE"])
+
+        assert records[0].previous_close_eur == pytest.approx(127.15)
+
+    @patch("agents.market_data_fetcher.yf.Ticker")
+    def test_none_when_neither_available(self, mock_ticker_cls):
+        ticker = MagicMock()
+        ticker.fast_info = _make_fast_info(price=100.0, currency="EUR")
+        mock_ticker_cls.return_value = ticker
+
+        fetcher = MarketDataFetcher(RateLimiter(calls_per_second=1000))
+        records, _ = fetcher.fetch_current_prices(["ANY.DE"])
+
+        assert records[0].previous_close_eur is None
+
+    @patch("agents.market_data_fetcher.yf.Ticker")
+    def test_pence_previous_close_converted(self, mock_ticker_cls):
+        def side_effect(symbol):
+            m = MagicMock()
+            if symbol == "REL.L":
+                m.fast_info = _make_fast_info(
+                    price=2670.0, currency="GBp",
+                    regular_market_previous_close=2668.0,
+                )
+            else:  # GBPEUR=X
+                m.fast_info = _make_fx_fast_info(rate=1.17)
+            return m
+
+        mock_ticker_cls.side_effect = side_effect
+
+        fetcher = MarketDataFetcher(RateLimiter(calls_per_second=1000))
+        records, _ = fetcher.fetch_current_prices(["REL.L"])
+
+        assert records[0].previous_close_eur == pytest.approx(26.68 * 1.17, rel=1e-4)
 
 
 class TestFetchCurrentPrices:

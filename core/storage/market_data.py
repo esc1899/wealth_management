@@ -4,10 +4,11 @@ Public market data is NOT encrypted (no privacy benefit for public data).
 """
 
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from core.storage.models import DividendRecord, HistoricalPrice, PriceRecord
+from core.trading_calendar import last_trading_day
 
 
 class MarketDataRepository:
@@ -111,22 +112,19 @@ class MarketDataRepository:
         ).fetchall()
         return [self._deserialize_historical(row) for row in rows]
 
-    def get_prev_close(self, symbol: str) -> Optional[float]:
-        """Return the most recent historical closing price strictly before today.
+    def get_prev_close(self, symbol: str, asof: Optional[date] = None) -> Optional[float]:
+        """Return the close of the last trading day before ``asof`` (default: today, UTC).
 
-        Used to compute daily P&L (current_price vs. last exchange close).
-        Returns None if no such data point exists.
+        Anchored on the calendar, deliberately NOT on "the newest row before today":
+        a hole in historical_prices (missed fetch, app down, Yahoo gap) would otherwise
+        silently turn the daily P&L into a multi-day change. That happened on
+        2026-08-28: the 27th was missing, so SAP showed +4.89 % for a ~+0.5 % day.
+        No row for the expected day -> None, and the caller falls back to the live
+        quote's previous close (which also covers exchange holidays).
         """
-        row = self._conn.execute(
-            """
-            SELECT close_eur FROM historical_prices
-            WHERE symbol = ? AND date < date('now')
-            ORDER BY date DESC
-            LIMIT 1
-            """,
-            (symbol.upper(),),
-        ).fetchone()
-        return float(row["close_eur"]) if row else None
+        today = asof or datetime.now(timezone.utc).date()
+        ref_date = last_trading_day(today - timedelta(days=1))
+        return self.get_price_for_date(symbol, ref_date.isoformat())
 
     def get_price_for_date(self, symbol: str, date_str: str) -> Optional[float]:
         """Return the closing price in EUR for a symbol on a specific date. Returns None if not found."""

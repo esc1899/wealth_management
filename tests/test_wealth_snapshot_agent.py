@@ -1,7 +1,7 @@
 """Tests for WealthSnapshotAgent."""
 
 import pytest
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from unittest.mock import Mock, MagicMock
 from core.storage.wealth_snapshots import WealthSnapshotRepository
 from core.storage.dividend_snapshots import DividendSnapshotRepository
@@ -796,6 +796,62 @@ class TestBackfillSnapshots:
         agent, wealth_repo = self._make_agent([], price_map={})
         assert agent.backfill_snapshots(days=7) == 0
         wealth_repo.create.assert_not_called()
+
+    def test_refetches_history_when_exact_date_missing(self):
+        """A day the app missed has no stored close — backfill must pull the history
+        instead of silently pricing the day with the previous close (2026-08-27)."""
+        pos_repo = Mock(spec=PositionsRepository)
+        pos_repo.get_portfolio.return_value = [_make_position(quantity=5.0)]
+        market_repo = Mock(spec=MarketDataRepository)
+        stored: dict = {}  # empty until the re-fetch fills it
+
+        def _lookup(sym, d, max_days_back=3):
+            if d in stored:
+                return stored[d]
+            return 90.0 if max_days_back > 0 else None  # stale neighbour day
+
+        market_repo.get_price_for_date_or_prior.side_effect = _lookup
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        wealth_repo.get_by_date.return_value = None
+        market_agent = Mock()
+
+        def _fetch(symbol):
+            for i in range(1, 15):
+                stored[(date.today() - timedelta(days=i)).isoformat()] = 100.0
+            return 1
+
+        market_agent.fetch_historical_for_symbol.side_effect = _fetch
+        agent = WealthSnapshotAgent(
+            positions_repo=pos_repo, market_repo=market_repo,
+            wealth_repo=wealth_repo, market_data_agent=market_agent,
+        )
+
+        agent.backfill_snapshots(days=7)
+
+        market_agent.fetch_historical_for_symbol.assert_called_with("AAPL")
+        # 5 × 100 (re-fetched exact close), not 5 × 90 (stale neighbour)
+        assert wealth_repo.create.call_args_list[0][1]["total_eur"] == pytest.approx(500.0)
+
+    def test_refetches_each_ticker_only_once_per_run(self):
+        pos_repo = Mock(spec=PositionsRepository)
+        pos_repo.get_portfolio.return_value = [_make_position(quantity=5.0)]
+        market_repo = Mock(spec=MarketDataRepository)
+        # Never resolvable: exact lookups stay empty, neighbour lookups return a price
+        market_repo.get_price_for_date_or_prior.side_effect = (
+            lambda sym, d, max_days_back=3: 90.0 if max_days_back > 0 else None
+        )
+        wealth_repo = Mock(spec=WealthSnapshotRepository)
+        wealth_repo.get_by_date.return_value = None
+        market_agent = Mock()
+        market_agent.fetch_historical_for_symbol.return_value = 0
+        agent = WealthSnapshotAgent(
+            positions_repo=pos_repo, market_repo=market_repo,
+            wealth_repo=wealth_repo, market_data_agent=market_agent,
+        )
+
+        agent.backfill_snapshots(days=14)
+
+        assert market_agent.fetch_historical_for_symbol.call_count == 1
 
 
 class TestRecalculateSnapshot:

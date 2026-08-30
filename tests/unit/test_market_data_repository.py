@@ -170,29 +170,42 @@ class TestGetHistorical:
 
 
 class TestGetPrevClose:
-    def test_returns_most_recent_close_before_today(self, repo):
-        from datetime import timedelta
-        today = date.today()
-        yesterday = today - timedelta(days=1)
-        day_before = today - timedelta(days=2)
-        repo.upsert_historical(make_history(d=yesterday, close=100.0))
-        repo.upsert_historical(make_history(d=day_before, close=90.0))
-        assert repo.get_prev_close("AAPL") == pytest.approx(100.0)
+    # 2026-08-27 = Thursday, 2026-08-28 = Friday, 2026-08-31 = Monday.
+
+    def test_returns_close_of_previous_trading_day(self, repo):
+        repo.upsert_historical(make_history(d=date(2026, 8, 27), close=100.0))
+        repo.upsert_historical(make_history(d=date(2026, 8, 26), close=90.0))
+        assert repo.get_prev_close("AAPL", asof=date(2026, 8, 28)) == pytest.approx(100.0)
 
     def test_excludes_todays_entry(self, repo):
-        from datetime import timedelta
-        today = date.today()
-        yesterday = today - timedelta(days=1)
-        repo.upsert_historical(make_history(d=today, close=999.0))
-        repo.upsert_historical(make_history(d=yesterday, close=50.0))
-        assert repo.get_prev_close("AAPL") == pytest.approx(50.0)
+        repo.upsert_historical(make_history(d=date(2026, 8, 28), close=999.0))
+        repo.upsert_historical(make_history(d=date(2026, 8, 27), close=50.0))
+        assert repo.get_prev_close("AAPL", asof=date(2026, 8, 28)) == pytest.approx(50.0)
+
+    def test_skips_weekend_back_to_friday(self, repo):
+        repo.upsert_historical(make_history(d=date(2026, 8, 28), close=100.0))  # Friday
+        assert repo.get_prev_close("AAPL", asof=date(2026, 8, 31)) == pytest.approx(100.0)
+
+    def test_returns_none_when_previous_trading_day_missing(self, repo):
+        # The gap that produced the SAP +4.89 % bug: the 27th was never fetched, so the
+        # newest older row is the 26th — using it would report a two-day change as "today".
+        repo.upsert_historical(make_history(d=date(2026, 8, 26), close=180.0))
+        repo.upsert_historical(make_history(d=date(2026, 8, 28), close=188.9))
+        assert repo.get_prev_close("AAPL", asof=date(2026, 8, 28)) is None
 
     def test_returns_none_when_no_history_before_today(self, repo):
-        repo.upsert_historical(make_history(d=date.today(), close=100.0))
-        assert repo.get_prev_close("AAPL") is None
+        repo.upsert_historical(make_history(d=date(2026, 8, 28), close=100.0))
+        assert repo.get_prev_close("AAPL", asof=date(2026, 8, 28)) is None
 
     def test_returns_none_when_empty(self, repo):
         assert repo.get_prev_close("AAPL") is None
+
+    def test_defaults_to_today_when_no_asof(self, repo):
+        from datetime import timedelta
+        from core.trading_calendar import last_trading_day
+        ref = last_trading_day(datetime.now(timezone.utc).date() - timedelta(days=1))
+        repo.upsert_historical(make_history(d=ref, close=77.0))
+        assert repo.get_prev_close("AAPL") == pytest.approx(77.0)
 
 
 class TestGetPriceForDate:
