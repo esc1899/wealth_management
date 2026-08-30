@@ -23,6 +23,7 @@ import importlib
 import inspect
 import pkgutil
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -288,4 +289,32 @@ def test_pages_only_import_from_state_facade():
     assert not offenders, (
         "Pages must import singletons from `state`, not the implementation modules: "
         f"{offenders}"
+    )
+
+
+# --- Guard 6: no page shadows a stdlib module ------------------------------------
+
+
+def test_no_page_shadows_stdlib_module():
+    """Page filenames must not collide with stdlib module names.
+
+    When a page is the entrypoint (``AppTest.from_file("pages/x.py")`` in the test
+    harness), Streamlit puts ``pages/`` on ``sys.path``. A page named like a stdlib
+    module then wins over the real one for every module imported afterwards.
+
+    This bit us on 2026-08-23 with the Streamlit 1.62 upgrade: ``pages/statistics.py``
+    shadowed stdlib ``statistics``, so ``core/portfolio_twr.py`` died with
+    ``AttributeError: module 'statistics' has no attribute 'pstdev'``. The running app
+    was fine (its entrypoint is ``app.py``, so only the repo root is on ``sys.path``)
+    and the suite passed only by import-order luck — which is exactly why this needs
+    to be a guard rather than a fixed bug.
+    """
+    pages_dir = Path(__file__).resolve().parents[2] / "pages"
+    collisions = sorted(
+        p.name for p in pages_dir.glob("*.py") if p.stem in sys.stdlib_module_names
+    )
+    assert not collisions, (
+        "Page filenames shadow stdlib modules and will break imports whenever "
+        f"`pages/` lands on sys.path: {collisions}. Rename them (e.g. statistics.py "
+        "-> usage_statistics.py)."
     )

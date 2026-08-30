@@ -101,7 +101,7 @@ def render_valuations(entries):
             t("common.value"):    lambda x: fmt_opt(x, "€ {:,.2f}"),
             col_div:              lambda x: fmt_opt(x, "{:.2f}%"),
         }),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
     st.caption("ℹ️ Dividenden / Ausschüttungen werden nicht automatisch mit Kursen aktualisiert — Button auf der Positionen-Seite.")

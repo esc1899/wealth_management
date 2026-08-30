@@ -249,7 +249,7 @@ with tab_trend:
             yaxis_title="Kosten ($)", showlegend=False, uniformtext_minsize=8,
             xaxis_type="category",
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig)
     else:
         st.info(t("statistics.no_data"))
 
@@ -273,7 +273,7 @@ with tab_trend:
             color_discrete_sequence=["#4C9BE8"],
         )
         fig2.update_layout(yaxis_title="Kosten ($)", showlegend=False)
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2)
     else:
         st.info(t("statistics.no_data"))
 
@@ -292,7 +292,7 @@ with tab_trend:
                 "calls": t("statistics.col_calls"),
                 "cost": t("statistics.col_cost"),
             })
-            st.dataframe(df_today, use_container_width=True, hide_index=True)
+            st.dataframe(df_today, width="stretch", hide_index=True)
         else:
             st.info(t("statistics.no_data_today"))
 
@@ -335,7 +335,7 @@ with tab_agents:
             })
 
         df_agents = pd.DataFrame(rows_agent)
-        st.dataframe(df_agents, use_container_width=True, hide_index=True)
+        st.dataframe(df_agents, width="stretch", hide_index=True)
     else:
         st.info(t("statistics.no_data"))
 
@@ -395,7 +395,7 @@ with tab_calls:
             "Cache Write (1.25×)", "Cache Read (0.1×)", "Eff. Input",
             "Dauer (ms)", "Echte Kosten ($)",
         ] if c in df_recent.columns]
-        st.dataframe(df_recent[display_recent_cols], use_container_width=True, hide_index=True)
+        st.dataframe(df_recent[display_recent_cols], width="stretch", hide_index=True)
     else:
         st.info("Noch keine Aufrufe aufgezeichnet.")
 

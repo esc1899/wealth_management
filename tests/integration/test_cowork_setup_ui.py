@@ -6,6 +6,7 @@ without exception in both languages and that the system prompt / example file
 follow current_language().
 """
 
+from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
@@ -16,10 +17,12 @@ from pages.cowork_setup import (
     _SYSTEM_PROMPT_EN,
 )
 
+PAGES = Path(__file__).resolve().parents[2] / "pages"
+
 
 @pytest.mark.parametrize("lang", ["de", "en"])
 def test_page_renders(lang):
-    at = AppTest.from_file("pages/cowork_setup.py", default_timeout=30)
+    at = AppTest.from_file(PAGES / "cowork_setup.py", default_timeout=30)
     at.session_state["lang"] = lang
     at.run()
     assert not at.exception, f"{lang}: {at.exception}"

@@ -30,7 +30,7 @@ with col_title:
     st.markdown(f"## {t('nav.wealth_history')}")
 with col_update:
     st.write("")
-    if st.button(t("wealth_history.update_button"), use_container_width=True,
+    if st.button(t("wealth_history.update_button"), width="stretch",
                  help=t("wealth_history.update_help")):
         try:
             with st.spinner(t("wealth_history.update_running")):
@@ -55,7 +55,7 @@ with col_update:
             st.error(t("wealth_history.update_error").format(error=e))
 with col_rebuild:
     st.write("")
-    if st.button(t("wealth_history.rebuild_button"), use_container_width=True,
+    if st.button(t("wealth_history.rebuild_button"), width="stretch",
                  help=t("wealth_history.rebuild_help")):
         try:
             with st.spinner(t("wealth_history.rebuild_running")):
@@ -155,7 +155,7 @@ if wealth_snapshots:
         yaxis_title=t("wealth_history.value_eur"),
         template="plotly_white",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig)
 
     # Optional: stacked breakdown chart
     if st.checkbox(t("wealth_history.show_breakdown")):
@@ -187,7 +187,7 @@ if wealth_snapshots:
             yaxis_title=t("wealth_history.value_eur"),
             template="plotly_white",
         )
-        st.plotly_chart(fig_breakdown, use_container_width=True)
+        st.plotly_chart(fig_breakdown)
 
     # Optional: relative asset-class mix (%) over time — complements the absolute stack
     if st.checkbox(t("wealth_history.mix_pct_section")):
@@ -208,7 +208,7 @@ if wealth_snapshots:
             hovermode="x unified", height=400, margin=dict(l=50, r=50, t=20, b=50),
             xaxis_title=t("wealth_history.date_label"), yaxis_title="%", template="plotly_white",
         )
-        st.plotly_chart(fig_mix, use_container_width=True)
+        st.plotly_chart(fig_mix)
 
     # Optional: position concentration over time (from holdings; forward-only)
     if st.checkbox(t("wealth_history.concentration_section"), help=t("wealth_history.concentration_help")):
@@ -232,7 +232,7 @@ if wealth_snapshots:
                 hovermode="x unified", height=350, margin=dict(l=50, r=50, t=20, b=50),
                 xaxis_title=t("wealth_history.date_label"), yaxis_title="%", template="plotly_white",
             )
-            st.plotly_chart(fig_conc, use_container_width=True)
+            st.plotly_chart(fig_conc)
             latest = conc[-1]
             st.caption(t("wealth_history.concentration_hhi").format(
                 hhi=f"{latest['hhi']:.3f}", n=f"{latest['effective_n']:.1f}"))
@@ -257,7 +257,7 @@ if wealth_snapshots:
             }
             for r in _sold
         ]
-        st.dataframe(_sold_rows, use_container_width=True, hide_index=True)
+        st.dataframe(_sold_rows, width="stretch", hide_index=True)
 
     # ── Return vs. benchmark — time-weighted, cashflow-immune (FEAT-73) ──────────
     st.markdown(f"#### {t('wealth_history.twr_section')}")
@@ -292,7 +292,7 @@ if wealth_snapshots:
             _msg_key = "twr_bench_no_history" if _latest_bench is None else "twr_bench_stale"
             st.warning(t(f"wealth_history.{_msg_key}").format(
                 symbol=_bench_symbol, latest=_latest_bench, start=_twr_dates[0]))
-            if _bc2.button(t("wealth_history.twr_bench_load"), use_container_width=True):
+            if _bc2.button(t("wealth_history.twr_bench_load"), width="stretch"):
                 with st.spinner(t("wealth_history.twr_bench_loading").format(symbol=_bench_symbol)):
                     _n = get_market_agent().fetch_historical_for_symbol(_bench_symbol)
                 st.session_state["wh_msg"] = {
@@ -353,7 +353,7 @@ if wealth_snapshots:
             xaxis_title=t("wealth_history.date_label"), yaxis_title="%", template="plotly_white",
             xaxis_tickformat="%d.%m.%Y",
         )
-        st.plotly_chart(fig_twr, use_container_width=True)
+        st.plotly_chart(fig_twr)
 
         # Drawdown (underwater) — optional, from the cashflow-immune TWR index
         if st.checkbox(t("wealth_history.twr_drawdown_section"),
@@ -372,7 +372,7 @@ if wealth_snapshots:
                 xaxis_title=t("wealth_history.date_label"), yaxis_title="%", template="plotly_white",
                 xaxis_tickformat="%d.%m.%Y",
             )
-            st.plotly_chart(fig_dd, use_container_width=True)
+            st.plotly_chart(fig_dd)
 
 else:
     st.warning(t("wealth_history.no_wealth_snapshots"))
@@ -422,7 +422,7 @@ if dividend_snapshots:
         template="plotly_white",
         showlegend=False,
     )
-    st.plotly_chart(fig_div, use_container_width=True)
+    st.plotly_chart(fig_div)
 
     # Optional: stacked by asset class
     if st.checkbox(t("wealth_history.show_dividend_breakdown")):
@@ -453,7 +453,7 @@ if dividend_snapshots:
             template="plotly_white",
             barmode="stack",
         )
-        st.plotly_chart(fig_div_breakdown, use_container_width=True)
+        st.plotly_chart(fig_div_breakdown)
 
 else:
     st.warning(t("wealth_history.no_dividend_snapshots"))

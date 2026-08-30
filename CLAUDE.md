@@ -81,6 +81,23 @@ All schema changes go into the single `migrate_db()` function in `core/storage/b
 2. Add `st.Page(...)` entry in the correct section dict inside `app.py`'s `st.navigation()` call
 3. Add a smoke test in `tests/unit/` (AppTest pattern, see existing smoke tests)
 
+## Toolchain
+
+**Python >= 3.10 erforderlich** (`.venv` läuft auf 3.11.15 via Homebrew). Streamlit >= 1.51 und
+yfinance > 1.2.0 lassen sich auf Python 3.9 nicht installieren. Wird das venv neu gebaut:
+`/opt/homebrew/bin/python3.11 -m venv .venv`. `app.sh` und der LaunchAgent referenzieren nur
+den Pfad `.venv/`, kein Interpreter-Pfad — ein Neubau an gleicher Stelle ist für beide transparent.
+
+**Kein Modulname in `pages/` darf ein stdlib-Modul überschatten.** Wenn eine Page direkt der
+Einstiegspunkt ist (`AppTest.from_file("pages/x.py")` im Testharness), landet `pages/` im
+`sys.path` und `import statistics` trifft dann `pages/statistics.py` statt der stdlib. Genau das
+ist am 2026-08-23 passiert; die Page heißt deshalb jetzt `usage_statistics.py`. Prüfen mit:
+`python -c "import sys,pathlib;print([p.stem for p in pathlib.Path('pages').glob('*.py') if p.stem in sys.stdlib_module_names])"`
+
+**`AppTest.from_file()` immer mit absolutem Pfad aufrufen.** Seit Streamlit 1.62 werden relative
+Pfade gegen die aufrufende Testdatei aufgelöst, nicht gegen das CWD. Muster in den
+Integrationstests: `PAGES = Path(__file__).resolve().parents[2] / "pages"`.
+
 ## Required Environment Variables
 
 ```

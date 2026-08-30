@@ -4,10 +4,10 @@ openai>=1.0.0,<2.0.0
 ollama>=0.4.0,<1.0.0
 
 # Storage & Encryption
-cryptography>=42.0.0,<43.0.0
+cryptography>=50.0.0,<51.0.0
 
 # Market Data
-yfinance>=0.2.0,<1.0.0
+yfinance>=1.6.0,<2.0.0
 requests>=2.32.0,<3.0.0
 
 # Testing
@@ -17,10 +17,9 @@ pytest-asyncio>=0.23.0,<1.0.0
 pytest-mock>=3.14.0,<4.0.0
 
 # UI
-# Pinned to the 1.50 line on purpose: the app still passes use_container_width in
-# ~88 places, which Streamlit has deprecated and will drop in a future minor. Raise
-# this bound only together with a migration to width='stretch' / width='content'.
-streamlit>=1.50.0,<1.51.0
+# The use_container_width -> width migration is done (2026-08-23), so minors are
+# safe to take again. Requires Python >= 3.10.
+streamlit>=1.62.0,<2.0.0
 plotly>=5.0.0,<6.0.0
 pandas>=2.0.0,<3.0.0
 openpyxl>=3.1.0,<4.0.0

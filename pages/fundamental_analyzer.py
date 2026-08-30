@@ -120,7 +120,7 @@ with st.expander(t("fundamental.batch_header"), expanded=False):
             t("fundamental.batch_button"),
             type="primary",
             key="_fa_batch_run",
-            use_container_width=False,
+            width="content",
             disabled=_BATCH["running"] or not _target_positions,
         ):
             _sel_skill = _skill_options[_sel_skill_name]
@@ -197,7 +197,7 @@ with col_left:
                 key="_fa_single_skill",
             )
 
-            submitted = st.form_submit_button(t("fundamental.start_button"), use_container_width=True, type="primary")
+            submitted = st.form_submit_button(t("fundamental.start_button"), width="stretch", type="primary")
 
         # Show position details as reference
         if selected_position:

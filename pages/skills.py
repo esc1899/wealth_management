@@ -49,9 +49,9 @@ else:
                         edit_prompt = st.text_area(t("settings.prompt_label"), value=skill.prompt, height=180)
                         col_save, col_cancel = st.columns(2)
                         with col_save:
-                            submitted = st.form_submit_button(t("settings.save_button"), use_container_width=True)
+                            submitted = st.form_submit_button(t("settings.save_button"), width="stretch")
                         with col_cancel:
-                            cancelled = st.form_submit_button(t("settings.cancel_button"), use_container_width=True)
+                            cancelled = st.form_submit_button(t("settings.cancel_button"), width="stretch")
                     if submitted:
                         if not edit_name.strip() or not edit_prompt.strip():
                             st.error(t("settings.name_required_error"))
@@ -74,11 +74,11 @@ else:
                     st.code(skill.prompt, language=None)
                     col_edit, col_del = st.columns(2)
                     with col_edit:
-                        if st.button(t("settings.edit_button"), key=f"edit_{skill.id}", use_container_width=True):
+                        if st.button(t("settings.edit_button"), key=f"edit_{skill.id}", width="stretch"):
                             st.session_state["editing_skill_id"] = skill.id
                             st.rerun()
                     with col_del:
-                        if st.button(t("settings.delete_button"), key=f"del_{skill.id}", type="secondary", use_container_width=True):
+                        if st.button(t("settings.delete_button"), key=f"del_{skill.id}", type="secondary", width="stretch"):
                             skills_repo.delete(skill.id)
                             st.success(f"{t('settings.skill_deleted')} '{skill.name}'")
                             st.rerun()
@@ -114,7 +114,7 @@ with st.form("add_skill_form"):
         custom_area = st.text_input(t("settings.custom_area_label"), placeholder=t("settings.custom_area_placeholder"))
     new_description = st.text_input(t("settings.description_label"), placeholder=t("settings.description_placeholder"))
     new_prompt = st.text_area(t("settings.prompt_label"), placeholder=t("settings.prompt_placeholder"), height=180)
-    save_btn = st.form_submit_button(t("settings.save_button"), use_container_width=True)
+    save_btn = st.form_submit_button(t("settings.save_button"), width="stretch")
 
 if save_btn:
     resolved_area = custom_area.strip() if area_choice == t("settings.other_area") else area_choice

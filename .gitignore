@@ -19,6 +19,7 @@ __pycache__/
 *.py[cod]
 *.pyo
 .venv/
+.venv_py39_old/
 venv/
 env/
 *.egg-info/
@@ -26,6 +27,7 @@ dist/
 build/
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 
 # macOS

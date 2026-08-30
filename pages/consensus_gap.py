@@ -135,7 +135,7 @@ else:
             t("consensus_gap.batch_button"),
             type="primary",
             key="_cgap_batch_run",
-            use_container_width=False,
+            width="content",
             disabled=_BATCH["running"] or not _target_positions,
         ):
             _sel_skill = _skill_options[_sel_skill_name]
@@ -210,7 +210,7 @@ with col_left:
             )
             _single_submitted = st.form_submit_button(
                 t("consensus_gap.run_button"),
-                use_container_width=True,
+                width="stretch",
                 type="primary",
             )
 

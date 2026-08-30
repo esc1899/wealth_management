@@ -93,7 +93,7 @@ elif bench_mode == "index":
     has_history = bool(market_repo.get_historical(symbol, days=800))
     if not has_history:
         st.warning(t("verdict_hindsight.bench_no_history").format(symbol=symbol))
-        if bcol2.button(t("verdict_hindsight.bench_load"), use_container_width=True):
+        if bcol2.button(t("verdict_hindsight.bench_load"), width="stretch"):
             with st.spinner(t("verdict_hindsight.bench_loading").format(symbol=symbol)):
                 n = get_market_agent().fetch_historical_for_symbol(symbol)
             st.success(t("verdict_hindsight.bench_loaded").format(n=n, symbol=symbol))
@@ -159,7 +159,7 @@ for agent, rows in scoped_report.by_agent.items():
 
     df = pd.DataFrame(table)
     styled = df.style.map(_color_pct, subset=median_cols)
-    st.dataframe(styled, hide_index=True, use_container_width=True)
+    st.dataframe(styled, hide_index=True, width="stretch")
 
     # Mean / best / worst live in a detail expander to keep the main table calm.
     with st.expander(t("verdict_hindsight.details")):
@@ -179,7 +179,7 @@ for agent, rows in scoped_report.by_agent.items():
                     t("verdict_hindsight.col_worst"): _fmt_pct(stat.worst_pct),
                 })
         if detail:
-            st.dataframe(pd.DataFrame(detail), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(detail), hide_index=True, width="stretch")
         else:
             st.caption(t("verdict_hindsight.details_empty"))
 

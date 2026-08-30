@@ -119,7 +119,7 @@ with col_left:
             ).strip()
 
             submitted = st.form_submit_button(
-                t("news_chat.start_button"), use_container_width=True
+                t("news_chat.start_button"), width="stretch"
             )
 
         if submitted and skill_choice:
@@ -191,7 +191,7 @@ with col_right:
                         if col_btn.button(
                             f"{older_date} · {older_run.skill_name} · {older_ticker_count}",
                             key=f"nc_older_{older_run.id}",
-                            use_container_width=True,
+                            width="stretch",
                         ):
                             st.session_state.nc_run_id = older_run.id
                             st.rerun()

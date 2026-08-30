@@ -6,6 +6,7 @@ DB_PATH=":memory:" from conftest) and runs the pages via AppTest. Seeded rows
 are removed in teardown so other page smoke tests stay unaffected.
 """
 
+from pathlib import Path
 from datetime import date
 
 import pytest
@@ -13,6 +14,8 @@ from streamlit.testing.v1 import AppTest
 
 from core.storage.models import Position
 from state import get_positions_repo, get_research_queue_repo
+
+PAGES = Path(__file__).resolve().parents[2] / "pages"
 
 
 @pytest.fixture
@@ -56,19 +59,19 @@ def seeded(request):
 
 class TestResearchAnswersPage:
     def test_page_loads_with_seeded_data(self, seeded):
-        at = AppTest.from_file("pages/research_answers.py")
+        at = AppTest.from_file(PAGES / "research_answers.py")
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 
     def test_to_position_button_for_portfolio_ticker(self, seeded):
-        at = AppTest.from_file("pages/research_answers.py")
+        at = AppTest.from_file(PAGES / "research_answers.py")
         at.run()
         keys = [b.key for b in at.button]
         assert any(k and k.startswith("to_pos_") for k in keys), keys
 
     def test_done_request_shows_answer_toggle(self, seeded):
         _, _, done_req = seeded
-        at = AppTest.from_file("pages/research_answers.py")
+        at = AppTest.from_file(PAGES / "research_answers.py")
         at.run()
         toggle_keys = [tg.key for tg in at.toggle]
         assert f"show_answer_{done_req.id}" in toggle_keys, toggle_keys
@@ -76,7 +79,7 @@ class TestResearchAnswersPage:
 
 class TestPositionDashboardAnswersSection:
     def test_dashboard_shows_answers_for_ticker(self, seeded):
-        at = AppTest.from_file("pages/position_dashboard.py")
+        at = AppTest.from_file(PAGES / "position_dashboard.py")
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
         # Answers section header rendered (2 answers for MSFT)
@@ -144,12 +147,12 @@ def seeded_watchlist(request):
 
 class TestWatchlistAnalysisResearchSection:
     def test_page_loads_with_seeded_watchlist(self, seeded_watchlist):
-        at = AppTest.from_file("pages/watchlist_analysis.py")
+        at = AppTest.from_file(PAGES / "watchlist_analysis.py")
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 
     def test_shows_answers_and_cowork_research(self, seeded_watchlist):
-        at = AppTest.from_file("pages/watchlist_analysis.py")
+        at = AppTest.from_file(PAGES / "watchlist_analysis.py")
         at.run()
         headers = [s.value for s in at.subheader]
         assert any("Research-Antworten (1)" in h or "Research answers (1)" in h for h in headers), headers

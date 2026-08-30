@@ -224,7 +224,7 @@ for pos in watchlist:
 
 _matrix_selection = st.dataframe(
     pd.DataFrame(matrix_rows),
-    use_container_width=True,
+    width="stretch",
     hide_index=True,
     on_select="rerun",
     selection_mode="single-row",
@@ -246,11 +246,11 @@ _matrix_selection = st.dataframe(
 def _show_delete_dialog(pos_id: int, pos_name: str) -> None:
     st.warning(t("watchlist_checker.delete_confirm_warning").format(name=pos_name))
     col_yes, col_no = st.columns(2)
-    if col_yes.button(t("watchlist_checker.delete_confirm_yes"), type="primary", use_container_width=True):
+    if col_yes.button(t("watchlist_checker.delete_confirm_yes"), type="primary", width="stretch"):
         get_positions_repo().delete(pos_id)
         st.toast(t("watchlist_checker.delete_done"), icon="🗑️")
         st.rerun()
-    if col_no.button(t("watchlist_checker.delete_confirm_no"), use_container_width=True):
+    if col_no.button(t("watchlist_checker.delete_confirm_no"), width="stretch"):
         st.rerun()
 
 
@@ -282,11 +282,11 @@ if _selected_rows and _selected_rows[0] < len(_valid_positions):
 
     _nav_col1, _nav_col2, _nav_col3, _nav_spacer = st.columns([1, 1, 2, 1])
     with _nav_col1:
-        if st.button(t("watchlist_analysis.nav_button"), key="nav_to_wla_btn", use_container_width=True):
+        if st.button(t("watchlist_analysis.nav_button"), key="nav_to_wla_btn", width="stretch"):
             st.session_state["wla_preselect_pos_id"] = _sel_pos.id
             st.switch_page("pages/watchlist_analysis.py")
     with _nav_col2:
-        if st.button(t("watchlist_checker.delete_button"), key="nav_delete_btn", use_container_width=True):
+        if st.button(t("watchlist_checker.delete_button"), key="nav_delete_btn", width="stretch"):
             st.session_state["_wc_delete_pending"] = {"id": _sel_pos.id, "name": _sel_pos.name}
             st.rerun()
     with _nav_col3:
@@ -296,7 +296,7 @@ if _selected_rows and _selected_rows[0] < len(_valid_positions):
                 if not _row_stale_wc
                 else t("watchlist_checker.cockpit_run_row_update").format(n=len(_row_needs_update))
             )
-            if st.button(_row_btn_label, key="wc_run_row_btn", use_container_width=True):
+            if st.button(_row_btn_label, key="wc_run_row_btn", width="stretch"):
                 _lang = current_language()
                 _pos_single = [_sel_pos]
                 _row_errors: list[str] = []

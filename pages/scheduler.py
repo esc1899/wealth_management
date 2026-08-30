@@ -333,7 +333,7 @@ with st.form("add_job_form"):
         key="_jf_model",
     )
 
-    _jf_submitted = st.form_submit_button(t("settings.save_button"), use_container_width=True)
+    _jf_submitted = st.form_submit_button(t("settings.save_button"), width="stretch")
 
 if _jf_submitted:
     _agent_key = st.session_state.get("_sched_new_agent", list(_SCHEDULABLE_AGENTS.keys())[0])

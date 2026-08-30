@@ -114,7 +114,7 @@ if selected_position.ticker:
         fig = px.line(df_hist, x=col_date, y=col_price,
                       title=f"{selected_position.ticker} — letztes Jahr")
         fig.update_layout(margin=dict(t=40))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig)
     else:
         st.info(t("analysis.no_history"))
     st.divider()

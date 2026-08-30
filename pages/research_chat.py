@@ -63,7 +63,7 @@ with col_sidebar:
                 height=120,
             ).strip()
 
-        submitted = st.form_submit_button(t("research_chat.start_button"), use_container_width=True)
+        submitted = st.form_submit_button(t("research_chat.start_button"), width="stretch")
 
     if submitted:
         if not company_input:
@@ -116,7 +116,7 @@ with col_sidebar:
             btn_label = f"{label}  \n{date_str}"
             active = st.session_state.rc_session_id == s.id
             btn_type = "primary" if active else "secondary"
-            if st.button(btn_label, key=f"sess_{s.id}", use_container_width=True, type=btn_type):
+            if st.button(btn_label, key=f"sess_{s.id}", width="stretch", type=btn_type):
                 st.session_state.rc_session_id = s.id
                 st.session_state.rc_proposals = []
                 st.rerun()

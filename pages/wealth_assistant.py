@@ -78,7 +78,7 @@ col_prep, col_snap, col_space = st.columns([2, 2, 4])
 with col_prep:
     if st.button(
         f"🔄 {t('wealth_assistant.prepare')}",
-        use_container_width=True,
+        width="stretch",
         help=t("wealth_assistant.prepare_help"),
     ):
         st.session_state["_prepare_preview"] = None
@@ -92,7 +92,7 @@ with col_prep:
 with col_snap:
     if st.button(
         f"📸 {t('wealth_assistant.take_snapshot')}",
-        use_container_width=True,
+        width="stretch",
         help=t("wealth_assistant.take_snapshot_help"),
     ):
         today = date.today().isoformat()

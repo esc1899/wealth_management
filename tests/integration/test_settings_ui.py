@@ -6,32 +6,35 @@ Verifies the page renders without exception and that the registry editor
 falls back gracefully on network errors, so no mocking is required.
 """
 
+from pathlib import Path
 from streamlit.testing.v1 import AppTest
 
 from state import get_app_config_repo
 
+PAGES = Path(__file__).resolve().parents[2] / "pages"
+
 
 class TestSettingsPage:
     def test_page_loads(self):
-        at = AppTest.from_file("pages/settings.py")
+        at = AppTest.from_file(PAGES / "settings.py")
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 
     def test_registry_save_button_present(self):
-        at = AppTest.from_file("pages/settings.py")
+        at = AppTest.from_file(PAGES / "settings.py")
         at.run()
         keys = [b.key for b in at.button]
         assert "_save_prices_btn" in keys, keys
 
     def test_provider_selectboxes_rendered(self):
         # One provider selectbox per registry row → at least the default models
-        at = AppTest.from_file("pages/settings.py")
+        at = AppTest.from_file(PAGES / "settings.py")
         at.run()
         prov_keys = [s.key for s in at.selectbox if s.key and s.key.startswith("_price_prov_")]
         assert prov_keys, "expected per-model provider selectboxes"
 
     def test_delete_checkboxes_and_add_dropdown_present(self):
-        at = AppTest.from_file("pages/settings.py")
+        at = AppTest.from_file(PAGES / "settings.py")
         at.run()
         del_keys = [c.key for c in at.checkbox if c.key and c.key.startswith("_price_del_")]
         assert del_keys, "expected per-model delete checkboxes"
@@ -61,7 +64,7 @@ class TestSettingsPage:
             }
             repo.set_model_prices(merged)
 
-            at = AppTest.from_file("pages/settings.py")
+            at = AppTest.from_file(PAGES / "settings.py")
             at.run()
             assert not at.exception, f"Page threw exception: {at.exception}"
             all_options = [opt for s in at.selectbox for opt in (s.options or [])]

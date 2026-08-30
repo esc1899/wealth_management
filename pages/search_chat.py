@@ -75,7 +75,7 @@ with col_sidebar:
         )
 
         submitted = st.form_submit_button(
-            t("search_chat.start_button"), use_container_width=True
+            t("search_chat.start_button"), width="stretch"
         )
 
     if submitted:
@@ -126,7 +126,7 @@ with col_sidebar:
             if st.button(
                 btn_label,
                 key=f"sess_{s.id}",
-                use_container_width=True,
+                width="stretch",
                 type="primary" if active else "secondary",
             ):
                 st.session_state.sc_session_id = s.id

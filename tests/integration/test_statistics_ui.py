@@ -6,10 +6,13 @@ by provider (registry-driven). Seeds a couple of usage rows via the shared
 state singletons and removes them in teardown.
 """
 
+from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
 from state import get_usage_repo
+
+PAGES = Path(__file__).resolve().parents[2] / "pages"
 
 
 @pytest.fixture
@@ -31,12 +34,12 @@ def seeded_usage(request):
 
 class TestStatisticsPage:
     def test_page_loads(self, seeded_usage):
-        at = AppTest.from_file("pages/statistics.py")
+        at = AppTest.from_file(PAGES / "usage_statistics.py")
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 
     def test_provider_breakdown_metrics_present(self, seeded_usage):
-        at = AppTest.from_file("pages/statistics.py")
+        at = AppTest.from_file(PAGES / "usage_statistics.py")
         at.run()
         labels = [m.label for m in at.metric]
         # Provider breakdown renders Anthropic + OpenRouter metrics for the seeded rows
@@ -44,7 +47,7 @@ class TestStatisticsPage:
         assert "OpenRouter" in labels, labels
 
     def test_costs_and_tokens_sections_present(self, seeded_usage):
-        at = AppTest.from_file("pages/statistics.py")
+        at = AppTest.from_file(PAGES / "usage_statistics.py")
         at.run()
         headers = " ".join(sh.value for sh in at.subheader)
         assert "Kosten" in headers, headers

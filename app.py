@@ -40,7 +40,7 @@ def _login_form():
     with st.form("login_form"):
         st.text_input("Benutzer", value="wealth-management", disabled=True)
         password = st.text_input("Passwort", type="password", autocomplete="current-password")
-        submitted = st.form_submit_button("Anmelden", use_container_width=True)
+        submitted = st.form_submit_button("Anmelden", width="stretch")
     if submitted:
         import hmac
         if hmac.compare_digest(password, config.APP_PASSWORD):
@@ -150,7 +150,7 @@ pg = st.navigation({
         st.Page("pages/cowork_setup.py",     title="Cowork Setup",           icon=":material/settings_suggest:"),
     ],
     t("nav.group_system"): [
-        st.Page("pages/statistics.py",      title=t("nav.statistics"),       icon=":material/bar_chart:"),
+        st.Page("pages/usage_statistics.py", title=t("nav.statistics"),       icon=":material/bar_chart:"),
         st.Page("pages/verdict_hindsight.py", title=t("nav.verdict_hindsight"), icon=":material/history_toggle_off:"),
         st.Page("pages/skills.py",          title="Skills",                  icon=":material/psychology:"),
         st.Page("pages/scheduler.py",       title="Scheduler",               icon=":material/schedule:"),
@@ -166,7 +166,7 @@ _has_warnings = any(c.severity == Severity.WARNING for c in _health_checks)
 with st.sidebar:
     # Logout button (top right)
     if config.APP_PASSWORD and st.session_state.get("authenticated"):
-        if st.button("🔓 Abmelden", use_container_width=False, key="logout_btn"):
+        if st.button("🔓 Abmelden", width="content", key="logout_btn"):
             st.session_state.clear()
             st.rerun()
         st.divider()

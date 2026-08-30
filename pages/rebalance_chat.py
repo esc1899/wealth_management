@@ -107,7 +107,7 @@ with col_sidebar:
         ).strip()
 
         submitted = st.form_submit_button(
-            t("rebalance_chat.start_button"), use_container_width=True
+            t("rebalance_chat.start_button"), width="stretch"
         )
 
     if submitted:
@@ -151,7 +151,7 @@ with col_sidebar:
             if col_btn.button(
                 label,
                 key=f"rb_sess_{s.id}",
-                use_container_width=True,
+                width="stretch",
                 type="primary" if active else "secondary",
             ):
                 st.session_state.rb_session_id = s.id

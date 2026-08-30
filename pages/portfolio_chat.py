@@ -87,7 +87,7 @@ with col_tables:
                 t("common.quantity"):        lambda x: "—" if x is None or pd.isna(x) else (f"{int(x):,}" if x == int(x) else f"{x:,.2f}"),
                 t("common.purchase_price"):  lambda x: f"{x:.2f}" if x is not None and not pd.isna(x) else "—",
             }),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:
@@ -109,6 +109,6 @@ with col_tables:
             }
             for e in watchlist
         ])
-        st.dataframe(df_wl, use_container_width=True, hide_index=True)
+        st.dataframe(df_wl, width="stretch", hide_index=True)
     else:
         st.info(t("portfolio_chat.empty_portfolio"))

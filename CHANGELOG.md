@@ -8,6 +8,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Toolchain: Python 3.11 + Streamlit 1.62 + yfinance 1.6 — 2026-08-23
+
+**Warum:** Das venv lief auf Python 3.9.6 (Xcode-System-Python, seit Okt 2025 End-of-Life).
+Streamlit >= 1.51 und yfinance > 1.2.0 verlangen Python >= 3.10 — die Versions-Pins in
+`requirements.txt` waren nie die eigentliche Bremse, der Interpreter war es.
+
+**Änderungen:**
+- `.venv` auf Python 3.11.15 (Homebrew) neu gebaut; `app.sh` und LaunchAgent referenzieren
+  nur den Pfad `.venv/` und brauchten keine Anpassung
+- streamlit 1.50.0 → 1.62.0, yfinance 1.2.0 → 1.6.0, cryptography 46.0.7 → 50.0.0,
+  anthropic 0.92.0 → 0.125.0
+- `requirements.txt`: Pins auf die tatsächlich getesteten Versionen gezogen. Vorher logen sie
+  (`yfinance<1.0.0` bei laufendem 1.2.0, `cryptography<43` bei laufendem 46.0.7) — ein frisches
+  `pip install -r requirements.txt` hätte eine andere App gebaut als die getestete.
+- **88 `use_container_width` migriert**: 59 → `width="stretch"`, 5 → `width="content"`,
+  24 bei `st.plotly_chart` ersatzlos entfernt (dort ist der Parameter nicht deprecated, hat
+  kein `width`-Pendant, und `True` ist bereits der Default). Damit ist der 1.50-Pin aufgehoben.
+
+**DB-Schema-Änderung:** keine. **Streamlit-Restart nötig:** ja (neues venv).
+
+**Zwei Streamlit-1.62-Fallstricke, die dabei aufschlugen:**
+1. `AppTest.from_file()` löst relative Pfade jetzt gegen die **aufrufende Testdatei** auf,
+   nicht mehr gegen das CWD → alle 47 Aufrufe auf ein absolutes `PAGES`-Konstrukt umgestellt.
+2. `pages/statistics.py` überschattete das stdlib-Modul `statistics`, sobald `pages/` im
+   `sys.path` landet (bei Page-als-Einstiegspunkt, also im Testharness). Folge:
+   `AttributeError: module 'statistics' has no attribute 'pstdev'` in `core/portfolio_twr.py`.
+   Die echte App war nicht betroffen (Einstieg ist `app.py`, damit liegt nur das Repo-Root im
+   `sys.path`), die Testsuite bestand nur durch glückliche Importreihenfolge.
+   → `pages/statistics.py` → `pages/usage_statistics.py` umbenannt (Nav-Titel unverändert,
+   nur der URL-Slug ändert sich). Keine stdlib-Kollision mehr in `pages/`.
+
+### Wartung — 2026-08-23
+- 35 verwaiste Einträge aus `current_prices` gelöscht (Symbole ohne Position/Watchlist-Bezug,
+  Kursstände von März–Juni). Verbleiben 30: 29 aktive Ticker + NVDA (Watchlist).
+
+
 ### FEAT-49/50/51/52: MCP Server + Research Queue — 2026-06-09
 
 **Wealth Management MCP Server (`mcp_server/`)**

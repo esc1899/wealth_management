@@ -274,7 +274,7 @@ for _p in _valid_portfolio:
 
 _matrix_selection = st.dataframe(
     pd.DataFrame(_matrix_rows),
-    use_container_width=True,
+    width="stretch",
     hide_index=True,
     on_select="rerun",
     selection_mode="single-row",
@@ -301,12 +301,12 @@ if _selected_rows and _selected_rows[0] < len(_valid_portfolio):
         st.caption(f"**{_sel_pos.name}** ({_sel_pos.ticker})")
         _nav_col1, _nav_col2, _nav_spacer = st.columns([1, 2, 3])
         with _nav_col1:
-            if st.button(t("portfolio_story.nav_to_pd"), key="pc_nav_pd_btn", use_container_width=True):
+            if st.button(t("portfolio_story.nav_to_pd"), key="pc_nav_pd_btn", width="stretch"):
                 st.session_state["pd_preselect_position_id"] = _sel_pos.id
                 st.switch_page("pages/position_dashboard.py")
         with _nav_col2:
             if _row_missing:
-                if st.button(t("portfolio_story.cockpit_run_row_missing").format(n=len(_row_missing)), key="pc_run_row_btn", use_container_width=True):
+                if st.button(t("portfolio_story.cockpit_run_row_missing").format(n=len(_row_missing)), key="pc_run_row_btn", width="stretch"):
                     _lang = current_language()
                     _row_total = 0
                     _row_errors: list[str] = []
@@ -379,7 +379,7 @@ st.divider()
 
 st.subheader(t("portfolio_story.story_check_section"))
 
-if st.button(t("portfolio_story.run_button"), type="primary", use_container_width=True):
+if st.button(t("portfolio_story.run_button"), type="primary", width="stretch"):
     if not current_story or not current_story.story:
         st.error(t("portfolio_story.no_story_error"))
     else:

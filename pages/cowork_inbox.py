@@ -154,7 +154,7 @@ def _render_proposal_panel(entry: ResearchEntry, candidates: list[WatchlistSugge
     col_btn, col_skip = st.columns([2, 1])
     with col_btn:
         if st.button(t("cowork.add_to_watchlist_btn"), type="primary", key=f"confirm_{entry.id}",
-                     use_container_width=True):
+                     width="stretch"):
             existing_tickers = {
                 (p.ticker.upper(), (p.extra_data or {}).get("exchange", "").upper())
                 for p in positions_repo.get_watchlist()
@@ -203,7 +203,7 @@ def _render_proposal_panel(entry: ResearchEntry, candidates: list[WatchlistSugge
             else:
                 st.warning(t("cowork.add_errors_warning").format(n=error_count))
     with col_skip:
-        if st.button(t("cowork.skip_all_btn"), key=f"skip_all_{entry.id}", use_container_width=True):
+        if st.button(t("cowork.skip_all_btn"), key=f"skip_all_{entry.id}", width="stretch"):
             for cand in pending:
                 cowork_repo.update_suggestion_status(cand.id, "rejected")
             cowork_repo.update_status(entry.id, "imported")
@@ -270,7 +270,7 @@ def _render_entry_detail(entry: ResearchEntry) -> None:
             if col_btn.button(
                 t("cowork.add_primary_btn").format(ticker=entry.primary_ticker),
                 key=f"add_primary_{entry.id}",
-                use_container_width=True,
+                width="stretch",
             ):
                 from core.asset_class_config import get_asset_class_registry
                 registry = get_asset_class_registry()
@@ -403,7 +403,7 @@ with tab_inbox:
                 label = f"{status_icon} {entry.date} — {entry.research_id}"
                 if entry.primary_ticker:
                     label += f" [{entry.primary_ticker}]"
-                if st.button(label, key=f"entry_{entry.id}", use_container_width=True):
+                if st.button(label, key=f"entry_{entry.id}", width="stretch"):
                     st.session_state["cowork_selected_id"] = entry.id
 
     with col_detail:

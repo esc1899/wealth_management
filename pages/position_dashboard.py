@@ -250,7 +250,7 @@ if selected_position.ticker:
             title=f"{selected_position.ticker} — letztes Jahr",
         )
         fig_hist.update_layout(margin=dict(t=40))
-        st.plotly_chart(fig_hist, use_container_width=True)
+        st.plotly_chart(fig_hist)
     else:
         st.info(t("analysis.no_history"))
 else:
@@ -347,7 +347,7 @@ with st.container():
             }
             for c in (_acc.engine_parts + _acc.components)
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
     if _acc.binding:

@@ -210,7 +210,7 @@ with col_s5:
 with col_s6:
     sel_devils_advocate = _public_sel("devils_advocate", "🐻 Devil's Advocate")
 
-if st.button(t("settings.save_models_button"), key="_save_models_btn", use_container_width=False):
+if st.button(t("settings.save_models_button"), key="_save_models_btn", width="content"):
     app_config.set("model_ollama_portfolio", sel_portfolio)
     app_config.set("model_ollama_portfolio_story", sel_portfolio_story)
     app_config.set("model_ollama_watchlist_checker", sel_watchlist_checker)

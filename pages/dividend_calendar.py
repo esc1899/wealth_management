@@ -114,7 +114,7 @@ if _top10:
         legend=dict(orientation="v", x=1.0, y=0.5),
     )
     _fig_pie.update_traces(textposition="inside", textinfo="percent")
-    st.plotly_chart(_fig_pie, use_container_width=True)
+    st.plotly_chart(_fig_pie)
 
 st.divider()
 
@@ -146,7 +146,7 @@ if _forecasts and _forecasts[0].contributions:
             reverse=True,
         )
     ]
-    st.dataframe(_rows, use_container_width=True, hide_index=True)
+    st.dataframe(_rows, width="stretch", hide_index=True)
 
 st.divider()
 
@@ -230,7 +230,7 @@ else:
             xaxis_tickformat="%d.%m.%Y",
         )
         if _fig_hist.data:
-            st.plotly_chart(_fig_hist, use_container_width=True)
+            st.plotly_chart(_fig_hist)
 
 st.divider()
 
@@ -285,7 +285,7 @@ else:
                 template="plotly_white",
                 xaxis_tickformat="%d.%m.%Y",
             )
-            st.plotly_chart(_fig_sc, use_container_width=True)
+            st.plotly_chart(_fig_sc)
 
     # --- Forward income over time (portfolio) ---
     if _income_ts:
@@ -309,7 +309,7 @@ else:
             template="plotly_white", showlegend=False,
             xaxis_tickformat="%d.%m.%Y",
         )
-        st.plotly_chart(_fig_inc, use_container_width=True)
+        st.plotly_chart(_fig_inc)
 
     # --- Value decomposition: price vs. share accumulation ---
     if _decomp:
@@ -334,7 +334,7 @@ else:
             xaxis_tickformat="%d.%m.%Y",
             template="plotly_white",
         )
-        st.plotly_chart(_fig_dec, use_container_width=True)
+        st.plotly_chart(_fig_dec)
 
 st.divider()
 
@@ -351,7 +351,7 @@ _latest_fetch = (
 
 _btn_col, _info_col = st.columns([1, 4])
 with _btn_col:
-    if st.button("🔄 Dividenden aktualisieren", use_container_width=True):
+    if st.button("🔄 Dividenden aktualisieren", width="stretch"):
         with st.spinner("Dividendendaten werden abgerufen..."):
             _errors = _market_agent.fetch_dividends_now()
             if _errors:

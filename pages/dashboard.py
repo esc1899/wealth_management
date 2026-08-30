@@ -136,7 +136,7 @@ for inv_type in investment_types:
         for v in group
     ]
     df = pd.DataFrame(rows)
-    st.dataframe(df.style.format(fmt_rules), use_container_width=True, hide_index=True)
+    st.dataframe(df.style.format(fmt_rules), width="stretch", hide_index=True)
 
 # ------------------------------------------------------------------
 # Allocation chart (only if prices available)
@@ -179,7 +179,7 @@ if has_prices:
                 color="sektor"
             )
             fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig)
 
     with col_sunburst2:
         st.caption(t("analysis.weight_by_position"))
@@ -202,6 +202,6 @@ if has_prices:
                 color="sektor"
             )
             fig2.update_layout(margin=dict(t=0, b=0, l=0, r=0))
-            st.plotly_chart(fig2, use_container_width=True)
+            st.plotly_chart(fig2)
 
 # Wealth history moved to dedicated "Vermögenshistorie" page

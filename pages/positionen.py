@@ -178,7 +178,7 @@ def _render_edit_form(pos_id: int | None, readonly: bool = False):
         with col_btn:
             st.write("")
             st.write("")
-            if st.button(t("positionen.lookup_button"), use_container_width=True):
+            if st.button(t("positionen.lookup_button"), width="stretch"):
                 id_type = "ID_ISIN" if lookup_isin.strip() else "ID_WERTPAPIER"
                 id_value = lookup_isin.strip() or lookup_wkn.strip()
                 if id_value:
@@ -727,13 +727,13 @@ def _show_detail(pos_id: int | None):
 
     # Mode toggle button
     toggle_label = "✏️ " + t("positionen.edit_button_detail") if mode == "view" else "👁 Ansicht"
-    if c2.button(toggle_label, key=f"toggle_mode_{pos_id}", use_container_width=True):
+    if c2.button(toggle_label, key=f"toggle_mode_{pos_id}", width="stretch"):
         _set(_pos_dialog_mode="edit" if mode == "view" else "view")
         st.rerun()
         return
 
     # Close button
-    if c3.button("✕", key=f"close_dialog_{pos_id}", use_container_width=True):
+    if c3.button("✕", key=f"close_dialog_{pos_id}", width="stretch"):
         _clear_form()
         st.rerun()
         return
@@ -830,12 +830,12 @@ def _show_delete_dialog(pos_id: int):
     st.warning(f"**{pos.name}** wird gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.")
 
     col_yes, col_no = st.columns(2)
-    if col_yes.button(t("positionen.confirm_yes"), type="primary", use_container_width=True):
+    if col_yes.button(t("positionen.confirm_yes"), type="primary", width="stretch"):
         repo.delete(pos_id)
         _clear_form()
         st.toast(t("positionen.deleted"), icon="🗑️")
         st.rerun()
-    if col_no.button(t("positionen.confirm_no"), use_container_width=True):
+    if col_no.button(t("positionen.confirm_no"), width="stretch"):
         _clear_form()
         st.rerun()
 

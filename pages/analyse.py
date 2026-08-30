@@ -208,7 +208,7 @@ if day_rows:
         text=[bar_label(row[col_day_eur], row[col_day_pct]) for _, row in df_day.iterrows()],
     )
     style_bar_chart(fig_day)
-    st.plotly_chart(fig_day, use_container_width=True)
+    st.plotly_chart(fig_day)
 else:
     st.info(t("analysis.no_day_pnl"))
 
@@ -285,7 +285,7 @@ if _attribution:
             text=[bar_label(row["Beitrag (€)"], row["%"]) for _, row in _df_attr.iterrows()],
         )
         style_bar_chart(_fig_attr)
-        st.plotly_chart(_fig_attr, use_container_width=True)
+        st.plotly_chart(_fig_attr)
 
     # Table
     _table_rows = []
@@ -303,7 +303,7 @@ if _attribution:
         if _has_dividends_month:
             row["Div. (€)*"] = f"+{r.dividend_contribution_eur:,.0f}" if r.dividend_contribution_eur > 0 else "—"
         _table_rows.append(row)
-    st.dataframe(pd.DataFrame(_table_rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(_table_rows), width="stretch", hide_index=True)
     _month_captions = ["Start = letzter Schlusskurs des Vormonats, Ende = letzter Schlusskurs des Monats (laufender Monat: aktueller Kurs)."]
     if _has_dividends_month:
         _month_captions.append("* Div. = geschätzte Dividende (Jahresdividende ÷ 12, aktuelle Rate — keine tatsächlichen Zahlungen).")
@@ -410,7 +410,7 @@ if _year_attribution:
             text=[bar_label(row["Beitrag (€)"], row["%"]) for _, row in _df_year_attr.iterrows()],
         )
         style_bar_chart(_fig_year_attr)
-        st.plotly_chart(_fig_year_attr, use_container_width=True)
+        st.plotly_chart(_fig_year_attr)
 
     _year_table_rows = []
     _has_dividends_year = any(r.dividend_contribution_eur > 0 for r in _year_attribution)
@@ -427,7 +427,7 @@ if _year_attribution:
         if _has_dividends_year:
             row["Div. (€)*"] = f"+{r.dividend_contribution_eur:,.0f}" if r.dividend_contribution_eur > 0 else "—"
         _year_table_rows.append(row)
-    st.dataframe(pd.DataFrame(_year_table_rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(_year_table_rows), width="stretch", hide_index=True)
     _year_captions = ["Start = letzter Schlusskurs des Vorjahres (31. Dez), Ende = letzter Schlusskurs des Jahres (laufendes Jahr: aktueller Kurs)."]
     if _has_dividends_year:
         _year_captions.append("* Div. = geschätzte Jahresdividende (aktuelle Rate — keine tatsächlichen Zahlungen).")
@@ -501,7 +501,7 @@ if pnl_rows:
         text=[bar_label(row[col_pnl_eur], row[col_pnl_pct]) for _, row in df_pnl.iterrows()],
     )
     style_bar_chart(fig_pnl)
-    st.plotly_chart(fig_pnl, use_container_width=True)
+    st.plotly_chart(fig_pnl)
 else:
     st.info(t("analysis.no_pnl"))
 
@@ -542,7 +542,7 @@ if rows:
         color="sektor"
     )
     fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig)
 else:
     st.info(t("analysis.no_weight_data"))
 
@@ -818,7 +818,7 @@ with st.expander("📊 Empfehler-Attribution", expanded=False):
                 })
 
             df_attr = pd.DataFrame(rows)
-            st.dataframe(df_attr, use_container_width=True, hide_index=True)
+            st.dataframe(df_attr, width="stretch", hide_index=True)
 
             # Explanation
             st.caption(

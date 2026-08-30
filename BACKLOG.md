@@ -21,7 +21,7 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 | ID | Entdeckt | Beschreibung |
 |---|---|---|
 | NOTE-1 | 2026-06-06 | ~~**Tavily Monats-Limit erschöpft**~~ — Plan-Limit erhöht (2026-06-07). Verbrauch zusätzlich optimiert: search_depth=basic (alle außer FA), client-side max_uses-Enforcement, fehlende Limits nachgerüstet, NewsAgent-Formel gekappt. ✅ ERLEDIGT |
-| NOTE-2 | 2026-06-06 | **SCANFL delisted/nicht gefunden** — yfinance liefert 404 für Symbol SCANFL. Position prüfen: Ticker noch aktuell? Ggf. aus Portfolio/Watchlist entfernen oder Ticker korrigieren. |
+| NOTE-2 | 2026-06-06 | ~~**SCANFL delisted/nicht gefunden**~~ — Symbol ist inzwischen aus Positionen, Watchlist und `current_prices` verschwunden; beim Status-Check 2026-08-23 nicht mehr auffindbar. ✅ ERLEDIGT |
 | NOTE-3 | 2026-06-23 | **Cloud-Modellauswahl (Settings) zeigt mehr als die konfigurierten Modelle** — auf dem Firmenrechner (nur Anthropic-Proxy aktiv) erscheinen im Dropdown mehr als die 3 `CLAUDE_MODELS`. Ursache vermutlich: der provider-aware Filter (commit 005efe3) lässt **Registry-/Preis-Tabellen-Einträge** durch, die als `claude` klassifiziert sind ([pages/settings.py](pages/settings.py) `_ALL_PUBLIC_MODELS` ∪ `_registry_public`); die sind nicht gegen den Proxy verifiziert → Risiko: unverfügbare ID wählen → 404. **Noch nicht bestätigt** (echte Dropdown-/Registry-Liste vom Firmenrechner steht aus). **Mögliche Lösung:** hinter custom base_url (Proxy) die Claude-Modelle auf genau `config.CLAUDE_MODELS` gaten (Registry-Claude-Einträge raus). **Verwandt:** [[second_install_company_machine]], Proxy-Anbindung 2026-06-22/23. |
 
 ---
@@ -46,6 +46,6 @@ Personal planning overview. User feedback and bug reports: [GitHub Issues](https
 | ID | Priority | Description | Notes |
 |---|---|---|---|
 | DEBT-8 | P3 | Document `migrate_db()` inline — add comments explaining the dual init+migrate pattern | Low risk, cosmetic |
-| DEBT-13 | P3 | Tighten requirements.txt version bounds | Low urgency, no known conflicts |
+| DEBT-13 | P3 | ~~Tighten requirements.txt version bounds~~ — Pins waren von der laufenden Umgebung abgedriftet (`yfinance<1.0.0` bei laufendem 1.2.0, `cryptography<43` bei 46.0.7): ein frisches `pip install -r requirements.txt` hätte eine andere App gebaut als die getestete. Am 2026-08-23 auf die tatsächlich getesteten Versionen gezogen (Python 3.11 + streamlit 1.62 + yfinance 1.6). | ✅ ERLEDIGT |
 
 ---

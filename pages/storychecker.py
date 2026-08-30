@@ -97,7 +97,7 @@ if positions_with_story:
             t("storychecker.batch_button"),
             type="primary",
             key="_sc_batch_run",
-            use_container_width=False,
+            width="content",
             disabled=_BATCH["running"] or not target_positions,
         ):
             _lang = current_language()
@@ -172,7 +172,7 @@ with col_left:
             selected_position = positions_with_story[selected_idx]
 
             submitted = st.form_submit_button(
-                t("storychecker.run_button"), use_container_width=True, type="primary"
+                t("storychecker.run_button"), width="stretch", type="primary"
             )
 
         # Show stored story as reference
