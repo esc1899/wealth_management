@@ -417,7 +417,7 @@ Gib eine prägnante, fokussierte Agenda (4–6 Punkte).
         return await self._llm.complete(
             prompt,
             system="Du bist ein Investmentanalyst. Antworte auf Deutsch.",
-            max_tokens=512,
+            max_tokens=1500,
         )
 
 

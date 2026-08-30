@@ -28,6 +28,7 @@ model_prices = model_registry
 # Provider display names (brand names — language-neutral).
 _PROVIDER_LABELS = {
     "claude": "Anthropic",
+    "claude_legacy": "Anthropic (abgelöst)",
     "openrouter": "OpenRouter",
     "deepseek": "DeepSeek",
     "ollama": "Ollama",

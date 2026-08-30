@@ -15,6 +15,7 @@ from datetime import date
 import pytest
 
 from core.encryption import EncryptionService
+from core.constants import CLAUDE_OPUS, CLAUDE_SONNET
 from core.storage.app_config import AppConfigRepository
 from core.storage.base import init_db, migrate_db
 from core.storage.models import Position
@@ -104,7 +105,7 @@ class TestModelRegistry:
         # Every default entry has a provider in the known set
         for model_id, entry in reg.items():
             assert entry["provider"] in {"claude", "openrouter", "deepseek", "ollama"}
-        assert reg["claude-opus-4-8"]["provider"] == "claude"
+        assert reg[CLAUDE_OPUS]["provider"] == "claude"
         assert reg["qwen3.5:9b"]["provider"] == "ollama"
         assert reg["mistralai/mistral-large-2512"]["provider"] == "openrouter"
         # deepseek/… (slash form) routes via OpenRouter, so tagged openrouter
@@ -158,8 +159,8 @@ class TestModelRegistry:
     def test_get_model_prices_unchanged_for_cost(self, app_config_repo):
         # Cost path only reads input/output — extra fields must not interfere
         prices = app_config_repo.get_model_prices()
-        assert prices["claude-sonnet-4-6"]["input"] == 3.0
-        assert prices["claude-sonnet-4-6"]["output"] == 15.0
+        assert prices[CLAUDE_SONNET]["input"] == 2.0
+        assert prices[CLAUDE_SONNET]["output"] == 10.0
 
     def test_ollama_params_defaults_to_none_ctx(self, app_config_repo):
         params = app_config_repo.get_ollama_params("qwen3.5:9b")

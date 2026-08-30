@@ -174,7 +174,7 @@ class ConsensusGapAgent:
                     SUBMIT_VERDICT_TOOL,
                 ],
                 system=system,
-                max_tokens=2500,
+                max_tokens=4096,
             )
         except Exception as exc:
             logger.warning("consensus_gap: LLM error for %s: %s", pos.name, exc)

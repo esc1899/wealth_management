@@ -1,12 +1,13 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from core.constants import CLAUDE_HAIKU, CLAUDE_OPUS, CLAUDE_SONNET
 from core.llm.claude import ClaudeProvider, validate_llm_response
 from core.llm.base import Message, Role
 
 
 @pytest.fixture
 def provider():
-    return ClaudeProvider(api_key="test_key", model="claude-sonnet-4-6")
+    return ClaudeProvider(api_key="test_key", model=CLAUDE_SONNET)
 
 
 def make_claude_response(text: str) -> MagicMock:
@@ -78,7 +79,7 @@ async def test_api_error_propagates(provider):
 
 
 def test_model_property(provider):
-    assert provider.model == "claude-sonnet-4-6"
+    assert provider.model == CLAUDE_SONNET
 
 
 # ------------------------------------------------------------------
@@ -378,3 +379,56 @@ async def test_chat_with_tools_logs_suspicious_output(provider, caplog):
     assert "ignore previous" in result.content.lower()
     # But warning is logged
     assert "Suspicious pattern detected" in caplog.text
+
+
+class TestReasoningKwargs:
+    """Ab Sonnet 5 / Opus 5 denkt das Modell auch ohne ``thinking``-Parameter — auf
+    4.6/4.8 hieß Weglassen "nicht denken". Der Toggle steuert daher effort."""
+
+    def test_toggle_off_lowers_effort_but_keeps_thinking_on(self, provider):
+        kwargs = provider._reasoning_kwargs(False)
+        assert kwargs["output_config"] == {"effort": "medium"}
+        assert "thinking" not in kwargs  # weglassen = adaptiv an (Modell-Default)
+
+    def test_toggle_on_raises_effort_and_shows_summary(self, provider):
+        kwargs = provider._reasoning_kwargs(True)
+        assert kwargs["output_config"] == {"effort": "high"}
+        assert kwargs["thinking"] == {"type": "adaptive", "display": "summarized"}
+
+    def test_forced_tool_disables_thinking(self, provider):
+        # Erzwungener tool_choice liefert keine Prosa — Denken wäre reine Kosten und
+        # frisst das knappe max_tokens-Budget. output_config ist dort unverträglich.
+        kwargs = provider._reasoning_kwargs(True, forced_tool=True)
+        assert kwargs == {"thinking": {"type": "disabled"}}
+
+    def test_haiku_gets_neither(self):
+        haiku = ClaudeProvider(api_key="k", model=CLAUDE_HAIKU)
+        assert haiku._reasoning_kwargs(True) == {}
+
+    def test_opus_included(self):
+        opus = ClaudeProvider(api_key="k", model=CLAUDE_OPUS)
+        assert opus._reasoning_kwargs(False)["output_config"] == {"effort": "medium"}
+
+    def test_instance_default_used_when_caller_passes_none(self):
+        thinking_provider = ClaudeProvider(api_key="k", model=CLAUDE_SONNET, enable_thinking=True)
+        assert thinking_provider._reasoning_kwargs(None)["output_config"] == {"effort": "high"}
+
+
+class TestCurrentModelIds:
+    def test_constants_point_at_current_models(self):
+        # Wechsel bewusst machen: die Preistabelle in app_config hängt an diesen IDs.
+        assert CLAUDE_SONNET == "claude-sonnet-5"
+        assert CLAUDE_OPUS == "claude-opus-5"
+
+
+@pytest.mark.asyncio
+async def test_chat_sends_effort(provider):
+    captured = {}
+
+    async def fake_create(**kwargs):
+        captured.update(kwargs)
+        return make_claude_response("ok")
+
+    provider._client.messages.create = fake_create
+    await provider.chat([Message(role=Role.USER, content="Hi")])
+    assert captured["output_config"] == {"effort": "medium"}

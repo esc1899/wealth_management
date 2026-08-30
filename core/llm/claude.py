@@ -102,6 +102,32 @@ class ClaudeProvider(LLMProvider):
         self._enable_thinking = enable_thinking
         self._tavily_search_depth = tavily_search_depth
 
+    def _reasoning_kwargs(
+        self, enable_thinking: Optional[bool] = None, *, forced_tool: bool = False
+    ) -> dict:
+        """effort/thinking-Parameter für das konfigurierte Modell (leer außer Sonnet/Opus).
+
+        Ab Sonnet 5 / Opus 5 denkt das Modell auch dann, wenn gar kein ``thinking``
+        mitgeschickt wird — auf 4.6/4.8 hieß Weglassen noch "nicht denken". Denk-Tokens
+        zählen gegen ``max_tokens``. Explizites Abschalten wäre bei freier Tool-Wahl
+        riskant: Opus 5 schreibt Tool-Aufrufe dann gelegentlich als Fließtext statt als
+        ``tool_use``-Block — der Aufruf passiert stillschweigend nicht. Der UI-Toggle
+        steuert deshalb die Denktiefe über ``effort``, nicht das Denken selbst.
+
+        Bei erzwungenem ``tool_choice`` gibt es keine Prosa-Antwort; Denken wäre reine
+        Kosten und frisst das knappe Token-Budget → dort abgeschaltet (``output_config``
+        verträgt sich nicht mit erzwungenem tool_choice).
+        """
+        if self._model not in {CLAUDE_SONNET, CLAUDE_OPUS}:
+            return {}
+        if forced_tool:
+            return {"thinking": {"type": "disabled"}}
+        _thinking = self._enable_thinking if enable_thinking is None else enable_thinking
+        kwargs: dict = {"output_config": {"effort": "high" if _thinking else "medium"}}
+        if _thinking:
+            kwargs["thinking"] = {"type": "adaptive", "display": "summarized"}
+        return kwargs
+
     async def chat(
         self,
         messages: list[Message],
@@ -126,6 +152,7 @@ class ClaudeProvider(LLMProvider):
         }
         if system_content:
             kwargs["system"] = system_content
+        kwargs.update(self._reasoning_kwargs())
 
         _t0 = time.monotonic()
         response = await self._client.messages.create(**kwargs)
@@ -192,13 +219,9 @@ class ClaudeProvider(LLMProvider):
             kwargs["system"] = [{"type": "text", "text": system}]
         if tool_choice:
             kwargs["tool_choice"] = tool_choice
-        # effort: "high" reduces thinking token overhead; Haiku does not support effort
-        # Skip output_config when tool_choice forces a specific tool — incompatible combination
-        if self._model in {CLAUDE_SONNET, CLAUDE_OPUS} and not tool_choice:
-            kwargs["output_config"] = {"effort": "high"}
-            _thinking = self._enable_thinking if enable_thinking is None else enable_thinking
-            if _thinking:
-                kwargs["thinking"] = {"type": "adaptive", "display": "summarized"}
+        # Haiku kennt weder effort noch adaptives Denken — _reasoning_kwargs liefert
+        # dafür ein leeres Dict.
+        kwargs.update(self._reasoning_kwargs(enable_thinking, forced_tool=bool(tool_choice)))
 
         _t0 = time.monotonic()
         total_input = total_output = total_cache_read = total_cache_write = total_web_search = 0

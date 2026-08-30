@@ -65,20 +65,28 @@ class AppConfigRepository:
     # ------------------------------------------------------------------
 
     # Model registry: prices (USD per million tokens) + provider + optional Ollama
-    # runtime params (think / num_ctx for local models). Anthropic list prices as
-    # defaults, May 2026. ``provider`` ∈ {claude, openrouter, deepseek, ollama}.
+    # runtime params (think / num_ctx for local models). ``provider`` ∈
+    # {claude, openrouter, deepseek, ollama}.
     # NOTE: ``deepseek/…`` (slash form) is served *via OpenRouter* — the router only
     # matches the ``deepseek-`` prefix (direct API), so these are tagged openrouter.
+    # Preise zuletzt geprüft 2026-08-30: Anthropic gegen die Listenpreis-Tabelle
+    # (platform.claude.com/docs/en/about-claude/pricing), OpenRouter gegen
+    # https://openrouter.ai/api/v1/models (Feld ``pricing``, $/Token → ×1e6).
     _DEFAULT_MODEL_PRICES: dict = {
         CLAUDE_HAIKU:   {"input": 1.00,  "output": 5.00,  "provider": "claude"},
-        CLAUDE_SONNET:  {"input": 3.00,  "output": 15.00, "provider": "claude"},
+        CLAUDE_SONNET:  {"input": 2.00,  "output": 10.00, "provider": "claude"},
         CLAUDE_OPUS:    {"input": 5.00,  "output": 25.00, "provider": "claude"},
-        # DeepSeek + Mistral via OpenRouter, May/June 2026
-        "deepseek/deepseek-v4-flash":   {"input": 0.27,  "output": 1.10, "provider": "openrouter"},
-        "deepseek/deepseek-v4-pro":     {"input": 0.90,  "output": 3.50, "provider": "openrouter"},
-        "deepseek/deepseek-chat":       {"input": 0.27,  "output": 1.10, "provider": "openrouter"},
-        "deepseek/deepseek-r1":         {"input": 0.55,  "output": 2.19, "provider": "openrouter"},
-        "mistralai/mistral-large-2512": {"input": 0.50,  "output": 1.50, "provider": "openrouter"},
+        # DeepSeek + Mistral via OpenRouter — DeepSeek hat seit Juni deutlich gesenkt
+        "deepseek/deepseek-v4-flash":   {"input": 0.0804, "output": 0.1607, "provider": "openrouter"},
+        "deepseek/deepseek-v4-pro":     {"input": 0.4475, "output": 0.8951, "provider": "openrouter"},
+        "deepseek/deepseek-chat":       {"input": 0.2574, "output": 1.0287, "provider": "openrouter"},
+        "deepseek/deepseek-r1":         {"input": 0.70,   "output": 2.50,   "provider": "openrouter"},
+        "mistralai/mistral-large-2512": {"input": 0.50,   "output": 1.50,   "provider": "openrouter"},
+        # Mistral Medium 3.5 (04/2026) — aktuellstes Mistral-Modell. Schreibt Prosa UND
+        # ruft das Submit-Tool; mistral-large-2512 kollabiert die Antwort in den Tool-Call
+        # (kein Prosa-Body), wie DeepSeek es beim FA tat — für Agents mit Prosa+Verdict
+        # also Medium 3.5 nehmen, nicht Large. Preise identisch mit Mistral direkt.
+        "mistralai/mistral-medium-3-5": {"input": 1.50,   "output": 7.50,   "provider": "openrouter"},
         # Local models are free (Ollama)
         "qwen3.5:9b":   {"input": 0.0,   "output": 0.0, "provider": "ollama"},
         "llama3.2":     {"input": 0.0,   "output": 0.0, "provider": "ollama"},
@@ -88,6 +96,11 @@ class AppConfigRepository:
 
     # Providers that serve the agent "Cloud"/public model dropdown.
     PUBLIC_PROVIDERS = ("claude", "openrouter", "deepseek")
+    # Abgelöste Modelle: bleiben mit ihrem damaligen Preis in der Registry, damit die
+    # Kosten alter llm_usage-Zeilen weiter berechenbar sind (compute_cost schlägt nur
+    # dort nach). Kein Public-Provider → sie tauchen nicht mehr in der Modellauswahl
+    # auf. Ein hier fehlendes Alt-Modell erscheint in der Statistik lautlos mit 0 $.
+    LEGACY_PROVIDER = "claude_legacy"
     # Local provider (privacy 🔒). Legacy value "local" is normalised to this.
     OLLAMA_PROVIDER = "ollama"
     _DELETED_KEY = "model_prices_deleted"
