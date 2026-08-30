@@ -2,6 +2,7 @@
 
 from core.llm.router import (
     available_public_models,
+    current_claude_models,
     resolve_provider_kind,
     tavily_news_mode,
     tavily_search_depth,
@@ -93,3 +94,37 @@ class TestTavilyFlags:
         for a in ("news", "structural_scan", "sector_rotation", "search_agent"):
             assert tavily_news_mode(a) is True
         assert tavily_news_mode("consensus_gap") is False
+
+
+class TestCurrentClaudeModels:
+    """Die Models-API liefert die komplette Claude-Historie — als Auswahl brauchen wir
+    nur die konfigurierten aktuellen Modelle, gefiltert auf tatsächlich Verfügbares."""
+
+    CONFIGURED = ["claude-haiku-4-5-20251001", "claude-sonnet-5", "claude-opus-5"]
+
+    def test_filters_history_down_to_configured(self):
+        available = [
+            "claude-opus-4-6", "claude-opus-4-7", "claude-opus-4-8", "claude-opus-5",
+            "claude-sonnet-4-5", "claude-sonnet-4-6", "claude-sonnet-5",
+            "claude-haiku-4-5-20251001", "claude-fable-5",
+        ]
+        assert current_claude_models(self.CONFIGURED, available) == self.CONFIGURED
+
+    def test_dateless_alias_counts_as_available(self):
+        # API meldet den Alias, konfiguriert ist die datierte ID (oder umgekehrt)
+        available = ["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-5"]
+        assert current_claude_models(self.CONFIGURED, available) == self.CONFIGURED
+
+    def test_unavailable_model_drops_out(self):
+        # Firmenproxy gibt Opus nicht frei
+        available = ["claude-haiku-4-5-20251001", "claude-sonnet-5"]
+        assert current_claude_models(self.CONFIGURED, available) == [
+            "claude-haiku-4-5-20251001", "claude-sonnet-5",
+        ]
+
+    def test_empty_api_answer_keeps_configured_list(self):
+        assert current_claude_models(self.CONFIGURED, []) == self.CONFIGURED
+
+    def test_no_overlap_keeps_configured_list(self):
+        # Lieber ungefiltert als leer — sonst steht der User ohne Auswahl da
+        assert current_claude_models(self.CONFIGURED, ["gpt-5", "mistral-large"]) == self.CONFIGURED

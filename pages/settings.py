@@ -12,7 +12,7 @@ from config import config
 from core.health import Severity, check_ollama_connectivity, run_static_checks
 from core.i18n import SUPPORTED_LANGUAGES, current_language, set_language, t
 from core.llm.claude import fetch_available_models as _fetch_claude_models
-from core.llm.router import available_public_models
+from core.llm.router import available_public_models, current_claude_models
 from state import get_app_config_repo, get_skills_repo
 
 st.set_page_config(page_title="Einstellungen", page_icon="⚙️", layout="wide")
@@ -85,13 +85,16 @@ app_config = get_app_config_repo()
 
 st.subheader(t("settings.model_selection_header"))
 
-# Fetch available Claude models from Anthropic API, fallback to config
+# Auswahl: die konfigurierten (jeweils aktuellen) Claude-Modelle, gefiltert auf das,
+# was der Account laut Models-API wirklich anbietet. Die API-Liste selbst ist als Auswahl
+# untauglich — sie enthält die gesamte Claude-Historie inkl. abgelöster Versionen.
 @st.cache_resource(ttl=3600)
 def _get_claude_model_list() -> list[str]:
     if not config.LLM_API_KEY:
         return config.CLAUDE_MODELS
-    models = _fetch_claude_models(config.LLM_API_KEY, config.LLM_BASE_URL)
-    return models if models else config.CLAUDE_MODELS
+    return current_claude_models(
+        config.CLAUDE_MODELS, _fetch_claude_models(config.LLM_API_KEY, config.LLM_BASE_URL)
+    )
 
 _CLAUDE_MODELS = _get_claude_model_list()
 
@@ -141,10 +144,19 @@ def _ollama_sel(agent_key: str, label: str) -> str:
     idx = _ollama_models.index(saved) if saved in _ollama_models else 0
     return st.selectbox(label, options=_ollama_models, index=idx, key=f"_model_ollama_{agent_key}")
 
+def _with_saved(options: list[str], saved: str) -> list[str]:
+    """Ein gespeichertes, nicht mehr gelistetes Modell bleibt in der Auswahl sichtbar.
+
+    Sonst zeigt das Dropdown stillschweigend Option 0, während in der DB weiter das alte
+    Modell steht — der Agent läuft dann anders, als die Seite behauptet.
+    """
+    return options if not saved or saved in options else options + [saved]
+
 def _claude_sel(agent_key: str, label: str) -> str:
     saved = app_config.get(f"model_claude_{agent_key}") or app_config.get("model_claude") or (_CLAUDE_MODELS[0] if _CLAUDE_MODELS else "")
-    idx = _CLAUDE_MODELS.index(saved) if saved in _CLAUDE_MODELS else 0
-    return st.selectbox(label, options=_CLAUDE_MODELS, index=idx, key=f"_model_claude_{agent_key}")
+    options = _with_saved(_CLAUDE_MODELS, saved)
+    idx = options.index(saved) if saved in options else 0
+    return st.selectbox(label, options=options, index=idx, key=f"_model_claude_{agent_key}")
 
 def _public_sel(agent_key: str, label: str) -> str:
     saved = (
@@ -154,7 +166,7 @@ def _public_sel(agent_key: str, label: str) -> str:
         or app_config.get("model_public")
         or (_ALL_PUBLIC_MODELS[0] if _ALL_PUBLIC_MODELS else "")
     )
-    options = _ALL_PUBLIC_MODELS or ["(keine Modelle konfiguriert)"]
+    options = _with_saved(_ALL_PUBLIC_MODELS, saved) or ["(keine Modelle konfiguriert)"]
     idx = options.index(saved) if saved in options else 0
     return st.selectbox(label, options=options, index=idx, key=f"_model_public_{agent_key}")
 

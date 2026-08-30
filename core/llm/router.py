@@ -6,6 +6,34 @@ Each call site passes the credentials it actually has via the ``has_*`` flags; t
 routing rule itself is defined exactly once.
 """
 
+import re
+
+# Datierte Modell-ID und datumsloser Alias sind dasselbe Modell
+# (claude-haiku-4-5-20251001 ↔ claude-haiku-4-5).
+_DATE_SUFFIX = re.compile(r"-\d{8}$")
+
+
+def _base_model_id(model_id: str) -> str:
+    return _DATE_SUFFIX.sub("", model_id)
+
+
+def current_claude_models(configured: list[str], available: list[str]) -> list[str]:
+    """Auswahlliste der Claude-Modelle: die konfigurierten — jeweils aktuellen — Modelle,
+    gefiltert auf das, was der Account laut Models-API wirklich anbietet.
+
+    ``client.models.list()`` liefert die komplette Claude-Historie inklusive abgelöster
+    Versionen. Als Dropdown ist das Lärm, und ein versehentlich gewähltes Altmodell fällt
+    erst Wochen später in der Kostenstatistik auf. Die API-Liste dient daher nur als
+    Verfügbarkeitsfilter: was der Key nicht sehen kann (Firmenproxy, gesperrtes Modell),
+    verschwindet. Liefert die Abfrage nichts, bleibt die konfigurierte Liste stehen —
+    lieber eine ungefilterte Auswahl als gar keine.
+    """
+    if not available:
+        return list(configured)
+    bases = {_base_model_id(m) for m in available}
+    filtered = [m for m in configured if _base_model_id(m) in bases]
+    return filtered or list(configured)
+
 # Agents whose Tavily web search should run in "news" topic mode (recent days).
 TAVILY_NEWS_AGENTS = {"news", "structural_scan", "sector_rotation", "search_agent"}
 # Agents that benefit from Tavily "advanced" search depth.
