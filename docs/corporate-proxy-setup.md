@@ -132,7 +132,7 @@ LLM-related env variable.)*
 ```bash
 python -c "import anthropic; from config import config as c; \
 cl = anthropic.Anthropic(api_key=c.LLM_API_KEY, base_url=c.LLM_BASE_URL); \
-m = cl.messages.create(model='claude-sonnet-4-6', max_tokens=5, \
+m = cl.messages.create(model='claude-sonnet-5', max_tokens=5, \
 messages=[{'role':'user','content':'ok'}]); \
 print('OK:', ''.join(b.text for b in m.content if getattr(b,'type','')=='text'))"
 ```
@@ -159,7 +159,7 @@ Then open **Settings → System Status** in the app, and pick a model per cloud 
 
 The proxy has **no `/v1/models` listing endpoint** in the reference setup, so the app can't
 auto-discover models and falls back to the IDs in `CLAUDE_MODELS` (defaults:
-`claude-haiku-4-5-20251001`, `claude-sonnet-4-6`, `claude-opus-4-8`). That's fine as long as
+`claude-haiku-4-5-20251001`, `claude-sonnet-5`, `claude-opus-5`). That's fine as long as
 the proxy serves those IDs — verify with `./app.sh ping`.
 
 ---

@@ -8,6 +8,76 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Claude 5er-Generation: Modelle, Preise, Denktiefe — 2026-08-30
+
+**Warum:** Die Modellauswahl stand noch auf Sonnet 4.6 / Opus 4.8, die hinterlegten Preise stammten
+teils aus Schätzungen. Beides wirkt still: ein Altmodell fällt erst Wochen später in der
+Kostenstatistik auf, ein falscher Preis nie.
+
+**Änderungen:**
+- Modelle je Klasse auf den aktuellen Stand gezogen: Sonnet 4.6 → **Sonnet 5**, Opus 4.8 →
+  **Opus 5** (Haiku 4.5 ist bereits aktuell). Sonnet wird damit von 3/15 auf **2/10 USD je Mio
+  Tokens** günstiger, Opus bleibt bei 5/25.
+- Preise gegen die Quellen geprüft statt geschätzt (Anthropic-Listenpreise, OpenRouter
+  `/api/v1/models`). DeepSeek v4-pro stand mit 0.90/3.50 in den Defaults und mit 0.252/0.378 in
+  der DB, real sind es **0.4475/0.8951**. Die gespeicherten Werte überschreiben die Defaults — ein
+  reiner Code-Fix hätte nichts bewirkt, die DB ist mitgezogen (`data/` ist gitignored).
+- Neu in der Registry: `mistralai/mistral-medium-3-5` (1.50/7.50).
+- **Denktiefe statt Denk-Schalter:** Ab Sonnet 5 / Opus 5 denkt das Modell auch ohne
+  `thinking`-Parameter — auf 4.6/4.8 hieß Weglassen „nicht denken", und Denk-Tokens zählen gegen
+  `max_tokens`. Explizites Abschalten ist bei freier Tool-Wahl riskant (Opus 5 schreibt
+  Tool-Aufrufe dann gelegentlich als Fließtext statt als `tool_use`-Block). Der UI-Toggle steuert
+  deshalb jetzt die Denktiefe über `effort`: aus = `medium`, an = `high` + Zusammenfassung. Bei
+  erzwungenem `tool_choice` wird Denken abgeschaltet (dort kommt ohnehin nur ein Tool-Block
+  zurück). Zwei enge Budgets bekamen Luft: Consensus Gap 2500 → 4096, FA-Vorschlag 512 → 1500.
+- **Kostenhistorie bleibt lesbar:** `compute_cost` schlägt Preise nur in der Registry nach — hätte
+  man die alten Modell-IDs entfernt, wären 121 historische `llm_usage`-Zeilen lautlos auf 0 $
+  gefallen. Sonnet 4.6 und Opus 4.8 bleiben deshalb mit ihrem damaligen Preis unter dem neuen
+  Provider `claude_legacy` erhalten: nicht in `PUBLIC_PROVIDERS`, also raus aus der Modellauswahl,
+  drin in der Kostenrechnung.
+
+**DB-Schema-Änderung:** keine (Werte liegen in `app_config.model_prices`).
+**Streamlit-Restart nötig:** ja — gecachte Agent-Singletons halten sonst den alten Provider.
+
+### Modellauswahl zeigt nur die aktuellen Claude-Modelle — 2026-08-30
+
+**Warum:** Die Auswahl kam ungefiltert aus `client.models.list()` — das sind aktuell 10 Einträge,
+die komplette Claude-Historie von Sonnet 4.5 bis Fable 5. Ein versehentlich gewähltes Altmodell
+fällt erst Wochen später in der Kostenstatistik auf.
+
+**Änderungen:**
+- Die API-Liste dient jetzt nur noch als **Verfügbarkeitsfilter** über `config.CLAUDE_MODELS`: was
+  der Key nicht sehen kann (Firmenproxy, gesperrtes Modell), verschwindet aus dem Dropdown.
+  Datierte IDs und ihre datumslosen Aliase gelten dabei als dasselbe Modell. Liefert die Abfrage
+  nichts, bleibt die konfigurierte Liste stehen statt eines leeren Dropdowns.
+- Mitgefixt: `options.index(saved) if saved in options else 0` zeigte bei einem gespeicherten,
+  nicht mehr gelisteten Modell kommentarlos Option 0 an, während der Agent weiter mit dem
+  gespeicherten Modell lief. Durch das Kürzen der Liste wäre dieser Fall häufiger geworden — ein
+  solcher Eintrag bleibt jetzt sichtbar angehängt.
+- Erledigt damit **NOTE-3** (Dropdown zeigte hinter dem Firmenproxy mehr als die konfigurierten
+  Modelle).
+
+### Fix: Tagesperformance zeigte Mehrtagesbewegung bei Kurslücken — 2026-08-30
+
+**Problem:** SAP wies +4,89 % Tagesperformance aus, tatsächlich waren es +0,55 %. Ursache war eine
+Lücke in `historical_prices`: Am 27.08. lief die App im Demo-Modus, alle Kurse und der
+Tagesabschluss landeten in `demo.db`, `portfolio.db` fehlte der Handelstag.
+
+**Drei Stellen machten daraus stille Falschzahlen:**
+- `get_prev_close()` nahm „die neueste Zeile vor heute" — bei fehlendem 27. also den 26.: eine
+  Zweitagesbewegung, ausgewiesen als „Heute". Jetzt kalenderverankert auf exakt den letzten
+  Handelstag, sonst `None`. Eine Lücke fällt damit auf, statt sich als Rendite zu tarnen.
+- Der Fallback nutzte yfinance `fast_info.previous_close` — ein Chart-Metadatum, das eine Session
+  danebenliegen kann (SAP 190,58 statt 189,88). Jetzt `regular_market_previous_close`,
+  `previous_close` nur noch als Rückfallebene. ETFs liefern dort `NaN` statt `None`: NaN ist truthy
+  und scheitert an jedem Vergleich, hätte den Fallback also verschluckt → `_positive_finite()`.
+- `backfill_snapshots()` bepreiste den verpassten Tag mit dem Vortagsschluss (27.08. lag 7.716 EUR
+  zu niedrig). Holt fehlende Historie jetzt nach, einmal pro Ticker und Lauf.
+
+**Daten repariert:** 27.08. nachgeholt, Snapshot neu berechnet. **Merke:** Ein Tag im Demo-Modus
+hinterlässt eine Lücke in der echten `portfolio.db` — Diagnose über die Zeilenzahl je Datum in
+`historical_prices`.
+
 ### Toolchain: Python 3.11 + Streamlit 1.62 + yfinance 1.6 — 2026-08-23
 
 **Warum:** Das venv lief auf Python 3.9.6 (Xcode-System-Python, seit Okt 2025 End-of-Life).

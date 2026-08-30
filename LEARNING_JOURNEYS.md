@@ -420,7 +420,7 @@ Build a simple comparison table. The numbers will surprise you.
 The app lets you select the model per agent in **Settings**. Repeat the same runs from Step 2 with:
 
 - `claude-haiku-4-5` (cheapest)
-- `claude-sonnet-4-6` (default for web search agents)
+- `claude-sonnet-5` (default for web search agents)
 
 Note the cost difference and the quality difference side by side. For agents without web search (News, Story Checker), Haiku is often sufficient. For agents with agentic loops (Structural Change Scanner, Consensus Gap), Sonnet is required — try Haiku and observe what breaks.
 

@@ -582,7 +582,7 @@ The public LLM layer is provider-agnostic and configured via environment variabl
 | `LLM_API_KEY` | Provider API key | — (required) |
 | `LLM_BASE_URL` | Endpoint URL | empty = Anthropic direct |
 | `LLM_DEFAULT_MODEL` | Fallback model when no DB override exists | empty = `claude-haiku-4-5-20251001` |
-| `CLAUDE_MODELS` | Comma-separated list for the Settings dropdown | `claude-haiku-4-5-20251001,claude-sonnet-4-6,claude-opus-4-6` |
+| `CLAUDE_MODELS` | Comma-separated list for the Settings dropdown | `claude-haiku-4-5-20251001,claude-sonnet-5,claude-opus-5` |
 
 ### Model Resolution Chain
 
@@ -594,6 +594,23 @@ DB (agent-specific)
 ```
 
 DB entries are written via the Settings UI. `LLM_DEFAULT_MODEL` serves as a fallback for infrastructure changes (provider switch without reconfiguring Settings).
+
+### Settings Dropdown — Availability Filter
+
+`CLAUDE_MODELS` is the **allowlist**, `client.models.list()` only the availability check: a
+configured model that the key cannot see (corporate proxy, restricted model) drops out of the
+dropdown; dated IDs and their undated aliases count as the same model. If the API call returns
+nothing, the configured list stands (no empty dropdown). A saved model that is no longer listed
+stays visible and selected — silently falling back to option 0 would show one model while the
+agent keeps running another.
+
+### Model Prices and the `claude_legacy` Provider
+
+`compute_cost()` looks prices up in the registry only (`app_config.model_prices`, seeded from
+`core/storage/app_config.py` defaults — stored values win over defaults). Removing a retired model
+ID would therefore silently re-cost its historical `llm_usage` rows at $0. Retired Claude models
+keep their price of the day under the provider `claude_legacy`, which is **not** in
+`PUBLIC_PROVIDERS`: out of the model selection, still in the cost calculation.
 
 ### Web Search
 
@@ -618,8 +635,8 @@ LLM_API_KEY=sk-ant-...
 ```env
 LLM_API_KEY=sk-or-...
 LLM_BASE_URL=https://openrouter.ai/api/v1
-LLM_DEFAULT_MODEL=anthropic/claude-sonnet-4-6
-CLAUDE_MODELS=anthropic/claude-haiku-4-5-20251001,anthropic/claude-sonnet-4-6,perplexity/sonar,openai/gpt-4o
+LLM_DEFAULT_MODEL=anthropic/claude-sonnet-5
+CLAUDE_MODELS=anthropic/claude-haiku-4-5-20251001,anthropic/claude-sonnet-5,perplexity/sonar,openai/gpt-4o
 TAVILY_API_KEY=tvly-...  # optional: web search for GPT-4o, etc.
 ```
 
