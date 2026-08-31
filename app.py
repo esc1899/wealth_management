@@ -86,8 +86,8 @@ def _legal_dialog():
         st.session_state["legal_accepted"] = True
         st.rerun()
 
-# Legal modal on first visit per session
-if not st.session_state.get("legal_accepted"):
+# Legal modal on first visit per session (disable per installation: SHOW_LEGAL_NOTICE=false)
+if config.SHOW_LEGAL_NOTICE and not st.session_state.get("legal_accepted"):
     _legal_dialog()
     st.stop()
 
@@ -208,9 +208,10 @@ with st.sidebar:
         st.rerun()
 pg.run()
 
-st.markdown("---")
-col1, col2 = st.columns([10, 1])
-with col2:
-    if st.button(t("legal.legal_footer"), key="legal_reopen"):
-        st.session_state["legal_accepted"] = False
-        st.rerun()
+if config.SHOW_LEGAL_NOTICE:
+    st.markdown("---")
+    col1, col2 = st.columns([10, 1])
+    with col2:
+        if st.button(t("legal.legal_footer"), key="legal_reopen"):
+            st.session_state["legal_accepted"] = False
+            st.rerun()

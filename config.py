@@ -57,6 +57,10 @@ class Config:
     # App authentication (optional — leave empty to disable login)
     APP_PASSWORD: str = os.getenv("APP_PASSWORD", "")
 
+    # Legal notice — blocking disclaimer/privacy modal on first visit per session.
+    # Defaults to on; a private single-user installation may turn it off via .env.
+    SHOW_LEGAL_NOTICE: bool = os.getenv("SHOW_LEGAL_NOTICE", "true").lower() == "true"
+
     # Demo mode
     DEMO_MODE: bool = os.getenv("DEMO_MODE", "false").lower() == "true"
 
