@@ -2,7 +2,7 @@
 Statistics — LLM costs and usage per agent/month.
 """
 
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 import plotly.express as px
@@ -61,7 +61,8 @@ _sel_source = st.radio(
 today_rows_raw = repo.total_today()
 alltime_rows_raw = repo.total_all_time()
 monthly_rows_raw = repo.monthly_totals_by_model()
-daily_rows_raw = repo.daily_totals_by_model(days=30)
+DAILY_WINDOW_DAYS = 30
+daily_rows_raw = repo.daily_totals_by_model(days=DAILY_WINDOW_DAYS)
 
 
 def _filter_source(rows: list[dict]) -> list[dict]:
@@ -263,9 +264,19 @@ with tab_trend:
             d = r["day"]
             daily_agg[d] = daily_agg.get(d, 0.0) + _row_cost(r)
 
+        # Über das volle 30-Tage-Fenster auffüllen (Nulltage inklusive). Ohne das
+        # bemisst Plotly die Balkenbreite am Abstand der vorhandenen Punkte — bei
+        # zwei Nutzungstagen werden daraus wochenbreite Balken.
+        _window_end = date.today()
+        _window_start = _window_end - timedelta(days=DAILY_WINDOW_DAYS)
+        _days = [
+            (_window_start + timedelta(days=i)).isoformat()
+            for i in range((_window_end - _window_start).days + 1)
+        ]
         df_daily = pd.DataFrame(
-            [{"day": d, "cost": c} for d, c in sorted(daily_agg.items())],
+            [{"day": d, "cost": daily_agg.get(d, 0.0)} for d in _days],
         )
+        df_daily["day"] = pd.to_datetime(df_daily["day"])
         fig2 = px.bar(
             df_daily,
             x="day",
@@ -273,7 +284,13 @@ with tab_trend:
             labels={"day": "", "cost": "Kosten ($)"},
             color_discrete_sequence=["#4C9BE8"],
         )
-        fig2.update_layout(yaxis_title="Kosten ($)", showlegend=False)
+        fig2.update_traces(hovertemplate="%{x|%d.%m.%Y}<br>$%{y:.3f}<extra></extra>")
+        fig2.update_layout(yaxis_title="Kosten ($)", showlegend=False, bargap=0.2)
+        fig2.update_xaxes(
+            tickformat="%d.%m.",
+            dtick="D1",
+            tickangle=-45,
+        )
         st.plotly_chart(fig2)
     else:
         st.info(t("statistics.no_data"))
