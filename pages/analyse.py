@@ -320,11 +320,33 @@ _digest_repo = get_monthly_digest_repo()
 _analyses_repo = get_analyses_repo()
 _digest_key = f"{_sel_year:04d}-{_sel_month:02d}"
 
-with st.expander(f"📋 Monatsdigest {_month_label}", expanded=False):
-    _digest = _digest_repo.get(_digest_key)
+_digest = _digest_repo.get(_digest_key)
+
+# Der Scheduler schreibt am Monatsersten den Digest des abgeschlossenen Vormonats.
+# Der Selektor steht aber auf dem laufenden Monat — ohne Fallback wäre der frisch
+# generierte Digest nie sichtbar, ohne das Dropdown umzustellen.
+_fallback_digest = None
+if _digest is None and _is_current_month:
+    _recent_digests = _digest_repo.get_recent(limit=1)
+    _fallback_digest = _recent_digests[0] if _recent_digests else None
+
+_shown_digest = _digest or _fallback_digest
+if _fallback_digest is not None:
+    _fb_year, _fb_month = int(_fallback_digest.month[:4]), int(_fallback_digest.month[5:7])
+    _digest_title = f"📋 Monatsdigest {_MONTH_NAMES_DE[_fb_month]} {_fb_year}"
+else:
+    _digest_title = f"📋 Monatsdigest {_month_label}"
+
+with st.expander(_digest_title, expanded=_shown_digest is not None):
+    if _shown_digest is not None:
+        if _fallback_digest is not None:
+            st.caption(
+                f"{_month_label} läuft noch — angezeigt wird der letzte abgeschlossene Monat."
+            )
+        st.markdown(_shown_digest.body_markdown)
+        st.caption(f"{t('common.generated_at')} {fmt_dt(_shown_digest.generated_at)} UTC")
+
     if _digest:
-        st.markdown(_digest.body_markdown)
-        st.caption(f"{t('common.generated_at')} {fmt_dt(_digest.generated_at)} UTC")
         if st.button("🔄 Digest neu generieren", key="regen_digest"):
             _md = generate_monthly_digest(
                 valuations, _analyses_repo, _app_config_repo,
@@ -341,7 +363,7 @@ with st.expander(f"📋 Monatsdigest {_month_label}", expanded=False):
             )
         else:
             st.info(f"Noch kein Digest für {_month_label}.")
-        if st.button("✨ Digest jetzt generieren", key="gen_digest"):
+        if st.button(f"✨ Digest für {_month_label} jetzt generieren", key="gen_digest"):
             with st.spinner("Generiere Digest..."):
                 _md = generate_monthly_digest(
                     valuations, _analyses_repo, _app_config_repo,

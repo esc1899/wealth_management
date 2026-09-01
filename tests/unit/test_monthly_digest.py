@@ -179,3 +179,45 @@ class TestGenerateMonthlyDigest:
         result = generate_monthly_digest(vals, analyses_repo, app_config, 2026, 5, market_repo=market_repo, today=_date(2026, 5, 15))
         assert "Portfolio gesamt" in result
         assert "AAPL" in result
+
+    def test_same_symbol_in_two_depots_listed_once(self):
+        """A ticker held in two depots is one contributor, not two (Doppel-Ticker)."""
+        import sqlite3 as sq
+        conn = sq.connect(":memory:")
+        conn.row_factory = sq.Row
+        conn.execute("""
+            CREATE TABLE historical_prices (
+                id INTEGER PRIMARY KEY,
+                symbol TEXT,
+                date TEXT,
+                close_eur REAL,
+                volume INTEGER
+            )
+        """)
+        conn.execute("INSERT INTO historical_prices VALUES (1, 'AAA.DE', '2026-04-30', 100.0, NULL)")
+        conn.commit()
+
+        def _get_last_price_in_range(symbol, range_start, range_end):
+            row = conn.execute(
+                "SELECT close_eur FROM historical_prices WHERE symbol = ? AND date BETWEEN ? AND ? ORDER BY date DESC LIMIT 1",
+                (symbol.upper(), range_start, range_end),
+            ).fetchone()
+            return float(row["close_eur"]) if row else None
+
+        market_repo = MagicMock()
+        market_repo.get_last_price_in_range.side_effect = _get_last_price_in_range
+
+        vals = [
+            _make_valuation("AAA.DE", current_price=120.0, quantity=10.0),
+            _make_valuation("AAA.DE", current_price=120.0, quantity=5.0),
+        ]
+        app_config = MagicMock()
+        app_config.get_json.return_value = None
+
+        from datetime import date as _date
+        result = generate_monthly_digest(
+            vals, _make_analyses_repo([]), app_config, 2026, 5,
+            market_repo=market_repo, today=_date(2026, 5, 15),
+        )
+        winners_line = next(l for l in result.splitlines() if "Beste Beiträge" in l)
+        assert winners_line.count("AAA.DE") == 1

@@ -14,6 +14,7 @@ from datetime import date, datetime, timezone
 from typing import List, Optional
 
 from core.monthly_attribution import compute_monthly_attribution, AttributionMonthRow
+from core.symbol_aggregation import aggregate_contributions
 
 
 _MONTH_NAMES_DE = {
@@ -89,8 +90,11 @@ def generate_monthly_digest(
         lines.append(f"**Portfolio gesamt:** {pct_str} ({sign}{total_contribution:,.0f}€)")
         lines.append("")
 
-        winners = sorted(rows_with_data, key=lambda r: r.contribution_eur, reverse=True)[:3]
-        losers = sorted(rows_with_data, key=lambda r: r.contribution_eur)[:3]
+        # Pro Symbol aggregieren — ein Ticker in zwei Depots ist eine Position,
+        # sonst steht er doppelt in den Top-Beiträgen (wie im Chart auf der Seite).
+        by_symbol = [c for c in aggregate_contributions(rows_with_data) if c.delta_pct is not None]
+        winners = sorted(by_symbol, key=lambda r: r.contribution_eur, reverse=True)[:3]
+        losers = sorted(by_symbol, key=lambda r: r.contribution_eur)[:3]
 
         if winners:
             w_parts = [f"{r.symbol} {r.delta_pct:+.1f}%" for r in winners if r.contribution_eur > 0]
