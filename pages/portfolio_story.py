@@ -24,6 +24,7 @@ from core.storage.models import PortfolioStory
 from core.ui.verdicts import cloud_notice, verdict_badge, VERDICT_CONFIGS, fmt_verdict_matrix, accumulation_matrix_cell
 from core.ui.markdown import llm_markdown
 from core.accumulation import accumulation_for_position
+from core.portfolio_snapshot import build_portfolio_snapshot
 from core.shareholder_yield import cached_buyback_yield_map
 from state import (
     get_analysis_service,
@@ -383,17 +384,12 @@ if st.button(t("portfolio_story.run_button"), type="primary", width="stretch"):
     if not current_story or not current_story.story:
         st.error(t("portfolio_story.no_story_error"))
     else:
-        # Build portfolio snapshot (WITHOUT dividends — LLM would invent numbers)
-        valuations = {v.symbol: v for v in valuations_list} if valuations_list else {}
-
-        portfolio_snapshot = "## Portfolio\n"
+        # Dividenden gehören in den Prompt: das Ziel im Liquiditätsbedarf ist oft
+        # ein Ausschüttungsziel. Ohne die berechneten Zahlen erfindet das Modell sie.
         if all_positions:
-            for p in all_positions:
-                val = valuations.get(p.ticker) if p.ticker else None
-                val_eur = val.current_value_eur if val and val.current_value_eur else 0
-                portfolio_snapshot += f"- {p.name} ({p.ticker}, {p.asset_class}): {val_eur:.0f}€\n"
+            portfolio_snapshot = build_portfolio_snapshot(all_positions, valuations_list)
         else:
-            portfolio_snapshot += t("portfolio_story.empty_portfolio") + "\n"
+            portfolio_snapshot = "## Portfolio\n" + t("portfolio_story.empty_portfolio") + "\n"
 
         verdict_lines = []
         sc_verdicts_for_job = all_verdicts_by_agent.get("storychecker", {})
@@ -515,12 +511,12 @@ with st.container(border=True):
     _pr_btn_type = "secondary"
     if st.button(t("portfolio_robustness.run_button"), key="pr_run_btn", type=_pr_btn_type):
         _pr_lang = current_language()
-        # Build portfolio snapshot (same as for Portfolio Story)
-        _pr_snapshot_lines = []
-        for _p in all_positions:
-            _ticker = f" ({_p.ticker})" if _p.ticker else ""
-            _pr_snapshot_lines.append(f"- {_p.name}{_ticker} [{_p.asset_class}]")
-        _pr_snapshot = "\n".join(_pr_snapshot_lines) if _pr_snapshot_lines else "(kein Portfolio)"
+        # Mit Werten und Gewichten — der Prompt fragt nach Konzentration (>15% / >30%),
+        # das ist ohne Zahlen nicht beantwortbar und wurde bisher geraten.
+        _pr_snapshot = (
+            build_portfolio_snapshot(all_positions, valuations_list)
+            if all_positions else "(kein Portfolio)"
+        )
 
         # Build verdicts summary from all available agents
         _pr_verdict_lines = []

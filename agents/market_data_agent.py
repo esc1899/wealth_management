@@ -61,6 +61,8 @@ class PortfolioValuation:
     dividend_source: Optional[str] = None        # "yfinance", "festgeld", "anleihe", None
     purchase_date: Optional[date] = None
     analysis_excluded: bool = False
+    position_id: Optional[int] = None    # stable link back to the position; `symbol` is
+                                         # ambiguous (duplicate tickers, name-derived pseudo-symbols)
 
 
 class MarketDataAgent:
@@ -310,6 +312,7 @@ class MarketDataAgent:
                     dividend_source=dividend_source,
                     purchase_date=pos.purchase_date,
                     analysis_excluded=pos.analysis_excluded,
+                    position_id=pos.id,
                 ))
                 continue
 
@@ -411,6 +414,7 @@ class MarketDataAgent:
                 dividend_source=dividend_source,
                 purchase_date=pos.purchase_date,
                 analysis_excluded=pos.analysis_excluded,
+                position_id=pos.id,
             ))
 
         return valuations
