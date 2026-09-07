@@ -190,7 +190,11 @@ class ClaudeProvider(LLMProvider):
         def _is_web_search(t: dict) -> bool:
             return t.get("type") == _WEB_SEARCH_SERVER or t.get("name") == "web_search"
 
-        tavily_key = os.getenv("TAVILY_API_KEY", "")
+        from core.secrets import get_secret
+
+        # Read per call, not once at import: the key may come from the keychain,
+        # and a rotation should take effect without restarting the process.
+        tavily_key = get_secret("TAVILY_API_KEY", "")
         _has_web_search = any(_is_web_search(t) for t in tools)
         _custom_endpoint = bool(self._base_url)
         # Native server-side web_search only works on a direct Anthropic endpoint.

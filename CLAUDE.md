@@ -98,14 +98,40 @@ ist am 2026-08-23 passiert; die Page heißt deshalb jetzt `usage_statistics.py`.
 Pfade gegen die aufrufende Testdatei aufgelöst, nicht gegen das CWD. Muster in den
 Integrationstests: `PAGES = Path(__file__).resolve().parents[2] / "pages"`.
 
-## Required Environment Variables
+## Secrets — macOS-Schlüsselbund, nicht .env
 
+Zugangsdaten liegen seit 2026-09-07 im Login-Schlüsselbund, ein Eintrag je Wert mit dem Präfix `wm-` (der Rechner wird von mehreren Projekten geteilt — `hoa-`/`curator-` gehören anderen). Zugriff **nur** über `core/secrets.py`:
+
+```python
+from core.secrets import get_secret
+key = get_secret("LLM_API_KEY", "")     # Umgebung → Schlüsselbund → Vorgabe
 ```
-ENCRYPTION_KEY=<Fernet key>   # required — generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-ANTHROPIC_API_KEY=<key>       # required for all cloud agents
-APP_PASSWORD=<password>       # optional — enables login gate
-DEMO_MODE=true                # optional — switches DB to data/demo.db
+
+Zwei Regeln, die nicht gebrochen werden dürfen:
+
+1. **Umgebung schlägt Schlüsselbund** — auch bei leerem String. Sonst laufen Tests, CI und ein Container nicht mehr, und `APP_PASSWORD=` („Login-Gate bewusst aus") kippt ins Unsichere.
+2. **Gelesen wird über `/usr/bin/security`, nie über `keyring`.** macOS vertraut je Eintrag der erzeugenden Anwendung; ein anderes Binary löst bei jedem unbeaufsichtigten Lauf einen Freigabedialog aus.
+
+Fehlt ein Eintrag → `None`, keine Ausnahme. Neuer Zugang? → in `KEYCHAIN_SECRETS` eintragen und über `get_secret` lesen, **nicht** über `os.getenv`.
+
+Anlegen (das `-w` ohne Wert ans Ende, sonst landet der Wert in Shell-History und Prozessliste):
+
+```bash
+security add-generic-password -U -a "$USER" -s wm-LLM_API_KEY -w
+.venv/bin/python scripts/check_secrets.py     # zeigt Herkunft je Wert, nie den Wert selbst
 ```
+
+In `.env` bleibt nur Konfiguration: `LLM_BASE_URL`, `LLM_DEFAULT_MODEL`, `OPENAI_BASE_URL`, `OPENAI_MODELS`, `OLLAMA_*`, `DB_PATH`, `DEMO_MODE`, `SHOW_LEGAL_NOTICE`, `BACKUP_REPO_PATH`, `RESTIC_PASSWORD_FILE`.
+
+⚠️ **`ENCRYPTION_KEY` ist nicht neu erzeugbar.** Er ist ein PBKDF2-*Passwort*; der Fernet-Schlüssel entsteht erst aus Passwort **plus `data/salt.bin`**. Fehlt `salt.bin`, legt `load_or_create_salt()` stillschweigend einen neuen an — die App startet normal und entschlüsselt nichts mehr. Beides gehört zusammen gesichert. Das Restic-Backup taugt dafür **nicht**: `wm_backup.sh` verschlüsselt die `.env` mit genau diesem Schlüssel.
+
+## Entwicklungs-Sitzungen laufen auf Demo-Daten
+
+`.claude/settings.json` setzt `DEMO_MODE=true` für die Sitzung, damit ad-hoc ausgeführter Code `data/portfolio.db` gar nicht erst öffnet — auch beim Debuggen von Produktionsfehlern. `data/demo.db` ist ein regenerierbares Build-Artefakt (`python scripts/seed_demo.py`).
+
+Die Testsuite pinnt `DEMO_MODE=false` in `tests/conftest.py`, **hart und absichtlich**: `config.DB_PATH` ignoriert `DB_PATH`, sobald `DEMO_MODE` gesetzt ist (`config.py:69`), und die Tests landeten sonst auf `data/demo.db` statt auf `:memory:`. Die Suite bestimmt ihre Datenbank selbst; `portfolio.db` erreicht sie so oder so nie.
+
+Tests dürfen **nichts** aus der echten `.env` beziehen. Braucht ein Test einen Schlüssel oder eine Base-URL, setzt er sie selbst (`patch.object(config, …)`) — sonst ist er auf einer frischen Maschine oder in CI rot.
 
 ---
 
@@ -166,9 +192,20 @@ Multi-turn Agents → **immer DB-Persistenz**, niemals in-memory Dict.
 Muster: `start_session()` → `repo.create_session()`, `chat()` → `repo.get_messages()` + `repo.add_message()`
 Referenz-Implementierung: StorycheckerAgent / FundamentalAnalyzerAgent
 
-### 4. Verschlüsselte Felder
+### 4. Verschlüsselte Felder — und was *nicht* verschlüsselt ist
 
-Position-Namen, Stories, Notes, extra_data (JSON) sind **Fernet-verschlüsselt** in der DB.
+Maßgeblich ist `_serialize()` in `core/storage/positions.py`, nicht diese Tabelle — aber beide müssen synchron bleiben. Stand 2026-09-07 verschlüsselt Fernet **fünf** Spalten:
+
+| Verschlüsselt 🔒 | Klartext ⚠️ |
+|---|---|
+| `quantity`, `purchase_price` | `name`, `isin`, `wkn`, `ticker` |
+| `notes`, `extra_data` (JSON) | `purchase_date`, `asset_class`, `investment_type`, `unit` |
+| `story` | `strategy`, `empfehlung`, `recommendation_source`, `story_skill` |
+
+**Die Positionsnamen sind NICHT verschlüsselt.** (Diese Datei behauptete bis 2026-09-07 das Gegenteil — die Annahme war falsch und hat die Privacy-Grenze zu optimistisch beschrieben.) Ebenso wenig verschlüsselt ist `position_analyses` — dort liegen die Volltexte sämtlicher Agent-Analysen im Klartext, inklusive der Positionsnamen, über die sie sprechen.
+
+**Was das praktisch bedeutet:** Wer `data/portfolio.db` liest, sieht vollständig, **was** im Portfolio und auf der Watchlist liegt — Namen, Ticker, ISIN, Kaufdatum, Empfehler — aber nicht, **wie viel** und **zu welchem Preis**. Die Verschlüsselung schützt gegen den Verlust der Datei (Backup-Platte, gestohlenes Gerät), nicht gegen lokal laufenden Code.
+
 Nie direkt als Plaintext schreiben — immer über das Repository-Layer.
 
 ### 5. Neue Agents: Checkliste

@@ -7,8 +7,11 @@ falls back gracefully on network errors, so no mocking is required.
 """
 
 from pathlib import Path
+from unittest.mock import patch
+
 from streamlit.testing.v1 import AppTest
 
+from config import config
 from state import get_app_config_repo
 
 PAGES = Path(__file__).resolve().parents[2] / "pages"
@@ -64,8 +67,17 @@ class TestSettingsPage:
             }
             repo.set_model_prices(merged)
 
-            at = AppTest.from_file(PAGES / "settings.py")
-            at.run()
+            # settings.py blendet die OpenRouter-Modelle aus, solange
+            # _HAS_OPENROUTER falsch ist (pages/settings.py:105). Die Vorbedingung
+            # gehört in den Test: früher kam sie unausgesprochen aus der echten
+            # .env des Entwicklers, was den Test von einer Datei abhängig machte,
+            # die weder im Repo noch in CI existiert.
+            with (
+                patch.object(config, "OPENAI_BASE_URL", "https://openrouter.test/api/v1"),
+                patch.object(config, "OPENAI_API_KEY", "test-openrouter-key"),
+            ):
+                at = AppTest.from_file(PAGES / "settings.py")
+                at.run()
             assert not at.exception, f"Page threw exception: {at.exception}"
             all_options = [opt for s in at.selectbox for opt in (s.options or [])]
             assert "acme/new-router-model" in all_options

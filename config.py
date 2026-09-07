@@ -3,6 +3,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from core.constants import CLAUDE_MODELS_DEFAULT_LIST
+from core.secrets import get_secret
 
 _PROJECT_ROOT = Path(__file__).parent
 
@@ -25,14 +26,17 @@ if _profile:
 
 class Config:
     # Public LLM — Anthropic-compatible endpoint
-    LLM_API_KEY: str = os.getenv("LLM_API_KEY") or os.getenv("ANTHROPIC_API_KEY", "")
+    # Secrets come from the environment first, then the macOS keychain (see
+    # core/secrets.py).  ANTHROPIC_API_KEY stays a pure environment alias — it is
+    # a backward-compat spelling, not a second place to store the key.
+    LLM_API_KEY: str = get_secret("LLM_API_KEY", "") or os.getenv("ANTHROPIC_API_KEY", "")
     # Mirror the key fallback: honour the SDK-standard ANTHROPIC_BASE_URL so a corporate
     # proxy set that way is passed explicitly (the SDK's own env pickup is version-fragile).
     LLM_BASE_URL: str = os.getenv("LLM_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL", "")
     LLM_DEFAULT_MODEL: str = os.getenv("LLM_DEFAULT_MODEL", "")
 
     # OpenAI-compatible provider (optional — OpenRouter, Perplexity, Groq, etc.)
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_API_KEY: str = get_secret("OPENAI_API_KEY", "")
     OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "")
     OPENAI_MODELS: list = [m.strip() for m in os.getenv("OPENAI_MODELS", "").split(",") if m.strip()]
     # OpenRouter provider routing — comma-separated preferred providers, e.g. "NovitaAI,SiliconFlow"
@@ -44,7 +48,7 @@ class Config:
     DEEPSEEK_MODELS: list = [m.strip() for m in os.getenv("DEEPSEEK_MODELS", "deepseek-chat,deepseek-reasoner").split(",") if m.strip()]
 
     # Tavily Search (optional — replaces Anthropic's built-in web_search when set)
-    TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
+    TAVILY_API_KEY: str = get_secret("TAVILY_API_KEY", "")
 
     # Ollama
     OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -52,10 +56,10 @@ class Config:
     OLLAMA_NUM_CTX: int = int(os.getenv("OLLAMA_NUM_CTX", "8192"))
 
     # Encryption
-    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
+    ENCRYPTION_KEY: str = get_secret("ENCRYPTION_KEY", "")
 
     # App authentication (optional — leave empty to disable login)
-    APP_PASSWORD: str = os.getenv("APP_PASSWORD", "")
+    APP_PASSWORD: str = get_secret("APP_PASSWORD", "")
 
     # Legal notice — blocking disclaimer/privacy modal on first visit per session.
     # Defaults to on; a private single-user installation may turn it off via .env.

@@ -387,10 +387,13 @@ def _main() -> None:
     args, _ = parser.parse_known_args()
 
     if args.transport == "streamable-http":
-        bearer_token = os.environ.get("MCP_BEARER_TOKEN", "")
+        from core.secrets import get_secret
+
+        bearer_token = get_secret("MCP_BEARER_TOKEN", "")
         if not bearer_token:
             print(
-                "ERROR: MCP_BEARER_TOKEN not set in .env — refusing to start HTTP server",
+                "ERROR: MCP_BEARER_TOKEN not set (.env or keychain item wm-MCP_BEARER_TOKEN)"
+                " — refusing to start HTTP server",
                 file=sys.stderr,
             )
             sys.exit(1)

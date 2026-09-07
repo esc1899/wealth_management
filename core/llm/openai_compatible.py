@@ -178,7 +178,11 @@ class OpenAICompatibleProvider(LLMProvider):
         import time
         from core.search import tavily as _tavily
 
-        tavily_key = os.getenv("TAVILY_API_KEY", "")
+        from core.secrets import get_secret
+
+        # Read per call, not once at import: the key may come from the keychain,
+        # and a rotation should take effect without restarting the process.
+        tavily_key = get_secret("TAVILY_API_KEY", "")
 
         # Extract max_uses before _to_openai_tools drops it (server-side field, not in OAI format)
         _web_search_max_uses: Optional[int] = next(
