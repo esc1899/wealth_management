@@ -438,6 +438,12 @@ else:
     st.info("WD Passport nicht verbunden. Laufwerk anschließen, dann Backup starten.", icon=":material/usb:")
 
 if _script_exists and _drive_mounted:
+    st.caption(
+        "⚠️ Bekannte Einschränkung (seit 2026-09-07): Der Button schlägt auf diesem Rechner "
+        "aktuell mit einem macOS-Festplattenvollzugriff-Fehler fehl, obwohl die Berechtigung "
+        "gesetzt ist — Ursache ungeklärt, siehe CLAUDE.md. Zuverlässig läuft das Backup direkt "
+        "im Terminal."
+    )
     if st.button("▶ Jetzt sichern", type="primary", key="_backup_now_btn"):
         with st.spinner("Backup läuft…"):
             result = _subprocess.run(
@@ -449,7 +455,22 @@ if _script_exists and _drive_mounted:
         if result.returncode == 0:
             st.success("Backup erfolgreich abgeschlossen!", icon=":material/check_circle:")
         else:
-            st.error("Backup fehlgeschlagen — siehe Log unten.", icon=":material/error:")
+            # Das Script leitet sein eigenes stdout/stderr per `exec >> LOG 2>&1` um
+            # (siehe wm_backup.sh) — result.stdout/stderr sind hier immer leer. Die
+            # eigentliche Fehlermeldung steht nur im Log-File, deshalb dort nachsehen.
+            _tail = ""
+            if _os.path.isfile(_BACKUP_LOG):
+                with open(_BACKUP_LOG) as _f:
+                    _tail = "".join(_f.readlines()[-8:])
+            if "Festplattenvollzugriff fehlt" in _tail:
+                st.error(
+                    "Backup fehlgeschlagen — Festplattenvollzugriff-Fehler (bekannte "
+                    "Einschränkung, siehe CLAUDE.md). Workaround: im Terminal ausführen:",
+                    icon=":material/error:",
+                )
+                st.code(f"bash {_BACKUP_SCRIPT}", language="bash")
+            else:
+                st.error("Backup fehlgeschlagen — siehe Log unten.", icon=":material/error:")
 
 if _os.path.isfile(_BACKUP_LOG):
     with st.expander("📋 Backup-Log (letzte Einträge)"):

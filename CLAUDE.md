@@ -39,6 +39,13 @@ launchctl load ~/Library/LaunchAgents/com.erik.wealth-management.plist
 # Scheduled job debugging — real tracebacks are here, not in the UI
 tail -100 /tmp/wm_streamlit.log | grep -A5 "Error\|Exception\|Traceback"
 
+# Backup manuell anstoßen (WD Passport muss angeschlossen sein). Der Button in
+# Settings schlägt aus ungeklärten macOS-Festplattenvollzugriff-Gründen fehl —
+# im Terminal ausgeführt läuft es zuverlässig. Details: Abschnitt weiter unten
+# "Backup-Button in Settings — ungeklärter Festplattenvollzugriff-Fehler".
+bash /Users/erik/scripts/wm_backup.sh
+tail -30 ~/Library/Logs/wm_backup.log
+
 # MCP in Claude Desktop App (Co-Work) — config: ~/Library/Application Support/Claude/claude_desktop_config.json
 # Claude Desktop App logs (MCP errors): ~/Library/Logs/Claude/mcp-server-wealth-research.log
 ```
@@ -322,4 +329,32 @@ Motto: **try to improve the whole**
 4. **Tests müssen kritische Tabellen verifizieren**
    - Integration-Test prüft dass all erwarteten Tabellen nach `migrate_db()` existieren
    - Fehler im Test würde Pre-Merge CI abfangen
+
+## Backup-Button in Settings — ungeklärter Festplattenvollzugriff-Fehler (seit 2026-09-07)
+
+`pages/settings.py` startet `~/scripts/wm_backup.sh` als Subprozess des laufenden Streamlit-
+Prozesses. Dieser Button **schlägt auf dem Dock-App-Prozess reproduzierbar fehl**:
+`restic` meldet `List(key) failed: open .../restic-repo/keys: operation not permitted`, obwohl
+Festplattenvollzugriff (Systemeinstellungen → Datenschutz & Sicherheit) für alle beteiligten
+Prozesse gesetzt war — durchprobiert:
+
+- `Python.app` (`/opt/homebrew/Cellar/python@3.11/.../Resources/Python.app`, der reale
+  Elternprozess des via LaunchAgent gestarteten Streamlit — `com.erik.wealth-management.plist`
+  ruft `launchd` → `Python.app` → `streamlit` → `bash` → `wm_backup.sh` → `restic`, ohne
+  Terminal-Vorfahren)
+- `restic` selbst, nach Neu-Signierung mit eindeutiger Identität (Homebrews Build hatte vorher
+  nur die generische Ad-hoc-Signatur `Identifier=a.out`, `TeamIdentifier=not set` — nicht
+  eindeutig genug, damit macOS einen Grant zuverlässig daran verankert; neu signiert mit
+  `codesign --force --sign - --identifier "com.restic.restic" <Pfad>`)
+- Beide gleichzeitig in der Liste
+- LaunchAgent-Reload nach jeder Berechtigungsänderung (frischer Prozess, kein Stale-Cache)
+
+Nichts davon hat den Fehler behoben. **Funktioniert zuverlässig: `wm_backup.sh` direkt im
+eigenen Terminal ausführen** — dort lief es sauber durch (Snapshot erstellt, `restic check`
+grün). Der Unterschied zum App-Button ist ungeklärt; vermutlich eine macOS-26-TCC-Eigenart bei
+Ad-hoc-signierten CLI-Tools ohne Terminal-Vorfahren im Prozessbaum, aber nicht verifiziert.
+
+**Für zukünftige Sessions:** Nicht wieder bei null anfangen — der Button ist ein bekanntes,
+noch ungelöstes Problem, kein neuer Bug. Backup-Bedarf → Terminal nutzen, nicht den Button.
+Falls jemand die tatsächliche Ursache findet: hier dokumentieren, nicht nur fixen.
 
