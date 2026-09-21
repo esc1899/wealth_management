@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Kachel auf der Startseite des Mac mini, Erscheinungsbild einer Bank — 2026-09-21
+
+**Warum:** Die gemeinsame Startseite des Mac mini (heimnetzwerk-Repo, `dienste`) zeigt seit dem
+20.09. je Dienst eine Kachel; Wealth Management blieb bewusst draußen, weil alles dort im WLAN
+sichtbar ist. Jetzt gibt es dort einen Zaun (`zugang = "lokal"`: Caddy liefert nur an 127.0.0.1),
+und damit kann die App eine Kachel haben — nur auf dem Mini selbst, unter `http://localhost/`.
+
+**Änderungen:**
+- **`baseUrlPath = "wealth"`** in `.streamlit/config.toml`: Die App läuft unter `/wealth/`, auch
+  direkt am Port — `http://localhost:8655/wealth/`. Dock-Starter (`start.command`), `app.sh` und
+  CLAUDE.md wissen das. Der LaunchAgent braucht dafür einen Neustart.
+- **Theme** in Blau (`#0018A8`) und Weiß mit wenig Rundung, die Seitenleiste in Blau mit dem
+  Zeichen (`assets/marke.svg`, ein Quadrat mit Schrägstrich — ein Zitat, kein Logo; `st.logo` in
+  `app.py`), ein blauer Strich über der Fläche. Streamlit-Standard war bis dahin die Optik.
+- **`scripts/kachel.py`**: schreibt `~/.dienste/www/kacheln/wealth.json` — die Tagesveränderung
+  des Depots in Prozent (dieselbe Bewertung und Summenformel wie die Analyse-Seite,
+  `aggregate_day_pnl`), Zahl der Positionen, wie viele ohne Tageskurs, die größte Bewegung als
+  Satz. **Kein Betrag in Euro**, auch wenn nur der Mini die Kachel sieht. Mit `--fetch` holt es
+  vorher die Kurse ohne Historie (die holt die App täglich um 18 Uhr). Fehlt die Startseite,
+  schreibt es nichts und ist trotzdem gut. Als ops-core-Job `wealth_management kachel`
+  stündlich (`~/.ops-core/jobs.toml`, `login,:40`).
+
 ### Claude 5er-Generation: Modelle, Preise, Denktiefe — 2026-08-30
 
 **Warum:** Die Modellauswahl stand noch auf Sonnet 4.6 / Opus 4.8, die hinterlegten Preise stammten

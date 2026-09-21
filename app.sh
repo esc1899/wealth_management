@@ -1,7 +1,7 @@
 #!/bin/bash
 # Einfache App-Steuerung "von Hand" — ohne Claude Code.
 #
-#   ./app.sh start     App starten (Port 8655, via .streamlit/config.toml)
+#   ./app.sh start     App starten (Port 8655 unter /wealth/, via .streamlit/config.toml)
 #   ./app.sh stop      App stoppen (lässt den LLM-Proxy auf 6655 in Ruhe)
 #   ./app.sh restart   stop + start
 #   ./app.sh status    läuft die App? antwortet sie?
@@ -22,7 +22,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 PORT=8655
-URL="http://localhost:${PORT}"
+URL="http://localhost:${PORT}/wealth"   # baseUrlPath, siehe .streamlit/config.toml
 LOG="/tmp/wm_app.log"
 PATTERN="streamlit run app.py"
 

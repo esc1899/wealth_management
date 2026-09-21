@@ -2,7 +2,7 @@
 # Dock launcher: ensure background service is running and open browser
 
 PLIST="$HOME/Library/LaunchAgents/com.erik.wealth-management.plist"
-SERVICE_URL="http://localhost:8655"
+SERVICE_URL="http://localhost:8655/wealth"   # baseUrlPath, siehe .streamlit/config.toml
 MAX_WAIT=5
 
 # Ensure LaunchAgent is loaded (starts the background service)

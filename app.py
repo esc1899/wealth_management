@@ -12,6 +12,17 @@ st.set_page_config(
     page_icon="💰",
     layout="wide",
 )
+# Das Erscheinungsbild einer Bank (seit 21.09.2026): Farben und Rundung stehen in
+# .streamlit/config.toml, hier nur das Zeichen in der Seitenleiste und ein
+# blauer Strich über der Fläche — die Kopfleiste, ohne Streamlits Header umzubauen.
+st.logo("assets/marke.svg", size="large")
+st.markdown(
+    "<style>"
+    "header[data-testid='stHeader'] { border-top: 5px solid #0018A8; }"
+    "[data-testid='stSidebar'] img { width: 2.2rem; height: 2.2rem; }"
+    "</style>",
+    unsafe_allow_html=True,
+)
 
 from config import config  # noqa: E402
 

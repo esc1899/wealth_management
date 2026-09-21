@@ -7,3 +7,30 @@ address = "localhost"
 # der sonst beim ersten "streamlit run" auf einem frischen Rechner den
 # Start blockiert. Browser muss dann von Hand geöffnet werden.
 headless = true
+# Seit 21.09.2026 läuft die App unter /wealth/ — auch direkt am Port:
+# http://localhost:8655/wealth/. So kann Caddy auf dem Mac mini sie unter
+# http://localhost/wealth/ durchreichen (heimnetzwerk-Repo, Registry
+# deploy/dienste/dienste.toml, zugang = "lokal": nur vom Rechner selbst).
+baseUrlPath = "wealth"
+
+# Das Erscheinungsbild einer Bank (seit 21.09.2026): ein Blau, Weiß, wenig
+# Rundung, sonst nichts. Die Seitenleiste trägt das Blau und das Zeichen
+# (assets/marke.svg, st.logo in app.py); die Fläche bleibt weiß.
+[theme]
+base = "light"
+primaryColor = "#0018A8"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F2F4F8"
+textColor = "#1F2328"
+linkColor = "#0018A8"
+borderColor = "#D6DAE3"
+baseRadius = "0.25rem"
+font = "sans-serif"
+headingFont = "sans-serif"
+
+[theme.sidebar]
+backgroundColor = "#0018A8"
+secondaryBackgroundColor = "#0B2BC0"
+textColor = "#FFFFFF"
+primaryColor = "#FFFFFF"
+borderColor = "#3A50C4"

@@ -21,7 +21,8 @@ pytest tests/integration/
 # Start the app (development)
 streamlit run app.py
 
-# Start on the fixed Dock-app port
+# Start on the fixed Dock-app port — the app lives under /wealth/ (baseUrlPath in
+# .streamlit/config.toml): http://localhost:8655/wealth/
 streamlit run app.py --server.port 8655
 
 # Rebuild the demo DB (data/demo.db is a regenerable build artifact — seeder is
