@@ -1,6 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40" fill="none" stroke="#fff" stroke-width="4">
-  <!-- Eine steigende Kurslinie im Quadrat. Weiss, fuer die blaue Seitenleiste; dasselbe
-       Zeichen traegt die Kachel auf der Startseite des Mac mini (heimnetzwerk, stil = "bank"). -->
-  <rect x="2" y="2" width="36" height="36"/>
-  <polyline points="9,29 16,21 22,26 31,12" stroke-linecap="square" stroke-linejoin="miter"/>
+  <!-- Eine steigende Kurslinie, die oben rechts aus einem offenen Rahmen ausbricht. Weiss,
+       fuer die blaue Seitenleiste; dasselbe Zeichen traegt die Kachel auf der Startseite des
+       Mac mini (heimnetzwerk, stil = "bank"). Bis zum 21.09.2026 abends war der Rahmen ein
+       geschlossenes Quadrat – das sah mit der Linie darin noch immer nach dem Zeichen einer
+       echten Bank aus. Mit Schriftzug: marke-schriftzug.svg. -->
+  <path d="M22 3H7a4 4 0 0 0-4 4v26a4 4 0 0 0 4 4h26a4 4 0 0 0 4-4V18" stroke-linecap="square"/>
+  <polyline points="10,28 16,21 22,26 34,8" stroke-linecap="square" stroke-linejoin="miter"/>
 </svg>

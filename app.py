@@ -13,13 +13,14 @@ st.set_page_config(
     layout="wide",
 )
 # Das Erscheinungsbild einer Bank (seit 21.09.2026): Farben und Rundung stehen in
-# .streamlit/config.toml, hier nur das Zeichen in der Seitenleiste und ein
-# blauer Strich über der Fläche — die Kopfleiste, ohne Streamlits Header umzubauen.
-st.logo("assets/marke.svg", size="large")
+# .streamlit/config.toml, hier nur das Zeichen mit Schriftzug in der Seitenleiste
+# (eingeklappt nur das Zeichen) und ein blauer Strich über der Fläche — die
+# Kopfleiste, ohne Streamlits Header umzubauen.
+st.logo("assets/marke-schriftzug.svg", size="large", icon_image="assets/marke.svg")
 st.markdown(
     "<style>"
     "header[data-testid='stHeader'] { border-top: 5px solid #0018A8; }"
-    "[data-testid='stSidebar'] img { width: 2.2rem; height: 2.2rem; }"
+    "[data-testid='stSidebar'] img { height: 2.2rem; width: auto; max-width: 100%; }"
     "</style>",
     unsafe_allow_html=True,
 )

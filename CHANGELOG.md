@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Zeichen mit offenem Rahmen und Schriftzug — 2026-09-21 (abends)
+
+**Warum:** Die Kurslinie im geschlossenen Quadrat sah Erik noch immer zu sehr nach dem Zeichen
+einer echten Bank aus (Quadrat, Diagonale darin). Die Linie bleibt, der Rahmen ändert sich.
+
+**Änderungen:**
+- **`assets/marke.svg`**: der Rahmen ist abgerundet und oben rechts offen, die Kurslinie bricht
+  dort hinaus. Gleicher Strich, gleiche Farbe. Die Kachel auf der Startseite des Mac mini trägt
+  dasselbe Zeichen (heimnetzwerk, `MARKE_BANK` in `src/dienste/startseite.py`).
+- **`assets/marke-schriftzug.svg`**: das Zeichen mit „Agentic Wealth Management" daneben,
+  zweizeilig in Versalien, Systemschrift. `st.logo` zeigt es in der Seitenleiste; eingeklappt
+  nur das Zeichen (`icon_image`). Die Kachel auf der Startseite heißt jetzt genauso.
+
 ### Kachel auf der Startseite des Mac mini, Erscheinungsbild einer Bank — 2026-09-21
 
 **Warum:** Die gemeinsame Startseite des Mac mini (heimnetzwerk-Repo, `dienste`) zeigt seit dem
