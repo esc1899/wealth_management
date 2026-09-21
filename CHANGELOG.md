@@ -20,8 +20,9 @@ und damit kann die App eine Kachel haben — nur auf dem Mini selbst, unter `htt
   direkt am Port — `http://localhost:8655/wealth/`. Dock-Starter (`start.command`), `app.sh` und
   CLAUDE.md wissen das. Der LaunchAgent braucht dafür einen Neustart.
 - **Theme** in Blau (`#0018A8`) und Weiß mit wenig Rundung, die Seitenleiste in Blau mit dem
-  Zeichen (`assets/marke.svg`, ein Quadrat mit Schrägstrich — ein Zitat, kein Logo; `st.logo` in
-  `app.py`), ein blauer Strich über der Fläche. Streamlit-Standard war bis dahin die Optik.
+  Zeichen (`assets/marke.svg`, eine steigende Kurslinie im Quadrat; `st.logo` in `app.py`), ein
+  blauer Strich über der Fläche. Der erste Wurf zitierte das Zeichen einer echten Bank — zu viel
+  für ein öffentliches Repo, darum die Kurslinie im selben Strich. Streamlit-Standard war bis dahin die Optik.
 - **`scripts/kachel.py`**: schreibt `~/.dienste/www/kacheln/wealth.json` — die Tagesveränderung
   des Depots in Prozent (dieselbe Bewertung und Summenformel wie die Analyse-Seite,
   `aggregate_day_pnl`), Zahl der Positionen, wie viele ohne Tageskurs, die größte Bewegung als

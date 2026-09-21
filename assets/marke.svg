@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
-  <!-- Das Quadrat mit dem Schraegstrich: ein Zitat, kein Logo. Weiss, fuer die blaue Seitenleiste. -->
-  <rect x="2" y="2" width="36" height="36" fill="none" stroke="#fff" stroke-width="4"/>
-  <line x1="10" y1="30" x2="30" y2="10" stroke="#fff" stroke-width="4"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40" fill="none" stroke="#fff" stroke-width="4">
+  <!-- Eine steigende Kurslinie im Quadrat. Weiss, fuer die blaue Seitenleiste; dasselbe
+       Zeichen traegt die Kachel auf der Startseite des Mac mini (heimnetzwerk, stil = "bank"). -->
+  <rect x="2" y="2" width="36" height="36"/>
+  <polyline points="9,29 16,21 22,26 31,12" stroke-linecap="square" stroke-linejoin="miter"/>
 </svg>
