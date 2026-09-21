@@ -44,8 +44,9 @@ tail -100 /tmp/wm_streamlit.log | grep -A5 "Error\|Exception\|Traceback"
 # Settings schlägt aus ungeklärten macOS-Festplattenvollzugriff-Gründen fehl —
 # im Terminal ausgeführt läuft es zuverlässig. Details: Abschnitt weiter unten
 # "Backup-Button in Settings — ungeklärter Festplattenvollzugriff-Fehler".
-bash /Users/erik/scripts/wm_backup.sh
-tail -30 ~/Library/Logs/wm_backup.log
+ops run wealth_management backup      # seit 20.09.2026 über ops-core: Lauf, Exit und Log in einem
+ops runs wealth_management --job backup --days 30   # wann lief es zuletzt gut?
+# Der direkte Weg geht weiter: bash /Users/erik/scripts/wm_backup.sh; tail -30 ~/Library/Logs/wm_backup.log
 
 # MCP in Claude Desktop App (Co-Work) — config: ~/Library/Application Support/Claude/claude_desktop_config.json
 # Claude Desktop App logs (MCP errors): ~/Library/Logs/Claude/mcp-server-wealth-research.log
