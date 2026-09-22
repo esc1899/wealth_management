@@ -571,6 +571,47 @@ verdicts = analysis_service.get_verdicts(ids, "storychecker")
 
 ---
 
+## Household LLM Accounting (2026-09-22)
+
+Four side projects on this machine talk to the same three providers
+(Claude, Ollama, OpenRouter). Each one knew its own token counts; nobody
+knew what the household spent, and nothing lined the numbers up. Since
+2026-09-22 they all book into the shared run log of **ops-core** (in the
+`heimnetzwerk` repo), where the Home-Ops agent sums the running
+calendar month per provider and holds it against a budget.
+
+**Where it hooks in.** `UsageRepository.record()` — the one choke point
+every call already passes through — writes the usage row and then books
+a `metric` event via `core/ops_events.py`. No call site changed.
+
+**What a booking carries.** Provider, model, the agent as `purpose`,
+token counts, cost, duration; for OpenRouter also the `generation_id`.
+No positions, no names, no prompt text — and the log is a file on this
+machine, in the same house as the app.
+
+**Two prices, one call.** The booking carries the **list price**, priced
+from the same model registry the statistics page uses. When the cost sync
+later learns what OpenRouter actually billed (`/generation`),
+`update_actual_cost()` books the **difference** as a separate metric
+(`llm_call_cost`). The household sum settles on the billed amount without
+the call ever being counted twice, and a second sync of the same row
+books nothing.
+
+**Pricing normalisation.** The registry holds Haiku under its dated id
+while the API also accepts the dateless alias; `_estimate()` falls back
+to the base id (the rule `core.llm.router` already applies to the model
+picker), so a call is not silently booked at 0 just because it used the
+other form. Note this fallback is **not** applied to the statistics page:
+a historic row under an id the registry does not hold still shows 0
+there.
+
+**Two rules inherited from ops-core**, both enforced by tests: a call
+must never fail because the log is unwritable (every error swallowed,
+noted on stderr), and the contract is the file, not the code — the writer
+is a deliberate copy, no import, so nothing here depends on ops-core
+being installed. Without `~/.ops-core` nothing is booked and nothing is
+created; the test suite points `OPS_CORE_HOME` at a throwaway directory.
+
 ## LLM Provider Configuration
 
 The public LLM layer is provider-agnostic and configured via environment variables.

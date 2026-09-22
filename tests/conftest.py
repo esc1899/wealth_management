@@ -1,5 +1,6 @@
 import pytest
 import os
+import tempfile
 
 import core.secrets as _secrets
 
@@ -63,3 +64,10 @@ os.environ.setdefault("DB_PATH", ":memory:")
 # dann auf data/demo.db statt auf :memory:.  Die Suite bestimmt ihre Datenbank
 # selbst; portfolio.db erreicht sie so oder so nie.
 os.environ["DEMO_MODE"] = "false"
+
+# Hausbuchhaltung (2026-09-22): Jeder LLM-Aufruf wird ins Run-Log von ops-core
+# gebucht (~/.ops-core/runs), wo der Home-Ops-Agent die Kosten des Monats
+# summiert. Für die Suite zeigt OPS_CORE_HOME auf ein Wegwerf-Verzeichnis --
+# aus demselben Grund wie der versiegelte Schlüsselbund oben: Kein Test darf
+# an das rühren, womit der Rechner wirklich arbeitet.
+os.environ["OPS_CORE_HOME"] = tempfile.mkdtemp(prefix="ops-core-test-")

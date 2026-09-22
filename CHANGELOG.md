@@ -8,6 +8,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Jeder LLM-Aufruf wird in die Hausbuchhaltung gebucht — 2026-09-22
+
+**Warum:** Vier Projekte auf dem Mac mini reden mit denselben drei Anbietern (Claude, Ollama,
+OpenRouter). Jedes kannte seine eigenen Token, keines die Summe des Hauses — und niemand sah,
+was ein Monat kostet. Seit dem 22.09. buchen sie in dasselbe Run-Log von ops-core
+(heimnetzwerk-Repo); der Home-Ops-Agent liest es zurück und zeigt den laufenden Monat je
+Anbieter gegen ein Budget. Diese App ist das zweite Projekt, das dort mitschreibt.
+
+**Änderungen:**
+- **`core/ops_events.py`** (neu): schreibt je Aufruf ein `metric`-Event ins Run-Log
+  (`~/.ops-core/runs/`). Bewusst eine Kopie des Schreibwegs, kein Import — kein Aufruf dieser
+  App darf davon abhängen, dass ops-core installiert ist; ohne `~/.ops-core` wird nichts
+  gebucht und nichts angelegt. Ein Schreibfehler wird geschluckt und auf stderr vermerkt: Die
+  harte Regel von ops-core ist, dass ein Projekt nie am Log scheitert.
+- **`UsageRepository.record()`**: bucht mit — der eine Engpass, durch den ohnehin jeder Aufruf
+  geht, also kein Aufrufer geändert. Mitgegeben werden Anbieter, Modell, der Agent als Zweck,
+  Token, Betrag, Dauer, bei OpenRouter die `generation_id`. **Keine** Positionen, Namen oder
+  Prompt-Texte; das Log bleibt auf diesem Rechner.
+- **`UsageRepository.update_actual_cost()`**: bucht die **Differenz** zwischen Listenpreis und
+  abgerechnetem Betrag als eigene Metrik (`llm_call_cost`), sobald der Kosten-Sync weiß, was
+  OpenRouter wirklich berechnet hat. So stimmt die Haussumme auf die Rechnung, ohne den Aufruf
+  doppelt zu zählen; ein zweiter Sync derselben Zeile bucht nichts.
+- **Preis-Normalisierung** in `_estimate()`: Die Registry führt Haiku unter seiner datierten ID,
+  die API nimmt auch den datumslosen Alias — beide gelten jetzt als dasselbe Modell (dieselbe
+  Regel wie in `core.llm.router`). Sonst wäre ein ganzer Anbieter still mit 0 $ gebucht worden.
+  **Offen:** Auf der Statistik-Seite gilt diese Nachsicht nicht; eine alte Zeile unter einer ID,
+  die die Registry nicht kennt, zeigt dort weiter 0 $.
+- **`tests/conftest.py`**: `OPS_CORE_HOME` zeigt auf ein Wegwerf-Verzeichnis — aus demselben
+  Grund wie der versiegelte Schlüsselbund: Kein Test rührt an das, womit der Rechner arbeitet.
+- **12 neue Tests** (`tests/unit/test_ops_events.py`), darunter die beiden Regeln: ein kaputtes
+  Log bricht keinen Aufruf ab, und ohne ops-core passiert gar nichts. 1474 grün.
+
+
 ### Zeichen mit offenem Rahmen und Schriftzug — 2026-09-21 (abends)
 
 **Warum:** Die Kurslinie im geschlossenen Quadrat sah Erik noch immer zu sehr nach dem Zeichen

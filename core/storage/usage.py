@@ -3,6 +3,7 @@ Repository for LLM token usage tracking.
 """
 
 import sqlite3
+import sys
 from datetime import datetime, date
 from typing import Optional
 
@@ -41,14 +42,100 @@ class UsageRepository:
              datetime.utcnow().isoformat()),
         )
         self._conn.commit()
+        # The household books (2026-09-22): every call also goes into the
+        # shared ops-core run log, where the Home-Ops agent sums the running
+        # month per provider. Local to this machine, no portfolio data, and
+        # it can never fail the call — see core/ops_events.py.
+        self._book(agent, model, source, input_tokens, output_tokens,
+                   duration_ms, cache_read_tokens, cache_write_tokens,
+                   web_search_requests, generation_id)
+
+    def _estimate(self, model: str, input_tokens, output_tokens,
+                  cache_read_tokens=None, cache_write_tokens=None,
+                  web_search_requests=None) -> tuple[str, float]:
+        """(provider, list price) for a call, from the model registry.
+
+        The registry is the same one the statistics page prices with, read
+        through the same connection; a model that is not in it at all has no
+        price and costs 0 — the same silent 0 the statistics show, not an
+        invented number.
+
+        One normalisation on top, because the household sum would otherwise be
+        wrong for a whole provider: the registry holds Haiku under its dated id
+        (``claude-haiku-4-5-20251001``) while the API also accepts the dateless
+        alias. Both are the same model — the same rule ``core.llm.router``
+        already applies to the model picker — so a call priced under one id is
+        priced under the other.
+        """
+        from core.llm.router import _base_model_id
+        from core.storage.app_config import AppConfigRepository
+
+        registry = AppConfigRepository(self._conn).get_model_registry()
+        key = model
+        if key not in registry:
+            base = _base_model_id(model)
+            key = next((m for m in registry if _base_model_id(m) == base), model)
+        provider = (registry.get(key) or {}).get("provider") or \
+            AppConfigRepository._infer_provider(model)
+        return provider, compute_cost(
+            input_tokens or 0, output_tokens or 0, key, registry,
+            cache_read_tokens, cache_write_tokens, web_search_requests)
+
+    def _book(self, agent, model, source, input_tokens, output_tokens,
+              duration_ms, cache_read_tokens, cache_write_tokens,
+              web_search_requests, generation_id) -> None:
+        try:
+            from core import ops_events
+
+            if ops_events.runs_dir() is None:
+                return
+            provider, cost = self._estimate(
+                model, input_tokens, output_tokens, cache_read_tokens,
+                cache_write_tokens, web_search_requests)
+            ops_events.book_llm_call(
+                provider=provider, model=model, purpose=agent,
+                tokens_in=input_tokens, tokens_out=output_tokens,
+                cost_usd=cost, duration_ms=duration_ms, source=source,
+                generation_id=generation_id)
+        except Exception as exc:  # noqa: BLE001 — a call never fails over its books
+            print(f"wealth_management: LLM call not booked "
+                  f"({type(exc).__name__}: {exc})", file=sys.stderr, flush=True)
 
     def update_actual_cost(self, record_id: int, cost_usd: float) -> None:
         """Store the real cost (from OpenRouter API) for a specific usage record."""
+        row = self._conn.execute(
+            "SELECT agent, model, source, input_tokens, output_tokens, cache_read_tokens,"
+            " cache_write_tokens, web_search_requests, generation_id, actual_cost_usd"
+            " FROM llm_usage WHERE id = ?", (record_id,)).fetchone()
         self._conn.execute(
             "UPDATE llm_usage SET actual_cost_usd = ? WHERE id = ?",
             (cost_usd, record_id),
         )
         self._conn.commit()
+        # What was booked was the list price; this is what the provider
+        # actually billed. Only the difference is booked, so the call is not
+        # counted twice — and a second sync of the same row books nothing.
+        if row is None or row["actual_cost_usd"] is not None:
+            return
+        try:
+            from core import ops_events
+
+            if ops_events.runs_dir() is None:
+                return
+            provider, estimate = self._estimate(
+                row["model"], row["input_tokens"], row["output_tokens"],
+                row["cache_read_tokens"], row["cache_write_tokens"],
+                row["web_search_requests"])
+            delta = float(cost_usd) - estimate
+            if abs(delta) < 1e-9:
+                return
+            ops_events.book_llm_cost_correction(
+                provider=provider, model=row["model"], purpose=row["agent"],
+                delta_usd=delta, generation_id=row["generation_id"],
+                source=row["source"] or "scheduled")
+        except Exception as exc:  # noqa: BLE001
+            print(f"wealth_management: cost correction not booked "
+                  f"({type(exc).__name__}: {exc})", file=sys.stderr, flush=True)
 
     def get_uncosted_openrouter_records(self, limit: int = 200) -> list[dict]:
         """Records that have a generation_id but no actual_cost_usd yet."""
