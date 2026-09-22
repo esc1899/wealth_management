@@ -11,8 +11,8 @@ holt deren Inhalt als JSON. Diese hier gibt es nur auf dem Mac mini selbst: Cadd
 jedem anderen Gerät aus antwortet der Pfad mit 404. Trotzdem steht kein Betrag in Euro auf
 der Kachel — nur die Tagesveränderung des Depots in Prozent, die Zahl der Positionen und
 die größte Bewegung des Tages. Die Zahlen sind dieselben wie auf der Analyse-Seite: gleiche
-Bewertung (`MarketDataAgent.get_portfolio_valuation`), gleiche Summenformel
-(`aggregate_day_pnl`), keine zweite Rechnung.
+Bewertung (`MarketDataAgent.get_portfolio_valuation`), gleiche Rechnung (`core/tagesbild.py`,
+seit 22.09.2026 auch die Kopfzeile des Dashboards), keine zweite Zahl.
 
 ops-core lässt es stündlich laufen (`ops run wealth_management kachel`, Zeitplan in
 `~/.ops-core/jobs.toml`), mit `--fetch`: erst die aktuellen Kurse (ohne Historie — die holt
@@ -33,54 +33,33 @@ from typing import Iterable, Optional
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_PROJECT_ROOT))
 
-from core.symbol_aggregation import aggregate_day_pnl  # noqa: E402
-
-MINUS = "−"   # das typografische Minus, wie auf der Startseite
+from core.tagesbild import groesste_bewegung, prozent, tagesbild  # noqa: E402
 
 
 def dienste_www() -> Path:
     return Path(os.environ.get("DIENSTE_HOME") or Path.home() / ".dienste") / "www"
 
 
-def prozent(wert: float) -> str:
-    """+0,42 % / −1,08 % / ±0,00 % — deutsch, mit Vorzeichen."""
-    if round(wert, 2) == 0:
-        return "±0,00 %"
-    text = f"{wert:+.2f}".replace(".", ",").replace("-", MINUS)
-    return f"{text} %"
-
-
 def kachel(valuations: Iterable, stand: Optional[datetime] = None) -> dict:
     """Das Kachel-JSON aus den Bewertungen des Portfolios (keine Watchlist).
     Ohne Tageskurse gibt es keine Prozentzahl — dann steht das da, statt einer Null."""
-    depot = [v for v in valuations if getattr(v, "in_portfolio", True)]
-    mit_tag = [v for v in depot if v.day_pnl_eur is not None and v.current_value_eur is not None]
-    vortag = sum(v.current_value_eur - v.day_pnl_eur for v in mit_tag)
-    tag = sum(v.day_pnl_eur for v in mit_tag)
+    bild = tagesbild(valuations)
 
     zeilen: list = []
-    if mit_tag and vortag > 0:
-        pct = tag / vortag * 100
-        zustand = "schlecht" if pct < 0 else "gut" if pct > 0 else ""
-        zeilen.append({"text": f"{prozent(pct)} heute", "zustand": zustand})
+    if bild.prozent is not None:
+        zustand = "schlecht" if bild.prozent < 0 else "gut" if bild.prozent > 0 else ""
+        zeilen.append({"text": f"{prozent(bild.prozent)} heute", "zustand": zustand})
     else:
         zeilen.append("keine Tageskurse")
-    zeilen.append("1 Position" if len(depot) == 1 else f"{len(depot)} Positionen")
-    ohne = len(depot) - len(mit_tag)
-    if mit_tag and ohne:
-        zeilen.append(f"{ohne} ohne Tageskurs")
-
-    satz = None
-    bewegungen = [b for b in aggregate_day_pnl(mit_tag) if b.day_pnl_pct is not None]
-    if bewegungen:
-        groesste = max(bewegungen, key=lambda b: abs(b.day_pnl_pct))
-        name = next((v.name for v in mit_tag if v.symbol == groesste.symbol), groesste.symbol)
-        satz = f"Größte Bewegung: {name} {prozent(groesste.day_pnl_pct)}"
+    zeilen.append("1 Position" if bild.positionen == 1 else f"{bild.positionen} Positionen")
+    if bild.prozent is not None and bild.ohne_tageskurs:
+        zeilen.append(f"{bild.ohne_tageskurs} ohne Tageskurs")
 
     stand = stand or datetime.now(timezone.utc)
     if stand.tzinfo is None:
         stand = stand.replace(tzinfo=timezone.utc)   # fetched_at ist naives UTC
-    return {"stand": stand.astimezone().isoformat(timespec="seconds"), "zeilen": zeilen, "satz": satz}
+    return {"stand": stand.astimezone().isoformat(timespec="seconds"),
+            "zeilen": zeilen, "satz": groesste_bewegung(bild)}
 
 
 def _agent():

@@ -177,6 +177,9 @@ dashboard:
   pnl: "Total P&L"
   cost_basis: "Cost Basis"
   positions_count: "Positions"
+  today: "Today"
+  today_help: "Day change of the portfolio — {n} position(s) without a day price are left out."
+  no_day_prices: "No day prices yet — the hourly price fetch hasn't run."
   no_prices: "No prices"
   portfolio_empty: "Portfolio is empty. Add positions in Portfolio Chat."
   allocation_chart: "Allocation"
@@ -269,6 +272,7 @@ analysis:
   day_pnl_col: "Daily P&L"
   day_pnl_pct_col: "Daily P&L %"
   no_day_pnl: "No daily P&L data — historical prices not yet fetched."
+  prices_as_of: "Prices as of"
   auto_fetch_notice: "Refreshing prices automatically…"
 
 rebalance_chat:

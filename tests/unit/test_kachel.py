@@ -22,13 +22,6 @@ class FakeValuation:
     in_portfolio: bool = True
 
 
-class TestProzent:
-    def test_deutsch_mit_vorzeichen(self):
-        assert k.prozent(0.4212) == "+0,42 %"
-        assert k.prozent(-1.076) == "−1,08 %"     # typografisches Minus
-        assert k.prozent(0.001) == "±0,00 %"
-
-
 class TestKachel:
     def test_tagesveraenderung_ist_die_summenformel_der_analyse(self):
         vals = [

@@ -12,6 +12,7 @@ import streamlit as st
 
 from core.currency import fmt, symbol
 from core.i18n import t
+from core.tagesbild import groesste_bewegung, prozent, tagesbild
 from state import get_market_agent, get_wealth_snapshot_agent
 
 st.set_page_config(page_title="Dashboard", page_icon="📊", layout="wide")
@@ -54,18 +55,33 @@ total_cost = sum(v.cost_basis_eur for v in valuations if v.cost_basis_eur is not
 total_pnl = (total_value - total_cost) if has_prices and total_cost > 0 else None
 total_pnl_pct = (total_pnl / total_cost * 100) if total_pnl is not None and total_cost > 0 else None
 
-col1, col2, col3, col4 = st.columns(4)
+# "Heute" ist dieselbe Zahl wie auf der Kachel der Startseite (core/tagesbild.py):
+# aus der Bewertung in der Datenbank, die der stündliche Kachel-Job frisch hält —
+# kein Abruf beim Öffnen. Der Betrag in Euro steht auf der Analyse-Seite.
+_bild = tagesbild(valuations)
+
+col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
     st.metric(t("dashboard.portfolio_value"), fmt(total_value) if has_prices else t("dashboard.no_prices"))
 with col2:
+    if _bild.prozent is not None:
+        st.metric(t("dashboard.today"), prozent(_bild.prozent), delta=f"{_bild.prozent:+.2f}%",
+                  help=t("dashboard.today_help").format(n=_bild.ohne_tageskurs) if _bild.ohne_tageskurs else None)
+    else:
+        st.metric(t("dashboard.today"), "—", help=t("dashboard.no_day_prices"))
+with col3:
     if total_pnl is not None:
         st.metric(t("dashboard.pnl"), fmt(total_pnl), delta=f"{total_pnl_pct:.2f}%")
     else:
         st.metric(t("dashboard.pnl"), "—")
-with col3:
-    st.metric(t("dashboard.cost_basis"), fmt(total_cost) if total_cost else "—")
 with col4:
+    st.metric(t("dashboard.cost_basis"), fmt(total_cost) if total_cost else "—")
+with col5:
     st.metric(t("dashboard.positions_count"), len(valuations))
+
+_satz = groesste_bewegung(_bild)
+if _satz:
+    st.caption(_satz)
 
 st.divider()
 

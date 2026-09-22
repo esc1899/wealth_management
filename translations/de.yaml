@@ -176,6 +176,9 @@ dashboard:
   pnl: "G/V gesamt"
   cost_basis: "Einstandswert"
   positions_count: "Positionen"
+  today: "Heute"
+  today_help: "Tagesveränderung des Depots — {n} Position(en) ohne Tageskurs bleiben außen vor."
+  no_day_prices: "Keine Tageskurse — der stündliche Kursabruf hat noch nicht gelaufen."
   no_prices: "Keine Kurse"
   portfolio_empty: "Portfolio ist leer. Positionen im Portfolio-Chat hinzufügen."
   allocation_chart: "Allokation"
@@ -268,6 +271,7 @@ analysis:
   day_pnl_col: "Tages-G/V"
   day_pnl_pct_col: "Tages-G/V %"
   no_day_pnl: "Keine Tages-G/V-Daten verfügbar — historische Kurse noch nicht abgerufen."
+  prices_as_of: "Kurse vom"
   auto_fetch_notice: "Kurse werden automatisch aktualisiert…"
 
 rebalance_chat:

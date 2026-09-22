@@ -4,7 +4,7 @@ Analysis — performance charts, historical prices, allocation.
 
 import calendar
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 import pandas as pd
@@ -13,7 +13,6 @@ import streamlit as st
 
 from core.currency import symbol
 from core.i18n import t, fmt_dt
-from core.trading_calendar import is_trading_day, last_trading_day
 from core.macro_context import load_or_refresh_macro
 from core.monthly_attribution import compute_monthly_attribution
 from core.monthly_digest_generator import generate_monthly_digest
@@ -35,39 +34,26 @@ st.title(f"🔍 {t('analysis.title')}")
 agent = get_market_agent()
 
 # ------------------------------------------------------------------
-# Auto-fetch: on trading days refresh intraday (>1h stale); on non-trading days
-# (weekends) prices can't change — only fetch if the last session's close isn't
-# captured yet. No pointless weekend/evening-after-close refetch.
+# Kein Abruf beim Öffnen (seit 22.09.2026). Bis dahin holte die Seite Kurse
+# samt Historie nach, sobald der letzte Abruf über eine Stunde her war — der
+# langsame Weg, und man wartete beim Öffnen. Die Kurse hält der stündliche
+# Kachel-Job frisch (ops-core.wealth_management.kachel, ~/.ops-core/jobs.toml),
+# die Historie der 18-Uhr-Abruf der App. Die Seite zeigt den Stand aus der
+# Datenbank und sagt, wie alt er ist; wer es jetzt genau wissen will, drückt 🔄.
 # ------------------------------------------------------------------
-
-if "analyse_auto_fetched" not in st.session_state:
-    st.session_state.analyse_auto_fetched = False
-
-if not st.session_state.analyse_auto_fetched:
-    valuations_check = agent.get_portfolio_valuation()
-    _now = datetime.now(timezone.utc)
-    _latest_fetch = max(
-        (v.fetched_at.replace(tzinfo=timezone.utc) for v in valuations_check if v.fetched_at is not None),
-        default=None,
-    )
-    if is_trading_day(_now.date()):
-        # Trading day: intraday prices move → keep the 1-hour staleness rule.
-        needs_fetch = _latest_fetch is None or (_now - _latest_fetch).total_seconds() >= 3600
-    else:
-        # Non-trading day: fetch only if we haven't captured the last trading close yet.
-        needs_fetch = _latest_fetch is None or _latest_fetch.date() < last_trading_day(_now.date())
-    if needs_fetch:
-        with st.spinner(t("analysis.auto_fetch_notice")):
-            agent.fetch_all_now(fetch_history=True)
-    st.session_state.analyse_auto_fetched = True
 
 col_title, col_refresh = st.columns([5, 1])
 with col_refresh:
     if st.button(f"🔄 {t('common.refresh')}"):
         with st.spinner(t("analysis.auto_fetch_notice")):
             agent.fetch_all_now(fetch_history=True)
-        st.session_state.analyse_auto_fetched = True
         st.rerun()
+
+_last_fetch = agent.get_latest_fetch_time()
+if _last_fetch:
+    st.caption(f"{t('analysis.prices_as_of')}: {fmt_dt(_last_fetch.replace(tzinfo=timezone.utc).astimezone())}")  # naives UTC -> Ortszeit
+else:
+    st.caption(t("analysis.no_price_data"))
 
 valuations = agent.get_portfolio_valuation()
 
