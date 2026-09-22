@@ -445,8 +445,13 @@ class AgentSchedulerService:
         """
         from core.llm.claude import ClaudeProvider
         from core.llm.openai_compatible import OpenAICompatibleProvider
-        from core.llm.router import resolve_provider_kind, tavily_news_mode, tavily_search_depth
+        from core.llm.router import (resolve_house_model, resolve_provider_kind,
+                                     tavily_news_mode, tavily_search_depth)
         usage_repo = UsageRepository(conn)
+        model = resolve_house_model(
+            model, has_anthropic=bool(self._anthropic_key),
+            has_openai_base=bool(self._openai_base_url),
+            fallback=self._default_claude_model or "")
         kind = resolve_provider_kind(
             model,
             has_anthropic=bool(self._anthropic_key),

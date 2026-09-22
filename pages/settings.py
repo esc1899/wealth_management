@@ -139,10 +139,33 @@ if not _ollama_models:
     st.caption(t("settings.ollama_unavailable"))
     _ollama_models = [config.OLLAMA_MODEL]
 
+# Haus-Standard (2026-09-22): "home" ist keine Modell-ID, sondern ein Verweis
+# auf ~/.ops-core/modelle.toml. Steht ein Agent darauf, ändert Erik ihn auf der
+# Home-Ops-Seite zusammen mit allen anderen, die folgen -- ohne Neustart.
+# Angezeigt wird, worauf er gerade zeigt; gespeichert wird "home".
+from core import house_models as _house
+
+_HOUSE = _house.load()
+_HOUSE_LOCAL = (_HOUSE.get(_house.OLLAMA) or {}).get("modell")
+_HOUSE_CLOUD = (_HOUSE.get(_house.CLAUDE) or {}).get("modell") \
+    or (_HOUSE.get(_house.OPENROUTER) or {}).get("modell")
+
+
+def _model_label(model: str, house: str | None) -> str:
+    if model != _house.HOME:
+        return model
+    return (t("settings.house_default_is").format(model=house) if house
+            else t("settings.house_default_missing"))
+
+
 def _ollama_sel(agent_key: str, label: str) -> str:
     saved = app_config.get(f"model_ollama_{agent_key}") or app_config.get("model_ollama") or config.OLLAMA_MODEL
-    idx = _ollama_models.index(saved) if saved in _ollama_models else 0
-    return st.selectbox(label, options=_ollama_models, index=idx, key=f"_model_ollama_{agent_key}")
+    options = ([_house.HOME] if _HOUSE_LOCAL else []) + _ollama_models
+    options = _with_saved(options, saved)
+    idx = options.index(saved) if saved in options else 0
+    return st.selectbox(label, options=options, index=idx,
+                        format_func=lambda m: _model_label(m, _HOUSE_LOCAL),
+                        key=f"_model_ollama_{agent_key}")
 
 def _with_saved(options: list[str], saved: str) -> list[str]:
     """Ein gespeichertes, nicht mehr gelistetes Modell bleibt in der Auswahl sichtbar.
@@ -166,9 +189,12 @@ def _public_sel(agent_key: str, label: str) -> str:
         or app_config.get("model_public")
         or (_ALL_PUBLIC_MODELS[0] if _ALL_PUBLIC_MODELS else "")
     )
-    options = _with_saved(_ALL_PUBLIC_MODELS, saved) or ["(keine Modelle konfiguriert)"]
+    options = ([_house.HOME] if _HOUSE_CLOUD else []) + _ALL_PUBLIC_MODELS
+    options = _with_saved(options, saved) or ["(keine Modelle konfiguriert)"]
     idx = options.index(saved) if saved in options else 0
-    return st.selectbox(label, options=options, index=idx, key=f"_model_public_{agent_key}")
+    return st.selectbox(label, options=options, index=idx,
+                        format_func=lambda m: _model_label(m, _HOUSE_CLOUD),
+                        key=f"_model_public_{agent_key}")
 
 st.markdown(f"**{t('settings.ollama_agents_header')}** 🔒")
 col_o1, col_o2, col_o3 = st.columns(3)

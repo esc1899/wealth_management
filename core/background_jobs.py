@@ -49,7 +49,13 @@ def _resolve_model_from_conn(conn, agent_key: str, default: str) -> str:
 
 def _make_bg_llm(model: str, agent_name: str, usage_repo: UsageRepository):
     """Create the correct LLM provider for a model — routing delegated to core.llm.router."""
-    from core.llm.router import resolve_provider_kind, tavily_news_mode, tavily_search_depth
+    from core.llm.router import (resolve_house_model, resolve_provider_kind,
+                                 tavily_news_mode, tavily_search_depth)
+
+    model = resolve_house_model(
+        model, has_anthropic=bool(config.LLM_API_KEY),
+        has_openai_base=bool(config.OPENAI_BASE_URL),
+        fallback=config.CLAUDE_MODELS[0] if config.CLAUDE_MODELS else "")
 
     def _on_usage(i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None):
         usage_repo.record(agent_name, model, i, o, skill=skill, source="manual", duration_ms=dur,

@@ -6,7 +6,8 @@ from config import config
 from core.llm.base import LLMProvider
 from core.llm.claude import ClaudeProvider
 from core.llm.local import OllamaProvider
-from core.llm.router import resolve_provider_kind, tavily_news_mode, tavily_search_depth
+from core.llm.router import (resolve_house_model, resolve_provider_kind,
+                             tavily_news_mode, tavily_search_depth)
 from state_repos import get_usage_repo, get_app_config_repo
 
 
@@ -73,6 +74,12 @@ def _make_deepseek_provider(model: str, agent_name: str) -> "OpenAICompatiblePro
 def _make_public_provider(model: str, agent_name: str, enable_thinking: bool = False) -> LLMProvider:
     """Route to the right provider for a model (see core.llm.router for the rule)."""
     depth = tavily_search_depth(agent_name)
+    # "home" folgt dem Haus-Standard -- aufgeloest bevor geroutet und gebucht
+    # wird, damit in der Statistik das echte Modell steht, nicht "home".
+    model = resolve_house_model(
+        model, has_anthropic=bool(config.LLM_API_KEY),
+        has_openai_base=bool(config.OPENAI_BASE_URL),
+        fallback=config.CLAUDE_MODELS[0] if config.CLAUDE_MODELS else "")
     kind = resolve_provider_kind(
         model,
         has_anthropic=bool(config.LLM_API_KEY),
@@ -119,6 +126,7 @@ def get_ollama_runtime_kwargs(model: str, *, num_ctx_floor: int = 0) -> dict:
 
 def _make_ollama_provider(model: str, agent_name: str, timeout: float = 120.0) -> OllamaProvider:
     """Create and wire up an Ollama provider with usage tracking."""
+    model = resolve_house_model(model, local=True, fallback=config.OLLAMA_MODEL)
     provider = OllamaProvider(host=config.OLLAMA_HOST, model=model, timeout=timeout, **get_ollama_runtime_kwargs(model))
     provider.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: get_usage_repo().record(agent_name, model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
     return provider

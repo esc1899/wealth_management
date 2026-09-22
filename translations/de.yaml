@@ -431,6 +431,8 @@ settings:
   save_models_button: "Modelle speichern"
   models_saved: "Gespeichert — Assistenten werden neu gestartet."
   ollama_unavailable: "Ollama nicht erreichbar — Standardmodell wird verwendet."
+  house_default_is: "Haus-Standard ({model})"
+  house_default_missing: "Haus-Standard (nicht eingetragen)"
   model_prices_header: "Modell-Registry (Preise & Provider)"
   model_prices_caption: "Modelle für Kostenschätzung und Auswahl. Provider bestimmt Routing & Statistik; OpenRouter-Modelle werden nach Eintrag sofort wählbar. Anthropic-Listenpreise als Vorgabe."
   model_prices_provider_note: "Neue Provider (z. B. Groq, Perplexity) lassen sich nur programmatisch anlegen (Routing & Credentials im Code)."

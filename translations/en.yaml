@@ -452,6 +452,8 @@ settings:
   model_prices_pick_model: "Pick model"
   model_prices_manual_entry: "Enter manually"
   ollama_unavailable: "Ollama not reachable — using default model."
+  house_default_is: "Household default ({model})"
+  house_default_missing: "Household default (not set)"
   scheduling_header: "Scheduled Tasks"
   scheduling_caption: "Run cloud agents automatically at configured times."
   no_scheduled_jobs: "No scheduled tasks yet. Add one below."

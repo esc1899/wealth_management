@@ -175,3 +175,89 @@ class TestCostCorrection:
         monkeypatch.setenv("OPS_CORE_HOME", str(tmp_path / "weg"))
         repo.update_actual_cost(row_id, 1.23)
         assert conn.execute("SELECT actual_cost_usd FROM llm_usage").fetchone()[0] == 1.23
+
+
+# ---------------------------------------------------------------------------
+# Haus-Standard: ein Modell namens "home" folgt ~/.ops-core/modelle.toml
+# ---------------------------------------------------------------------------
+
+from core import house_models
+from core.llm.router import resolve_house_model
+
+HOUSE_TOML = '''
+[claude]
+modell = "claude-sonnet-5"
+budget_usd = 20
+
+[ollama]
+modell = "qwen3.5:9b"
+
+[openrouter]
+modell = "deepseek/deepseek-chat"
+'''
+
+
+@pytest.fixture
+def house(tmp_path, monkeypatch):
+    """Die Datei im selben ops-core-Zuhause wie `runs` -- beide Fixtures
+    zusammen ergeben einen Rechner mit Log und Haus-Standard."""
+    home = tmp_path / "ops-core"
+    home.mkdir(exist_ok=True)
+    (home / "modelle.toml").write_text(HOUSE_TOML, encoding="utf-8")
+    monkeypatch.setenv("OPS_CORE_HOME", str(home))
+    return home / "modelle.toml"
+
+
+class TestHouseModels:
+    def test_home_resolves_per_provider(self, house):
+        assert resolve_house_model("home", local=True) == "qwen3.5:9b"
+        assert resolve_house_model("home") == "claude-sonnet-5"
+        # Kein Anthropic-Schlüssel, aber ein OpenAI-kompatibler Endpunkt:
+        # dann ist der Haus-Standard der von OpenRouter.
+        assert resolve_house_model("home", has_anthropic=False,
+                                   has_openai_base=True) == "deepseek/deepseek-chat"
+
+    def test_anything_else_stays_as_it_is(self, house):
+        assert resolve_house_model("claude-opus-5") == "claude-opus-5"
+        assert resolve_house_model("") == ""
+
+    def test_it_is_read_per_call_so_a_change_needs_no_restart(self, house):
+        assert resolve_house_model("home", local=True) == "qwen3.5:9b"
+        house.write_text(HOUSE_TOML.replace("qwen3.5:9b", "gemma3:4b"), encoding="utf-8")
+        assert resolve_house_model("home", local=True) == "gemma3:4b"
+
+    def test_without_the_file_the_fallback_stands(self, tmp_path, monkeypatch):
+        """Eine fehlende Datei darf die App nie anhalten."""
+        monkeypatch.setenv("OPS_CORE_HOME", str(tmp_path / "leer"))
+        assert resolve_house_model("home", local=True, fallback="llama3.2") == "llama3.2"
+        assert house_models.load() == {}
+
+    def test_a_broken_file_is_a_warning_not_a_crash(self, tmp_path, monkeypatch, caplog):
+        home = tmp_path / "ops-core"
+        home.mkdir()
+        (home / "modelle.toml").write_text("[claude\nmodell = ", encoding="utf-8")
+        monkeypatch.setenv("OPS_CORE_HOME", str(home))
+        assert house_models.load() == {}
+        assert resolve_house_model("home", fallback="claude-haiku-4-5") == "claude-haiku-4-5"
+
+    def test_an_entry_without_a_model_is_ignored(self, tmp_path, monkeypatch):
+        home = tmp_path / "ops-core"
+        home.mkdir()
+        (home / "modelle.toml").write_text(
+            '[claude]\nbudget_usd = 5\n[ollama]\nmodell = "qwen3.5:9b"\n', encoding="utf-8")
+        monkeypatch.setenv("OPS_CORE_HOME", str(home))
+        geladen = house_models.load()
+        assert "claude" not in geladen and geladen["ollama"]["modell"] == "qwen3.5:9b"
+
+    def test_the_resolved_model_is_what_gets_booked(self, conn, runs, house, monkeypatch):
+        """Gebucht wird das echte Modell, nie "home" -- sonst stünde in der
+        Hausbuchhaltung ein Wort statt eines Modells."""
+        import state_llm
+
+        monkeypatch.setattr(state_llm, "get_usage_repo", lambda: UsageRepository(conn))
+        provider = state_llm._make_ollama_provider("home", "portfolio_chat")
+        assert provider.model == "qwen3.5:9b"
+        provider.on_usage(900, 120)
+        (event,) = _lines(runs)
+        assert event["payload"]["model"] == "qwen3.5:9b"
+        assert event["payload"]["provider"] == "ollama"

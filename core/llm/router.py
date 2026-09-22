@@ -50,6 +50,39 @@ def tavily_news_mode(agent_name: str) -> bool:
     return agent_name in TAVILY_NEWS_AGENTS
 
 
+def resolve_house_model(
+    model: str,
+    *,
+    has_anthropic: bool = True,
+    has_openai_base: bool = False,
+    local: bool = False,
+    fallback: str = "",
+) -> str:
+    """Turn the ``home`` setting into a real model id (2026-09-22).
+
+    A model of ``home`` follows the household default from
+    ``~/.ops-core/modelle.toml`` — one place where Erik changes every app
+    that is set to follow. Which entry applies is decided the same way the
+    call itself is routed: a local setting takes Ollama's, a cloud setting
+    takes Claude's, unless this install has no Anthropic key and does have
+    an OpenAI-compatible base (then it is OpenRouter's).
+
+    Resolved per call, not once at startup, so a change takes effect
+    without a restart; without an entry the caller's ``fallback`` stands.
+    """
+    from core import house_models
+
+    if not house_models.is_home(model):
+        return model
+    if local:
+        provider = house_models.OLLAMA
+    elif not has_anthropic and has_openai_base:
+        provider = house_models.OPENROUTER
+    else:
+        provider = house_models.CLAUDE
+    return house_models.resolve(model, provider, fallback=fallback)
+
+
 def resolve_provider_kind(
     model: str,
     *,
