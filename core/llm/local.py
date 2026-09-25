@@ -33,7 +33,7 @@ class OllamaProvider(LLMProvider):
     No data leaves the machine.
     """
 
-    def __init__(self, host: str, model: str, timeout: float = 120.0, think: bool = False, num_ctx: int = 8192):
+    def __init__(self, host: str, model: str, timeout: float = 120.0, think: bool = False, num_ctx: int = 32768):
         self._host = host.rstrip("/")
         self._model = model
         self._timeout = timeout

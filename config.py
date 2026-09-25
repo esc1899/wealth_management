@@ -53,7 +53,7 @@ class Config:
     # Ollama
     OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
     OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.2")
-    OLLAMA_NUM_CTX: int = int(os.getenv("OLLAMA_NUM_CTX", "8192"))
+    OLLAMA_NUM_CTX: int = int(os.getenv("OLLAMA_NUM_CTX", "32768"))  # shared Ollama: every project uses 32k, a different value forces a reload
 
     # Encryption
     ENCRYPTION_KEY: str = get_secret("ENCRYPTION_KEY", "")
