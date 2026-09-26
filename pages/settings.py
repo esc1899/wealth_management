@@ -464,39 +464,34 @@ else:
     st.info("WD Passport nicht verbunden. Laufwerk anschließen, dann Backup starten.", icon=":material/usb:")
 
 if _script_exists and _drive_mounted:
+    # Der Button startet das Skript nicht selbst, sondern in einem Terminal-Fenster
+    # (seit 2026-09-26). Als Kind dieses Prozesses rechnet macOS den Plattenzugriff
+    # dem Homebrew-Python der App zu, und das hat keinen Festplattenvollzugriff --
+    # soll es auch nicht, siehe CLAUDE.md. Ueber `open` startet Launch Services das
+    # Terminal, das die Freigabe schon hat; es kommt keine neue dazu.
     st.caption(
-        "⚠️ Bekannte Einschränkung (seit 2026-09-07): Der Button schlägt auf diesem Rechner "
-        "aktuell mit einem macOS-Festplattenvollzugriff-Fehler fehl, obwohl die Berechtigung "
-        "gesetzt ist — Ursache ungeklärt, siehe CLAUDE.md. Zuverlässig läuft das Backup direkt "
-        "im Terminal."
+        "Die Sicherung läuft in einem eigenen Terminal-Fenster: Nur Terminal darf "
+        "auf die Platte, die App nicht. Tippen musst du dort nichts."
     )
     if st.button("▶ Jetzt sichern", type="primary", key="_backup_now_btn"):
-        with st.spinner("Backup läuft…"):
-            result = _subprocess.run(
-                ["/bin/bash", _BACKUP_SCRIPT],
-                capture_output=True,
-                text=True,
-                timeout=300,
-            )
+        result = _subprocess.run(
+            ["/usr/bin/open", "-a", "Terminal", _BACKUP_SCRIPT],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
         if result.returncode == 0:
-            st.success("Backup erfolgreich abgeschlossen!", icon=":material/check_circle:")
+            st.info(
+                "Sicherung im Terminal-Fenster gestartet. Wenn dort „completed "
+                "successfully“ steht, ist sie fertig – das Log unten zeigt es nach "
+                "dem Neuladen der Seite.",
+                icon=":material/terminal:",
+            )
         else:
-            # Das Script leitet sein eigenes stdout/stderr per `exec >> LOG 2>&1` um
-            # (siehe wm_backup.sh) — result.stdout/stderr sind hier immer leer. Die
-            # eigentliche Fehlermeldung steht nur im Log-File, deshalb dort nachsehen.
-            _tail = ""
-            if _os.path.isfile(_BACKUP_LOG):
-                with open(_BACKUP_LOG) as _f:
-                    _tail = "".join(_f.readlines()[-8:])
-            if "Festplattenvollzugriff fehlt" in _tail:
-                st.error(
-                    "Backup fehlgeschlagen — Festplattenvollzugriff-Fehler (bekannte "
-                    "Einschränkung, siehe CLAUDE.md). Workaround: im Terminal ausführen:",
-                    icon=":material/error:",
-                )
-                st.code(f"bash {_BACKUP_SCRIPT}", language="bash")
-            else:
-                st.error("Backup fehlgeschlagen — siehe Log unten.", icon=":material/error:")
+            st.error(
+                f"Terminal ließ sich nicht öffnen: {result.stderr.strip() or result.returncode}",
+                icon=":material/error:",
+            )
 
 if _os.path.isfile(_BACKUP_LOG):
     with st.expander("📋 Backup-Log (letzte Einträge)"):

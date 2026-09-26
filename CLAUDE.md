@@ -47,9 +47,9 @@ launchctl kickstart -k gui/$(id -u)/ops-core.wealth_management.meldungen
 tail -100 ~/.ops-core/launchd/ops-core.wealth_management.app.log | grep -A5 "Error\|Exception\|Traceback"
 
 # Backup manuell anstoßen (WD Passport muss angeschlossen sein). Der Button in
-# Settings schlägt aus ungeklärten macOS-Festplattenvollzugriff-Gründen fehl —
-# im Terminal ausgeführt läuft es zuverlässig. Details: Abschnitt weiter unten
-# "Backup-Button in Settings — ungeklärter Festplattenvollzugriff-Fehler".
+# Settings öffnet dafür ein Terminal-Fenster (seit 26.09.2026) — nur Terminal hat
+# Festplattenvollzugriff, die App nicht. Warum: Abschnitt weiter unten
+# "Backup-Button in Settings — Festplattenvollzugriff".
 ops run wealth_management backup      # seit 20.09.2026 über ops-core: Lauf, Exit und Log in einem
 ops runs wealth_management --job backup --days 30   # wann lief es zuletzt gut?
 # Der direkte Weg geht weiter: bash /Users/erik/scripts/wm_backup.sh; tail -30 ~/Library/Logs/wm_backup.log
@@ -338,7 +338,7 @@ Motto: **try to improve the whole**
    - Integration-Test prüft dass all erwarteten Tabellen nach `migrate_db()` existieren
    - Fehler im Test würde Pre-Merge CI abfangen
 
-## Backup-Button in Settings — ungeklärter Festplattenvollzugriff-Fehler (seit 2026-09-07)
+## Backup-Button in Settings — Festplattenvollzugriff (2026-09-07, gelöst 2026-09-26)
 
 `pages/settings.py` startet `~/scripts/wm_backup.sh` als Subprozess des laufenden Streamlit-
 Prozesses. Dieser Button **schlägt auf dem Dock-App-Prozess reproduzierbar fehl**:
@@ -360,7 +360,7 @@ Prozesse gesetzt war — durchprobiert:
 
 Nichts davon hat den Fehler behoben. **Funktioniert zuverlässig: `wm_backup.sh` direkt im
 eigenen Terminal ausführen** — dort lief es sauber durch (Snapshot erstellt, `restic check`
-grün). Der Unterschied zum App-Button ist ungeklärt; vermutlich eine macOS-26-TCC-Eigenart bei
+grün). Der Unterschied zum App-Button war lange ungeklärt (Ursache unten); vermutlich eine macOS-26-TCC-Eigenart bei
 Ad-hoc-signierten CLI-Tools ohne Terminal-Vorfahren im Prozessbaum, aber nicht verifiziert.
 
 **Für zukünftige Sessions:** Nicht wieder bei null anfangen — der Button ist ein bekanntes,
@@ -379,4 +379,23 @@ Die Lösung bei ops-core war ein eigenes kleines Startprogramm mit Festplattenvo
 (`~/.ops-core/bin/ops-vollzugriff`, per `full_disk_access = true` nur vor einem Job). Für
 das Backup läge nahe, den Job `wealth_management backup` genauso zu starten statt über den
 Button — der nächste Versuch sollte dort ansetzen. Die Platte muss trotzdem stecken.
+(Nachtrag: Dieses Startprogramm ist am selben Tag zurückgebaut worden, weil es jedem
+Prozess als Erik den ganzen Rechner öffnete — kein Weg mehr.)
+
+**Ursache gefunden am 26.09.2026** (Button-Lauf 17:10, `log show`, Subsystem `com.apple.TCC`):
+Gefragt wird `kTCCServiceSystemPolicyAllFiles` — Festplattenvollzugriff, nicht
+„Wechseldatenträger“, obwohl die WD Passport per USB hängt. Als verantwortlich zählt
+`/opt/homebrew/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/bin/python3.11`,
+also das Python, das launchd für die App startet (Streamlit-Agent) — **nicht** `Python.app`
+(nur `binary_path`) und nicht `restic` (abgelehnt wird schon das `/bin/ls` der Vorprüfung).
+Die damaligen Freigaben saßen also am falschen Programm. Die „richtige“ Freigabe ist trotzdem
+keine: Sie gäbe jedem Skript, das mit Homebrews Python 3.11 als Erik läuft, den ganzen
+Rechner — genau das, was bei ops-core verworfen wurde. Im Terminal geht es, weil dort
+Terminal verantwortlich ist und Terminal den Vollzugriff hat (Voraussetzung 4 im Skriptkopf).
+Derselbe Grund bremst `ops run wealth_management backup` unter launchd; aus dem Terminal
+aufgerufen läuft es.
+
+**Seither startet der Button das Skript über `open -a Terminal`** (`pages/settings.py`):
+Launch Services startet Terminal, Terminal ist verantwortlich, keine neue Freigabe. Der Button
+wartet nicht auf das Ende — das Ergebnis steht im Terminal-Fenster und im Log darunter.
 
