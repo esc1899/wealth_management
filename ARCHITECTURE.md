@@ -612,6 +612,31 @@ is a deliberate copy, no import, so nothing here depends on ops-core
 being installed. Without `~/.ops-core` nothing is booked and nothing is
 created; the test suite points `OPS_CORE_HOME` at a throwaway directory.
 
+## Running on the Home Server (2026-09-20 … 26)
+
+The app runs on the household Mac mini next to four other side projects.
+Everything that ties them together lives in the `heimnetzwerk` repo, not
+here; this repo only delivers the pieces the house asks for:
+
+| Piece | Here | Wired up in `heimnetzwerk` |
+|---|---|---|
+| The app | `streamlit run app.py`, `127.0.0.1:8655` under `/wealth/` (`.streamlit/config.toml`) | `ops-core.wealth_management.app` (KeepAlive) from `~/.ops-core/jobs.toml`; Caddy route with `zugang = "lokal"` — reachable only from the Mini itself (`http://localhost/wealth/`), 404 for every other sender |
+| The tile | `scripts/kachel.py --fetch` writes `~/.dienste/www/kacheln/wealth.json`: day change, positions, biggest mover | job `kachel`, hourly at :40 and at login |
+| The notice | `core/story_meldung.py`: once the Story Checker has judged every position with a story, the tile carries the sum of its verdicts, red if one is endangered, linking to `/wealth/storychecker` | written by the tile job — never when the tile is opened |
+| The ✕ on the notice | `scripts/meldungen_dienst.py`, stdlib only, `127.0.0.1:8656`; a POST remembers the dismissed pass in `app_config` and drops the notice from the file | service `meldungen`; Caddy routes `/kacheln/wealth/*` there (it must sit under the tile's path, or the start page shows no ✕) |
+| LLM accounting | `core/ops_events.py` (see above) | read back by the Home-Ops agent |
+| House model | model name `home` → `core/house_models.py`, resolved in `core.llm.router.resolve_house_model` at call time | `~/.ops-core/modelle.toml`, edited on the Home-Ops page |
+
+Two rules carry over from the house. **Nothing on the start page is
+computed when it is opened** — the hourly job decides, the page reads a
+file. And **no app imports another**: the contracts are files
+(`jobs.toml`, the run log, the tile JSON) and HTTP. Wealth Management is
+deliberately *not* in the house's nightly iCloud backup — it keeps its
+own restic backup to an external drive (`~/scripts/wm_backup.sh`, outside
+the repo, run by hand via `ops run wealth_management backup`).
+
+---
+
 ## LLM Provider Configuration
 
 The public LLM layer is provider-agnostic and configured via environment variables.

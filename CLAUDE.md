@@ -38,6 +38,10 @@ kill $(pgrep -f "streamlit run") && streamlit run app.py
 # `ops install wealth_management` from ~/.ops-core/jobs.toml (heimnetzwerk repo);
 # port, address, headless and baseUrlPath live in .streamlit/config.toml.
 launchctl kickstart -k gui/$(id -u)/ops-core.wealth_management.app
+# Die Kachel der Startseite (stündlich :40) und der Empfänger für ihr x (127.0.0.1:8656)
+# laufen daneben — siehe ARCHITECTURE.md "Running on the Home Server".
+ops run wealth_management kachel
+launchctl kickstart -k gui/$(id -u)/ops-core.wealth_management.meldungen
 
 # Scheduled job debugging — real tracebacks are here, not in the UI
 tail -100 ~/.ops-core/launchd/ops-core.wealth_management.app.log | grep -A5 "Error\|Exception\|Traceback"
@@ -362,4 +366,17 @@ Ad-hoc-signierten CLI-Tools ohne Terminal-Vorfahren im Prozessbaum, aber nicht v
 **Für zukünftige Sessions:** Nicht wieder bei null anfangen — der Button ist ein bekanntes,
 noch ungelöstes Problem, kein neuer Bug. Backup-Bedarf → Terminal nutzen, nicht den Button.
 Falls jemand die tatsächliche Ursache findet: hier dokumentieren, nicht nur fixen.
+
+**Spur vom 26.09.2026 (nicht am Button geprüft):** Dasselbe Muster trat bei der Sicherung von
+ops-core auf (heimnetzwerk, `docs/ops-core/README.md`, Nachtrag zu Schritt 17): aus dem
+Terminal gut, unter launchd „Operation not permitted" — sogar für `/bin/ls`. Gelöst hat es
+dort erst eine Freigabe für **das Programm, das launchd selbst startet**; Freigaben für
+Programme weiter unten in der Kette (dort Python) halfen nicht. macOS rechnet den Zugriff
+dem Prozess zu, den launchd gestartet hat, nicht dem, der die Datei öffnet. Beim Button
+steht vorn im App-Agenten `.venv/bin/streamlit` — ein Skript; welches Programm macOS dort
+zählt, ist ungeprüft, `Python.app` und `restic` waren es jedenfalls nicht allein.
+Die Lösung bei ops-core war ein eigenes kleines Startprogramm mit Festplattenvollzugriff
+(`~/.ops-core/bin/ops-vollzugriff`, per `full_disk_access = true` nur vor einem Job). Für
+das Backup läge nahe, den Job `wealth_management backup` genauso zu starten statt über den
+Button — der nächste Versuch sollte dort ansetzen. Die Platte muss trotzdem stecken.
 

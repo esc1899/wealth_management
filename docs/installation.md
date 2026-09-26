@@ -34,7 +34,9 @@ ollama pull qwen3:8b
 streamlit run app.py
 ```
 
-The app opens at [http://localhost:8501](http://localhost:8501).
+The app opens at [http://localhost:8655/wealth/](http://localhost:8655/wealth/) — port and
+path prefix come from `.streamlit/config.toml` (`port = 8655`, `baseUrlPath = "wealth"`).
+Drop `baseUrlPath` there if you run the app standalone and prefer the plain root.
 
 ---
 
