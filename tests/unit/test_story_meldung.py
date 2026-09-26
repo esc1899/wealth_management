@@ -52,3 +52,45 @@ def test_der_durchgang_waechst_nur_mit_der_letzten_position():
 def test_ein_unbekanntes_urteil_wird_gezaehlt_nicht_versteckt():
     m = story_meldung({1: ("intact", _t(20)), 2: ("unknown", _t(20))}, [1, 2])
     assert m["text"].endswith("· 1 ohne Urteil")
+
+
+def test_das_x_traegt_den_durchgang():
+    m = story_meldung(URTEILE, [1, 2, 3, 4])
+    assert m["verwerfen"] == "kacheln/wealth/verwerfen?story=2026-09-20T09%3A00%3A00%2B00%3A00"
+
+
+def test_der_empfaenger_merkt_und_nimmt_die_meldung_aus_der_kachel(tmp_path):
+    import json
+    import sys
+    import threading
+    import urllib.error
+    import urllib.request
+    from http.server import ThreadingHTTPServer
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+    import meldungen_dienst as md
+
+    m = story_meldung(URTEILE, [1, 2, 3, 4])
+    datei = tmp_path / "wealth.json"
+    datei.write_text(json.dumps({"zeilen": ["x"], "meldungen": [m]}), encoding="utf-8")
+    gemerkt = []
+    server = ThreadingHTTPServer(("127.0.0.1", 0), md.handler(merken=gemerkt.append, datei=lambda: datei))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    basis = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        assert urllib.request.urlopen(basis + "/health").read() == b"ok"
+        pfad = m["verwerfen"].removeprefix("kacheln/wealth")      # Caddy schneidet das Präfix ab
+        r = urllib.request.urlopen(urllib.request.Request(basis + pfad, method="POST"))
+        assert r.status == 204
+        assert gemerkt == [m["schluessel"]]
+        assert "meldungen" not in json.loads(datei.read_text(encoding="utf-8"))
+        # Ein zweites x ändert nichts, eines ohne Durchgang wird abgelehnt
+        urllib.request.urlopen(urllib.request.Request(basis + pfad, method="POST"))
+        try:
+            urllib.request.urlopen(urllib.request.Request(basis + "/verwerfen", method="POST"))
+            assert False, "ohne story haette es scheitern muessen"
+        except urllib.error.HTTPError as e:
+            assert e.code == 400
+    finally:
+        server.shutdown()
