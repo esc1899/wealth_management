@@ -45,6 +45,12 @@ class TestKachel:
         leer = k.kachel([FakeValuation("A", "A", current_value_eur=95.0)], stand=datetime.now(timezone.utc))
         assert leer["zeilen"] == ["keine Tageskurse", "1 Position"] and leer["satz"] is None
 
+    def test_die_story_meldung_steht_nur_da_wenn_es_eine_gibt(self):
+        val = [FakeValuation("A", "A", day_pnl_eur=1.0, current_value_eur=101.0)]
+        assert "meldungen" not in k.kachel(val, stand=datetime.now(timezone.utc))
+        m = {"text": "Story-Check: 3 intakt · 0 gemischt · 0 gefährdet", "ziel": "storychecker"}
+        assert k.kachel(val, stand=datetime.now(timezone.utc), meldungen=[m])["meldungen"] == [m]
+
     def test_ohne_startseite_passiert_nichts(self, tmp_path, monkeypatch, capsys):
         monkeypatch.setenv("DIENSTE_HOME", str(tmp_path / "gibt-es-nicht"))
         assert k.main([]) == 0

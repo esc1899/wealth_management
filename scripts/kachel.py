@@ -40,7 +40,8 @@ def dienste_www() -> Path:
     return Path(os.environ.get("DIENSTE_HOME") or Path.home() / ".dienste") / "www"
 
 
-def kachel(valuations: Iterable, stand: Optional[datetime] = None) -> dict:
+def kachel(valuations: Iterable, stand: Optional[datetime] = None,
+           meldungen: Optional[list] = None) -> dict:
     """Das Kachel-JSON aus den Bewertungen des Portfolios (keine Watchlist).
     Ohne Tageskurse gibt es keine Prozentzahl — dann steht das da, statt einer Null."""
     bild = tagesbild(valuations)
@@ -58,8 +59,25 @@ def kachel(valuations: Iterable, stand: Optional[datetime] = None) -> dict:
     stand = stand or datetime.now(timezone.utc)
     if stand.tzinfo is None:
         stand = stand.replace(tzinfo=timezone.utc)   # fetched_at ist naives UTC
-    return {"stand": stand.astimezone().isoformat(timespec="seconds"),
-            "zeilen": zeilen, "satz": groesste_bewegung(bild)}
+    daten = {"stand": stand.astimezone().isoformat(timespec="seconds"),
+             "zeilen": zeilen, "satz": groesste_bewegung(bild)}
+    if meldungen:
+        daten["meldungen"] = meldungen
+    return daten
+
+
+def story(conn, positions_repo) -> Optional[dict]:
+    """Die Meldung des Story-Checks (core/story_meldung.py): dieselben Positionen wie der
+    eingeplante Lauf — im Depot, mit Story, nicht von der Analyse ausgenommen."""
+    from core.storage.analyses import PositionAnalysesRepository
+    from core.storage.app_config import AppConfigRepository
+    from core.story_meldung import VERWORFEN_KEY, story_meldung
+
+    ids = [p.id for p in positions_repo.get_portfolio()
+           if p.id and p.story and not p.analysis_excluded]
+    latest = PositionAnalysesRepository(conn).get_latest_bulk(ids, "storychecker")
+    urteile = {i: (a.verdict or "unknown", a.created_at) for i, a in latest.items()}
+    return story_meldung(urteile, ids, AppConfigRepository(conn).get(VERWORFEN_KEY))
 
 
 def _agent():
@@ -77,14 +95,15 @@ def _agent():
     salt_path = os.path.join(os.path.dirname(os.path.abspath(config.DB_PATH)), "salt.bin")
     enc = build_encryption_service(config.ENCRYPTION_KEY, salt_path)
     market = MarketDataRepository(conn)
+    positions_repo = PositionsRepository(conn, enc)
     agent = MarketDataAgent(
-        positions_repo=PositionsRepository(conn, enc),
+        positions_repo=positions_repo,
         market_repo=market,
         fetcher=MarketDataFetcher(rate_limiter=RateLimiter(calls_per_second=config.RATE_LIMIT_RPS)),
         db_path=config.DB_PATH,
         encryption_key=config.ENCRYPTION_KEY,
     )
-    return agent, market
+    return agent, market, conn, positions_repo
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -103,12 +122,18 @@ def main(argv: list[str]) -> int:
         print(f"Startseite nicht installiert ({dienste_www()} fehlt) — nichts zu tun.")
         return 0
 
-    agent, market = _agent()
+    agent, market, conn, positions_repo = _agent()
     if args.fetch:
         ergebnis = agent.fetch_all_now(fetch_history=False, include_watchlist=False)
         print(f"Kurse: {ergebnis.fetched} geholt"
               + (f", {len(ergebnis.failed)} fehlgeschlagen ({', '.join(ergebnis.failed[:5])})" if ergebnis.failed else ""))
-    daten = kachel(agent.get_portfolio_valuation(include_watchlist=False), stand=market.get_latest_fetch_time())
+    try:
+        meldung = story(conn, positions_repo)
+    except Exception as exc:   # die Meldung ist Zutat — die Kachel steht auch ohne sie
+        print(f"Story-Meldung nicht bestimmt: {exc}", file=sys.stderr)
+        meldung = None
+    daten = kachel(agent.get_portfolio_valuation(include_watchlist=False),
+                   stand=market.get_latest_fetch_time(), meldungen=[meldung] if meldung else None)
     text = json.dumps(daten, ensure_ascii=False, indent=1)
     if args.stdout:
         print(text)
