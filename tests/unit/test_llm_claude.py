@@ -409,6 +409,30 @@ class TestReasoningKwargs:
         opus = ClaudeProvider(api_key="k", model=CLAUDE_OPUS)
         assert opus._reasoning_kwargs(False)["output_config"] == {"effort": "medium"}
 
+    def test_newer_models_included(self):
+        # Bis 2026-09-27 fiel jedes Modell ausser Sonnet 5 / Opus 5 still heraus.
+        neu = ClaudeProvider(api_key="k", model="claude-opus-5-5")
+        assert neu._reasoning_kwargs(True)["output_config"] == {"effort": "high"}
+
+    async def test_auto_tool_choice_is_not_forced(self, provider):
+        # Nur tool/any schaltet das Denken ab; auto ist freie Wahl (Opus 5.5 kennt
+        # erzwungenes tool_choice nicht mehr).
+        gesehen = {}
+
+        async def mock_create(**kw):
+            gesehen.update(kw)
+            return MagicMock(content=[], stop_reason="end_turn",
+                             usage=MagicMock(input_tokens=1, output_tokens=1,
+                                             cache_read_input_tokens=0,
+                                             cache_creation_input_tokens=0,
+                                             server_tool_use=None))
+
+        provider._client.messages.create = mock_create
+        await provider.chat_with_tools(messages=[{"role": "user", "content": "x"}],
+                                       tools=[], tool_choice={"type": "auto"})
+        assert gesehen["tool_choice"] == {"type": "auto"}
+        assert gesehen.get("thinking") != {"type": "disabled"}
+
     def test_instance_default_used_when_caller_passes_none(self):
         thinking_provider = ClaudeProvider(api_key="k", model=CLAUDE_SONNET, enable_thinking=True)
         assert thinking_provider._reasoning_kwargs(None)["output_config"] == {"effort": "high"}

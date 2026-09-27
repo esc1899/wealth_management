@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
 import anthropic
-from core.constants import CLAUDE_SONNET, CLAUDE_OPUS
+from core.constants import CLAUDE_SONNET, supports_effort
 from core.llm.base import LLMProvider, Message, Role
 
 _logger = logging.getLogger(__name__)
@@ -118,7 +118,7 @@ class ClaudeProvider(LLMProvider):
         Kosten und frisst das knappe Token-Budget → dort abgeschaltet (``output_config``
         verträgt sich nicht mit erzwungenem tool_choice).
         """
-        if self._model not in {CLAUDE_SONNET, CLAUDE_OPUS}:
+        if not supports_effort(self._model):
             return {}
         if forced_tool:
             return {"thinking": {"type": "disabled"}}
@@ -225,7 +225,11 @@ class ClaudeProvider(LLMProvider):
             kwargs["tool_choice"] = tool_choice
         # Haiku kennt weder effort noch adaptives Denken — _reasoning_kwargs liefert
         # dafür ein leeres Dict.
-        kwargs.update(self._reasoning_kwargs(enable_thinking, forced_tool=bool(tool_choice)))
+        # Nur ein *erzwungenes* tool_choice (tool/any) schaltet das Denken ab; ``auto``
+        # ist freie Wahl. Opus 5.5 kennt ohnehin keins von beiden (400), deshalb
+        # erzwingt seit 2026-09-27 kein Aufrufer mehr.
+        forced = bool(tool_choice) and tool_choice.get("type") in ("tool", "any")
+        kwargs.update(self._reasoning_kwargs(enable_thinking, forced_tool=forced))
 
         _t0 = time.monotonic()
         total_input = total_output = total_cache_read = total_cache_write = total_web_search = 0

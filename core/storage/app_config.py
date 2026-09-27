@@ -76,6 +76,7 @@ class AppConfigRepository:
         CLAUDE_HAIKU:   {"input": 1.00,  "output": 5.00,  "provider": "claude"},
         CLAUDE_SONNET:  {"input": 2.00,  "output": 10.00, "provider": "claude"},
         CLAUDE_OPUS:    {"input": 5.00,  "output": 25.00, "provider": "claude"},
+        "claude-opus-5-5": {"input": 4.00, "output": 20.00, "provider": "claude"},
         # DeepSeek + Mistral via OpenRouter — DeepSeek hat seit Juni deutlich gesenkt
         "deepseek/deepseek-v4-flash":   {"input": 0.0804, "output": 0.1607, "provider": "openrouter"},
         "deepseek/deepseek-v4-pro":     {"input": 0.4475, "output": 0.8951, "provider": "openrouter"},

@@ -17,6 +17,18 @@ CLAUDE_HAIKU = "claude-haiku-4-5-20251001"
 CLAUDE_SONNET = "claude-sonnet-5"
 CLAUDE_OPUS = "claude-opus-5"
 
+
+def supports_effort(model: str) -> bool:
+    """Nimmt dieses Modell ``effort`` und adaptives Denken? (2026-09-27)
+
+    Bis dahin stand hier eine feste Menge {Sonnet 5, Opus 5} — jedes neuere Modell
+    (Opus 5.5) fiel still heraus, der Thinking-Schalter war grau und die Denktiefe
+    stand auf dem Modell-Default. Alle aktuellen Claude-Modelle können es; nur Haiku
+    4.5 kennt ``effort`` nicht.
+    """
+    return model.startswith("claude-") and "haiku" not in model
+
+
 # Per-agent default models (based on cost/capability trade-offs)
 CLAUDE_MODEL_DEFAULTS = {
     "haiku": CLAUDE_HAIKU,          # research, news, storychecker (lower cost)

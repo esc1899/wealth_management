@@ -64,8 +64,8 @@ with col_sidebar:
                 height=120,
             ).strip()
 
-        from core.constants import CLAUDE_SONNET, CLAUDE_OPUS
-        _supports_thinking = agent.model in {CLAUDE_SONNET, CLAUDE_OPUS}
+        from core.constants import supports_effort
+        _supports_thinking = supports_effort(agent.model)
         use_thinking = st.toggle(
             "Extended Thinking",
             value=False,

@@ -100,8 +100,8 @@ with st.expander(t("structural_scan.new_scan_header"), expanded=st.session_state
         disabled=_JOB["running"],
     )
 
-    from core.constants import CLAUDE_SONNET, CLAUDE_OPUS
-    _supports_thinking = _agent._llm.model in {CLAUDE_SONNET, CLAUDE_OPUS}
+    from core.constants import supports_effort
+    _supports_thinking = supports_effort(_agent._llm.model)
     _use_thinking = st.toggle(
         "Extended Thinking",
         value=False,

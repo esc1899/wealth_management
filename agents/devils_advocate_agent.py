@@ -238,8 +238,12 @@ class DevilsAdvocateAgent:
                     ],
                     tools=[SUBMIT_DA_VERDICT_TOOL],
                     system=system,
-                    max_tokens=1000,
-                    tool_choice={"type": "tool", "name": "submit_da_verdict"},
+                    # Nicht erzwungen: Opus 5.5 lehnt tool_choice tool/any mit 400 ab,
+                    # und der Rückfall liefe still ins Leere. Der Auftrag steht in der
+                    # Nachricht, das Tool ist das einzige. Das Modell denkt dabei mit —
+                    # darum mehr als die früheren 1000 Tokens.
+                    max_tokens=3000,
+                    tool_choice={"type": "auto"},
                 )
                 parsed = _extract_parsed(response2)
                 logger.info("devils_advocate: fallback result for %s — parsed=%d", pos.name, len(parsed))
