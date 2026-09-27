@@ -85,18 +85,25 @@ app_config = get_app_config_repo()
 
 st.subheader(t("settings.model_selection_header"))
 
-# Auswahl: die konfigurierten (jeweils aktuellen) Claude-Modelle, gefiltert auf das,
-# was der Account laut Models-API wirklich anbietet. Die API-Liste selbst ist als Auswahl
-# untauglich — sie enthält die gesamte Claude-Historie inkl. abgelöster Versionen.
-@st.cache_resource(ttl=3600)
-def _get_claude_model_list() -> list[str]:
-    if not config.LLM_API_KEY:
-        return config.CLAUDE_MODELS
-    return current_claude_models(
-        config.CLAUDE_MODELS, _fetch_claude_models(config.LLM_API_KEY, config.LLM_BASE_URL)
-    )
+# Auswahl: die jeweils aktuellen Claude-Modelle, gefiltert auf das, was der Account laut
+# Models-API wirklich anbietet. Die API-Liste selbst ist als Auswahl untauglich — sie
+# enthält die gesamte Claude-Historie inkl. abgelöster Versionen.
+# Welche "aktuell" sind, sagt seit 2026-09-27 der Modellkatalog des Hauses
+# (~/.ops-core/katalog.toml, auf der Home-Ops-Seite aufgefrischt: je Familie das neueste);
+# ohne Katalog die Liste aus der Konfiguration (constants.py / CLAUDE_MODELS).
+from core import house_models as _house
 
-_CLAUDE_MODELS = _get_claude_model_list()
+@st.cache_resource(ttl=3600)
+def _available_claude_models() -> list[str]:
+    """Die Models-API — gecacht, sie ändert sich selten und kostet einen Aufruf."""
+    return _fetch_claude_models(config.LLM_API_KEY, config.LLM_BASE_URL)
+
+# Der Katalog wird bei jedem Laden gelesen (eine kleine Datei): Ein Klick auf
+# "aktualisieren" auf der Home-Ops-Seite ist beim nächsten Neuladen hier.
+_CATALOG_CURRENT = _house.load_catalog(_house.CLAUDE).get("current") or []
+_CONFIGURED_CLAUDE = _CATALOG_CURRENT or config.CLAUDE_MODELS
+_CLAUDE_MODELS = (current_claude_models(_CONFIGURED_CLAUDE, _available_claude_models())
+                  if config.LLM_API_KEY else list(_CONFIGURED_CLAUDE))
 
 # Combined public model list: env-configured models + UI-registered cloud models
 # (registry ∪ env), so a model added in the registry below is immediately selectable
@@ -110,10 +117,16 @@ _ALL_PUBLIC_MODELS = available_public_models(
     claude_models=_CLAUDE_MODELS,
     openrouter_models=config.OPENAI_MODELS,
     deepseek_models=config.DEEPSEEK_MODELS,
+    # Claude-Modelle aus der Preisliste nur, wenn der Katalog sie als aktuell führt
+    # (2026-09-27): Die Preisliste behält abgelöste Modelle, damit alte Aufrufe ihren
+    # Preis haben -- zur Wahl stehen sollen sie nicht. Ein gespeichertes bleibt über
+    # `_with_saved` sichtbar, mit Hinweis. Ohne Katalog wie bisher.
     registry={
         mid: e.get("provider")
         for mid, e in app_config.get_model_registry().items()
         if e.get("provider") in app_config.PUBLIC_PROVIDERS
+        and not (e.get("provider") == "claude" and _CATALOG_CURRENT
+                 and mid not in _CLAUDE_MODELS)
     },
     has_anthropic=_HAS_ANTHROPIC,
     has_openrouter=_HAS_OPENROUTER,
@@ -143,7 +156,6 @@ if not _ollama_models:
 # auf ~/.ops-core/modelle.toml. Steht ein Agent darauf, ändert Erik ihn auf der
 # Home-Ops-Seite zusammen mit allen anderen, die folgen -- ohne Neustart.
 # Angezeigt wird, worauf er gerade zeigt; gespeichert wird "home".
-from core import house_models as _house
 
 _HOUSE = _house.load()
 _HOUSE_LOCAL = (_HOUSE.get(_house.OLLAMA) or {}).get("modell")
@@ -153,9 +165,18 @@ _HOUSE_CLOUD = (_HOUSE.get(_house.CLAUDE) or {}).get("modell") \
 
 def _model_label(model: str, house: str | None) -> str:
     if model != _house.HOME:
-        return model
+        return _stale_label(model)
     return (t("settings.house_default_is").format(model=house) if house
             else t("settings.house_default_missing"))
+
+
+def _stale_label(model: str) -> str:
+    """Ein Claude-Modell, das der Katalog nicht mehr als aktuell führt, bleibt wählbar
+    (``_with_saved``), sagt aber, dass es ein neueres gibt — sonst fällt ein Altmodell
+    erst Wochen später in der Kostenstatistik auf."""
+    if _CATALOG_CURRENT and model.startswith("claude-") and model not in _CATALOG_CURRENT:
+        return t("settings.model_not_current").format(model=model)
+    return model
 
 
 def _ollama_sel(agent_key: str, label: str) -> str:
@@ -179,7 +200,8 @@ def _claude_sel(agent_key: str, label: str) -> str:
     saved = app_config.get(f"model_claude_{agent_key}") or app_config.get("model_claude") or (_CLAUDE_MODELS[0] if _CLAUDE_MODELS else "")
     options = _with_saved(_CLAUDE_MODELS, saved)
     idx = options.index(saved) if saved in options else 0
-    return st.selectbox(label, options=options, index=idx, key=f"_model_claude_{agent_key}")
+    return st.selectbox(label, options=options, index=idx, format_func=_stale_label,
+                        key=f"_model_claude_{agent_key}")
 
 def _public_sel(agent_key: str, label: str) -> str:
     saved = (
@@ -347,6 +369,8 @@ for _prov_key in _PROVIDERS:
     if not _items:
         continue
     st.markdown(f"**{_PROVIDER_GROUP_LABELS[_prov_key]}**")
+    if _prov_key == "claude" and _CATALOG_CURRENT:
+        st.caption(t("settings.model_prices_from_catalog"))
     for _model_id, _entry in _items:
         _render_registry_row(_model_id, _entry, ollama=(_prov_key == app_config.OLLAMA_PROVIDER))
 

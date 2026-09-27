@@ -8,6 +8,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Claude-Modelle und -Preise aus dem Modellkatalog des Hauses — 2026-09-27
+
+**Warum:** Opus 5.5 war erschienen und fehlte überall: in der Preisliste dieser App, in der
+Auswahl je Agent (die nur kannte, was in `constants.py` stand) und in den Preistabellen der
+anderen Apps im Haus. Seither gibt es `~/.ops-core/katalog.toml` (heimnetzwerk, ops-core
+Schritt 18): je Familie das neueste Modell und die Preise aller Modelle, aufgefrischt per
+Knopf auf der Home-Ops-Seite aus der Models-API und der Preisseite von Anthropic.
+
+**Änderungen:**
+- **`core/house_models.load_catalog()`** (neu): Kopie des Lesers von ops-core, wie beim
+  Haus-Standard; gelesen beim Aufruf, wirft nie, ohne Datei ändert sich nichts.
+- **Preisliste** (`AppConfigRepository.get_model_prices`): Die Claude-Preise aus dem Katalog
+  gehen vor Standardwerten *und* vor einer Änderung auf der Einstellungsseite (dort steht
+  jetzt ein Satz dazu). Ein aktuelles Modell wird ergänzt, ein abgelöstes nicht — die Tabelle
+  wüchse sonst um die ganze Claude-Historie. `compute_cost` nimmt die Cache-Preise des
+  Katalogs, wenn er sie nennt (Opus 5.5 liest den Cache zu 0,05×, nicht 0,1×).
+- **Auswahl je Agent** (Cloud-Modelle): Claude-Modelle nur noch, wenn der Katalog sie als
+  aktuell führt, weiterhin gefiltert auf das, was der Schlüssel laut Models-API sieht. Ein
+  gespeichertes Altmodell bleibt wählbar und heißt „— nicht mehr aktuell“.
+- Vorher am selben Tag (`5399b6e`): Opus 5.5 lehnt erzwungenes `tool_choice` ab — der
+  Rückfall des Devil's Advocate hätte still kein Urteil geliefert; er fragt jetzt mit `auto`.
+  Effort und Thinking-Schalter hängen an `supports_effort()` statt an zwei festen IDs.
+
 ### Jeder LLM-Aufruf wird in die Hausbuchhaltung gebucht — 2026-09-22
 
 **Warum:** Vier Projekte auf dem Mac mini reden mit denselben drei Anbietern (Claude, Ollama,

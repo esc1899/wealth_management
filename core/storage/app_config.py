@@ -69,7 +69,9 @@ class AppConfigRepository:
     # {claude, openrouter, deepseek, ollama}.
     # NOTE: ``deepseek/…`` (slash form) is served *via OpenRouter* — the router only
     # matches the ``deepseek-`` prefix (direct API), so these are tagged openrouter.
-    # Preise zuletzt geprüft 2026-08-30: Anthropic gegen die Listenpreis-Tabelle
+    # Claude-Preise: seit 2026-09-27 aus dem Modellkatalog des Hauses (_overlay_catalog),
+    # die Werte hier gelten nur ohne Katalog. Preise zuletzt geprüft 2026-08-30:
+    # Anthropic gegen die Listenpreis-Tabelle
     # (platform.claude.com/docs/en/about-claude/pricing), OpenRouter gegen
     # https://openrouter.ai/api/v1/models (Feld ``pricing``, $/Token → ×1e6).
     _DEFAULT_MODEL_PRICES: dict = {
@@ -143,9 +145,42 @@ class AppConfigRepository:
             # Merge: stored overrides defaults, new models added from defaults
             merged = dict(self._DEFAULT_MODEL_PRICES)
             merged.update(stored)
+        self._overlay_catalog(merged)
         for deleted_id in self.get_deleted_models():
             merged.pop(deleted_id, None)
         return merged
+
+    @staticmethod
+    def _overlay_catalog(merged: dict) -> None:
+        """Claude prices from the household model catalog (2026-09-27).
+
+        The catalog (``~/.ops-core/katalog.toml``, refreshed on the Home-Ops
+        page) is the one place a Claude price is kept for every app in the
+        house; it wins over defaults *and* over a price edited here. Two rules
+        keep the registry tidy:
+
+        * a model the registry already has gets the catalog's price, matched
+          on the dateless id as well (``claude-haiku-4-5-20251001``), and keeps
+          its provider;
+        * a model the catalog calls current is added as ``claude`` — that is
+          what makes a new model selectable without editing anything here.
+
+        Retired models are *not* added: they would clutter the picker and the
+        price table. Without a catalog nothing changes.
+        """
+        from core import house_models
+        from core.llm.router import _base_model_id
+
+        catalog = house_models.load_catalog(house_models.CLAUDE)
+        if not catalog:
+            return
+        by_base = {_base_model_id(m): m for m in merged}
+        for model_id, price in catalog["prices"].items():
+            key = model_id if model_id in merged else by_base.get(_base_model_id(model_id))
+            if key is not None:
+                merged[key] = {**merged[key], **price}
+            elif model_id in catalog["current"]:
+                merged[model_id] = {**price, "provider": "claude"}
 
     def set_model_prices(self, prices: dict) -> None:
         self.set_json("model_prices", prices)

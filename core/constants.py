@@ -9,8 +9,10 @@ Purpose: Prevent hardcoded model strings scattered across codebase (DEBT-3).
 # Claude API Model Identifiers
 # =========================================================================
 
-# Jeweils das aktuelle Modell der Klasse (Stand 2026-08-30). Beim Wechsel auch die
-# Preise in core/storage/app_config.py mitziehen und die gespeicherten Auswahlen
+# Jeweils das aktuelle Modell der Klasse (Stand 2026-08-30) -- die Vorgabe für Agenten
+# ohne gespeicherte Auswahl. Was zur Wahl steht und was es kostet, sagt seit 2026-09-27
+# der Modellkatalog des Hauses (core/house_models.load_catalog); ohne Katalog gilt diese
+# Liste. Beim Wechsel die gespeicherten Auswahlen
 # (app_config `model_claude_*` / `model_public_*`, scheduled_jobs.model) migrieren —
 # sonst rufen bestehende Jobs weiter das alte Modell.
 CLAUDE_HAIKU = "claude-haiku-4-5-20251001"

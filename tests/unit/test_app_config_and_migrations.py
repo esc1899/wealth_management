@@ -15,7 +15,7 @@ from datetime import date
 import pytest
 
 from core.encryption import EncryptionService
-from core.constants import CLAUDE_OPUS, CLAUDE_SONNET
+from core.constants import CLAUDE_HAIKU, CLAUDE_OPUS, CLAUDE_SONNET
 from core.storage.app_config import AppConfigRepository
 from core.storage.base import init_db, migrate_db
 from core.storage.models import Position
@@ -447,3 +447,88 @@ class TestManualPositions:
         loaded = repo.get(saved.id)
         assert loaded.extra_data["interest_rate"] == 3.5
         assert loaded.extra_data["bank"] == "DKB"
+
+
+# ---------------------------------------------------------------------------
+# Household model catalog (ops-core step 18, 2026-09-27)
+# ---------------------------------------------------------------------------
+
+_CATALOG = '''
+[claude]
+aktuell = ["claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5-20251001"]
+
+[claude.preise."claude-fable-5-1"]
+eingabe = 10
+ausgabe = 50
+cache_lesen = 0.25
+
+[claude.preise."claude-opus-5-5"]
+eingabe = 4
+ausgabe = 20
+cache_lesen = 0.2
+cache_schreiben = 5
+
+[claude.preise."claude-opus-5"]
+eingabe = 5
+ausgabe = 25
+
+[claude.preise."claude-haiku-4-5"]
+eingabe = 1.5
+ausgabe = 6
+
+[claude.preise."claude-opus-4-1"]
+eingabe = 15
+ausgabe = 75
+'''
+
+
+@pytest.fixture
+def catalog(tmp_path, monkeypatch):
+    path = tmp_path / "katalog.toml"
+    path.write_text(_CATALOG, encoding="utf-8")
+    monkeypatch.setenv("OPS_CORE_KATALOG", str(path))
+    return path
+
+
+class TestModelCatalog:
+    def test_without_catalog_nothing_changes(self, app_config_repo, tmp_path, monkeypatch):
+        monkeypatch.setenv("OPS_CORE_KATALOG", str(tmp_path / "missing.toml"))
+        reg = app_config_repo.get_model_registry()
+        assert "claude-fable-5-1" not in reg
+        assert reg[CLAUDE_HAIKU]["input"] == 1.0
+
+    def test_current_models_are_added_retired_ones_not(self, app_config_repo, catalog):
+        reg = app_config_repo.get_model_registry()
+        assert reg["claude-fable-5-1"]["provider"] == "claude"
+        assert reg["claude-fable-5-1"]["cache_read"] == 0.25
+        assert "claude-opus-4-1" not in reg          # retired: no clutter in the picker
+
+    def test_catalog_price_wins_even_over_an_edit(self, app_config_repo, catalog):
+        app_config_repo.set_model_prices({CLAUDE_OPUS: {"input": 9.0, "output": 9.0,
+                                                        "provider": "claude"}})
+        reg = app_config_repo.get_model_registry()
+        assert (reg[CLAUDE_OPUS]["input"], reg[CLAUDE_OPUS]["output"]) == (5.0, 25.0)
+        # dateless catalog id prices the dated registry entry, provider kept
+        assert reg[CLAUDE_HAIKU]["input"] == 1.5 and reg[CLAUDE_HAIKU]["provider"] == "claude"
+
+    def test_deleted_stays_deleted(self, app_config_repo, catalog):
+        app_config_repo.set_deleted_models(["claude-fable-5-1"])
+        assert "claude-fable-5-1" not in app_config_repo.get_model_registry()
+
+    def test_cache_prices_from_the_catalog(self, app_config_repo, catalog):
+        from core.storage.usage import compute_cost
+
+        reg = app_config_repo.get_model_registry()
+        cost = compute_cost(0, 0, "claude-opus-5-5", reg,
+                            cache_read_tokens=1_000_000, cache_write_tokens=1_000_000)
+        assert cost == pytest.approx(0.2 + 5.0)
+        # without catalog cache prices: the usual factors on the input price
+        assert compute_cost(0, 0, CLAUDE_OPUS, reg, cache_read_tokens=1_000_000) \
+            == pytest.approx(0.5)
+
+    def test_unreadable_catalog_means_none(self, tmp_path, monkeypatch):
+        from core import house_models
+
+        bad = tmp_path / "k.toml"
+        bad.write_text("[broken", encoding="utf-8")
+        assert house_models.load_catalog(path=bad) == {}

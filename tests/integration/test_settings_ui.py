@@ -83,3 +83,44 @@ class TestSettingsPage:
             assert "acme/new-router-model" in all_options
         finally:
             repo.set_model_prices(original)
+
+
+class TestHouseholdCatalog:
+    """2026-09-27: the per-agent picker follows the household model catalog."""
+
+    def test_picker_offers_current_claude_models_and_marks_a_saved_old_one(
+            self, tmp_path, monkeypatch):
+        katalog = tmp_path / "katalog.toml"
+        katalog.write_text(
+            '[claude]\naktuell = ["claude-opus-5-5", "claude-sonnet-5"]\n\n'
+            '[claude.preise."claude-opus-5-5"]\neingabe = 4\nausgabe = 20\n',
+            encoding="utf-8")
+        monkeypatch.setenv("OPS_CORE_KATALOG", str(katalog))
+        repo = get_app_config_repo()
+        saved = repo.get("model_public_devils_advocate")
+        try:
+            repo.set("model_public_devils_advocate", "claude-opus-5")
+            with (
+                patch.object(config, "LLM_API_KEY", "test-key"),
+                # the Models API: the account sees both, old and new
+                patch("core.llm.claude.fetch_available_models",
+                      return_value=["claude-opus-5-5", "claude-opus-5", "claude-sonnet-5"]),
+            ):
+                at = AppTest.from_file(PAGES / "settings.py")
+                at.run()
+            assert not at.exception, f"Page threw exception: {at.exception}"
+            boxes = [s for s in at.selectbox if s.key and s.key.startswith("_model_public_")]
+            assert boxes
+            # AppTest reports options as rendered labels (format_func applied).
+            fremd = [s for s in boxes if s.key != "_model_public_devils_advocate"]
+            assert "claude-opus-5-5" in fremd[0].options
+            assert not any(o.startswith("claude-opus-5 ") or o == "claude-opus-5"
+                           for o in fremd[0].options)                 # retired: not offered
+            da = next(s for s in boxes if s.key == "_model_public_devils_advocate")
+            assert "claude-opus-5 — nicht mehr aktuell" in da.options \
+                or "claude-opus-5 — no longer current" in da.options  # saved: visible, marked
+        finally:
+            if saved is None:
+                repo.delete("model_public_devils_advocate")
+            else:
+                repo.set("model_public_devils_advocate", saved)

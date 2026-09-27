@@ -367,12 +367,16 @@ def _compute_cost(
         web_search_requests = 0
 
     # Anthropic returns input_tokens for regular (non-cached) tokens only.
-    # cache_write_tokens (1.25x) and cache_read_tokens (0.10x) are billed separately.
+    # cache_write_tokens (1.25x) and cache_read_tokens (0.10x) are billed separately —
+    # unless the entry carries its own cache prices (from the household model catalog,
+    # 2026-09-27: Opus 5.5 reads its cache at 0.05x, Fable 5.1 at 0.025x).
     # Web search requests: $10 per 1000 requests = $0.01 per request
+    cache_write_price = price.get("cache_write", input_price * 1.25)
+    cache_read_price = price.get("cache_read", input_price * 0.10)
     cost = (
         input_tokens * input_price +
-        cache_write_tokens * input_price * 1.25 +
-        cache_read_tokens * input_price * 0.10 +
+        cache_write_tokens * cache_write_price +
+        cache_read_tokens * cache_read_price +
         output_tokens * output_price
     ) / 1_000_000
     cost += web_search_requests * 0.01
