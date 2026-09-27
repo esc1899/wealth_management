@@ -399,3 +399,9 @@ aufgerufen läuft es.
 Launch Services startet Terminal, Terminal ist verantwortlich, keine neue Freigabe. Der Button
 wartet nicht auf das Ende — das Ergebnis steht im Terminal-Fenster und im Log darunter.
 
+**Seit 27.09.2026 öffnet das Fenster `scripts/backup_im_terminal.command`**, und das ruft
+`ops run wealth_management backup` statt des nackten Skripts. Am 26.09. lief die Sicherung
+direkt und erfolgreich, die ops-core-Kachel zeigte trotzdem „übersprungen, nie gut“ — sie
+liest nur das Run-Log, und dort war der Lauf nie angekommen. Terminal bleibt verantwortlich,
+ops und das Skript sind seine Kinder.
+

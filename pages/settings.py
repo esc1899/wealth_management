@@ -472,6 +472,12 @@ import subprocess as _subprocess
 st.subheader("💾 Backup")
 
 _BACKUP_SCRIPT = _os.path.expanduser("~/scripts/wm_backup.sh")
+# Was das Terminal-Fenster startet: `ops run wealth_management backup`, damit der
+# Lauf im Run-Log von ops-core steht und die Kachel ihn kennt (seit 2026-09-27).
+_BACKUP_STARTER = _os.path.join(
+    _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+    "scripts", "backup_im_terminal.command",
+)
 _BACKUP_REPO = config.BACKUP_REPO_PATH
 _BACKUP_LOG = _os.path.expanduser("~/Library/Logs/wm_backup.log")
 
@@ -499,7 +505,7 @@ if _script_exists and _drive_mounted:
     )
     if st.button("▶ Jetzt sichern", type="primary", key="_backup_now_btn"):
         result = _subprocess.run(
-            ["/usr/bin/open", "-a", "Terminal", _BACKUP_SCRIPT],
+            ["/usr/bin/open", "-a", "Terminal", _BACKUP_STARTER],
             capture_output=True,
             text=True,
             timeout=30,
