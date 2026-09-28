@@ -257,7 +257,7 @@ Damit zukünftige Sessions alles finden:
 | **CLAUDE.md** (diese Datei) | Arbeitsweise, Process, Stack-Fallstricke, Architektur-Guards | Claude bei Prozess-Änderungen |
 | **ARCHITECTURE.md** | Architektur-Entscheidungen, Design-Patterns, Architektur-Guards, Schulden-Status | Claude bei Arch-Änderungen |
 | **CHANGELOG.md** | Version-Historie, Technische Schulden Remediation Status | Claude beim Release |
-| **BACKLOG.md** | Features (geplant + abgeschlossen), Technische Schulden Inventory | User/Claude beim Planning |
+| **BACKLOG.md** | Nur Offenes (Features, Schulden); Erledigtes wird gelöscht | User/Claude beim Planning |
 | **Memory/user_profile.md** | Wer ist Erik, wie arbeitet er | Claude nach User-Feedback |
 | **Memory/feedback.md** | Feedback zur Arbeitsweise mit Claude | Claude nach User-Feedback |
 | **Memory/private_skills.md** | Persönliche Skills (Wu-Wei, Lindy+Potential, etc) | User-Configured |

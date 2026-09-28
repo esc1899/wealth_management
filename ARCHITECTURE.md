@@ -476,8 +476,6 @@ pytest -k consensus_gap       # Specific agent
 
 ## Known Technical Debt
 
-See **BACKLOG.md § Technical Debt** for full inventory.
-
 **DEBT Stack Completed (2026-04-16):** ✅
 - ✅ [DEBT-9] asyncio.get_event_loop() → asyncio.run() (Python 3.12+ safe)
 - ✅ [DEBT-7] state.py decomposed (437 → 60 lines + 5 modules, zero page disruption)
