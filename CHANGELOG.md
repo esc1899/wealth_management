@@ -12,7 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 **Warum:** Als Sonnet 5.5 kam, stand das nur in der Modellauswahl („— nicht mehr aktuell“),
 und die sieht man erst, wenn man dort hinschaut. Der Maschinenraum meldete es auf seiner
-Kachel für den Haus-Standard und für Programme, die ins Run-Log buchen, diese App aber nicht.
+Kachel für den Haus-Standard und je Programm nach dessen letztem Aufruf im Run-Log — diese
+App hatte seit dem 22.09. keinen, also sah er nichts.
 
 **Änderungen:**
 - **`core/modell_meldung.py`** (neu): Je Cloud-Agent das Modell aus der Einstellung (dieselbe

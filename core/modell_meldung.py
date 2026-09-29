@@ -6,8 +6,9 @@ aktuell" — sichtbar erst, wenn man dort hinschaut. Jetzt legt der Kachel-Job e
 auf die Kachel, wie der Maschinenraum für den Haus-Standard: "Neueres Claude-Modell:
 Sonnet 5.5 — Sonnet 5 noch bei Story Checker, News-Digest", mit Link auf die Einstellungen.
 
-Gefragt wird die Einstellung, nicht das Run-Log: Die App bucht ihre Aufrufe nicht dort,
-und was ein Agent beim nächsten Lauf nimmt, sagt die Einstellung. Ein Agent auf ``home``
+Gefragt wird die Einstellung, nicht das Run-Log: Der Maschinenraum sieht nur den letzten
+Aufruf, und manche Agenten laufen wochenlang nicht (seit dem 22.09. keiner) — was ein
+Agent beim nächsten Lauf nimmt, sagt die Einstellung. Ein Agent auf ``home``
 folgt dem Haus — den meldet der Maschinenraum, hier nicht ein zweites Mal. Einer auf
 ``neuestes:sonnet`` (seit demselben Tag) zieht von selbst nach; gemeldet werden also nur
 fest eingestellte Modelle. Kein x: Die
