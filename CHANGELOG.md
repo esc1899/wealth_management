@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Neueres Claude-Modell als Meldung auf der Kachel — 2026-09-29
+
+**Warum:** Als Sonnet 5.5 kam, stand das nur in der Modellauswahl („— nicht mehr aktuell“),
+und die sieht man erst, wenn man dort hinschaut. Der Maschinenraum meldete es auf seiner
+Kachel für den Haus-Standard und für Programme, die ins Run-Log buchen, diese App aber nicht.
+
+**Änderungen:**
+- **`core/modell_meldung.py`** (neu): Je Cloud-Agent das Modell aus der Einstellung (dieselbe
+  Reihenfolge wie `state_llm._get_public_agent_model`). Hat eines einen neueren Nachfolger
+  derselben Familie im Katalog, legt der Kachel-Job eine Meldung ab: „Neueres Claude-Modell:
+  Sonnet 5.5 · Sonnet 5 noch bei Story Checker“, mit Link auf die Einstellungen. Ein Agent auf
+  `home` fehlt dort, den meldet der Maschinenraum. Kein x: Nach dem Umstellen verschwindet die
+  Meldung mit dem nächsten Kachel-Lauf (stündlich um :40).
+- **`load_catalog()`** liefert zusätzlich Namen und Stand des Katalogs.
+
 ### Claude-Modelle und -Preise aus dem Modellkatalog des Hauses — 2026-09-27
 
 **Warum:** Opus 5.5 war erschienen und fehlte überall: in der Preisliste dieser App, in der

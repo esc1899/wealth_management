@@ -80,6 +80,18 @@ def story(conn, positions_repo) -> Optional[dict]:
     return story_meldung(urteile, ids, AppConfigRepository(conn).get(VERWORFEN_KEY))
 
 
+def modell_hinweis(conn) -> Optional[dict]:
+    """Ein neueres Claude-Modell für einen Cloud-Agenten (core/modell_meldung.py)."""
+    from config import config
+    from core import house_models
+    from core.modell_meldung import agenten_modelle, modell_meldung
+    from core.storage.app_config import AppConfigRepository
+
+    repo = AppConfigRepository(conn)
+    return modell_meldung(agenten_modelle(repo.get, config.LLM_DEFAULT_MODEL or ""),
+                          house_models.load_catalog(house_models.CLAUDE))
+
+
 def _agent():
     """Der Marktdaten-Agent ohne Streamlit — wie `_scheduled_fetch` ihn baut."""
     from agents.market_data_agent import MarketDataAgent
@@ -132,8 +144,14 @@ def main(argv: list[str]) -> int:
     except Exception as exc:   # die Meldung ist Zutat — die Kachel steht auch ohne sie
         print(f"Story-Meldung nicht bestimmt: {exc}", file=sys.stderr)
         meldung = None
+    try:
+        modell = modell_hinweis(conn)
+    except Exception as exc:   # ebenso Zutat
+        print(f"Modell-Meldung nicht bestimmt: {exc}", file=sys.stderr)
+        modell = None
+    meldungen = [m for m in (meldung, modell) if m]
     daten = kachel(agent.get_portfolio_valuation(include_watchlist=False),
-                   stand=market.get_latest_fetch_time(), meldungen=[meldung] if meldung else None)
+                   stand=market.get_latest_fetch_time(), meldungen=meldungen or None)
     text = json.dumps(daten, ensure_ascii=False, indent=1)
     if args.stdout:
         print(text)

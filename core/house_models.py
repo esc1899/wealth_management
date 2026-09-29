@@ -138,9 +138,11 @@ def _price(value) -> Optional[float]:
 
 def load_catalog(provider: str = CLAUDE, path: Optional[Path] = None) -> dict:
     """``{"current": [ids], "prices": {id: {"input", "output", "cache_read"?,
-    "cache_write"?}}}`` for one provider — or ``{}`` without a catalog.
+    "cache_write"?}}, "names": {id: "Claude Sonnet 5.5"}, "stand": str | None}``
+    for one provider — or ``{}`` without a catalog.
 
     Prices are US dollars per million tokens, the unit of the model registry.
+    Names carry the family and version (``core/modell_meldung.py`` reads them).
     """
     path = path or catalog_file()
     try:
@@ -155,10 +157,12 @@ def load_catalog(provider: str = CLAUDE, path: Optional[Path] = None) -> dict:
         return {}
     current = [m.strip() for m in entry.get("aktuell") or []
                if isinstance(m, str) and m.strip()]
-    prices = {}
+    prices, names = {}, {}
     for model_id, p in (entry.get("preise") or {}).items():
         if not isinstance(p, dict):
             continue
+        if isinstance(p.get("name"), str) and p["name"].strip():
+            names[model_id] = p["name"].strip()
         inp, out = _price(p.get("eingabe")), _price(p.get("ausgabe"))
         if inp is None or out is None:
             continue
@@ -168,4 +172,6 @@ def load_catalog(provider: str = CLAUDE, path: Optional[Path] = None) -> dict:
         if _price(p.get("cache_schreiben")) is not None:
             price["cache_write"] = _price(p.get("cache_schreiben"))
         prices[model_id] = price
-    return {"current": current, "prices": prices}
+    stand = entry.get("stand")
+    return {"current": current, "prices": prices, "names": names,
+            "stand": str(stand) if stand else None}
