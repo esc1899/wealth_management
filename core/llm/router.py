@@ -69,9 +69,20 @@ def resolve_house_model(
 
     Resolved per call, not once at startup, so a change takes effect
     without a restart; without an entry the caller's ``fallback`` stands.
+
+    ``neuestes:<family>`` (2026-09-29) is resolved here too: the newest
+    model of that Claude family in the household catalog.
     """
     from core import house_models
 
+    if house_models.is_newest(model):
+        # "neuestes:sonnet" (2026-09-29): das neueste Sonnet laut Katalog.
+        # Ohne Katalog die Vorgabe der Klasse aus constants.py.
+        from core.constants import CLAUDE_MODEL_DEFAULTS
+
+        family = model.strip()[len(house_models.NEWEST):]
+        return house_models.resolve_newest(
+            model, fallback=CLAUDE_MODEL_DEFAULTS.get(family) or fallback)
     if not house_models.is_home(model):
         return model
     if local:

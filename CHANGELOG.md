@@ -22,6 +22,13 @@ Kachel für den Haus-Standard und für Programme, die ins Run-Log buchen, diese 
   `home` fehlt dort, den meldet der Maschinenraum. Kein x: Nach dem Umstellen verschwindet die
   Meldung mit dem nächsten Kachel-Lauf (stündlich um :40).
 - **`load_catalog()`** liefert zusätzlich Namen und Stand des Katalogs.
+- **„Immer das neueste“ je Klasse** (am selben Tag): In der Auswahl der Cloud-Agenten
+  stehen unter dem Haus-Standard „Opus/Sonnet/Haiku – immer das neueste (Claude Sonnet 5.5)“.
+  Gespeichert wird `neuestes:sonnet`; `resolve_house_model` löst es bei jedem Aufruf aus dem
+  Katalog auf (Seite, Scheduler, Hintergrund-Jobs), ohne Katalog gilt die Vorgabe der Klasse
+  aus `constants.py`. So hält es der Ollama-Rat des Maschinenraums schon. Der Preis: Ein neues
+  Modell kommt ungeprüft (Opus 5.5 lehnte am 27.09. erzwungenes `tool_choice` ab). Wer das
+  nicht will, stellt den Agenten fest ein; nur dann erscheint die Meldung oben.
 
 ### Claude-Modelle und -Preise aus dem Modellkatalog des Hauses — 2026-09-27
 

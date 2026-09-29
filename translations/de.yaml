@@ -433,6 +433,7 @@ settings:
   ollama_unavailable: "Ollama nicht erreichbar — Standardmodell wird verwendet."
   house_default_is: "Haus-Standard ({model})"
   house_default_missing: "Haus-Standard (nicht eingetragen)"
+  newest_of_family: "{family} – immer das neueste ({model})"
   model_not_current: "{model} — nicht mehr aktuell"
   model_prices_from_catalog: "Die Claude-Preise kommen aus dem Modellkatalog des Hauses (Home-Ops-Seite, „Modelle und Preise aktualisieren“). Eine Änderung hier gilt nur bis zum nächsten Laden."
   model_prices_header: "Modell-Registry (Preise & Provider)"

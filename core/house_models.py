@@ -109,6 +109,47 @@ def is_home(model: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Always the newest of a family (2026-09-29)
+# ---------------------------------------------------------------------------
+#
+# A setting of ``neuestes:sonnet`` means: the newest Sonnet the catalog calls
+# current, looked up at call time -- like ``home``, but per family instead of
+# per provider. The Ollama advice in the Maschinenraum has picked its model
+# this way since M37. A new model then arrives without anyone switching; the
+# price is that it arrives untested (Opus 5.5 rejected a forced tool_choice
+# on 2026-09-27). A pinned model id stays possible for agents where that
+# matters, and only pinned ids produce the "newer model" notice on the tile.
+
+NEWEST = "neuestes:"
+FAMILIES = ("opus", "sonnet", "haiku")
+
+
+def is_newest(model: str) -> bool:
+    return (model or "").strip().startswith(NEWEST)
+
+
+def newest_setting(family: str) -> str:
+    return NEWEST + family
+
+
+def newest(family: str, path: Optional[Path] = None) -> Optional[str]:
+    """The newest current model of *family* in the catalog, or None."""
+    catalog = load_catalog(CLAUDE, path)
+    names = catalog.get("names") or {}
+    prefix = f"Claude {family.strip().capitalize()} "
+    return next((m for m in catalog.get("current") or []
+                 if names.get(m, "").startswith(prefix)), None)
+
+
+def resolve_newest(model: str, fallback: str = "", path: Optional[Path] = None) -> str:
+    """Turn ``neuestes:<family>`` into a model id; anything else stays as it is.
+    Without a catalog (or without that family in it) the ``fallback`` stands."""
+    if not is_newest(model):
+        return model
+    return newest(model.strip()[len(NEWEST):], path) or fallback
+
+
+# ---------------------------------------------------------------------------
 # The model catalog (ops-core step 18, 2026-09-27)
 # ---------------------------------------------------------------------------
 #

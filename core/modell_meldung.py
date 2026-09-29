@@ -8,7 +8,9 @@ Sonnet 5.5 — Sonnet 5 noch bei Story Checker, News-Digest", mit Link auf die E
 
 Gefragt wird die Einstellung, nicht das Run-Log: Die App bucht ihre Aufrufe nicht dort,
 und was ein Agent beim nächsten Lauf nimmt, sagt die Einstellung. Ein Agent auf ``home``
-folgt dem Haus — den meldet der Maschinenraum, hier nicht ein zweites Mal. Kein x: Die
+folgt dem Haus — den meldet der Maschinenraum, hier nicht ein zweites Mal. Einer auf
+``neuestes:sonnet`` (seit demselben Tag) zieht von selbst nach; gemeldet werden also nur
+fest eingestellte Modelle. Kein x: Die
 Meldung ist ein Zustand und verschwindet mit dem nächsten Kachel-Lauf nach dem Umstellen.
 """
 

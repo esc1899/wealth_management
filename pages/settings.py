@@ -163,7 +163,20 @@ _HOUSE_CLOUD = (_HOUSE.get(_house.CLAUDE) or {}).get("modell") \
     or (_HOUSE.get(_house.OPENROUTER) or {}).get("modell")
 
 
+# "Immer das neueste" je Klasse (2026-09-29): gespeichert wird "neuestes:sonnet",
+# aufgelöst beim Aufruf aus dem Katalog (core.llm.router.resolve_house_model).
+# Angeboten nur, was der Katalog als aktuell führt – und nur mit Anthropic-Schlüssel.
+_NEWEST = {f: _house.newest(f) for f in _house.FAMILIES} if _HAS_ANTHROPIC else {}
+_NEWEST_OPTIONS = [_house.newest_setting(f) for f, m in _NEWEST.items() if m]
+_CATALOG_NAMES = _house.load_catalog(_house.CLAUDE).get("names") or {}
+
+
 def _model_label(model: str, house: str | None) -> str:
+    if _house.is_newest(model):
+        family = model[len(_house.NEWEST):]
+        return t("settings.newest_of_family").format(
+            family=family.capitalize(),
+            model=_CATALOG_NAMES.get(_NEWEST.get(family), _NEWEST.get(family)) or "–")
     if model != _house.HOME:
         return _stale_label(model)
     return (t("settings.house_default_is").format(model=house) if house
@@ -211,7 +224,7 @@ def _public_sel(agent_key: str, label: str) -> str:
         or app_config.get("model_public")
         or (_ALL_PUBLIC_MODELS[0] if _ALL_PUBLIC_MODELS else "")
     )
-    options = ([_house.HOME] if _HOUSE_CLOUD else []) + _ALL_PUBLIC_MODELS
+    options = ([_house.HOME] if _HOUSE_CLOUD else []) + _NEWEST_OPTIONS + _ALL_PUBLIC_MODELS
     options = _with_saved(options, saved) or ["(keine Modelle konfiguriert)"]
     idx = options.index(saved) if saved in options else 0
     return st.selectbox(label, options=options, index=idx,

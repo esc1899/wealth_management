@@ -51,3 +51,41 @@ def test_der_katalog_liefert_namen_und_stand(tmp_path):
     k = house_models.load_catalog(path=pfad)
     assert k["names"] == {"claude-sonnet-5-5": "Claude Sonnet 5.5"}
     assert k["stand"] == "2026-09-29T06:53:00+02:00"
+
+
+# --- Immer das neueste je Klasse (29.09.2026) ------------------------------
+
+def _katalog(tmp_path, monkeypatch, aktuell='["claude-opus-5-5", "claude-sonnet-5-5"]'):
+    pfad = tmp_path / "katalog.toml"
+    pfad.write_text(f'[claude]\naktuell = {aktuell}\n'
+                    '[claude.preise."claude-opus-5-5"]\nname = "Claude Opus 5.5"\neingabe = 5\nausgabe = 25\n'
+                    '[claude.preise."claude-sonnet-5-5"]\nname = "Claude Sonnet 5.5"\neingabe = 3\nausgabe = 15\n'
+                    '[claude.preise."claude-sonnet-6"]\nname = "Claude Sonnet 6"\neingabe = 3\nausgabe = 15\n',
+                    encoding="utf-8")
+    monkeypatch.setenv("OPS_CORE_KATALOG", str(pfad))
+    return pfad
+
+
+def test_neuestes_wird_beim_aufruf_aus_dem_katalog_gelesen(tmp_path, monkeypatch):
+    from core.llm.router import resolve_house_model
+
+    pfad = _katalog(tmp_path, monkeypatch)
+    assert resolve_house_model("neuestes:sonnet") == "claude-sonnet-5-5"
+    assert resolve_house_model("neuestes:opus") == "claude-opus-5-5"
+    # Der Katalog nennt ein neueres: der nächste Aufruf nimmt es, ohne Neustart.
+    _katalog(tmp_path, monkeypatch, aktuell='["claude-opus-5-5", "claude-sonnet-6"]')
+    assert pfad.exists() and resolve_house_model("neuestes:sonnet") == "claude-sonnet-6"
+
+
+def test_neuestes_ohne_katalog_nimmt_die_vorgabe_der_klasse(tmp_path, monkeypatch):
+    from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET
+    from core.llm.router import resolve_house_model
+
+    monkeypatch.setenv("OPS_CORE_KATALOG", str(tmp_path / "fehlt.toml"))
+    assert resolve_house_model("neuestes:sonnet") == CLAUDE_SONNET
+    _katalog(tmp_path, monkeypatch)                        # Katalog ohne Haiku
+    assert resolve_house_model("neuestes:haiku") == CLAUDE_HAIKU
+
+
+def test_neuestes_meldet_nichts_auf_der_kachel():
+    assert modell_meldung({"A": "neuestes:sonnet"}, KATALOG) is None
