@@ -8,6 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Die Jobs laufen ab dem Login, nicht erst beim Öffnen der Seite — 2026-10-01
+
+**Warum:** Am 01.10. starteten die Monatsjobs vom 1. erst abends um 21:35, als die Seite
+geöffnet wurde; am 30.09. lief gar kein Job. Der Dienst `ops-core.wealth_management.app`
+lief seit dem Login, aber Streamlit führt `app.py` erst aus, wenn ein Browser kommt — und
+dort wurden beide Zeitpläne gestartet. Tagesjobs holt der Scheduler nicht nach; ein Tag ohne
+Besuch fehlte einfach.
+
+**Änderungen:**
+- **`scripts/planer_dienst.py`** (neu): Kursabruf um 18 Uhr und die Agenten-Jobs der Seite
+  „Scheduler“ in einem eigenen Prozess, als ops-core-Dienst `planer` (KeepAlive). Beim Start
+  wird Verpasstes nachgeholt wie bisher beim ersten Öffnen.
+- **`AgentSchedulerService.sync_jobs()`**: Der Planer gleicht jede Minute mit der Tabelle
+  `scheduled_jobs` ab und lädt nur neu, wenn sich geändert hat, *wann* ein Job läuft — ein
+  eigener Lauf (`last_run`) zählt nicht. `reload_jobs()` wirkt nur im gestarteten Prozess.
+- **Die App startet keinen Zeitplan mehr** (`state_agents.py`, `app.py`). „Jetzt ausführen“
+  läuft weiter in der App.
+- **Letzter Lauf in Ortszeit** (`core/storage/scheduled_jobs.py`): SQLite schreibt
+  `last_run`/`created_at` in UTC, das Nachholen verglich sie mit der Feuerzeit in Ortszeit.
+  Ein Monatsjob, um 08:00 gelaufen, stand mit 06:00 da — ein Neustart des Planers am selben
+  Tag hätte ihn noch einmal ausgeführt. Die Seite „Scheduler“ zeigte den Lauf zwei Stunden
+  zu früh. Jetzt wird beim Lesen umgerechnet.
+- Braucht `ops install wealth_management` und einen Neustart der App.
+
 ### Neueres Claude-Modell als Meldung auf der Kachel — 2026-09-29
 
 **Warum:** Als Sonnet 5.5 kam, stand das nur in der Modellauswahl („— nicht mehr aktuell“),

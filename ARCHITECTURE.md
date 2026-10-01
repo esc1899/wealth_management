@@ -71,8 +71,7 @@ sequenceDiagram
     B->>A: Page request
     A->>A: validate config, login gate
     A->>S: get_portfolio_agent() ← EAGER
-    A->>S: get_market_agent() ← EAGER + APScheduler
-    A->>S: get_agent_scheduler() ← EAGER + BackgroundThread
+    A->>S: get_market_agent() ← EAGER (no schedule — see planner)
     A->>B: render navigation
 
     B->>A: navigate to analysis page
@@ -234,11 +233,20 @@ class MyAgent:
 
 ## Dependency Injection (state.py)
 
-All agents are **lazy-loaded via `@st.cache_resource` factory functions**. Three agents are **eager-initialized** in `app.py`:
+All agents are **lazy-loaded via `@st.cache_resource` factory functions**. Two agents are **eager-initialized** in `app.py`:
 
 - `get_portfolio_agent()` — Portfolio Chat critical path
-- `get_market_agent()` — APScheduler (daily price fetch)
-- `get_agent_scheduler()` — Background thread (scheduled cloud jobs)
+- `get_market_agent()` — market data for the pages
+
+**No schedule runs in the Streamlit process** (since 2026-10-01). The daily price fetch
+and the scheduled cloud jobs run in the planner, `scripts/planer_dienst.py`, its own
+process started at login. Streamlit executes `app.py` only when a browser opens the
+page, so a schedule started there missed every run of a day without a visit. The app
+keeps an unstarted `AgentSchedulerService` (`get_agent_scheduler()`) for "run now";
+its `reload_jobs()` does nothing, the planner picks up changes from the Scheduler page
+by polling the jobs table once a minute (`sync_jobs()`). Never call `start()` in the
+app: every job would run twice, and each process would close the other's running runs
+as orphans on startup.
 
 All others are loaded on first page visit and cached for the session.
 
@@ -619,6 +627,7 @@ here; this repo only delivers the pieces the house asks for:
 | Piece | Here | Wired up in `heimnetzwerk` |
 |---|---|---|
 | The app | `streamlit run app.py`, `127.0.0.1:8655` under `/wealth/` (`.streamlit/config.toml`) | `ops-core.wealth_management.app` (KeepAlive) from `~/.ops-core/jobs.toml`; Caddy route with `zugang = "lokal"` — reachable only from the Mini itself (`http://localhost/wealth/`), 404 for every other sender |
+| The schedule | `scripts/planer_dienst.py`: daily price fetch at 18:00 and the jobs of the Scheduler page, missed runs caught up at start | service `planer` (KeepAlive), log `~/.ops-core/launchd/ops-core.wealth_management.planer.log`; no port, so not in the registry |
 | The tile | `scripts/kachel.py --fetch` writes `~/.dienste/www/kacheln/wealth.json`: day change, positions, biggest mover | job `kachel`, hourly at :40 and at login |
 | The notice | `core/story_meldung.py`: once the Story Checker has judged every position with a story, the tile carries the sum of its verdicts, red if one is endangered, linking to `/wealth/storychecker` | written by the tile job — never when the tile is opened |
 | The ✕ on the notice | `scripts/meldungen_dienst.py`, stdlib only, `127.0.0.1:8656`; a POST remembers the dismissed pass in `app_config` and drops the notice from the file | service `meldungen`; Caddy routes `/kacheln/wealth/*` there (it must sit under the tile's path, or the start page shows no ✕) |

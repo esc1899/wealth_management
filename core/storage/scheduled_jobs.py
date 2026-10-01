@@ -9,6 +9,18 @@ from typing import List, Optional
 from core.storage.models import ScheduledJob, ScheduledJobRun
 
 
+def _ortszeit(wert: Optional[str]) -> Optional[datetime]:
+    """SQLite schreibt `datetime('now')` in UTC; Zeitplan, Nachholen und Seite rechnen in
+    Ortszeit (naiv). Ohne Umrechnung lag ein Lauf um 08:00 vor der Feuerzeit 08:00 — ein
+    Neustart am selben Tag hätte den Job noch einmal ausgeführt (01.10.2026)."""
+    if not wert:
+        return None
+    zeit = datetime.fromisoformat(wert)
+    if zeit.tzinfo is None:
+        zeit = zeit.replace(tzinfo=timezone.utc)
+    return zeit.astimezone().replace(tzinfo=None)
+
+
 class ScheduledJobsRepository:
     def __init__(self, conn: sqlite3.Connection):
         self._conn = conn
@@ -102,16 +114,8 @@ class ScheduledJobsRepository:
             run_month=row["run_month"] if "run_month" in keys else None,
             model=row["model"] if "model" in keys else None,
             enabled=bool(row["enabled"]),
-            last_run=(
-                datetime.fromisoformat(row["last_run"])
-                if row["last_run"]
-                else None
-            ),
-            created_at=(
-                datetime.fromisoformat(row["created_at"])
-                if "created_at" in keys and row["created_at"]
-                else None
-            ),
+            last_run=_ortszeit(row["last_run"]),
+            created_at=_ortszeit(row["created_at"]) if "created_at" in keys else None,
         )
 
 

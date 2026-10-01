@@ -2,7 +2,13 @@
 AgentSchedulerService — runs cloud agent jobs on a cron schedule.
 
 Each ScheduledJob in the DB maps to an APScheduler job. On startup, all enabled
-jobs are loaded and registered. Settings changes call reload_jobs() to sync.
+jobs are loaded and registered. Since 2026-10-01 the service runs in its own
+process (`scripts/planer_dienst.py`, ops-core service `planer`), not in Streamlit:
+Streamlit only executes app.py once a browser opens the page, so a scheduler
+started there missed every job of a day nobody looked. The planner picks up
+changes from the Scheduler page by itself (`sync_jobs()`, once a minute); the
+app holds an unstarted instance only for "run now", and its reload_jobs() is a
+no-op.
 
 Background thread safety: the service creates its own DB connection and agent
 instances — it does NOT use Streamlit's @st.cache_resource singletons.
@@ -62,6 +68,8 @@ class AgentSchedulerService:
         self._default_claude_model = default_claude_model
         self._timezone = timezone
         self._scheduler = BackgroundScheduler(timezone=timezone)
+        self._started = False
+        self._job_signature: Optional[tuple] = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -69,6 +77,7 @@ class AgentSchedulerService:
 
     def start(self) -> None:
         self._scheduler.start()
+        self._started = True
         self._close_orphaned_runs()
         self._reload_jobs()
         logger.info("AgentSchedulerService started")
@@ -105,9 +114,43 @@ class AgentSchedulerService:
         thread = threading.Thread(target=_run_catchup, daemon=True)
         thread.start()
 
+    def shutdown(self) -> None:
+        if self._started:
+            self._scheduler.shutdown(wait=False)
+            self._started = False
+
     def reload_jobs(self) -> None:
-        """Call after DB changes to re-sync APScheduler with stored jobs."""
+        """Call after DB changes to re-sync APScheduler with stored jobs.
+
+        Only acts in the process that started the scheduler (the planner). In the
+        app it does nothing — the planner notices the change via sync_jobs()."""
+        if self._started:
+            self._reload_jobs()
+
+    def sync_jobs(self) -> bool:
+        """Reload the schedule if the stored jobs changed since the last load.
+
+        Polled by the planner process. Compares only what decides *when* a job
+        fires, so a job's own run (last_run) never causes a reload — re-adding a
+        cron job right at its fire time could otherwise swallow that run.
+        Returns True if it reloaded."""
+        conn = self._open_conn()
+        try:
+            signature = self._signature(ScheduledJobsRepository(conn).get_enabled())
+        finally:
+            conn.close()
+        if signature == self._job_signature:
+            return False
+        logger.info("Scheduled jobs changed, reloading")
         self._reload_jobs()
+        return True
+
+    @staticmethod
+    def _signature(jobs) -> tuple:
+        return tuple(sorted(
+            (j.id, j.frequency, j.run_hour, j.run_minute, j.run_weekday, j.run_day, j.run_month)
+            for j in jobs
+        ))
 
     def run_job_now(self, job_id: int) -> None:
         """Trigger a job immediately in a background thread, bypassing enabled check."""
@@ -170,7 +213,9 @@ class AgentSchedulerService:
         conn = self._open_conn()
         try:
             jobs_repo = ScheduledJobsRepository(conn)
-            for job in jobs_repo.get_enabled():
+            enabled = jobs_repo.get_enabled()
+            self._job_signature = self._signature(enabled)
+            for job in enabled:
                 if job.frequency == "manual":
                     continue  # Manual jobs are never auto-scheduled
                 trigger = self._build_trigger(job)

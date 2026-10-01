@@ -111,16 +111,12 @@ def get_market_agent() -> MarketDataAgent:
         encryption_key=config.ENCRYPTION_KEY,
         app_config_repo=get_app_config_repo(),
     )
-    scheduler = agent.setup_scheduler(fetch_hour=config.MARKET_DATA_FETCH_HOUR)
-    scheduler.start()
-
     # Register post-fetch callback for automatic wealth snapshots
     agent.set_post_fetch_callback(lambda: _safe_take_snapshot())
 
-    # Catch up the daily fetch if the app was asleep at fetch_hour (no APScheduler
-    # catchup for daily triggers) — otherwise prices and daily P&L stay stale.
-    agent.catchup_fetch_if_missed(fetch_hour=config.MARKET_DATA_FETCH_HOUR)
-
+    # The daily fetch and its catchup run in the planner process
+    # (scripts/planer_dienst.py), not here: Streamlit builds this only when a
+    # browser opens the page, and a day without a visit had no prices.
     return agent
 
 
@@ -295,7 +291,10 @@ def get_portfolio_robustness_agent() -> PortfolioRobustnessAgent:
 
 @st.cache_resource
 def get_agent_scheduler() -> AgentSchedulerService:
-    service = AgentSchedulerService(
+    """Unstarted: here only for "run now" from the pages. The schedule itself runs
+    in the planner process (scripts/planer_dienst.py) — starting it here as well
+    would run every job twice and close the planner's running runs as orphans."""
+    return AgentSchedulerService(
         db_path=config.DB_PATH,
         encryption_key=config.ENCRYPTION_KEY,
         anthropic_api_key=config.LLM_API_KEY,
@@ -304,8 +303,6 @@ def get_agent_scheduler() -> AgentSchedulerService:
         openai_api_key=config.OPENAI_API_KEY,
         openai_base_url=config.OPENAI_BASE_URL,
     )
-    service.start()
-    return service
 
 
 @st.cache_resource
