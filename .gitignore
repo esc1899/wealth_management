@@ -48,3 +48,6 @@ CHANGELOG.md
 core/llm/TOKEN_COST_REVIEW.md
 core/llm/AGENT_EXPECTATIONS.md
 mcp_venv/
+
+# Sicherungskopien der Claude-Einstellungen (02.10.2026 versehentlich committet)
+.claude/*.bak*
