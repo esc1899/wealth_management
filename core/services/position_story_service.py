@@ -7,6 +7,8 @@ Replaces inline _generate_story_proposal() calls from pages.
 
 import asyncio
 import logging
+import re
+from datetime import date
 from typing import Optional
 
 from core.constants import CLAUDE_HAIKU
@@ -14,6 +16,17 @@ from core.llm.claude import ClaudeProvider
 from core.storage.usage import UsageRepository
 
 logger = logging.getLogger(__name__)
+
+# Ohne Suche schreibt das Modell aus seinem Trainingsstand: Abspaltungen,
+# Uebernahmen und Kursbewegungen danach fehlen (Kongsberg, Samsung, 02.10.2026).
+WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 3}
+
+
+def _these_aus(text: str) -> str:
+    """Nur die These: Der Text aller Suchrunden kommt gesammelt zurueck,
+    Zwischensaetze wie "Ich suche ..." gehoeren nicht in die Story."""
+    treffer = re.findall(r"<these>(.*?)</these>", text, flags=re.DOTALL)
+    return (treffer[-1] if treffer else text).strip()
 
 
 class PositionStoryService:
@@ -89,21 +102,35 @@ class PositionStoryService:
         else:
             task = "Schreibe eine prägnante Investment-These (2–4 Sätze)."
 
-        # System prompt
+        heute = date.today()
+        system = (
+            "Du bist ein erfahrener Investmentanalyst. "
+            f"Heute ist der {heute:%d.%m.%Y}. Dein Trainingswissen ist veraltet: "
+            "Suche zuerst im Web nach den wichtigsten Entwicklungen der letzten zwölf "
+            "Monate (Abspaltungen, Übernahmen, Umbauten, Kursentwicklung seit "
+            "Jahresbeginn, Ergebnisse, Ausblick) und stütze die These auf diesen Stand. "
+            "Passt etwas in einer bestehenden These nicht mehr, korrigiere es."
+        )
         prompt = (
-            f"Du bist ein erfahrener Investmentanalyst.\n\n"
             f"Position:\n{info}\n\n"
             f"{task}\n\n"
             "Die These soll erklären: warum diese Position interessant ist, "
             "was die Kernthese ist (Wachstum, Value, Dividende, Absicherung …) "
             "und welche wichtigen Katalysatoren oder Risiken bestehen. "
-            "Antworte NUR mit der These, keine Einleitung, keine Überschrift."
+            "Schreib die fertige These zwischen <these> und </these> – ohne "
+            "Einleitung, Überschrift oder Quellenangaben."
         )
 
-        # Generate story
-        # Grosszuegiges Budget: denkende Modelle verbrauchen Tokens, bevor sie
-        # antworten. Bei 400 blieb die Antwort leer und loeschte die Story.
-        result = (await llm.complete(prompt, max_tokens=4000) or "").strip()
+        # Websuche laeuft in beiden Providern intern (Anthropic nativ, sonst Tavily);
+        # zurueck kommt nur der Text. Grosszuegiges Budget: Suche und Denken
+        # verbrauchen Tokens -- bei 400 blieb die Antwort leer und loeschte die Story.
+        response = await llm.chat_with_tools(
+            messages=[{"role": "user", "content": prompt}],
+            tools=[WEB_SEARCH_TOOL],
+            system=system,
+            max_tokens=4000,
+        )
+        result = _these_aus(response.content or "")
         if not result:
             raise RuntimeError(
                 f"Das Modell {self._model} hat keinen Text geliefert – die bestehende Story bleibt unverändert."
