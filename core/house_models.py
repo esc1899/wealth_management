@@ -81,8 +81,16 @@ def load(path: Optional[Path] = None) -> dict:
             "modell": model.strip(),
             "budget_usd": float(budget) if isinstance(budget, (int, float))
             and not isinstance(budget, bool) else None,
+            "batch": entry.get("batch") is True,
         }
     return out
+
+
+def scheduled_batch(path: Optional[Path] = None) -> bool:
+    """Household switch (2026-10-02, Maschinenraum): scheduled runs go out as
+    Anthropic batches. ``batch = true`` under ``[claude]``; read per run, so a
+    change on the Maschinenraum page needs no restart. Missing means off."""
+    return bool((load(path).get(CLAUDE) or {}).get("batch"))
 
 
 def house_model(provider: str, path: Optional[Path] = None) -> Optional[str]:

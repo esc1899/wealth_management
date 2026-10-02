@@ -39,6 +39,16 @@ def mock_repos(scheduler):
 # ------------------------------------------------------------------
 
 
+@pytest.fixture
+def eingeplant():
+    """Wie ein eingeplanter Lauf: nur dort darf der Scheduler Batches schicken."""
+    from core.scheduler import _BATCH_ERLAUBT
+    token = _BATCH_ERLAUBT.set(True)
+    yield
+    _BATCH_ERLAUBT.reset(token)
+
+
+@pytest.mark.usefixtures("eingeplant")
 class TestCanUseBatchApi:
     def _make_scheduler(self, anthropic_key="sk-ant-real", llm_base_url="", openai_base_url=""):
         return AgentSchedulerService(
@@ -241,3 +251,79 @@ def test_process_batch_results_routes_new_agents():
     s, e = scheduler._process_batch_results("search_agent", "sk", [search_result], conn)
     assert s == 1 and e == 0
     scheduler._process_search_result.assert_called_once()
+
+
+# ------------------------------------------------------------------
+# 02.10.2026: Batch ist Standard fuer eingeplante Laeufe, nie fuer "Jetzt ausfuehren"
+# ------------------------------------------------------------------
+
+
+def test_jetzt_ausfuehren_laeuft_live(monkeypatch):
+    monkeypatch.setattr("config.config.USE_BATCH_API", True)
+    s = AgentSchedulerService(db_path=":memory:", encryption_key="k",
+                              anthropic_api_key="sk-ant-real", default_claude_model="claude-haiku-4-5")
+    assert s._can_use_batch_api("claude-sonnet-5-5") is False  # Kontext nicht gesetzt
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source, erwartet", [("scheduled", True), ("manual", False)])
+async def test_quelle_des_laufs_entscheidet(monkeypatch, source, erwartet):
+    from core.scheduler import _BATCH_ERLAUBT
+    monkeypatch.setattr("config.config.USE_BATCH_API", True)
+    s = AgentSchedulerService(db_path=":memory:", encryption_key="k",
+                              anthropic_api_key="sk-ant-real", default_claude_model="claude-haiku-4-5")
+    gesehen = {}
+
+    async def dispatch(job, conn, log_fn):
+        gesehen["batch"] = s._can_use_batch_api("claude-sonnet-5-5")
+
+    s._open_conn = Mock(return_value=MagicMock())
+    s._dispatch_agent = dispatch
+    with patch("core.scheduler.ScheduledJobsRepository") as jobs, \
+         patch("core.scheduler.ScheduledJobRunsRepository"):
+        jobs.return_value.get.return_value = MagicMock(enabled=True)
+        await s._execute_job(1, source=source)
+    assert gesehen["batch"] is erwartet
+    assert _BATCH_ERLAUBT.get() is False  # setzt nichts ausserhalb des Laufs
+
+
+def test_neuestes_wird_vor_der_batch_pruefung_aufgeloest():
+    s = AgentSchedulerService(db_path=":memory:", encryption_key="k",
+                              anthropic_api_key="sk-ant-real", default_claude_model="claude-haiku-4-5")
+    with patch("core.house_models.resolve_newest", return_value="claude-sonnet-5-5"):
+        assert s._resolve_model("storychecker", "neuestes:sonnet", MagicMock()) == "claude-sonnet-5-5"
+
+
+@pytest.mark.asyncio
+async def test_batch_anfragen_denken_wie_live():
+    from core.llm.claude import ClaudeProvider
+    llm = ClaudeProvider(api_key="k", model="claude-sonnet-5-5")
+    llm._client = MagicMock()
+    llm._client.messages.batches.create = AsyncMock(return_value=MagicMock(id="b1"))
+    req = ClaudeProvider.build_batch_request("sc_1", "claude-sonnet-5-5", "sys",
+                                             [{"role": "user", "content": "x"}], [], 4096)
+    await llm.submit_batch([req])
+    gesendet = llm._client.messages.batches.create.call_args.kwargs["requests"][0]["params"]
+    for k, v in llm._reasoning_kwargs().items():
+        assert gesendet[k] == v
+
+
+def test_schalter_im_maschinenraum_schaltet(monkeypatch, tmp_path):
+    """Der Hebel ist modelle.toml ([claude] batch), nicht die .env."""
+    from core import house_models
+    from core.scheduler import _BATCH_ERLAUBT
+
+    monkeypatch.setattr("config.config.USE_BATCH_API", False)
+    monkeypatch.setenv("OPS_CORE_HOME", str(tmp_path))
+    s = AgentSchedulerService(db_path=":memory:", encryption_key="k",
+                              anthropic_api_key="sk-ant-real", default_claude_model="claude-haiku-4-5")
+    token = _BATCH_ERLAUBT.set(True)
+    try:
+        assert s._can_use_batch_api("claude-sonnet-5-5") is False          # keine Datei: aus
+        (tmp_path / "modelle.toml").write_text('[claude]\nmodell = "claude-sonnet-5-5"\nbatch = true\n')
+        assert house_models.scheduled_batch() is True
+        assert s._can_use_batch_api("claude-sonnet-5-5") is True
+        (tmp_path / "modelle.toml").write_text('[claude]\nmodell = "claude-sonnet-5-5"\nbatch = false\n')
+        assert s._can_use_batch_api("claude-sonnet-5-5") is False
+    finally:
+        _BATCH_ERLAUBT.reset(token)

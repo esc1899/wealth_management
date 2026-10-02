@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import calendar
+import contextvars
 import logging
 from datetime import datetime, timedelta
 from typing import Callable, Optional
@@ -38,6 +39,10 @@ from core.storage.news import NewsRepository
 from core.storage.positions import PositionsRepository
 from core.storage.scheduled_jobs import ScheduledJobsRepository, ScheduledJobRunsRepository
 from core.storage.usage import UsageRepository
+
+# Batch nur, wo niemand wartet: gesetzt fuer eingeplante Laeufe, nie fuer
+# "Jetzt ausfuehren" auf der Seite (dort kaeme das Ergebnis erst eine Stunde spaeter).
+_BATCH_ERLAUBT: contextvars.ContextVar[bool] = contextvars.ContextVar("batch_erlaubt", default=False)
 
 logger = logging.getLogger(__name__)
 
@@ -190,9 +195,9 @@ class AgentSchedulerService:
         finally:
             conn.close()
 
-    def batches_abholen(self) -> None:
-        """Collect finished Anthropic batches (only used with USE_BATCH_API)."""
-        asyncio.run(self._poll_and_process_batches())
+    def batches_abholen(self) -> list[str]:
+        """Collect finished Anthropic batches; one line per batch for the job output."""
+        return asyncio.run(self._poll_and_process_batches())
 
     # ------------------------------------------------------------------
     # "Run now" from the page (app process)
@@ -263,6 +268,7 @@ class AgentSchedulerService:
             def log_fn(msg: str) -> None:
                 runs_repo.append_log(run.id, msg)
                 logger.info("[job %s] %s", job_id, msg)
+            batch_token = _BATCH_ERLAUBT.set(source == "scheduled")
             try:
                 await self._dispatch_agent(job, conn, log_fn)
                 jobs_repo.update_last_run(job_id)
@@ -270,6 +276,8 @@ class AgentSchedulerService:
             except Exception as exc:
                 runs_repo.fail(run.id, str(exc))
                 raise
+            finally:
+                _BATCH_ERLAUBT.reset(batch_token)
         finally:
             conn.close()
 
@@ -303,12 +311,15 @@ class AgentSchedulerService:
     def _can_use_batch_api(self, model: str) -> bool:
         """
         True only when the resolved model runs on Anthropic directly.
-        Checks: USE_BATCH_API flag, real Anthropic key, native Claude model name
+        Checks: house switch (Maschinenraum) or USE_BATCH_API, a scheduled run, real Anthropic key, native Claude model name
         (not an OpenRouter path like 'anthropic/claude-...'), and no custom LLM base URL
         (which would mean OpenRouter or another proxy).
         """
+        from core import house_models
+
         return (
-            config.USE_BATCH_API
+            (config.USE_BATCH_API or house_models.scheduled_batch())
+            and _BATCH_ERLAUBT.get()
             and bool(self._anthropic_key)
             and model.startswith("claude-")
             and not self._llm_base_url
@@ -331,6 +342,16 @@ class AgentSchedulerService:
         5. First configured model (OpenRouter then Claude)
         6. Built-in default
         """
+        # "home"/"neuestes:..." gleich hier aufloesen: Der Batch-Weg prueft auf eine
+        # echte claude-ID, sonst lief ein so eingestellter Agent still am Batch vorbei.
+        from core.llm.router import resolve_house_model
+        return resolve_house_model(
+            self._resolve_model_raw(agent_name, job_model, conn),
+            has_anthropic=bool(self._anthropic_key),
+            has_openai_base=bool(self._openai_base_url),
+            fallback=self._default_claude_model or "")
+
+    def _resolve_model_raw(self, agent_name: str, job_model: str, conn) -> str:
         if job_model:
             return job_model
 
@@ -820,34 +841,40 @@ class AgentSchedulerService:
         _log(f"Jahresdigest {year_key} gespeichert")
 
     # ------------------------------------------------------------------
-    # Batch API — submit + poll (USE_BATCH_API=true, Anthropic direct only)
+    # Batch API — submit + poll (house switch or USE_BATCH_API, Anthropic direct only)
     # ------------------------------------------------------------------
 
-    async def _poll_and_process_batches(self) -> None:
+    async def _poll_and_process_batches(self) -> list[str]:
         from core.llm.claude import ClaudeProvider
         from core.storage.batch_queue import BatchQueueRepository
 
+        zeilen: list[str] = []
         conn = self._open_conn()
         try:
             batch_repo = BatchQueueRepository(conn)
             pending = batch_repo.get_pending()
             if not pending:
-                return
+                return zeilen
             llm = ClaudeProvider(api_key=self._anthropic_key, model="claude-haiku-4-5-20251001", base_url=self._llm_base_url)
             for batch_row in pending:
                 try:
                     results = await llm.fetch_batch_results(batch_row.batch_id)
                     if results is None:
                         logger.info("Batch %s still processing", batch_row.batch_id)
+                        zeilen.append(f"Batch {batch_row.agent_name}: läuft noch")
                         continue
                     logger.info("Batch %s complete (%d results)", batch_row.batch_id, len(results))
                     success, errors = self._process_batch_results(batch_row.agent_name, batch_row.skill_name or "", results, conn)
                     batch_repo.mark_done(batch_row.batch_id, success, errors)
                     logger.info("Batch %s: %d ok, %d errors", batch_row.batch_id, success, errors)
-                except Exception:
+                    zeilen.append(f"Batch {batch_row.agent_name}: {success} ausgewertet"
+                                  + (f", {errors} ohne Ergebnis" if errors else ""))
+                except Exception as exc:
                     logger.exception("Error processing batch %s", batch_row.batch_id)
+                    zeilen.append(f"Batch {batch_row.agent_name}: Fehler beim Abholen ({type(exc).__name__})")
         finally:
             conn.close()
+        return zeilen
 
     @staticmethod
     def _book_batch_usage(agent_name: str, skill_name: str, message, conn) -> None:
@@ -1246,7 +1273,7 @@ class AgentSchedulerService:
                 system=system,
                 messages=[{"role": "user", "content": _build_initial_message(pos, skill_name, skill_prompt)}],
                 tools=[WEB_SEARCH_TOOL],
-                max_tokens=2048,
+                max_tokens=4096,
             ))
         if not requests:
             return ""
@@ -1287,7 +1314,7 @@ class AgentSchedulerService:
                 system=system,
                 messages=[{"role": "user", "content": "\n".join(lines)}],
                 tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 1}, SUBMIT_VERDICT_TOOL],
-                max_tokens=2500,
+                max_tokens=4096,
             ))
         if not requests:
             return ""
@@ -1315,7 +1342,7 @@ class AgentSchedulerService:
                 system=system,
                 messages=[{"role": "user", "content": _build_initial_message(pos, skill_name or None, skill_prompt or None)}],
                 tools=[WEB_SEARCH_TOOL, SUBMIT_FA_VERDICT_TOOL],
-                max_tokens=3000,
+                max_tokens=4096,
             ))
         if not requests:
             return ""

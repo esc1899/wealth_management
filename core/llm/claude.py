@@ -332,7 +332,15 @@ class ClaudeProvider(LLMProvider):
         return {"custom_id": custom_id, "params": params}
 
     async def submit_batch(self, requests: list[dict]) -> str:
-        """Submit a message batch. Returns the batch_id."""
+        """Submit a message batch. Returns the batch_id.
+
+        Dieselben effort/thinking-Parameter wie live (_reasoning_kwargs): Ohne sie
+        denkt Sonnet/Opus 5.x auf "high" und verbraucht max_tokens, bevor es antwortet.
+        """
+        reasoning = self._reasoning_kwargs()
+        for r in requests:
+            for k, v in reasoning.items():
+                r["params"].setdefault(k, v)
         batch = await self._client.messages.batches.create(requests=requests)
         return batch.id
 

@@ -107,6 +107,9 @@ class Config:
     COWORK_AUTO_IMPORT_READY: bool = os.getenv("COWORK_AUTO_IMPORT_READY", "true").lower() == "true"
 
     # Batch API — 50% cheaper for scheduled background jobs (Anthropic only)
+    # Ob eingeplante Laeufe als Anthropic-Batch gehen, sagt der Schalter im
+    # Maschinenraum (modelle.toml, [claude] batch); USE_BATCH_API=true erzwingt es
+    # nur lokal. "Jetzt ausfuehren" laeuft immer live.
     USE_BATCH_API: bool = os.getenv("USE_BATCH_API", "false").lower() == "true"
 
     def validate(self) -> list[str]:

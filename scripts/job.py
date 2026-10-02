@@ -84,8 +84,8 @@ def _marktdaten_agent():
 def agenten(dienst, batch_api: bool) -> int:
     gelaufen, fehlgeschlagen, gebremst = dienst.laufen_lassen()
     if batch_api:
-        dienst.batches_abholen()
-        print("Batches abgeholt.")
+        for zeile in dienst.batches_abholen():
+            print(zeile)
     if gebremst:
         # Rot, obwohl nichts lief: Sonst wäre die Kachel nach dem dritten Fehlversuch
         # wieder grün, und der Job stünde still, ohne dass es jemand sieht.
@@ -130,7 +130,9 @@ def main(argv: list[str]) -> int:
     from config import config
 
     if args.job == "agenten":
-        return agenten(_agenten_dienst(), config.USE_BATCH_API)
+        # Immer abholen: Auch nach dem Ausschalten im Maschinenraum darf kein
+        # eingereichter Batch liegen bleiben. Ohne offene Batches kein Netz.
+        return agenten(_agenten_dienst(), True)
     if args.job == "kurse":
         return kurse(_marktdaten_agent(), config.MARKET_DATA_FETCH_HOUR)
     return kosten(_agenten_dienst())
