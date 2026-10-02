@@ -101,7 +101,13 @@ class PositionStoryService:
         )
 
         # Generate story
-        result = await llm.complete(prompt, max_tokens=400)
+        # Grosszuegiges Budget: denkende Modelle verbrauchen Tokens, bevor sie
+        # antworten. Bei 400 blieb die Antwort leer und loeschte die Story.
+        result = (await llm.complete(prompt, max_tokens=4000) or "").strip()
+        if not result:
+            raise RuntimeError(
+                f"Das Modell {self._model} hat keinen Text geliefert – die bestehende Story bleibt unverändert."
+            )
 
         # Track usage if repo provided
         if self._usage_repo:

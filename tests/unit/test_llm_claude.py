@@ -12,7 +12,7 @@ def provider():
 
 def make_claude_response(text: str) -> MagicMock:
     mock = MagicMock()
-    mock.content = [MagicMock(text=text)]
+    mock.content = [MagicMock(text=text, type="text")]
     return mock
 
 
@@ -21,6 +21,17 @@ async def test_chat_returns_content(provider):
     provider._client.messages.create = AsyncMock(
         return_value=make_claude_response("Analysis complete")
     )
+    result = await provider.chat([Message(role=Role.USER, content="Analyse AAPL")])
+    assert result == "Analysis complete"
+
+
+@pytest.mark.asyncio
+async def test_chat_skips_thinking_block(provider):
+    """Steht ein Denk-Block vorn, zaehlt nur der Text dahinter."""
+    response = MagicMock()
+    response.content = [MagicMock(type="thinking", spec=["type", "thinking"]),
+                        MagicMock(text="Analysis complete", type="text")]
+    provider._client.messages.create = AsyncMock(return_value=response)
     result = await provider.chat([Message(role=Role.USER, content="Analyse AAPL")])
     assert result == "Analysis complete"
 

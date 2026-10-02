@@ -161,7 +161,8 @@ class ClaudeProvider(LLMProvider):
             cache_read = getattr(response.usage, 'cache_read_input_tokens', 0) or 0
             cache_write = getattr(response.usage, 'cache_creation_input_tokens', 0) or 0
             self.on_usage(response.usage.input_tokens, response.usage.output_tokens, self.skill_context, _duration_ms, self.position_count, cache_read, cache_write)
-        return response.content[0].text
+        # Ab Sonnet/Opus 5 kann ein Denk-Block vorn stehen -- nur Textbloecke zaehlen.
+        return "".join(b.text for b in response.content if getattr(b, "type", None) == "text")
 
     async def chat_with_tools(
         self,

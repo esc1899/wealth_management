@@ -237,6 +237,8 @@ def _render_edit_form(pos_id: int | None, readonly: bool = False):
                     asset_class=_suggest_ac,
                     existing_story=_current_story or None,
                 )
+                if not (_draft or "").strip():
+                    raise RuntimeError("leerer Entwurf – die bestehende Story bleibt unverändert")
                 st.session_state["_pos_form_story"] = _draft
             except Exception as _exc:
                 _story_err = str(_exc)
