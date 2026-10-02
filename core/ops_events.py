@@ -117,6 +117,13 @@ def _write(payload: dict, source: str) -> Optional[dict]:
     return event
 
 
+def report_waiting(*, anzahl: int, seit: Optional[str], was: list) -> Optional[dict]:
+    """Worauf der Job noch wartet (2026-10-02): eingereichte Batches. Am Ende
+    jedes Laufs, auch mit anzahl 0 -- der juengste Stand gilt auf der
+    ops-core-Kachel. Vertrag: heimnetzwerk docs/haus/vertraege/wartet.ndjson."""
+    return _write({"metric": "wartet", "anzahl": anzahl, "seit": seit, "was": list(was)}, "scheduled")
+
+
 def book_llm_call(
     *,
     provider: str,

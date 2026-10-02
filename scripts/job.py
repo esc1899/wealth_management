@@ -86,6 +86,12 @@ def agenten(dienst, batch_api: bool) -> int:
     if batch_api:
         for zeile in dienst.batches_abholen():
             print(zeile)
+        # Fuer die ops-core-Kachel: worauf noch gewartet wird (auch "nichts").
+        from core import ops_events
+        stand = dienst.wartet()
+        ops_events.report_waiting(**stand)
+        if stand["anzahl"]:
+            print(f"Wartet auf {', '.join(stand['was'])} seit {stand['seit'][11:16]}.")
     if gebremst:
         # Rot, obwohl nichts lief: Sonst wäre die Kachel nach dem dritten Fehlversuch
         # wieder grün, und der Job stünde still, ohne dass es jemand sieht.

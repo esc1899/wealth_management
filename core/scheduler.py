@@ -29,7 +29,7 @@ import asyncio
 import calendar
 import contextvars
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional
 
 from config import config
@@ -43,6 +43,14 @@ from core.storage.usage import UsageRepository
 # Batch nur, wo niemand wartet: gesetzt fuer eingeplante Laeufe, nie fuer
 # "Jetzt ausfuehren" auf der Seite (dort kaeme das Ergebnis erst eine Stunde spaeter).
 _BATCH_ERLAUBT: contextvars.ContextVar[bool] = contextvars.ContextVar("batch_erlaubt", default=False)
+
+#: Wie ein Mensch die Batch-Agenten liest (Job-Ausgabe, ops-core-Kachel).
+BATCH_NAMEN = {
+    "storychecker": "Storychecker", "fundamental_analyzer": "Fundamentalwert",
+    "consensus_gap": "Konsens-Lücken", "sector_rotation": "Sektor-Rotation",
+    "structural_scan": "Strukturwandel", "search_agent": "Investment-Suche",
+    "news_digest": "News-Digest", "devils_advocate": "Devil's Advocate",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +202,24 @@ class AgentSchedulerService:
             return fetch_and_store_costs(self._openai_api_key, self._openai_base_url, offen, repo), len(offen)
         finally:
             conn.close()
+
+    def wartet(self) -> dict:
+        """Worauf noch gewartet wird -- der Messwert `wartet` fuer die
+        ops-core-Kachel (Vertrag docs/haus/vertraege/wartet.ndjson in heimnetzwerk)."""
+        from core.storage.batch_queue import BatchQueueRepository
+
+        conn = self._open_conn()
+        try:
+            offen = BatchQueueRepository(conn).get_pending()
+        finally:
+            conn.close()
+        if not offen:
+            return {"anzahl": 0, "seit": None, "was": []}
+        aeltester = min(b.submitted_at for b in offen)       # SQLite datetime('now'): UTC
+        seit = datetime.fromisoformat(aeltester.replace(" ", "T")).replace(
+            tzinfo=timezone.utc).astimezone().isoformat(timespec="seconds")
+        was = list(dict.fromkeys(BATCH_NAMEN.get(b.agent_name, b.agent_name) for b in offen))
+        return {"anzahl": len(offen), "seit": seit, "was": was}
 
     def batches_abholen(self) -> list[str]:
         """Collect finished Anthropic batches; one line per batch for the job output."""
@@ -428,6 +454,11 @@ class AgentSchedulerService:
 
         _log(f"{len(tickers)} Tickers: {', '.join(tickers)}")
         ticker_names = {p.ticker: p.name for p in positions if p.ticker}
+        if self._can_use_batch_api(model):
+            batch_id = await self._submit_news_batch(
+                tickers, ticker_names, job.skill_name, job.skill_prompt, model, conn)
+            _log(f"Batch submitted: {batch_id}")
+            return
         await agent.start_run(
             tickers=tickers,
             ticker_names=ticker_names,
@@ -679,6 +710,11 @@ class AgentSchedulerService:
             return
         _log(f"{len(positions)} Watchlist-Positionen werden analysiert")
         pub_positions = [PublicPosition(id=p.id, name=p.name, ticker=p.ticker, isin=p.isin, asset_class=p.asset_class, anlageart=p.anlageart, story=p.story, story_skill=p.story_skill) for p in positions]
+        if self._can_use_batch_api(model):
+            batch_id = await self._submit_devils_advocate_batch(
+                pub_positions, job.skill_name or "Standard", job.skill_prompt or "", model, conn)
+            _log(f"Batch submitted: {batch_id}")
+            return
 
         agent = DevilsAdvocateAgent(llm=llm, analyses_repo=analyses_repo, da_repo=da_repo)
         results = await agent.analyze_portfolio(
@@ -861,17 +897,18 @@ class AgentSchedulerService:
                     results = await llm.fetch_batch_results(batch_row.batch_id)
                     if results is None:
                         logger.info("Batch %s still processing", batch_row.batch_id)
-                        zeilen.append(f"Batch {batch_row.agent_name}: läuft noch")
+                        zeilen.append(f"Batch {BATCH_NAMEN.get(batch_row.agent_name, batch_row.agent_name)}: läuft noch")
                         continue
                     logger.info("Batch %s complete (%d results)", batch_row.batch_id, len(results))
-                    success, errors = self._process_batch_results(batch_row.agent_name, batch_row.skill_name or "", results, conn)
+                    success, errors = self._process_batch_results(
+                        batch_row.agent_name, batch_row.skill_name or "", results, conn, batch_row.kontext)
                     batch_repo.mark_done(batch_row.batch_id, success, errors)
                     logger.info("Batch %s: %d ok, %d errors", batch_row.batch_id, success, errors)
-                    zeilen.append(f"Batch {batch_row.agent_name}: {success} ausgewertet"
+                    zeilen.append(f"Batch {BATCH_NAMEN.get(batch_row.agent_name, batch_row.agent_name)}: {success} ausgewertet"
                                   + (f", {errors} ohne Ergebnis" if errors else ""))
                 except Exception as exc:
                     logger.exception("Error processing batch %s", batch_row.batch_id)
-                    zeilen.append(f"Batch {batch_row.agent_name}: Fehler beim Abholen ({type(exc).__name__})")
+                    zeilen.append(f"Batch {BATCH_NAMEN.get(batch_row.agent_name, batch_row.agent_name)}: Fehler beim Abholen ({type(exc).__name__})")
         finally:
             conn.close()
         return zeilen
@@ -894,7 +931,8 @@ class AgentSchedulerService:
         except Exception:  # noqa: BLE001 — a result is never lost over its books
             logger.exception("Batch usage not booked (%s)", agent_name)
 
-    def _process_batch_results(self, agent_name: str, skill_name: str, results, conn) -> tuple[int, int]:
+    def _process_batch_results(self, agent_name: str, skill_name: str, results, conn,
+                               kontext: Optional[str] = None) -> tuple[int, int]:
         success, errors = 0, 0
         for result in results:
             try:
@@ -915,6 +953,10 @@ class AgentSchedulerService:
                     ok = self._process_structural_scan_result(result, skill_name, conn)
                 elif agent_name == "search_agent":
                     ok = self._process_search_result(result, skill_name, conn)
+                elif agent_name == "news_digest":
+                    ok = self._process_news_result(result, skill_name, kontext, conn)
+                elif agent_name == "devils_advocate":
+                    ok = self._process_da_result(result, skill_name, conn)
                 else:
                     logger.warning("Unknown batch agent_name: %s", agent_name)
                     ok = False
@@ -1152,6 +1194,92 @@ class AgentSchedulerService:
         search_repo.add_message(session.id, "assistant", report)
         logger.info("Search agent batch result: session %s", session.id)
         return True
+
+    def _process_news_result(self, result, skill_name: str, kontext: Optional[str], conn) -> bool:
+        import json as _json
+        if result.custom_id != "news_digest":
+            return False
+        digest = self._text_from_batch_message(result.result.message)
+        if not digest:
+            return False
+        tickers = (_json.loads(kontext) if kontext else {}).get("tickers", [])
+        repo = NewsRepository(conn)
+        run = repo.save_run(skill_name=skill_name, tickers=tickers, result=digest)
+        repo.add_message(run.id, "user", "Automatisch geplanter News-Digest.")
+        repo.add_message(run.id, "assistant", digest)
+        return True
+
+    def _process_da_result(self, result, skill_name: str, conn) -> bool:
+        """Wie live, ohne den zweiten Aufruf: Gibt das Modell kein Urteil ab,
+        zaehlt die Position als ohne Ergebnis (wie bei den Konsens-Luecken)."""
+        from agents.devils_advocate_agent import AGENT_NAME, VALID_VERDICTS, format_position
+        from core.storage.analyses import PositionAnalysesRepository
+        from core.storage.devils_advocate import DevilsAdvocateRepository
+
+        cid = result.custom_id
+        if not cid.startswith("da_"):
+            return False
+        try:
+            position_id = int(cid[3:])
+        except ValueError:
+            return False
+        message = result.result.message
+        verdict = summary = analysis = None
+        for block in message.content:
+            if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == "submit_da_verdict":
+                v = (block.input.get("verdict") or "").lower()
+                if v in VALID_VERDICTS:
+                    verdict, summary, analysis = v, block.input.get("summary", ""), block.input.get("analysis", "")
+                    break
+        if not verdict:
+            return False
+        pos = self._lookup_position(position_id, conn)
+        da_repo = DevilsAdvocateRepository(conn)
+        session = da_repo.create_session(
+            position_id=position_id, ticker=pos.ticker if pos else None,
+            position_name=pos.name if pos else f"Position {position_id}", skill_name=skill_name)
+        if pos:
+            da_repo.add_message(session.id, "user", format_position(pos))
+        da_repo.add_message(session.id, "assistant", analysis or self._text_from_batch_message(message) or summary)
+        PositionAnalysesRepository(conn).save(
+            position_id=position_id, agent=AGENT_NAME, skill_name=skill_name,
+            verdict=verdict, summary=summary, session_id=session.id)
+        return True
+
+    async def _submit_news_batch(self, tickers, ticker_names, skill_name, skill_prompt, model, conn) -> str:
+        import json as _json
+        from agents.news_agent import build_digest_request
+        from core.llm.claude import ClaudeProvider
+        from core.storage.batch_queue import BatchQueueRepository
+
+        llm = ClaudeProvider(api_key=self._anthropic_key, model=model, base_url=self._llm_base_url)
+        system, user_message, web_search_tool = build_digest_request(
+            tickers, ticker_names, skill_name or "", skill_prompt or "")
+        batch_id = await llm.submit_batch([ClaudeProvider.build_batch_request(
+            custom_id="news_digest", model=model, system=system,
+            messages=[{"role": "user", "content": user_message}],
+            tools=[web_search_tool], max_tokens=4096)])
+        BatchQueueRepository(conn).create(batch_id, "news_digest", skill_name, "de", 1,
+                                          kontext=_json.dumps({"tickers": tickers}))
+        return batch_id
+
+    async def _submit_devils_advocate_batch(self, pub_positions, skill_name, skill_prompt, model, conn) -> str:
+        from agents.devils_advocate_agent import SUBMIT_DA_VERDICT_TOOL, build_system, format_position
+        from core.llm.claude import ClaudeProvider
+        from core.storage.batch_queue import BatchQueueRepository
+
+        llm = ClaudeProvider(api_key=self._anthropic_key, model=model, base_url=self._llm_base_url)
+        system = build_system(skill_prompt, "de")
+        requests = [ClaudeProvider.build_batch_request(
+            custom_id=f"da_{pos.id}", model=model, system=system,
+            messages=[{"role": "user", "content": format_position(pos)}],
+            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 2}, SUBMIT_DA_VERDICT_TOOL],
+            max_tokens=4000) for pos in pub_positions if pos.ticker and pos.id is not None]
+        if not requests:
+            return ""
+        batch_id = await llm.submit_batch(requests)
+        BatchQueueRepository(conn).create(batch_id, "devils_advocate", skill_name, "de", len(requests))
+        return batch_id
 
     async def _submit_sector_rotation_batch(self, pub_positions, skill_name: str, skill_prompt: str, model: str, conn, _log) -> str:
         from agents.sector_rotation_agent import BASE_SYSTEM_PROMPT, SUBMIT_VERDICT_TOOL, WEB_SEARCH_TOOL

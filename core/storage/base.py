@@ -647,8 +647,12 @@ def migrate_db(conn: sqlite3.Connection) -> None:
             request_count INTEGER,
             success_count INTEGER,
             error_count   INTEGER,
-            error_msg     TEXT
+            error_msg     TEXT,
+            kontext       TEXT
         )""")
+    elif "kontext" not in existing_batches:
+        # 02.10.2026: was die Auswertung spaeter braucht, z. B. die Ticker des News-Digests
+        conn.execute("ALTER TABLE pending_batches ADD COLUMN kontext TEXT")
 
     conn.execute("""CREATE TABLE IF NOT EXISTS devils_advocate_sessions (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,

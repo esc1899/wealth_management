@@ -327,3 +327,64 @@ def test_schalter_im_maschinenraum_schaltet(monkeypatch, tmp_path):
         assert s._can_use_batch_api("claude-sonnet-5-5") is False
     finally:
         _BATCH_ERLAUBT.reset(token)
+
+
+# ------------------------------------------------------------------
+# 02.10.2026: News-Digest und Devil's Advocate im Batch, Stand fuer die Kachel
+# ------------------------------------------------------------------
+
+
+def _scheduler_mit_db(tmp_path):
+    from core.storage.base import get_connection, init_db, migrate_db
+    pfad = str(tmp_path / "wm.db")
+    conn = get_connection(pfad); init_db(conn); migrate_db(conn); conn.close()
+    s = AgentSchedulerService(db_path=pfad, encryption_key="k" * 32,
+                              anthropic_api_key="sk-ant-real", default_claude_model="claude-haiku-4-5")
+    return s
+
+
+def _ergebnis(custom_id, blocks):
+    msg = MagicMock(content=blocks, model="claude-sonnet-5-5")
+    msg.usage = MagicMock(input_tokens=10, output_tokens=5, cache_read_input_tokens=0,
+                          cache_creation_input_tokens=0, server_tool_use=None)
+    return MagicMock(custom_id=custom_id, result=MagicMock(type="succeeded", message=msg))
+
+
+def test_wartet_nennt_die_offenen_batches(tmp_path):
+    from core.storage.batch_queue import BatchQueueRepository
+    s = _scheduler_mit_db(tmp_path)
+    assert s.wartet() == {"anzahl": 0, "seit": None, "was": []}
+    conn = s._open_conn()
+    BatchQueueRepository(conn).create("b1", "storychecker", None, "de", 3)
+    BatchQueueRepository(conn).create("b2", "news_digest", "Standard", "de", 1, kontext='{"tickers": ["SAP"]}')
+    BatchQueueRepository(conn).mark_done("b0-nie", 0, 0)
+    conn.close()
+    w = s.wartet()
+    assert w["anzahl"] == 2 and w["was"] == ["Storychecker", "News-Digest"]
+    assert w["seit"][19:] in ("+01:00", "+02:00", "+00:00") or "+" in w["seit"]
+
+
+def test_news_digest_aus_dem_batch_mit_den_tickern_des_laufs(tmp_path):
+    from core.storage.news import NewsRepository
+    s = _scheduler_mit_db(tmp_path)
+    conn = s._open_conn()
+    text = MagicMock(type="text", text="## Digest")
+    ok, fehler = s._process_batch_results("news_digest", "Standard", [_ergebnis("news_digest", [text])],
+                                          conn, '{"tickers": ["SAP", "KOG.OL"]}')
+    assert (ok, fehler) == (1, 0)
+    [run] = NewsRepository(conn).list_runs()
+    assert run.result == "## Digest" and run.tickers == "SAP, KOG.OL"
+
+
+def test_devils_advocate_aus_dem_batch_braucht_ein_urteil(tmp_path):
+    from core.storage.analyses import PositionAnalysesRepository
+    s = _scheduler_mit_db(tmp_path)
+    s._lookup_position = lambda pid, conn: None
+    conn = s._open_conn()
+    urteil = MagicMock(type="tool_use", input={"verdict": "fragil", "summary": "kurz", "analysis": "lang"})
+    urteil.name = "submit_da_verdict"
+    nur_text = MagicMock(type="text", text="Analyse ohne Urteil")
+    ok, fehler = s._process_batch_results("devils_advocate", "Standard",
+                                          [_ergebnis("da_7", [urteil]), _ergebnis("da_8", [nur_text])], conn)
+    assert (ok, fehler) == (1, 1)
+    assert PositionAnalysesRepository(conn).get_latest_bulk([7], "devils_advocate")[7].verdict == "fragil"

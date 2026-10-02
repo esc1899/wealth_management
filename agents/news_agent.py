@@ -61,6 +61,32 @@ If asked about a position not in the digest, say so clearly.
 _WEB_SEARCH_BASE = {"type": "web_search_20250305", "name": "web_search"}
 
 
+def build_digest_request(
+    tickers: list[str],
+    ticker_names: Optional[dict[str, str]],
+    skill_name: str,
+    skill_prompt: str,
+) -> tuple[str, str, dict]:
+    """(system, user_message, web_search_tool) des Digests -- live und im
+    Batch (Scheduler) derselbe."""
+    names = ticker_names or {}
+    system = current_date_context() + BASE_SYSTEM_PROMPT
+    if skill_prompt:
+        system += f"\n\n## Filter Strategy: {skill_name}\n{skill_prompt}"
+
+    # 1 search per ticker, min 4, max 10 — keeps costs proportional but bounded
+    web_search_tool = {**_WEB_SEARCH_BASE, "max_uses": min(max(4, len(tickers)), 10)}
+
+    position_lines = "\n".join(
+        f"- **{t}** ({names.get(t, t)})" for t in tickers
+    )
+    user_message = (
+        f"Please search for recent news for the following portfolio positions "
+        f"and produce a digest applying the filter strategy:\n\n{position_lines}"
+    )
+    return system, user_message, web_search_tool
+
+
 class NewsAgent:
     """
     Conversational agent: start_run() triggers the digest, chat() handles follow-ups.
@@ -167,21 +193,8 @@ class NewsAgent:
         if not tickers:
             return "No positions found. Add positions in Portfolio Chat first."
 
-        names = ticker_names or {}
-        system = current_date_context() + BASE_SYSTEM_PROMPT
-        if skill_prompt:
-            system += f"\n\n## Filter Strategy: {skill_name}\n{skill_prompt}"
-
-        # 1 search per ticker, min 4, max 10 — keeps costs proportional but bounded
-        web_search_tool = {**_WEB_SEARCH_BASE, "max_uses": min(max(4, len(tickers)), 10)}
-
-        position_lines = "\n".join(
-            f"- **{t}** ({names.get(t, t)})" for t in tickers
-        )
-        user_message = (
-            f"Please search for recent news for the following portfolio positions "
-            f"and produce a digest applying the filter strategy:\n\n{position_lines}"
-        )
+        system, user_message, web_search_tool = build_digest_request(
+            tickers, ticker_names, skill_name, skill_prompt)
 
         response = await self._llm.chat_with_tools(
             messages=[{"role": "user", "content": user_message}],

@@ -190,8 +190,28 @@ class TestSkript:
     def test_batch_api_holt_die_batches_ab(self):
         d = MagicMock()
         d.laufen_lassen.return_value = (0, [], [])
+        d.wartet.return_value = {"anzahl": 0, "seit": None, "was": []}
         skript.agenten(d, batch_api=True)
         d.batches_abholen.assert_called_once()
+
+    def test_meldet_ins_run_log_worauf_es_wartet(self, capsys, tmp_path, monkeypatch):
+        """02.10.2026: der Messwert wartet fuer die ops-core-Kachel, Form wie im
+        Vertrag (heimnetzwerk docs/haus/vertraege/wartet.ndjson)."""
+        import json
+        (tmp_path / "runs").mkdir()
+        monkeypatch.setenv("OPS_CORE_HOME", str(tmp_path))
+        monkeypatch.setenv("OPS_RUN_ID", "01TEST")
+        monkeypatch.setenv("OPS_JOB", "agenten")
+        d = MagicMock()
+        d.laufen_lassen.return_value = (0, [], [])
+        d.batches_abholen.return_value = ["Batch Storychecker: läuft noch"]
+        d.wartet.return_value = {"anzahl": 1, "seit": "2026-10-02T13:05:12+02:00", "was": ["Storychecker"]}
+        assert skript.agenten(d, batch_api=True) == 0
+        assert "Wartet auf Storychecker seit 13:05." in capsys.readouterr().out
+        [zeile] = [json.loads(z) for f in (tmp_path / "runs").iterdir() for z in f.read_text().splitlines()]
+        assert (zeile["kind"], zeile["job"], zeile["run_id"]) == ("metric", "agenten", "01TEST")
+        assert zeile["payload"] == {"metric": "wartet", "anzahl": 1,
+                                    "seit": "2026-10-02T13:05:12+02:00", "was": ["Storychecker"]}
 
     def test_kurse_nicht_faellig_ist_ein_guter_lauf(self, capsys):
         markt = MagicMock()

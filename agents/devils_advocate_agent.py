@@ -119,6 +119,44 @@ def _extract_parsed(response) -> list:
     ]
 
 
+def build_system(skill_prompt: str, language: str = "de") -> str:
+    """System-Prompt der Analyse -- live und im Batch (Scheduler) derselbe."""
+    system = (
+        current_date_context()
+        + ANALYSIS_SYSTEM_PROMPT
+        + "\n"
+        + response_language_with_fixed_codes(language, list(VALID_VERDICTS))
+    )
+    if skill_prompt:
+        system += f"\n\n## Analyse-Fokus\n{skill_prompt}"
+    return system
+
+
+def format_position(pos: PublicPosition) -> str:
+    """Die Nachricht je Position -- live und im Batch derselbe."""
+    lines = [
+        "Analysiere diese Watchlist-Position aus der Perspektive eines kritischen Gegenanalysten.",
+        "",
+        f"**Position ID:** {pos.id}",
+        f"**Name:** {pos.name}",
+        f"**Ticker:** {pos.ticker}",
+    ]
+    if pos.asset_class:
+        lines.append(f"**Asset-Klasse:** {pos.asset_class}")
+    if pos.isin:
+        lines.append(f"**ISIN:** {pos.isin}")
+    if pos.story:
+        lines.append("")
+        lines.append("**Investment-These (greife diese spezifisch an):**")
+        lines.append(pos.story)
+    lines.append("")
+    lines.append(
+        f"Recherchiere und verfasse die Bären-Analyse — "
+        f"dann rufe `submit_da_verdict` auf (position_id={pos.id})."
+    )
+    return "\n".join(lines)
+
+
 class DevilsAdvocateAgent:
     """
     Cloud agent (Claude ☁️) — finds the bear case for watchlist positions.
@@ -165,14 +203,7 @@ class DevilsAdvocateAgent:
 
         self._llm.skill_context = skill_name
         self._llm.position_count = len(eligible)
-        system = (
-            current_date_context()
-            + ANALYSIS_SYSTEM_PROMPT
-            + "\n"
-            + response_language_with_fixed_codes(language, list(VALID_VERDICTS))
-        )
-        if skill_prompt:
-            system += f"\n\n## Analyse-Fokus\n{skill_prompt}"
+        system = build_system(skill_prompt, language)
 
         semaphore = asyncio.Semaphore(3)
 
@@ -284,24 +315,4 @@ class DevilsAdvocateAgent:
     # ------------------------------------------------------------------
 
     def _format_position(self, pos: PublicPosition) -> str:
-        lines = [
-            "Analysiere diese Watchlist-Position aus der Perspektive eines kritischen Gegenanalysten.",
-            "",
-            f"**Position ID:** {pos.id}",
-            f"**Name:** {pos.name}",
-            f"**Ticker:** {pos.ticker}",
-        ]
-        if pos.asset_class:
-            lines.append(f"**Asset-Klasse:** {pos.asset_class}")
-        if pos.isin:
-            lines.append(f"**ISIN:** {pos.isin}")
-        if pos.story:
-            lines.append("")
-            lines.append("**Investment-These (greife diese spezifisch an):**")
-            lines.append(pos.story)
-        lines.append("")
-        lines.append(
-            f"Recherchiere und verfasse die Bären-Analyse — "
-            f"dann rufe `submit_da_verdict` auf (position_id={pos.id})."
-        )
-        return "\n".join(lines)
+        return format_position(pos)

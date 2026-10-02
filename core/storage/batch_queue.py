@@ -24,6 +24,7 @@ class PendingBatch:
     success_count: Optional[int]
     error_count: Optional[int]
     error_msg: Optional[str]
+    kontext: Optional[str] = None
 
 
 class BatchQueueRepository:
@@ -37,12 +38,13 @@ class BatchQueueRepository:
         skill_name: Optional[str],
         language: str,
         request_count: int,
+        kontext: Optional[str] = None,
     ) -> None:
         self._conn.execute(
             """INSERT OR IGNORE INTO pending_batches
-               (batch_id, agent_name, skill_name, language, request_count)
-               VALUES (?, ?, ?, ?, ?)""",
-            (batch_id, agent_name, skill_name, language, request_count),
+               (batch_id, agent_name, skill_name, language, request_count, kontext)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (batch_id, agent_name, skill_name, language, request_count, kontext),
         )
         self._conn.commit()
 
@@ -86,4 +88,5 @@ class BatchQueueRepository:
             success_count=row["success_count"],
             error_count=row["error_count"],
             error_msg=row["error_msg"],
+            kontext=row["kontext"] if "kontext" in row.keys() else None,
         )
