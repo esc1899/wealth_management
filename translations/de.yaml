@@ -457,7 +457,7 @@ settings:
   model_prices_pick_model: "Modell wählen"
   model_prices_manual_entry: "Manuell eingeben"
   scheduling_header: "Geplante Aufgaben"
-  scheduling_caption: "Cloud-Agenten automatisch zu festgelegten Zeiten ausführen."
+  scheduling_caption: "Cloud-Agenten automatisch zu festgelegten Zeiten ausführen. Ein Job startet in der Stunde nach seiner Uhrzeit (ops-core-Job agenten, stündlich und beim Login) – war der Mac aus, holt der nächste Lauf ihn nach. Läufe stehen auch auf der Jobs-Kachel der Startseite."
   no_scheduled_jobs: "Noch keine geplanten Aufgaben. Unten eine neue hinzufügen."
   add_scheduled_job: "Neue geplante Aufgabe"
   job_enabled: "Aktiv"

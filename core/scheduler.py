@@ -1,14 +1,23 @@
 """
-AgentSchedulerService — runs cloud agent jobs on a cron schedule.
+AgentSchedulerService — runs the agent jobs of the Scheduler page.
 
-Each ScheduledJob in the DB maps to an APScheduler job. On startup, all enabled
-jobs are loaded and registered. Since 2026-10-01 the service runs in its own
-process (`scripts/planer_dienst.py`, ops-core service `planer`), not in Streamlit:
-Streamlit only executes app.py once a browser opens the page, so a scheduler
-started there missed every job of a day nobody looked. The planner picks up
-changes from the Scheduler page by itself (`sync_jobs()`, once a minute); the
-app holds an unstarted instance only for "run now", and its reload_jobs() is a
-no-op.
+Each ScheduledJob in the DB says *what* runs (agent, skill, model) and *when it is
+due* (frequency, day, hour). Since 2026-10-02 nothing in this module keeps time:
+the ops-core job `wealth_management agenten` (`scripts/job.py agenten`, hourly and
+at login, `~/.ops-core/jobs.toml`) asks `faellige_jobs()` and runs them one after
+another via `laufen_lassen()`. Run log, `ops status`, the jobs tile of the start
+page and the transcript are therefore the same as for every other job in the house.
+
+Until then an APScheduler ran here — first inside Streamlit, which only executes
+app.py once a browser opens the page (on 2026-10-01 the monthly jobs started at
+21:35, when the page was opened; on 2026-09-30 nothing ran), then for one day in
+its own service. Neither showed up in the run log of ops-core.
+
+"Due" is period-based and therefore idempotent: a job is due when its most recent
+scheduled time has passed and it has not run since. A missed run (Mac switched
+off) is picked up by the next hourly run or at login; a second run in the same
+hour finds nothing to do. "Run now" on the page still runs in the app process
+(`run_job_now`).
 
 Background thread safety: the service creates its own DB connection and agent
 instances — it does NOT use Streamlit's @st.cache_resource singletons.
@@ -17,13 +26,10 @@ instances — it does NOT use Streamlit's @st.cache_resource singletons.
 from __future__ import annotations
 
 import asyncio
+import calendar
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
-
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
+from typing import Callable, Optional
 
 from config import config
 from core.storage.base import build_encryption_service, get_connection, init_db, migrate_db
@@ -35,12 +41,62 @@ from core.storage.usage import UsageRepository
 
 logger = logging.getLogger(__name__)
 
-_JOB_ID_PREFIX = "agent_job_"
+# A run row still 'running' after this long belongs to a process that died
+# (power cut, killed job). Younger ones may be a "run now" in the app.
+VERWAIST_NACH = timedelta(hours=2)
+
+# A job that fails does not set last_run and would be due again an hour later —
+# 15 attempts a day, each paying for the model calls made before it broke. After
+# this many failed scheduled attempts since its most recent scheduled time it
+# waits for the next one (2026-10-02). "Run now" on the page does not count.
+FEHLVERSUCHE_JE_TERMIN = 3
+
+
+def letzte_feuerzeit(job: ScheduledJob, now: datetime) -> Optional[datetime]:
+    """The most recent scheduled time of this job at or before `now` (local, naive).
+    None for manual jobs — they are never due."""
+    h, m = job.run_hour, job.run_minute
+    if job.frequency == "daily":
+        heute = now.replace(hour=h, minute=m, second=0, microsecond=0)
+        return heute if now >= heute else heute - timedelta(days=1)
+    if job.frequency == "weekly":
+        tag = job.run_weekday or 0  # 0 = Monday
+        diese = (now - timedelta(days=(now.weekday() - tag) % 7)).replace(
+            hour=h, minute=m, second=0, microsecond=0)
+        return diese if now >= diese else diese - timedelta(days=7)
+    if job.frequency == "monthly":
+        def im_monat(jahr: int, monat: int) -> datetime:
+            tag = min(job.run_day or 1, calendar.monthrange(jahr, monat)[1])
+            return datetime(jahr, monat, tag, h, m)
+        diese = im_monat(now.year, now.month)
+        if now >= diese:
+            return diese
+        return im_monat(now.year - 1, 12) if now.month == 1 else im_monat(now.year, now.month - 1)
+    if job.frequency == "yearly":
+        def im_jahr(jahr: int) -> datetime:
+            monat = job.run_month or 1
+            tag = min(job.run_day or 1, calendar.monthrange(jahr, monat)[1])
+            return datetime(jahr, monat, tag, h, m)
+        diese = im_jahr(now.year)
+        return diese if now >= diese else im_jahr(now.year - 1)
+    return None
+
+
+def ist_faellig(job: ScheduledJob, now: datetime) -> bool:
+    """Due: enabled, its most recent scheduled time has passed, and no run since.
+    A job that never ran is due as soon as one scheduled time has passed."""
+    if not job.enabled:
+        return False
+    feuer = letzte_feuerzeit(job, now)
+    if feuer is None:
+        return False
+    return job.last_run is None or job.last_run < feuer
 
 
 class AgentSchedulerService:
     """
-    Singleton service that drives scheduled agent runs via APScheduler.
+    Runs the agent jobs stored in the DB — the due ones from the ops-core job,
+    single ones on "run now" from the page.
 
     Intentionally decoupled from Streamlit state — holds its own DB connection
     so background threads can safely access the database.
@@ -67,90 +123,80 @@ class AgentSchedulerService:
         self._openai_base_url = openai_base_url
         self._default_claude_model = default_claude_model
         self._timezone = timezone
-        self._scheduler = BackgroundScheduler(timezone=timezone)
-        self._started = False
-        self._job_signature: Optional[tuple] = None
 
     # ------------------------------------------------------------------
-    # Lifecycle
+    # The ops-core jobs (scripts/job.py)
     # ------------------------------------------------------------------
 
-    def start(self) -> None:
-        self._scheduler.start()
-        self._started = True
-        self._close_orphaned_runs()
-        self._reload_jobs()
-        logger.info("AgentSchedulerService started")
-
-        if config.USE_BATCH_API:
-            self._scheduler.add_job(
-                func=self._dispatch_batch_poll,
-                trigger=IntervalTrigger(minutes=15),
-                id="batch_poll",
-                replace_existing=True,
-            )
-            logger.info("Batch API polling job registered (every 15 min)")
-
-        # Reconcile real OpenRouter costs in the background so the Statistics page
-        # is display-only (no manual fetch needed). First run ~20s after startup.
-        if self._openai_api_key and self._openai_base_url:
-            self._scheduler.add_job(
-                func=self._dispatch_openrouter_cost_sync,
-                trigger=IntervalTrigger(minutes=30),
-                id="openrouter_cost_sync",
-                next_run_time=datetime.now() + timedelta(seconds=20),
-                replace_existing=True,
-            )
-            logger.info("OpenRouter cost sync job registered (every 30 min)")
-
-        # Catch up any missed jobs in background (don't block app startup)
-        import threading
-        def _run_catchup():
-            try:
-                asyncio.run(self._catchup_missed_jobs())
-            except Exception:
-                logger.exception("Catchup of missed jobs failed")
-
-        thread = threading.Thread(target=_run_catchup, daemon=True)
-        thread.start()
-
-    def shutdown(self) -> None:
-        if self._started:
-            self._scheduler.shutdown(wait=False)
-            self._started = False
-
-    def reload_jobs(self) -> None:
-        """Call after DB changes to re-sync APScheduler with stored jobs.
-
-        Only acts in the process that started the scheduler (the planner). In the
-        app it does nothing — the planner notices the change via sync_jobs()."""
-        if self._started:
-            self._reload_jobs()
-
-    def sync_jobs(self) -> bool:
-        """Reload the schedule if the stored jobs changed since the last load.
-
-        Polled by the planner process. Compares only what decides *when* a job
-        fires, so a job's own run (last_run) never causes a reload — re-adding a
-        cron job right at its fire time could otherwise swallow that run.
-        Returns True if it reloaded."""
+    def faellige_jobs(self, now: Optional[datetime] = None) -> list[ScheduledJob]:
+        now = now or datetime.now()
         conn = self._open_conn()
         try:
-            signature = self._signature(ScheduledJobsRepository(conn).get_enabled())
+            return [j for j in ScheduledJobsRepository(conn).get_enabled() if ist_faellig(j, now)]
         finally:
             conn.close()
-        if signature == self._job_signature:
-            return False
-        logger.info("Scheduled jobs changed, reloading")
-        self._reload_jobs()
-        return True
 
-    @staticmethod
-    def _signature(jobs) -> tuple:
-        return tuple(sorted(
-            (j.id, j.frequency, j.run_hour, j.run_minute, j.run_weekday, j.run_day, j.run_month)
-            for j in jobs
-        ))
+    def laufen_lassen(self, now: Optional[datetime] = None,
+                      aus: Callable[[str], None] = print) -> tuple[int, list[str], list[str]]:
+        """Run every due job, one after another. A failing job does not stop the
+        others. A job with FEHLVERSUCHE_JE_TERMIN failed attempts since its most
+        recent scheduled time is not run again ("gebremst") until the next one.
+        Returns (number run, names failed, names gebremst)."""
+        now = now or datetime.now()
+        self._close_orphaned_runs()
+        gelaufen, fehlgeschlagen, gebremst = 0, [], []
+        for job in self.faellige_jobs(now):
+            name = f"{job.agent_name} (#{job.id})"
+            versuche = self._fehlversuche_seit_termin(job, now)
+            if versuche >= FEHLVERSUCHE_JE_TERMIN:
+                aus(f"{name}: {versuche} Fehlversuche seit dem letzten Termin, "
+                    f"wartet auf den nächsten (Jetzt ausführen geht weiter)")
+                gebremst.append(name)
+                continue
+            aus(f"{name}: fällig ({job.frequency}), läuft")
+            try:
+                asyncio.run(self._execute_job(job.id))
+                aus(f"{name}: fertig")
+            except Exception as exc:
+                logger.exception("Job %s failed", job.id)
+                aus(f"{name}: fehlgeschlagen: {exc}")
+                fehlgeschlagen.append(name)
+            gelaufen += 1
+        return gelaufen, fehlgeschlagen, gebremst
+
+    def _fehlversuche_seit_termin(self, job: ScheduledJob, now: datetime) -> int:
+        feuer = letzte_feuerzeit(job, now)
+        if feuer is None:
+            return 0
+        conn = self._open_conn()
+        try:
+            return ScheduledJobRunsRepository(conn).count_failed_since(job.id, feuer.astimezone())
+        finally:
+            conn.close()
+
+    def kosten_abgleichen(self) -> tuple[int, int]:
+        """Fetch real costs for uncosted OpenRouter calls, so the Statistics page
+        only displays. Returns (updated, open). Errors reach the job."""
+        if not (self._openai_api_key and self._openai_base_url):
+            return 0, 0
+        from core.llm.openrouter_costs import fetch_and_store_costs
+        conn = self._open_conn()
+        try:
+            repo = UsageRepository(conn)
+            offen = repo.get_uncosted_openrouter_records(limit=200)
+            if not offen:
+                return 0, 0
+            return fetch_and_store_costs(self._openai_api_key, self._openai_base_url, offen, repo), len(offen)
+        finally:
+            conn.close()
+
+    def batches_abholen(self) -> None:
+        """Collect finished Anthropic batches (only used with USE_BATCH_API)."""
+        asyncio.run(self._poll_and_process_batches())
+
+    # ------------------------------------------------------------------
+    # "Run now" from the page (app process)
+    # ------------------------------------------------------------------
 
     def run_job_now(self, job_id: int) -> None:
         """Trigger a job immediately in a background thread, bypassing enabled check."""
@@ -193,78 +239,17 @@ class AgentSchedulerService:
     # ------------------------------------------------------------------
 
     def _close_orphaned_runs(self) -> None:
-        """Mark runs left 'running' by a previous process as failed (see fail_orphaned)."""
+        """Mark runs left 'running' by a dead process as failed (see fail_orphaned)."""
         conn = self._open_conn()
         try:
-            closed = ScheduledJobRunsRepository(conn).fail_orphaned()
+            closed = ScheduledJobRunsRepository(conn).fail_orphaned(
+                "Abgebrochen (Prozess beendet)", aelter_als=VERWAIST_NACH)
             if closed:
                 logger.info("Closed %s orphaned job run(s) from a previous process", closed)
         except Exception:
             logger.exception("Closing orphaned job runs failed")
         finally:
             conn.close()
-
-    def _reload_jobs(self) -> None:
-        # Remove all existing agent jobs
-        for job in self._scheduler.get_jobs():
-            if job.id.startswith(_JOB_ID_PREFIX):
-                job.remove()
-
-        conn = self._open_conn()
-        try:
-            jobs_repo = ScheduledJobsRepository(conn)
-            enabled = jobs_repo.get_enabled()
-            self._job_signature = self._signature(enabled)
-            for job in enabled:
-                if job.frequency == "manual":
-                    continue  # Manual jobs are never auto-scheduled
-                trigger = self._build_trigger(job)
-                self._scheduler.add_job(
-                    func=self._dispatch_job,
-                    trigger=trigger,
-                    id=f"{_JOB_ID_PREFIX}{job.id}",
-                    args=[job.id],
-                    replace_existing=True,
-                    misfire_grace_time=3600,
-                )
-                logger.info("Scheduled agent job %s (%s %s)", job.id, job.agent_name, job.frequency)
-        finally:
-            conn.close()
-
-    def _build_trigger(self, job: ScheduledJob) -> CronTrigger:
-        if job.frequency == "daily":
-            return CronTrigger(
-                hour=job.run_hour, minute=job.run_minute, timezone=self._timezone
-            )
-        elif job.frequency == "weekly":
-            return CronTrigger(
-                day_of_week=job.run_weekday or 0,
-                hour=job.run_hour,
-                minute=job.run_minute,
-                timezone=self._timezone,
-            )
-        elif job.frequency == "yearly":
-            return CronTrigger(
-                month=job.run_month or 1,
-                day=job.run_day or 1,
-                hour=job.run_hour,
-                minute=job.run_minute,
-                timezone=self._timezone,
-            )
-        else:  # monthly
-            return CronTrigger(
-                day=job.run_day or 1,
-                hour=job.run_hour,
-                minute=job.run_minute,
-                timezone=self._timezone,
-            )
-
-    def _dispatch_job(self, job_id: int) -> None:
-        """Called by APScheduler in a background thread."""
-        try:
-            asyncio.run(self._execute_job(job_id))
-        except Exception:
-            logger.exception("Scheduled job %s failed", job_id)
 
     async def _execute_job(self, job_id: int, source: str = "scheduled") -> None:
         conn = self._open_conn()
@@ -285,120 +270,6 @@ class AgentSchedulerService:
             except Exception as exc:
                 runs_repo.fail(run.id, str(exc))
                 raise
-        finally:
-            conn.close()
-
-    @staticmethod
-    def _previous_scheduled_fire_time(job: "ScheduledJob", now: "datetime") -> Optional["datetime"]:
-        """Return the most recent past datetime when this job was scheduled to fire.
-
-        Used by catchup to determine whether a job already ran for the current period.
-        Returns None for daily jobs (no catchup) or if the fire time can't be computed.
-        """
-        import calendar as _cal
-
-        run_hour = job.run_hour
-        run_minute = job.run_minute
-
-        if job.frequency == "monthly":
-            run_day = job.run_day or 1
-            last_day = _cal.monthrange(now.year, now.month)[1]
-            fire_this = now.replace(day=min(run_day, last_day), hour=run_hour, minute=run_minute, second=0, microsecond=0)
-            if now >= fire_this:
-                return fire_this
-            # Previous month
-            if now.month == 1:
-                py, pm = now.year - 1, 12
-            else:
-                py, pm = now.year, now.month - 1
-            last_day = _cal.monthrange(py, pm)[1]
-            return datetime(py, pm, min(run_day, last_day), run_hour, run_minute)
-
-        elif job.frequency == "yearly":
-            run_month = job.run_month or 1
-            run_day = job.run_day or 1
-            last_day = _cal.monthrange(now.year, run_month)[1]
-            fire_this = datetime(now.year, run_month, min(run_day, last_day), run_hour, run_minute)
-            if now >= fire_this:
-                return fire_this
-            py = now.year - 1
-            last_day = _cal.monthrange(py, run_month)[1]
-            return datetime(py, run_month, min(run_day, last_day), run_hour, run_minute)
-
-        return None  # daily has no catchup; weekly uses time_since logic
-
-    async def _catchup_missed_jobs(self, now: Optional[datetime] = None) -> None:
-        """Check if any scheduled jobs are overdue and run them if within grace period."""
-        if now is None:
-            now = datetime.now()
-        conn = self._open_conn()
-        try:
-            jobs_repo = ScheduledJobsRepository(conn)
-            enabled_jobs = jobs_repo.get_enabled()
-            logger.info("Catchup: checking %d enabled jobs", len(enabled_jobs))
-
-            for job in enabled_jobs:
-                if job.frequency in ("daily", "manual"):
-                    continue  # No catchup for daily or manual-only jobs
-
-                # New job (never run) → always run on startup
-                if job.last_run is None:
-                    if not job.created_at:
-                        logger.warning("Catchup: job %s has no reference_time, skipping", job.id)
-                        continue
-                    logger.info("Catchup: new %s job %s (never run), running now", job.frequency, job.id)
-                    try:
-                        await self._execute_job(job.id, source="catchup")
-                    except Exception:
-                        logger.exception("Catchup job %s failed", job.id)
-                    continue
-
-                if job.frequency in ("monthly", "yearly"):
-                    prev_fire = self._previous_scheduled_fire_time(job, now)
-                    if prev_fire is None:
-                        continue
-
-                    if job.last_run >= prev_fire:
-                        # Already ran for this period — skip
-                        logger.info(
-                            "Catchup: %s job %s already ran since last fire (%s → last_run %s), skipping",
-                            job.frequency, job.id,
-                            prev_fire.strftime("%Y-%m-%d %H:%M"),
-                            job.last_run.strftime("%Y-%m-%d %H:%M"),
-                        )
-                        continue
-
-                    # Missed its fire time — check grace period
-                    grace = timedelta(days=30) if job.frequency == "yearly" else timedelta(days=7)
-                    time_since_fire = now - prev_fire
-                    if time_since_fire <= grace:
-                        logger.info(
-                            "Catchup: %s job %s missed fire at %s (%.1fd ago), running",
-                            job.frequency, job.id, prev_fire.strftime("%Y-%m-%d"), time_since_fire.days,
-                        )
-                        try:
-                            await self._execute_job(job.id, source="catchup")
-                        except Exception:
-                            logger.exception("Catchup job %s failed", job.id)
-                    else:
-                        logger.info(
-                            "Catchup: %s job %s missed fire at %s but outside %dd grace, skipping",
-                            job.frequency, job.id, prev_fire.strftime("%Y-%m-%d"), grace.days,
-                        )
-
-                elif job.frequency == "weekly":
-                    time_since = now - job.last_run
-                    grace = timedelta(days=3)
-                    logger.info(
-                        "Catchup: weekly job %s — %.1f hours since last run, grace %dd",
-                        job.id, time_since.total_seconds() / 3600, grace.days,
-                    )
-                    if time_since > grace:
-                        logger.info("Catchup: weekly job %s overdue, running", job.id)
-                        try:
-                            await self._execute_job(job.id, source="catchup")
-                        except Exception:
-                            logger.exception("Catchup job %s failed", job.id)
         finally:
             conn.close()
 
@@ -951,31 +822,6 @@ class AgentSchedulerService:
     # ------------------------------------------------------------------
     # Batch API — submit + poll (USE_BATCH_API=true, Anthropic direct only)
     # ------------------------------------------------------------------
-
-    def _dispatch_batch_poll(self) -> None:
-        try:
-            asyncio.run(self._poll_and_process_batches())
-        except Exception:
-            logger.exception("Batch poll failed")
-
-    def _dispatch_openrouter_cost_sync(self) -> None:
-        """Fetch real costs for any uncosted OpenRouter calls (runs in background)."""
-        try:
-            from core.llm.openrouter_costs import fetch_and_store_costs
-            conn = self._open_conn()
-            try:
-                repo = UsageRepository(conn)
-                uncosted = repo.get_uncosted_openrouter_records(limit=200)
-                if not uncosted:
-                    return
-                updated = fetch_and_store_costs(
-                    self._openai_api_key, self._openai_base_url, uncosted, repo
-                )
-                logger.info("OpenRouter cost sync: %d/%d records updated", updated, len(uncosted))
-            finally:
-                conn.close()
-        except Exception:
-            logger.exception("OpenRouter cost sync failed")
 
     async def _poll_and_process_batches(self) -> None:
         from core.llm.claude import ClaudeProvider

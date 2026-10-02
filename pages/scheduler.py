@@ -60,7 +60,6 @@ if not any(j.agent_name == "monthly_digest" for j in _all_jobs_for_seed):
         enabled=True,
     )
     _sched_repo.add(_seed_job)
-    get_agent_scheduler().reload_jobs()
 
 if not any(j.agent_name == "yearly_digest" for j in _all_jobs_for_seed):
     _seed_yearly = ScheduledJob(
@@ -75,7 +74,6 @@ if not any(j.agent_name == "yearly_digest" for j in _all_jobs_for_seed):
         enabled=True,
     )
     _sched_repo.add(_seed_yearly)
-    get_agent_scheduler().reload_jobs()
 
 if not any(j.agent_name == "wealth_snapshot" for j in _all_jobs_for_seed):
     _seed_snapshot = ScheduledJob(
@@ -88,7 +86,6 @@ if not any(j.agent_name == "wealth_snapshot" for j in _all_jobs_for_seed):
         enabled=True,
     )
     _sched_repo.add(_seed_snapshot)
-    get_agent_scheduler().reload_jobs()
 
 _SCHEDULABLE_AGENTS = {
     "news": t("settings.agent_news"),
@@ -169,8 +166,7 @@ else:
                 )
                 if _new_enabled != _job.enabled:
                     _sched_repo.set_enabled(_job.id, _new_enabled)
-                    get_agent_scheduler().reload_jobs()
-                    st.rerun()
+                                    st.rerun()
             with _jc3:
                 if st.button(t("settings.run_now_button"), key=f"_job_run_{_job.id}", type="primary"):
                     get_agent_scheduler().run_job_now(_job.id)
@@ -180,8 +176,7 @@ else:
                     st.write("")  # no delete for system jobs
                 elif st.button(t("settings.delete_button"), key=f"_job_del_{_job.id}", type="secondary"):
                     _sched_repo.delete(_job.id)
-                    get_agent_scheduler().reload_jobs()
-                    st.rerun()
+                                    st.rerun()
 
             # Inline model + skill selectors (non-system jobs only)
             if not _is_system:
@@ -358,6 +353,5 @@ if _jf_submitted:
         model=_jf_model or None,
     )
     _sched_repo.add(_new_job)
-    get_agent_scheduler().reload_jobs()
     st.success(t("settings.job_saved"))
     st.rerun()

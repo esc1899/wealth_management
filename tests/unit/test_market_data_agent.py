@@ -387,14 +387,6 @@ class TestDailyPnL:
         assert v.day_pnl_eur == pytest.approx(50.0)
 
 
-class TestSetupScheduler:
-    def test_returns_scheduler(self, agent):
-        scheduler = agent.setup_scheduler(fetch_hour=18)
-        assert scheduler is not None
-        jobs = scheduler.get_jobs()
-        assert any(j.id == "daily_market_fetch" for j in jobs)
-
-
 class TestFetchOverdue:
     """Pure decision logic for the daily-fetch catchup (no threads, no tz lookup)."""
 
@@ -429,25 +421,48 @@ class TestFetchOverdue:
         assert MarketDataAgent._is_fetch_overdue(now, None, 18) is False
 
 
-class TestCatchupFetch:
-    def test_triggers_scheduled_fetch_when_overdue(self, agent):
-        agent.get_latest_fetch_time = MagicMock(
-            return_value=datetime(2026, 6, 16, 16, 42, tzinfo=timezone.utc)
-        )
-        done = threading.Event()
-        agent._scheduled_fetch = MagicMock(side_effect=lambda: done.set())
-        now = datetime(2026, 6, 17, 19, 0, tzinfo=ZoneInfo("Europe/Berlin"))
+class TestTagesabruf:
+    """The ops-core job `kurse` asks this at login and at 18:05 (scripts/job.py)."""
 
-        assert agent.catchup_fetch_if_missed(fetch_hour=18, now=now) is True
-        assert done.wait(timeout=2)
-        agent._scheduled_fetch.assert_called_once()
+    @staticmethod
+    def _mit_wasserstand(agent, wert=None):
+        speicher = {} if wert is None else {MarketDataAgent.TAGESABRUF_KEY: wert}
+        agent._app_config = MagicMock()
+        agent._app_config.get.side_effect = speicher.get
+        agent._app_config.set.side_effect = speicher.__setitem__
+        return speicher
 
-    def test_no_trigger_when_already_fetched_today(self, agent):
-        agent.get_latest_fetch_time = MagicMock(
-            return_value=datetime(2026, 6, 17, 16, 30, tzinfo=timezone.utc)
-        )
+    def test_runs_when_due_and_sets_its_watermark(self, agent):
+        speicher = self._mit_wasserstand(agent, "2026-06-16T18:05:00+02:00")
         agent._scheduled_fetch = MagicMock()
         now = datetime(2026, 6, 17, 19, 0, tzinfo=ZoneInfo("Europe/Berlin"))
 
-        assert agent.catchup_fetch_if_missed(fetch_hour=18, now=now) is False
+        assert agent.tagesabruf_wenn_faellig(fetch_hour=18, now=now) is True
+        agent._scheduled_fetch.assert_called_once()
+        assert speicher[MarketDataAgent.TAGESABRUF_KEY] == now.isoformat()
+
+    def test_not_due_when_it_ran_after_fire_today(self, agent):
+        self._mit_wasserstand(agent, "2026-06-17T18:05:00+02:00")
+        agent._scheduled_fetch = MagicMock()
+        now = datetime(2026, 6, 17, 19, 0, tzinfo=ZoneInfo("Europe/Berlin"))
+
+        assert agent.tagesabruf_wenn_faellig(fetch_hour=18, now=now) is False
         agent._scheduled_fetch.assert_not_called()
+
+    def test_tile_fetch_does_not_count_as_daily_fetch(self, agent):
+        """The hourly tile job fetches current prices after 18:00 — without history
+        and snapshots. That must not mark the daily fetch as done."""
+        self._mit_wasserstand(agent, "2026-06-16T18:05:00+02:00")
+        agent.get_latest_fetch_time = MagicMock(
+            return_value=datetime(2026, 6, 17, 16, 40, tzinfo=timezone.utc))  # 18:40 Berlin
+        agent._scheduled_fetch = MagicMock()
+        now = datetime(2026, 6, 17, 19, 0, tzinfo=ZoneInfo("Europe/Berlin"))
+
+        assert agent.tagesabruf_wenn_faellig(fetch_hour=18, now=now) is True
+
+    def test_not_due_before_fire_hour(self, agent):
+        self._mit_wasserstand(agent)
+        agent._scheduled_fetch = MagicMock()
+        now = datetime(2026, 6, 17, 8, 0, tzinfo=ZoneInfo("Europe/Berlin"))
+
+        assert agent.tagesabruf_wenn_faellig(fetch_hour=18, now=now) is False

@@ -458,7 +458,7 @@ settings:
   model_not_current: "{model} — no longer current"
   model_prices_from_catalog: "Claude prices come from the household model catalog (Home-Ops page, “update models and prices”). A change made here only lasts until the next reload."
   scheduling_header: "Scheduled Tasks"
-  scheduling_caption: "Run cloud agents automatically at configured times."
+  scheduling_caption: "Run cloud agents automatically at configured times. A job starts within the hour after its time (ops-core job agenten, hourly and at login) — if the Mac was off, the next run catches up. Runs also show on the jobs tile of the start page."
   no_scheduled_jobs: "No scheduled tasks yet. Add one below."
   add_scheduled_job: "New Scheduled Task"
   job_enabled: "Active"

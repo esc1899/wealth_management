@@ -102,10 +102,17 @@ def test_fail_orphaned_is_idempotent(runs_repo, job_id):
     assert runs_repo.fail_orphaned() == 0
 
 
-def test_start_closes_orphaned_runs(scheduler, conn, job_id):
-    """AgentSchedulerService.start() wires the cleanup in."""
+def test_job_run_closes_old_orphans_but_not_young_runs(scheduler, conn, job_id):
+    """laufen_lassen() (the ops-core job) closes runs a dead process left behind —
+    but not a young 'running' row: that may be "run now" in the app, a separate process."""
+    from datetime import datetime, timedelta, timezone
+
     runs_repo = ScheduledJobRunsRepository(conn)
-    runs_repo.create(job_id)
+    alt = runs_repo.create(job_id)
+    vor_drei_stunden = (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat()
+    conn.execute("UPDATE scheduled_job_runs SET started_at = ? WHERE id = ?", (vor_drei_stunden, alt.id))
+    conn.commit()
+    jung = runs_repo.create(job_id)
 
     # The scheduler closes the connection it opened — that would drop the :memory:
     # DB before we can assert, so hand it a proxy whose close() is a no-op.
@@ -120,13 +127,13 @@ def test_start_closes_orphaned_runs(scheduler, conn, job_id):
             pass
 
     scheduler._open_conn = Mock(return_value=_KeepAlive(conn))
-    scheduler._scheduler = MagicMock()
-    scheduler._reload_jobs = Mock()
+    scheduler.faellige_jobs = Mock(return_value=[])
 
-    with patch.object(scheduler, "_catchup_missed_jobs"):
-        scheduler.start()
+    scheduler.laufen_lassen(aus=lambda _: None)
 
-    assert runs_repo.get_for_job(job_id)[0].status == "failed"
+    status = {r.id: r.status for r in runs_repo.get_for_job(job_id)}
+    assert status[alt.id] == "failed"
+    assert status[jung.id] == "running"
 
 
 # ------------------------------------------------------------------

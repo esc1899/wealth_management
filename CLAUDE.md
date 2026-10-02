@@ -45,12 +45,14 @@ launchctl kickstart -k gui/$(id -u)/ops-core.wealth_management.app
 ops run wealth_management kachel
 launchctl kickstart -k gui/$(id -u)/ops-core.wealth_management.meldungen
 
-# Scheduled job debugging — real tracebacks are here, not in the UI. Since 2026-10-01 the
-# schedule (price fetch 18:00, Scheduler-page jobs) runs in its own service, the planner
-# (scripts/planer_dienst.py), not in Streamlit — Streamlit only runs app.py once a browser
-# opens the page. "Run now" still runs in the app, its tracebacks are in the app log.
-tail -100 ~/.ops-core/launchd/ops-core.wealth_management.planer.log | grep -A5 "Error\|Exception\|Traceback"
-launchctl kickstart -k gui/$(id -u)/ops-core.wealth_management.planer   # after changes in core/scheduler.py or agents
+# Scheduled jobs are ops-core jobs since 2026-10-02 (scripts/job.py): agenten (due jobs of
+# the Scheduler page, hourly), kurse (daily fetch, 18:05), kosten (OpenRouter, hourly).
+# Never a scheduler inside the app — Streamlit only runs app.py once a browser opens the page.
+ops status wealth_management                       # wann lief was zuletzt gut?
+ops runs wealth_management --job agenten --days 2  # Läufe; die Ausgabe steht im Mitschnitt
+ops run wealth_management agenten                  # von Hand: führt aus, was fällig ist
+# "Run now" on the page still runs in the app process — its tracebacks are in the app log:
+tail -100 ~/.ops-core/launchd/ops-core.wealth_management.app.log | grep -A5 "Error\|Exception\|Traceback"
 
 # Backup manuell anstoßen (WD Passport muss angeschlossen sein). Der Button in
 # Settings öffnet dafür ein Terminal-Fenster (seit 26.09.2026) — nur Terminal hat

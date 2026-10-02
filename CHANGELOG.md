@@ -8,6 +8,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Die Jobs sind ops-core-Jobs — 2026-10-02
+
+**Warum:** Der Planer vom Vortag lief zuverlässig, aber am Run-Log des Hauses vorbei: Die
+Agenten-Jobs standen weder in `ops status` noch auf der Jobs-Kachel der Startseite. Wealth war
+das einzige Projekt mit einem Zeitplan außerhalb von `~/.ops-core/jobs.toml`.
+
+**Änderungen:**
+- **`scripts/job.py`** (neu, ersetzt `planer_dienst.py`): `agenten` (stündlich und beim Login)
+  führt die fälligen Jobs der Seite „Scheduler“ nacheinander aus, ein Fehler hält die anderen
+  nicht auf und macht den Lauf rot; mit `USE_BATCH_API` holt er danach die Batches ab.
+  `kurse` (Login, 18:05) ist der Tagesabruf, `kosten` (stündlich) trägt OpenRouter-Kosten nach.
+- **Fällig** (`core.scheduler.ist_faellig`): der letzte Termin ist vorbei, und seitdem lief der
+  Job nicht. Gilt jetzt auch für tägliche Jobs — ein verpasster Tagesjob wird nachgeholt.
+  Takt und Uhrzeit bleiben auf der Seite; ein Job startet in der Stunde nach seiner Uhrzeit.
+- **Eigener Wasserstand für den Tagesabruf** (`tagesabruf_zuletzt`): Gemessen am letzten
+  Kursabruf überhaupt hätte der stündliche Kachel-Lauf (ohne Historie, ohne Snapshot) ihn nach
+  einem Login nach 18 Uhr als erledigt gelten lassen.
+- **Bremse für Fehlversuche:** Ein gescheiterter Job setzt `last_run` nicht und wäre eine Stunde
+  später wieder fällig — 15 Versuche am Tag, jeder zahlt die Modellaufrufe bis zum Abbruch. Nach
+  drei gescheiterten geplanten Versuchen seit seinem letzten Termin wartet er auf den nächsten
+  (`FEHLVERSUCHE_JE_TERMIN`). Der Lauf `agenten` bleibt dabei rot, damit der Stillstand auf der
+  Kachel steht; „Jetzt ausführen“ zählt nicht mit und geht immer.
+- **Verwaiste Läufe** werden nur geschlossen, wenn sie älter als zwei Stunden sind — „Jetzt
+  ausführen“ in der App ist ein anderer Prozess.
+- APScheduler ist raus (Code und `requirements.txt`), ebenso `sync_jobs`, `reload_jobs`,
+  `setup_scheduler`, `catchup_fetch_if_missed`.
+
 ### Die Jobs laufen ab dem Login, nicht erst beim Öffnen der Seite — 2026-10-01
 
 **Warum:** Am 01.10. starteten die Monatsjobs vom 1. erst abends um 21:35, als die Seite

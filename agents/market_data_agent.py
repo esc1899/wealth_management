@@ -12,8 +12,6 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Optional, Callable
 
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
 
 from agents.market_data_fetcher import MarketDataFetcher
 from core.asset_class_config import get_asset_class_registry
@@ -436,18 +434,10 @@ class MarketDataAgent:
         return self._market.get_historical(symbol, days=days)
 
     # ------------------------------------------------------------------
-    # Scheduler
+    # Daily fetch — run by the ops-core job `kurse` (scripts/job.py), which
+    # asks tagesabruf_wenn_faellig() at login and at 18:05. Until 2026-10-02 an
+    # APScheduler inside Streamlit did this, only once a browser had opened the page.
     # ------------------------------------------------------------------
-
-    def setup_scheduler(self, fetch_hour: int = 18, timezone: str = "Europe/Berlin") -> BackgroundScheduler:
-        scheduler = BackgroundScheduler(timezone=timezone)
-        scheduler.add_job(
-            func=self._scheduled_fetch,
-            trigger=CronTrigger(hour=fetch_hour, minute=0, timezone=timezone),
-            id="daily_market_fetch",
-            replace_existing=True,
-        )
-        return scheduler
 
     def _scheduled_fetch(self) -> None:
         conn = get_connection(self._db_path)
@@ -504,38 +494,31 @@ class MarketDataAgent:
             return True
         return last_fetch.astimezone(now_local.tzinfo) < fire_today
 
-    def catchup_fetch_if_missed(
+    TAGESABRUF_KEY = "tagesabruf_zuletzt"
+
+    def tagesabruf_wenn_faellig(
         self,
         fetch_hour: int = 18,
         timezone: str = "Europe/Berlin",
         now: Optional[datetime] = None,
     ) -> bool:
-        """Run the daily fetch now if today's scheduled fire was missed.
+        """Run the daily fetch (history + snapshots) if today's `fetch_hour:00` has
+        passed and it has not run since. Synchronous; True if it ran.
 
-        The daily CronTrigger does not fire if the process was asleep at
-        `fetch_hour` (macOS App Nap, app restart), and there is no APScheduler
-        catchup. Without a fresh fetch the day's prices — and the daily P&L
-        derived from them — stay stale. Called once at app startup. Returns
-        True if a catchup fetch was triggered (runs in a background thread).
-        """
-        try:
-            from zoneinfo import ZoneInfo
-            tz = ZoneInfo(timezone)
-        except Exception:
-            logger.warning("catchup: timezone %s unavailable, skipping", timezone)
-            return False
-
+        The watermark is its own (`tagesabruf_zuletzt` in app_config), not the latest
+        price fetch: the hourly tile job fetches current prices too, without history
+        and snapshots — measured against that, a login after 18:00 would count the
+        daily fetch as done whenever the tile run finished first."""
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(timezone)
         if now is None:
             now = datetime.now(tz)
-        last = self.get_latest_fetch_time()
+        roh = self._app_config.get(self.TAGESABRUF_KEY) if self._app_config else None
+        last = datetime.fromisoformat(roh) if roh else None
         if not self._is_fetch_overdue(now, last, fetch_hour):
             return False
-
-        logger.info(
-            "catchup: daily %02d:00 fetch missed (last=%s), running now",
-            fetch_hour, last,
-        )
-        threading.Thread(
-            target=self._scheduled_fetch, daemon=True, name="market-catchup"
-        ).start()
+        logger.info("daily %02d:00 fetch due (last=%s), running", fetch_hour, last)
+        self._scheduled_fetch()
+        if self._app_config:
+            self._app_config.set(self.TAGESABRUF_KEY, now.isoformat())
         return True

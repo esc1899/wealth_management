@@ -20,6 +20,13 @@ class TestPageLoadability:
     """
 
     # Agent Pages (Cloud & Local) — Multi-turn sessions
+    def test_scheduler_page_loads(self):
+        """Scheduler page — since 2026-10-02 without reload_jobs(); the jobs run as
+        the ops-core job `agenten`."""
+        at = AppTest.from_file(PAGES / "scheduler.py")
+        at.run()
+        assert not at.exception, f"Page threw exception: {at.exception}"
+
     def test_watchlist_checker_page_loads(self):
         """Watchlist Checker page should load without exceptions."""
         at = AppTest.from_file(PAGES / "watchlist_checker.py")

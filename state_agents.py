@@ -114,9 +114,9 @@ def get_market_agent() -> MarketDataAgent:
     # Register post-fetch callback for automatic wealth snapshots
     agent.set_post_fetch_callback(lambda: _safe_take_snapshot())
 
-    # The daily fetch and its catchup run in the planner process
-    # (scripts/planer_dienst.py), not here: Streamlit builds this only when a
-    # browser opens the page, and a day without a visit had no prices.
+    # The daily fetch runs as the ops-core job `kurse` (scripts/job.py), not
+    # here: Streamlit builds this only when a browser opens the page, and a day
+    # without a visit had no history and no snapshot.
     return agent
 
 
@@ -291,9 +291,8 @@ def get_portfolio_robustness_agent() -> PortfolioRobustnessAgent:
 
 @st.cache_resource
 def get_agent_scheduler() -> AgentSchedulerService:
-    """Unstarted: here only for "run now" from the pages. The schedule itself runs
-    in the planner process (scripts/planer_dienst.py) — starting it here as well
-    would run every job twice and close the planner's running runs as orphans."""
+    """Only for "run now" on the Scheduler page. The due jobs run as the ops-core
+    job `agenten` (scripts/job.py), not in Streamlit."""
     return AgentSchedulerService(
         db_path=config.DB_PATH,
         encryption_key=config.ENCRYPTION_KEY,

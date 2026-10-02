@@ -71,7 +71,7 @@ sequenceDiagram
     B->>A: Page request
     A->>A: validate config, login gate
     A->>S: get_portfolio_agent() ← EAGER
-    A->>S: get_market_agent() ← EAGER (no schedule — see planner)
+    A->>S: get_market_agent() ← EAGER (no schedule — see ops-core jobs)
     A->>B: render navigation
 
     B->>A: navigate to analysis page
@@ -238,15 +238,19 @@ All agents are **lazy-loaded via `@st.cache_resource` factory functions**. Two a
 - `get_portfolio_agent()` — Portfolio Chat critical path
 - `get_market_agent()` — market data for the pages
 
-**No schedule runs in the Streamlit process** (since 2026-10-01). The daily price fetch
-and the scheduled cloud jobs run in the planner, `scripts/planer_dienst.py`, its own
-process started at login. Streamlit executes `app.py` only when a browser opens the
-page, so a schedule started there missed every run of a day without a visit. The app
-keeps an unstarted `AgentSchedulerService` (`get_agent_scheduler()`) for "run now";
-its `reload_jobs()` does nothing, the planner picks up changes from the Scheduler page
-by polling the jobs table once a minute (`sync_jobs()`). Never call `start()` in the
-app: every job would run twice, and each process would close the other's running runs
-as orphans on startup.
+**No schedule runs in the app** (since 2026-10-02). Everything that runs regularly is an
+ops-core job (`scripts/job.py`, schedule in `~/.ops-core/jobs.toml`): `agenten` (hourly
+and at login — runs the due jobs of the Scheduler page), `kurse` (login and 18:05 — the
+daily fetch with history and snapshots) and `kosten` (hourly — real OpenRouter costs).
+Streamlit executes `app.py` only when a browser opens the page, so the APScheduler that
+used to run there missed every run of a day without a visit, and none of it showed in the
+house's run log. Frequency and time of an agent job are still set on the Scheduler page;
+the job decides what is due (`core.scheduler.ist_faellig`: the most recent scheduled time
+has passed and the job has not run since). After three failed scheduled attempts since
+that time a job waits for its next one, and `agenten` stays red meanwhile
+(`FEHLVERSUCHE_JE_TERMIN`) — otherwise a failing job would retry, and pay, every hour.
+The app keeps an `AgentSchedulerService` only
+for "run now". Don't add a scheduler to the app again — add a job.
 
 All others are loaded on first page visit and cached for the session.
 
@@ -627,7 +631,7 @@ here; this repo only delivers the pieces the house asks for:
 | Piece | Here | Wired up in `heimnetzwerk` |
 |---|---|---|
 | The app | `streamlit run app.py`, `127.0.0.1:8655` under `/wealth/` (`.streamlit/config.toml`) | `ops-core.wealth_management.app` (KeepAlive) from `~/.ops-core/jobs.toml`; Caddy route with `zugang = "lokal"` — reachable only from the Mini itself (`http://localhost/wealth/`), 404 for every other sender |
-| The schedule | `scripts/planer_dienst.py`: daily price fetch at 18:00 and the jobs of the Scheduler page, missed runs caught up at start | service `planer` (KeepAlive), log `~/.ops-core/launchd/ops-core.wealth_management.planer.log`; no port, so not in the registry |
+| The schedule | `scripts/job.py agenten / kurse / kosten`: the due jobs of the Scheduler page, the daily fetch, OpenRouter costs | jobs `agenten` (login, :05), `kurse` (login, 18:05), `kosten` (login, :35); run log, `ops status` and the jobs tile like every job; the tile's Wealth row jumps to `/wealth/scheduler` |
 | The tile | `scripts/kachel.py --fetch` writes `~/.dienste/www/kacheln/wealth.json`: day change, positions, biggest mover | job `kachel`, hourly at :40 and at login |
 | The notice | `core/story_meldung.py`: once the Story Checker has judged every position with a story, the tile carries the sum of its verdicts, red if one is endangered, linking to `/wealth/storychecker` | written by the tile job — never when the tile is opened |
 | The ✕ on the notice | `scripts/meldungen_dienst.py`, stdlib only, `127.0.0.1:8656`; a POST remembers the dismissed pass in `app_config` and drops the notice from the file | service `meldungen`; Caddy routes `/kacheln/wealth/*` there (it must sit under the tile's path, or the start page shows no ✕) |

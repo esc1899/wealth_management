@@ -3,7 +3,7 @@ ScheduledJobsRepository + ScheduledJobRunsRepository — CRUD for scheduler tabl
 """
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from core.storage.models import ScheduledJob, ScheduledJobRun
@@ -150,19 +150,22 @@ class ScheduledJobRunsRepository:
         )
         self._conn.commit()
 
-    def fail_orphaned(self, error_msg: str = "Abgebrochen (App-Neustart)") -> int:
+    def fail_orphaned(self, error_msg: str = "Abgebrochen (App-Neustart)",
+                      aelter_als: Optional[timedelta] = None) -> int:
         """Close run rows left in 'running' by a killed process.
 
         A run row only ever ends via complete()/fail() inside the executing process,
-        so a restart leaves in-flight runs stuck as 'running' forever. Call this once
-        at scheduler startup — before any job of this process can have started.
+        so a power cut leaves in-flight runs stuck as 'running' forever. With
+        `aelter_als`, only rows started longer ago are closed — the job and "run now"
+        in the app are separate processes, a young 'running' row may be alive.
         Returns the number of rows closed.
         """
         now = datetime.now(timezone.utc)
+        grenze = (now - aelter_als).isoformat() if aelter_als else now.isoformat()
         cur = self._conn.execute(
             "UPDATE scheduled_job_runs SET status = 'failed', completed_at = ?, error_msg = ? "
-            "WHERE status = 'running'",
-            (now.isoformat(), error_msg[:500]),
+            "WHERE status = 'running' AND started_at <= ?",
+            (now.isoformat(), error_msg[:500], grenze),
         )
         self._conn.commit()
         return cur.rowcount
@@ -190,6 +193,15 @@ class ScheduledJobRunsRepository:
             )
             WHERE j.enabled = 1 AND r.status = 'failed'
             """
+        ).fetchone()
+        return row[0]
+
+    def count_failed_since(self, job_id: int, seit: datetime, source: str = "scheduled") -> int:
+        """Failed runs of this job started at or after `seit` (aware), from `source`."""
+        row = self._conn.execute(
+            "SELECT COUNT(*) FROM scheduled_job_runs "
+            "WHERE job_id = ? AND source = ? AND status = 'failed' AND started_at >= ?",
+            (job_id, source, seit.astimezone(timezone.utc).isoformat()),
         ).fetchone()
         return row[0]
 
