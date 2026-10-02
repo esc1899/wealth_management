@@ -7,7 +7,7 @@ import streamlit as st
 from config import config
 from core.constants import CLAUDE_HAIKU
 from state_repos import get_usage_repo, get_analyses_repo, get_positions_repo
-from state_llm import _get_agent_model, _get_public_agent_model
+from state_llm import _get_agent_model, _get_public_agent_model, _make_public_provider
 
 # Default model values
 _DEFAULT_OLLAMA_MODEL = config.OLLAMA_MODEL
@@ -16,15 +16,16 @@ _DEFAULT_CLAUDE_MODEL = CLAUDE_HAIKU
 
 @st.cache_resource
 def get_position_story_service():
-    """Service for generating individual position investment theses."""
+    """Service for generating individual position investment theses.
+
+    Modell aus den Einstellungen ("Story-Entwurf"), je Aufruf gelesen und
+    geroutet wie jeder Cloud-Agent -- bis 02.10.2026 umging der Service das
+    und waehlte den Anbieter allein danach, ob OPENAI_BASE_URL gesetzt war.
+    """
     from core.services.position_story_service import PositionStoryService
     return PositionStoryService(
-        api_key=config.LLM_API_KEY,
-        usage_repo=get_usage_repo(),
-        model=_get_public_agent_model("position_story", CLAUDE_HAIKU),
-        base_url=config.LLM_BASE_URL,
-        openai_api_key=config.OPENAI_API_KEY,
-        openai_base_url=config.OPENAI_BASE_URL,
+        provider_factory=lambda: _make_public_provider(
+            _get_public_agent_model("position_story", CLAUDE_HAIKU), "position_story"),
     )
 
 

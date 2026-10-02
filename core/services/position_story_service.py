@@ -9,11 +9,9 @@ import asyncio
 import logging
 import re
 from datetime import date
-from typing import Optional
+from typing import Callable, Optional
 
-from core.constants import CLAUDE_HAIKU
-from core.llm.claude import ClaudeProvider
-from core.storage.usage import UsageRepository
+from core.llm.base import LLMProvider
 
 logger = logging.getLogger(__name__)
 
@@ -32,21 +30,11 @@ def _these_aus(text: str) -> str:
 class PositionStoryService:
     """Service for generating and updating investment theses for positions."""
 
-    def __init__(
-        self,
-        api_key: str,
-        usage_repo: Optional[UsageRepository] = None,
-        model: Optional[str] = None,
-        base_url: str = "",
-        openai_api_key: str = "",
-        openai_base_url: str = "",
-    ):
-        self._api_key = api_key
-        self._base_url = base_url
-        self._openai_api_key = openai_api_key
-        self._openai_base_url = openai_base_url
-        self._usage_repo = usage_repo
-        self._model = model or CLAUDE_HAIKU
+    def __init__(self, provider_factory: Callable[[], LLMProvider]):
+        """provider_factory baut je Aufruf den Provider -- so wirkt eine neue
+        Modellwahl in den Einstellungen ohne Neustart, und Routing (Anthropic,
+        OpenRouter, DeepSeek) und Verbrauch laufen wie bei allen Cloud-Agenten."""
+        self._provider_factory = provider_factory
 
     def generate_position_story(
         self,
@@ -79,11 +67,7 @@ class PositionStoryService:
         """
         Async implementation of position story generation.
         """
-        if self._openai_base_url:
-            from core.llm.openai_compatible import OpenAICompatibleProvider
-            llm = OpenAICompatibleProvider(api_key=self._openai_api_key, model=self._model, base_url=self._openai_base_url)
-        else:
-            llm = ClaudeProvider(api_key=self._api_key, model=self._model, base_url=self._base_url)
+        llm = self._provider_factory()
 
         # Track position context for usage stats
         llm.skill_context = "position_story"
@@ -132,23 +116,9 @@ class PositionStoryService:
         )
         result = _these_aus(response.content or "")
         if not result:
+            modell = getattr(llm, "_model", "")
             raise RuntimeError(
-                f"Das Modell {self._model} hat keinen Text geliefert – die bestehende Story bleibt unverändert."
-            )
-
-        # Track usage if repo provided
-        if self._usage_repo:
-            # Calculate approximate token count (rough estimate: 4 chars ≈ 1 token)
-            input_tokens = len(prompt) // 4
-            output_tokens = len(result) // 4
-            self._usage_repo.record(
-                agent="position_story_service",
-                model=self._model,
-                skill="position_story",
-                source="manual",
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                position_count=1,
+                f"Das Modell {modell} hat keinen Text geliefert – die bestehende Story bleibt unverändert."
             )
 
         return result

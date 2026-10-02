@@ -283,6 +283,10 @@ with col_s5:
 with col_s6:
     sel_devils_advocate = _public_sel("devils_advocate", "🐻 Devil's Advocate")
 
+col_s7, _, _ = st.columns([1, 1, 1])
+with col_s7:
+    sel_position_story = _public_sel("position_story", "✍️ Story-Entwurf")
+
 if st.button(t("settings.save_models_button"), key="_save_models_btn", width="content"):
     app_config.set("model_ollama_portfolio", sel_portfolio)
     app_config.set("model_ollama_portfolio_story", sel_portfolio_story)
@@ -297,6 +301,7 @@ if st.button(t("settings.save_models_button"), key="_save_models_btn", width="co
     app_config.set("model_public_capital_allocator", sel_capital_allocator)
     app_config.set("model_public_sector_rotation", sel_sector_rotation)
     app_config.set("model_public_devils_advocate", sel_devils_advocate)
+    app_config.set("model_public_position_story", sel_position_story)
     app_config.set("model_ollama_portfolio_robustness", sel_portfolio_robustness)
     app_config.set("model_ollama_rebalance", sel_rebalance)
     st.cache_resource.clear()

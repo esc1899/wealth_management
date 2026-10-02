@@ -26,7 +26,7 @@ AGENTEN = (
     ("storychecker", "Story Checker"), ("structural_scan", "Strukturwandel-Scanner"),
     ("consensus_gap", "Konsens-Lücken"), ("fundamental_analyzer", "Fundamentalwert"),
     ("capital_allocator", "Capital Allocator"), ("sector_rotation", "Sektor Rotation"),
-    ("devils_advocate", "Devil's Advocate"),
+    ("devils_advocate", "Devil's Advocate"), ("position_story", "Story-Entwurf"),
 )
 
 _FAMILIE = re.compile(r"^Claude (\w+) (\d+)(?:\.(\d+))?$")
