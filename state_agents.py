@@ -7,7 +7,6 @@ import streamlit as st
 
 from config import config
 from core.constants import CLAUDE_HAIKU, CLAUDE_SONNET
-from core.llm.local import OllamaProvider
 from agents.capital_allocator_agent import CapitalAllocatorAgent
 from agents.devils_advocate_agent import DevilsAdvocateAgent
 from agents.portfolio_robustness_agent import PortfolioRobustnessAgent
@@ -49,7 +48,7 @@ from state_repos import (
     get_watchlist_checker_repo,
     get_dividend_snapshot_repo,
 )
-from state_llm import _make_claude_provider, _make_ollama_provider, _get_agent_model, _make_public_provider, _get_public_agent_model, get_ollama_runtime_kwargs
+from state_llm import _make_claude_provider, _make_ollama_provider, _get_agent_model, _make_public_provider, _get_public_agent_model
 
 # Default model values (overridable via app_config)
 _DEFAULT_OLLAMA_MODEL = config.OLLAMA_MODEL
@@ -61,8 +60,7 @@ logger = logging.getLogger(__name__)
 @st.cache_resource
 def get_portfolio_agent() -> PortfolioAgent:
     model = _get_agent_model("portfolio", "ollama", _DEFAULT_OLLAMA_MODEL)
-    llm = OllamaProvider(host=config.OLLAMA_HOST, model=model, **get_ollama_runtime_kwargs(model))
-    llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: get_usage_repo().record("portfolio_chat", model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
+    llm = _make_ollama_provider(model, "portfolio_chat")
     fetcher = MarketDataFetcher(
         rate_limiter=RateLimiter(calls_per_second=config.RATE_LIMIT_RPS)
     )
@@ -206,8 +204,7 @@ def get_rebalance_agent() -> RebalanceAgent:
     # The rebalance prompt embeds the full portfolio snapshot (weights + per-position
     # verdicts), which can run ~9–13k tokens. The default 8k context fills up entirely
     # with the prompt, leaving no room to generate — so this agent needs a larger window.
-    llm = OllamaProvider(host=config.OLLAMA_HOST, model=model, **get_ollama_runtime_kwargs(model, num_ctx_floor=24576))
-    llm.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: get_usage_repo().record("rebalance", model, i, o, skill=skill, duration_ms=dur, position_count=pos, cache_read_tokens=cache_read, cache_write_tokens=cache_write, web_search_requests=web_search)
+    llm = _make_ollama_provider(model, "rebalance", num_ctx_floor=24576)
     return RebalanceAgent(
         positions_repo=get_positions_repo(),
         market_repo=get_market_repo(),

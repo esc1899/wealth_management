@@ -11,10 +11,8 @@ st.title("🎯 Skills")
 
 from core.i18n import t
 from core.llm.base import Message, Role
-from core.llm.local import OllamaProvider
 from core.storage.models import Skill
-from config import config
-from state import get_skills_repo
+from state import get_skill_generator_llm, get_skills_repo
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +157,7 @@ if st.button(t("settings.generate_button"), key="gen_btn"):
     else:
         with st.spinner(t("settings.generating")):
             try:
-                llm = OllamaProvider(host=config.OLLAMA_HOST, model=config.OLLAMA_MODEL, num_ctx=config.OLLAMA_NUM_CTX)
+                llm = get_skill_generator_llm()
                 user_msg = (
                     f"Erstelle einen Investment-Analyse-Prompt für folgenden Anwendungsfall: "
                     f"{gen_description.strip()}. Bereich: {gen_area}. "

@@ -90,6 +90,7 @@ def _row_cost(r: dict) -> float:
         r.get("cache_read_tokens"),
         r.get("cache_write_tokens"),
         r.get("web_search_requests"),
+        batch=r.get("source") == "batch",
     )
 
 

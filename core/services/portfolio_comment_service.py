@@ -8,11 +8,9 @@ Reusable across different contexts (portfolio story, position analysis, etc.).
 
 import asyncio
 import logging
-from typing import Optional
+from typing import Callable
 
-from core.llm.base import Message, Role
-from core.llm.local import OllamaProvider
-from core.storage.usage import UsageRepository
+from core.llm.base import LLMProvider, Message, Role
 
 logger = logging.getLogger(__name__)
 
@@ -61,23 +59,10 @@ COMMENT_STYLES = [
 class PortfolioCommentService:
     """Service for generating stylized commentary on portfolio analysis results."""
 
-    def __init__(
-        self,
-        host: str,
-        model: str,
-        usage_repo: Optional[UsageRepository] = None,
-    ):
-        """
-        Initialize the service.
-
-        Args:
-            host: Ollama host (e.g., 'http://localhost:11434')
-            model: Ollama model to use
-            usage_repo: Optional UsageRepository for tracking token usage
-        """
-        self._host = host
-        self._model = model
-        self._usage_repo = usage_repo
+    def __init__(self, provider_factory: Callable[[], LLMProvider]):
+        """provider_factory baut je Aufruf den Ollama-Provider (state_llm):
+        dort wird "home" aufgeloest und der Verbrauch gebucht."""
+        self._provider_factory = provider_factory
 
     def generate_comment(
         self,
@@ -107,28 +92,7 @@ class PortfolioCommentService:
         """
         style = get_style_by_id(style_id)
 
-        llm = OllamaProvider(host=self._host, model=self._model)
-
-        # Wire usage tracking if repo provided
-        if self._usage_repo:
-            repo, model = self._usage_repo, self._model
-
-            def _on_usage(inp, out, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None):
-                repo.record(
-                    "portfolio_comment",
-                    model,
-                    inp,
-                    out,
-                    skill=style_id,
-                    source="manual",
-                    duration_ms=dur,
-                    cache_read_tokens=cache_read,
-                    cache_write_tokens=cache_write,
-                    web_search_requests=web_search,
-                )
-
-            llm.on_usage = _on_usage
-
+        llm = self._provider_factory()
         llm.skill_context = style_id
 
         prompt = (

@@ -75,6 +75,7 @@ from state_services import (
     get_portfolio_comment_service,
     get_analysis_service,
     get_portfolio_service,
+    get_skill_generator_llm,
 )
 
 __all__ = [
@@ -133,4 +134,5 @@ __all__ = [
     "get_portfolio_comment_service",
     "get_analysis_service",
     "get_portfolio_service",
+    "get_skill_generator_llm",
 ]

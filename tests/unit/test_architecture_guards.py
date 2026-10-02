@@ -318,3 +318,34 @@ def test_no_page_shadows_stdlib_module():
         f"`pages/` lands on sys.path: {collisions}. Rename them (e.g. statistics.py "
         "-> usage_statistics.py)."
     )
+
+
+# --- Guard 7: no hidden model calls ------------------------------------------------
+
+_PROVIDER_CTOR = re.compile(r"\b(ClaudeProvider|OpenAICompatibleProvider|OllamaProvider)\(")
+
+# Die Weichen: hier wird das Modell aus den Einstellungen gelesen, "home"
+# aufgeloest, geroutet und der Verbrauch gebucht. scheduler.py zusaetzlich fuer
+# die Anthropic-Batches (nur echte claude-IDs, gebucht in _book_batch_usage).
+_PROVIDER_FACTORIES = {"state_llm.py", "core/background_jobs.py", "core/scheduler.py"}
+
+
+def test_no_provider_built_outside_the_factories():
+    """Kein versteckter Modellaufruf: Wer einen Provider selbst baut, umgeht
+    Modellwahl, "home" und Verbrauch (Story-Entwurf, Portfolio-Chat, Rebalance,
+    KI-Kommentare und Prompt-Generator taten das bis 02.10.2026)."""
+    root = Path(__file__).resolve().parents[2]
+    offenders = []
+    for path in sorted(root.rglob("*.py")):
+        rel = path.relative_to(root).as_posix()
+        if rel.split("/")[0] in {"tests", ".venv", "venv"} or rel.startswith("core/llm/"):
+            continue
+        if rel in _PROVIDER_FACTORIES:
+            continue
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if _PROVIDER_CTOR.search(line):
+                offenders.append(f"{rel}:{n}")
+    assert not offenders, (
+        "LLM-Provider nur ueber state_llm (_make_public_provider / _make_ollama_provider) "
+        f"bauen: {offenders}"
+    )

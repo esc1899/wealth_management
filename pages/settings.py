@@ -248,6 +248,14 @@ with col_o5:
 with col_o6:
     sel_rebalance = _ollama_sel("rebalance", f"⚖️ {t('nav.rebalance_chat')}")
 
+col_o7, col_o8, col_o9 = st.columns([1, 1, 1])
+with col_o7:
+    sel_dividend_calendar = _ollama_sel("dividend_calendar", "💰 Dividendenkalender")
+with col_o8:
+    sel_tax_loss = _ollama_sel("tax_loss_harvesting", "🧾 Tax-Loss-Harvesting")
+with col_o9:
+    sel_skill_generator = _ollama_sel("skill_generator", "🧩 Skill-Generator")
+
 _providers = []
 if _HAS_ANTHROPIC:
     _providers.append("Anthropic")
@@ -283,9 +291,11 @@ with col_s5:
 with col_s6:
     sel_devils_advocate = _public_sel("devils_advocate", "🐻 Devil's Advocate")
 
-col_s7, _, _ = st.columns([1, 1, 1])
+col_s7, col_s8, _ = st.columns([1, 1, 1])
 with col_s7:
     sel_position_story = _public_sel("position_story", "✍️ Story-Entwurf")
+with col_s8:
+    sel_research = _public_sel("research", "🔬 Research-Chat")
 
 if st.button(t("settings.save_models_button"), key="_save_models_btn", width="content"):
     app_config.set("model_ollama_portfolio", sel_portfolio)
@@ -304,6 +314,10 @@ if st.button(t("settings.save_models_button"), key="_save_models_btn", width="co
     app_config.set("model_public_position_story", sel_position_story)
     app_config.set("model_ollama_portfolio_robustness", sel_portfolio_robustness)
     app_config.set("model_ollama_rebalance", sel_rebalance)
+    app_config.set("model_ollama_dividend_calendar", sel_dividend_calendar)
+    app_config.set("model_ollama_tax_loss_harvesting", sel_tax_loss)
+    app_config.set("model_ollama_skill_generator", sel_skill_generator)
+    app_config.set("model_public_research", sel_research)
     st.cache_resource.clear()
     st.success(t("settings.models_saved"))
 

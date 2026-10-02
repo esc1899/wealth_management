@@ -7,7 +7,7 @@ import streamlit as st
 from config import config
 from core.constants import CLAUDE_HAIKU
 from state_repos import get_usage_repo, get_analyses_repo, get_positions_repo
-from state_llm import _get_agent_model, _get_public_agent_model, _make_public_provider
+from state_llm import _get_agent_model, _get_public_agent_model, _make_ollama_provider, _make_public_provider
 
 # Default model values
 _DEFAULT_OLLAMA_MODEL = config.OLLAMA_MODEL
@@ -34,6 +34,13 @@ def get_portfolio_comment_model() -> str:
     return _get_agent_model("portfolio_comment", "ollama", _DEFAULT_OLLAMA_MODEL)
 
 
+def get_skill_generator_llm():
+    """Lokales Modell fuer den Prompt-Generator der Skills-Seite -- je Aufruf
+    gebaut, damit eine neue Auswahl in den Einstellungen sofort gilt."""
+    model = _get_agent_model("skill_generator", "ollama", _DEFAULT_OLLAMA_MODEL)
+    return _make_ollama_provider(model, "skill_generator")
+
+
 @st.cache_resource
 def get_portfolio_comment_service(model: str = ""):
     """Service for generating stylized financial commentary.
@@ -43,9 +50,7 @@ def get_portfolio_comment_service(model: str = ""):
     """
     from core.services.portfolio_comment_service import PortfolioCommentService
     return PortfolioCommentService(
-        host=config.OLLAMA_HOST,
-        model=model or _DEFAULT_OLLAMA_MODEL,
-        usage_repo=get_usage_repo(),
+        provider_factory=lambda: _make_ollama_provider(model or _DEFAULT_OLLAMA_MODEL, "portfolio_comment"),
     )
 
 

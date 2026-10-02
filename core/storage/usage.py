@@ -52,7 +52,7 @@ class UsageRepository:
 
     def _estimate(self, model: str, input_tokens, output_tokens,
                   cache_read_tokens=None, cache_write_tokens=None,
-                  web_search_requests=None) -> tuple[str, float]:
+                  web_search_requests=None, source: str = "") -> tuple[str, float]:
         """(provider, list price) for a call, from the model registry.
 
         The registry is the same one the statistics page prices with, read
@@ -79,7 +79,8 @@ class UsageRepository:
             AppConfigRepository._infer_provider(model)
         return provider, compute_cost(
             input_tokens or 0, output_tokens or 0, key, registry,
-            cache_read_tokens, cache_write_tokens, web_search_requests)
+            cache_read_tokens, cache_write_tokens, web_search_requests,
+            batch=(source == "batch"))
 
     def _book(self, agent, model, source, input_tokens, output_tokens,
               duration_ms, cache_read_tokens, cache_write_tokens,
@@ -91,7 +92,7 @@ class UsageRepository:
                 return
             provider, cost = self._estimate(
                 model, input_tokens, output_tokens, cache_read_tokens,
-                cache_write_tokens, web_search_requests)
+                cache_write_tokens, web_search_requests, source)
             ops_events.book_llm_call(
                 provider=provider, model=model, purpose=agent,
                 tokens_in=input_tokens, tokens_out=output_tokens,
@@ -125,7 +126,7 @@ class UsageRepository:
             provider, estimate = self._estimate(
                 row["model"], row["input_tokens"], row["output_tokens"],
                 row["cache_read_tokens"], row["cache_write_tokens"],
-                row["web_search_requests"])
+                row["web_search_requests"], row["source"])
             delta = float(cost_usd) - estimate
             if abs(delta) < 1e-9:
                 return
@@ -341,9 +342,14 @@ def compute_cost(
     cache_read_tokens: Optional[float] = None,
     cache_write_tokens: Optional[float] = None,
     web_search_requests: Optional[float] = None,
+    batch: bool = False,
 ) -> float:
-    """Cost in EUR/USD (same unit as prices dict) for given token counts."""
-    return _compute_cost(input_tokens, output_tokens, model, model_prices, cache_read_tokens, cache_write_tokens, web_search_requests)
+    """Cost in EUR/USD (same unit as prices dict) for given token counts.
+
+    ``batch``: Anthropic's Message Batches API bills tokens at half the list
+    price; web search is not discounted.
+    """
+    return _compute_cost(input_tokens, output_tokens, model, model_prices, cache_read_tokens, cache_write_tokens, web_search_requests, batch)
 
 
 def _compute_cost(
@@ -354,6 +360,7 @@ def _compute_cost(
     cache_read_tokens: Optional[float] = None,
     cache_write_tokens: Optional[float] = None,
     web_search_requests: Optional[float] = None,
+    batch: bool = False,
 ) -> float:
     price = model_prices.get(model, {})
     input_price = price.get("input", 0.0)
@@ -379,5 +386,7 @@ def _compute_cost(
         cache_read_tokens * cache_read_price +
         output_tokens * output_price
     ) / 1_000_000
+    if batch:
+        cost *= 0.5
     cost += web_search_requests * 0.01
     return cost

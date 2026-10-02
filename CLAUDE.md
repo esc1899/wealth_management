@@ -199,6 +199,8 @@ Die drei Buckets entsprechen exakt der Klassifikation in `tests/unit/test_archit
 
 **Ausführbarer Guard (FEAT-60):** Diese Grenze ist seit 2026-06-16 kein Prosa-Versprechen mehr, sondern Code: `tests/unit/test_architecture_guards.py` zwingt jeden neuen Agent in genau einen Provider-Bucket (cloud/local/non-LLM) und lässt keinen Cloud-Agent ein `Position` (statt `PublicPosition`) als Methoden-Input annehmen. StorycheckerAgent ist die einzige whitelisted Ausnahme. Ein vergessener Bucket oder ein Cloud-Agent mit `Position`-Signatur scheitert in CI, nicht erst im Review.
 
+**Kein versteckter Modellaufruf (02.10.2026):** Ein LLM-Provider wird nur in `state_llm.py` gebaut (`_make_public_provider` / `_make_ollama_provider`), dazu in den beiden Job-Weichen `core/background_jobs.py` und `core/scheduler.py`. Nur dort wird das Modell aus den Einstellungen gelesen, `home` aufgeloest, geroutet und der Verbrauch gebucht. Jeder Aufruf braucht eine Auswahl in den Einstellungen. `test_no_provider_built_outside_the_factories` macht jedes andere `ClaudeProvider(`/`OllamaProvider(`/`OpenAICompatibleProvider(` rot.
+
 ### 2. Zweisprachigkeit (i18n)
 
 Die App ist **Deutsch/Englisch** schaltbar. Gilt für jeden neuen Code:

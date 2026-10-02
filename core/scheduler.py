@@ -849,6 +849,24 @@ class AgentSchedulerService:
         finally:
             conn.close()
 
+    @staticmethod
+    def _book_batch_usage(agent_name: str, skill_name: str, message, conn) -> None:
+        """Book one batch answer like any other call (bis 02.10.2026 fehlten
+        Batch-Laeufe in Statistik und Hausbuchhaltung). source="batch" prices
+        the tokens at Anthropic's batch discount."""
+        try:
+            usage = message.usage
+            stu = getattr(usage, "server_tool_use", None)
+            UsageRepository(conn).record(
+                agent_name, message.model, usage.input_tokens, usage.output_tokens,
+                skill=skill_name or None, source="batch",
+                cache_read_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
+                cache_write_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
+                web_search_requests=getattr(stu, "web_search_requests", 0) or 0,
+            )
+        except Exception:  # noqa: BLE001 — a result is never lost over its books
+            logger.exception("Batch usage not booked (%s)", agent_name)
+
     def _process_batch_results(self, agent_name: str, skill_name: str, results, conn) -> tuple[int, int]:
         success, errors = 0, 0
         for result in results:
@@ -857,6 +875,7 @@ class AgentSchedulerService:
                     logger.warning("Batch item %s: %s", result.custom_id, result.result.type)
                     errors += 1
                     continue
+                self._book_batch_usage(agent_name, skill_name, result.result.message, conn)
                 if agent_name == "storychecker":
                     ok = self._process_sc_result(result, skill_name, conn)
                 elif agent_name == "consensus_gap":

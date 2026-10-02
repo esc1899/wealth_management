@@ -372,3 +372,28 @@ def test_total_today_includes_calls(usage_repo):
     rows = usage_repo.total_today()
     assert len(rows) == 1
     assert rows[0]["calls"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Batch API (02.10.2026): gebucht, zum halben Tokenpreis
+# ---------------------------------------------------------------------------
+
+def test_batch_halves_token_cost_but_not_web_search():
+    prices = {"claude-x": {"input": 3.0, "output": 15.0}}
+    voll = compute_cost(1_000_000, 1_000_000, "claude-x", prices, web_search_requests=2)
+    batch = compute_cost(1_000_000, 1_000_000, "claude-x", prices, web_search_requests=2, batch=True)
+    assert voll == pytest.approx(18.0 + 0.02)
+    assert batch == pytest.approx(9.0 + 0.02)
+
+
+def test_batch_result_is_booked(conn):
+    from core.scheduler import AgentSchedulerService
+
+    message = MagicMock(model="claude-sonnet-5-5")
+    message.usage = MagicMock(input_tokens=1200, output_tokens=300,
+                              cache_read_input_tokens=0, cache_creation_input_tokens=0,
+                              server_tool_use=MagicMock(web_search_requests=2))
+    AgentSchedulerService._book_batch_usage("storychecker", "", message, conn)
+    row = conn.execute("SELECT agent, model, source, input_tokens, output_tokens, web_search_requests"
+                       " FROM llm_usage").fetchone()
+    assert tuple(row) == ("storychecker", "claude-sonnet-5-5", "batch", 1200, 300, 2)
