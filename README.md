@@ -62,7 +62,7 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Skills Integration** — optional user-selectable skills for WatchlistChecker, PortfolioStory, and other agents
 - **Per-agent Model Selection** — choose Ollama and Claude models individually at runtime
 - **Scheduled Tasks** — run cloud agents automatically on a schedule (daily / weekly / monthly / yearly); dedicated Scheduler page with per-job run history
-- **Batch API** — optional 50% cost reduction for scheduled jobs via the Anthropic Batch API (`USE_BATCH_API=true`)
+- **Batch API** — scheduled jobs (all eight cloud agents) go out as Anthropic batches at half price when the household switch is on (Maschinenraum, "Eingeplante Läufe als Batch" → `batch = true` under `[claude]` in `~/.ops-core/modelle.toml`). "Run now" stays live. The job `agenten` collects results hourly and reports what it still waits for to the ops-core tile. Background and decisions: heimnetzwerk `docs/haus/integrationen.md`, profile "Claude".
 - **Cost & Token Tracking** — per-agent/skill/model token counts and USD costs; split by manual vs. scheduled runs; daily trend chart; non-destructive per-row reset
 - **Cost Alerts** — configurable daily and monthly USD spending limits; warnings in sidebar and Statistics page
 - **Monthly Cost Forecast** — projects scheduled-job costs forward based on actual average tokens per call
@@ -175,7 +175,7 @@ Copy `.env.example` to `.env` and fill in your values.
 | `COWORK_OUTBOX_PATH` | Optional | Path to Research Inbox outbox directory. Default: `~/wealth-research/outbox` |
 | `COWORK_WATCH_ENABLED` | Optional | Set to `false` to disable the file watcher (files scanned on startup only). Default: `true` |
 | `APP_PASSWORD` | Optional | Enables a login gate (works with Apple Passwords / Keychain autofill). Empty = no login |
-| `USE_BATCH_API` | Optional | Set to `true` to run scheduled jobs via the Anthropic Batch API (50% cheaper; Anthropic direct only) |
+| `USE_BATCH_API` | Optional | Forces batch for scheduled jobs on this machine only; normally the household switch in the Maschinenraum decides. Anthropic direct only (no `LLM_BASE_URL`) |
 | `MCP_BEARER_TOKEN` | Optional | Bearer token for the MCP server's HTTP transport (only needed for sandboxed clients; stdio needs no token) |
 | `MCP_HTTP_PORT` | Optional | Port for the MCP HTTP transport. Default: `7890` |
 | `BACKUP_REPO_PATH` | Optional | restic repository path on an external drive — enables the Backup section in Settings |

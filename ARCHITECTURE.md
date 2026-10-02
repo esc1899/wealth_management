@@ -531,7 +531,7 @@ pytest -k consensus_gap       # Specific agent
    - DevilsAdvocateAgent + PortfolioRobustnessAgent (FEAT-47/48)
    - SectorRotationAgent (FEAT-46), TaxLossHarvestingAgent (FEAT-44), DividendCalendarAgent (FEAT-45)
 
-✅ **Batch API** (2026-06-07/08) — 50% cheaper scheduled jobs via `pending_batches` + scheduler polling
+✅ **Batch API** (2026-06-07/08) — 50% cheaper scheduled jobs via `pending_batches` + scheduler polling. Since 2026-10-02 switched by the household (`modelle.toml`, Maschinenraum), only for scheduled runs (`_BATCH_ERLAUBT`), same effort/max_tokens as live, booked with `source="batch"` at half price, all eight cloud agents incl. News and Devil's Advocate (no second verdict call in batch), and the job reports `wartet` to the run log. See heimnetzwerk `docs/haus/integrationen.md` (Claude).
 
 ✅ **Attribution & digests** (FEAT-34–39, May 2026) — monthly/yearly attribution incl. dividends, digest reports, macro chips
 
