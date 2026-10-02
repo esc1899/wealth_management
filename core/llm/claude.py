@@ -14,6 +14,7 @@ from typing import Any, List, Optional
 
 import anthropic
 from core.constants import CLAUDE_SONNET, supports_effort
+from core.house_models import house_effort
 from core.llm.base import LLMProvider, Message, Role
 
 _logger = logging.getLogger(__name__)
@@ -123,7 +124,10 @@ class ClaudeProvider(LLMProvider):
         if forced_tool:
             return {"thinking": {"type": "disabled"}}
         _thinking = self._enable_thinking if enable_thinking is None else enable_thinking
-        kwargs: dict = {"output_config": {"effort": "high" if _thinking else "medium"}}
+        # "Denken an" bleibt high; sonst die Denktiefe des Hauses aus dem
+        # Maschinenraum (2026-10-02) -- ohne sie medium wie bisher.
+        effort = "high" if _thinking else (house_effort() or "medium")
+        kwargs: dict = {"output_config": {"effort": effort}}
         if _thinking:
             kwargs["thinking"] = {"type": "adaptive", "display": "summarized"}
         return kwargs

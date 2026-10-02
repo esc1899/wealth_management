@@ -48,6 +48,8 @@ CLAUDE = "claude"
 OLLAMA = "ollama"
 OPENROUTER = "openrouter"
 PROVIDERS = (CLAUDE, OLLAMA, OPENROUTER)
+#: The thinking depths the API knows (``output_config.effort``).
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
 
 
 def models_file() -> Path:
@@ -82,6 +84,7 @@ def load(path: Optional[Path] = None) -> dict:
             "budget_usd": float(budget) if isinstance(budget, (int, float))
             and not isinstance(budget, bool) else None,
             "batch": entry.get("batch") is True,
+            "effort": entry.get("effort") if entry.get("effort") in EFFORTS else None,
         }
     return out
 
@@ -91,6 +94,14 @@ def scheduled_batch(path: Optional[Path] = None) -> bool:
     Anthropic batches. ``batch = true`` under ``[claude]``; read per run, so a
     change on the Maschinenraum page needs no restart. Missing means off."""
     return bool((load(path).get(CLAUDE) or {}).get("batch"))
+
+
+def house_effort(path: Optional[Path] = None) -> Optional[str]:
+    """Household thinking depth (2026-10-02, Maschinenraum): ``effort`` under
+    ``[claude]``, read per call. Without it Sonnet 5.5 thinks on "high" — so
+    every call that has no reason of its own takes this one. Missing or
+    unknown means None: the caller keeps what it did before."""
+    return (load(path).get(CLAUDE) or {}).get("effort")
 
 
 def house_model(provider: str, path: Optional[Path] = None) -> Optional[str]:

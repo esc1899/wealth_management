@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### „Denken aus“ folgt der Denktiefe des Hauses — 2026-10-02
+
+**Warum:** Die Denktiefe wird seit heute im Maschinenraum fürs ganze Haus gewählt (`effort`
+unter `[claude]` in `~/.ops-core/modelle.toml`). Ein Vergleich am Storychecker zeigte: „high“
+urteilt nicht besser als „medium“ und kostet ein Sechstel mehr.
+
+**Änderungen:**
+- `ClaudeProvider._reasoning_kwargs`: „Denken aus“ nimmt die Denktiefe des Hauses, ohne sie
+  wie bisher `medium`; „Denken an“ bleibt `high`. Gilt live und im Batch gleich.
+- `core.house_models.house_effort()` liest das Feld beim Aufruf; eine unbekannte Stufe gilt
+  als nicht gesetzt.
+
 ### Die Jobs sind ops-core-Jobs — 2026-10-02
 
 **Warum:** Der Planer vom Vortag lief zuverlässig, aber am Run-Log des Hauses vorbei: Die

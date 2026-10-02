@@ -412,6 +412,16 @@ class TestReasoningKwargs:
         kwargs = provider._reasoning_kwargs(True, forced_tool=True)
         assert kwargs == {"thinking": {"type": "disabled"}}
 
+    def test_toggle_off_follows_the_household_depth(self, provider, tmp_path, monkeypatch):
+        # 2026-10-02: Die Denktiefe des Hauses (Maschinenraum) ersetzt das feste
+        # "medium"; "Denken an" bleibt high.
+        monkeypatch.setenv("OPS_CORE_HOME", str(tmp_path))
+        (tmp_path / "modelle.toml").write_text('[claude]\nmodell = "x"\neffort = "low"\n')
+        assert provider._reasoning_kwargs(False)["output_config"] == {"effort": "low"}
+        assert provider._reasoning_kwargs(True)["output_config"] == {"effort": "high"}
+        (tmp_path / "modelle.toml").write_text('[claude]\nmodell = "x"\neffort = "viel"\n')
+        assert provider._reasoning_kwargs(False)["output_config"] == {"effort": "medium"}
+
     def test_haiku_gets_neither(self):
         haiku = ClaudeProvider(api_key="k", model=CLAUDE_HAIKU)
         assert haiku._reasoning_kwargs(True) == {}
