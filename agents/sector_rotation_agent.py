@@ -19,6 +19,7 @@ from core.llm.base import LLMProvider
 from core.storage.models import PublicPosition
 from core.storage.sector_rotation import SectorRotationRepository, SectorRotationRun, SectorVerdict
 from agents.agent_language import current_date_context, response_language_instruction
+from core.constants import WEB_SEARCH_TYPE
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +35,15 @@ MAX_TOOL_ITERATIONS = 15
 # Tool definitions
 # ------------------------------------------------------------------
 
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 8}
+WEB_SEARCH_TOOL = {"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 8}
 
 SUBMIT_VERDICT_TOOL = {
     "name": "submit_sector_verdict",
     "description": "Submit a verdict for a sector based on current rotation momentum vs. portfolio exposure.",
+    "strict": True,
     "input_schema": {
         "type": "object",
+        "additionalProperties": False,
         "properties": {
             "sector": {
                 "type": "string",

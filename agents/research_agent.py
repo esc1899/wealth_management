@@ -23,6 +23,7 @@ from core.storage.positions import PositionsRepository
 from core.storage.research import ResearchRepository
 from core.strategy_config import StrategyConfig, StrategyRegistry
 from agents.agent_language import response_language_instruction, current_date_context
+from core.constants import WEB_SEARCH_TYPE
 
 
 logger = logging.getLogger(__name__)
@@ -52,13 +53,15 @@ Wenn investitionswürdig: propose_for_watchlist aufrufen. Der Nutzer bestätigt 
 # ------------------------------------------------------------------
 
 # Server-side web search — Anthropic executes this, no client handling needed
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 5}
+WEB_SEARCH_TOOL = {"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 5}
 
 PROPOSE_FOR_WATCHLIST_TOOL = {
     "name": "propose_for_watchlist",
     "description": "Propose a stock as a watchlist candidate. The user will review and confirm before it is added.",
+    "strict": True,
     "input_schema": {
         "type": "object",
+        "additionalProperties": False,
         "properties": {
             "ticker": {
                 "type": "string",

@@ -12,12 +12,13 @@ from datetime import date
 from typing import Callable, Optional
 
 from core.llm.base import LLMProvider
+from core.constants import WEB_SEARCH_TYPE
 
 logger = logging.getLogger(__name__)
 
 # Ohne Suche schreibt das Modell aus seinem Trainingsstand: Abspaltungen,
 # Uebernahmen und Kursbewegungen danach fehlen (Kongsberg, Samsung, 02.10.2026).
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 3}
+WEB_SEARCH_TOOL = {"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 3}
 
 
 def _these_aus(text: str) -> str:

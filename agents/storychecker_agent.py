@@ -27,6 +27,7 @@ from core.storage.storychecker import StorycheckerRepository
 from agents.agent_language import response_language_instruction, current_date_context
 from core.asset_class_config import FUND_ASSET_CLASSES
 from core.position_metrics import build_metrics_block
+from core.constants import WEB_SEARCH_TYPE
 
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 
 # Server-side web search — Anthropic executes this, no client handling needed
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 3}
+WEB_SEARCH_TOOL = {"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 3}
 
 MAX_TOOL_ITERATIONS = 5
 

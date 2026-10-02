@@ -24,6 +24,7 @@ from core.llm.claude import ClaudeProvider
 from core.storage.models import NewsRun
 from core.storage.news import NewsRepository
 from agents.agent_language import current_date_context
+from core.constants import WEB_SEARCH_TYPE
 
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ If asked about a position not in the digest, say so clearly.
 {digest}"""
 
 # Server-side web search — max_uses is set dynamically per call based on ticker count
-_WEB_SEARCH_BASE = {"type": "web_search_20250305", "name": "web_search"}
+_WEB_SEARCH_BASE = {"type": WEB_SEARCH_TYPE, "name": "web_search"}
 
 
 def build_digest_request(

@@ -11,11 +11,12 @@ from typing import Any, List, Optional
 
 from openai import AsyncOpenAI
 
+from core.constants import WEB_SEARCH_TYPES
 from core.llm.base import LLMProvider, Message, Role
 
 _logger = logging.getLogger(__name__)
 
-_WEB_SEARCH_TYPES = {"web_search_20250305"}
+_WEB_SEARCH_TYPES = WEB_SEARCH_TYPES
 _MAX_SEARCH_ITERATIONS = 8
 
 
@@ -25,7 +26,7 @@ def _to_openai_tools(tools: list[dict], tavily_key: str = "") -> list[dict]:
     Handles three formats:
     - Format A (already OpenAI): type=function → pass through
     - Format B (Anthropic custom): name + input_schema → convert to function
-    - Format C (Anthropic built-in): web_search_20250305 → replace with Tavily if key set, else drop
+    - Format C (Anthropic built-in): web_search (jede Fassung) → replace with Tavily if key set, else drop
     """
     from core.search import tavily as _tavily
     result = []

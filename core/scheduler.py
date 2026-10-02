@@ -39,6 +39,7 @@ from core.storage.news import NewsRepository
 from core.storage.positions import PositionsRepository
 from core.storage.scheduled_jobs import ScheduledJobsRepository, ScheduledJobRunsRepository
 from core.storage.usage import UsageRepository
+from core.constants import WEB_SEARCH_TYPE
 
 # Batch nur, wo niemand wartet: gesetzt fuer eingeplante Laeufe, nie fuer
 # "Jetzt ausfuehren" auf der Seite (dort kaeme das Ergebnis erst eine Stunde spaeter).
@@ -1273,7 +1274,7 @@ class AgentSchedulerService:
         requests = [ClaudeProvider.build_batch_request(
             custom_id=f"da_{pos.id}", model=model, system=system,
             messages=[{"role": "user", "content": format_position(pos)}],
-            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 2}, SUBMIT_DA_VERDICT_TOOL],
+            tools=[{"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 2}, SUBMIT_DA_VERDICT_TOOL],
             max_tokens=4000) for pos in pub_positions if pos.ticker and pos.id is not None]
         if not requests:
             return ""
@@ -1441,7 +1442,7 @@ class AgentSchedulerService:
                 model=model,
                 system=system,
                 messages=[{"role": "user", "content": "\n".join(lines)}],
-                tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 1}, SUBMIT_VERDICT_TOOL],
+                tools=[{"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 1}, SUBMIT_VERDICT_TOOL],
                 max_tokens=4096,
             ))
         if not requests:

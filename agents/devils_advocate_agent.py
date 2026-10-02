@@ -31,6 +31,7 @@ from core.storage.analyses import PositionAnalysesRepository
 from core.storage.devils_advocate import DevilsAdvocateRepository
 from core.storage.models import DevilsAdvocateMessage, PublicPosition
 from agents.agent_language import response_language_with_fixed_codes, current_date_context
+from core.constants import WEB_SEARCH_TYPE
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,10 @@ VALID_VERDICTS = {"robust", "angreifbar", "fragil", "kritisch"}
 SUBMIT_DA_VERDICT_TOOL = {
     "name": "submit_da_verdict",
     "description": "Submit the devil's advocate verdict after completing the bear-case analysis.",
+    "strict": True,
     "input_schema": {
         "type": "object",
+        "additionalProperties": False,
         "properties": {
             "position_id": {
                 "type": "integer",
@@ -235,7 +238,7 @@ class DevilsAdvocateAgent:
             response = await self._llm.chat_with_tools(
                 messages=[{"role": "user", "content": user_msg}],
                 tools=[
-                    {"type": "web_search_20250305", "name": "web_search", "max_uses": 2},
+                    {"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 2},
                     SUBMIT_DA_VERDICT_TOOL,
                 ],
                 system=system,

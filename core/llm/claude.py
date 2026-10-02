@@ -13,7 +13,9 @@ from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
 import anthropic
-from core.constants import CLAUDE_SONNET, supports_effort
+from core.constants import (
+    CLAUDE_SONNET, WEB_SEARCH_TYPE_BASIC, WEB_SEARCH_TYPES, supports_dynamic_search, supports_effort,
+)
 from core.house_models import house_effort
 from core.llm.base import LLMProvider, Message, Role
 
@@ -32,6 +34,25 @@ _OUTPUT_COMPILED_PATTERNS = [
 
 # Claude model to use — update when a newer version is preferred
 DEFAULT_MODEL = CLAUDE_SONNET
+
+# Wie oft eine vom Server unterbrochene Runde (``pause_turn``) live fortgesetzt wird.
+# Die Suche mit dynamischer Filterung läuft über Code-Ausführung und kann länger
+# dauern als eine Runde; im Batch gibt es kein Fortsetzen.
+MAX_PAUSE_CONTINUATIONS = 4
+
+
+def tools_for_model(tools: list[dict], model: str) -> list[dict]:
+    """Die Werkzeuge so, wie dieses Modell sie annimmt.
+
+    Die Agenten nennen die Websuche mit dynamischer Filterung (``WEB_SEARCH_TYPE``);
+    Haiku 4.5 kann sie nicht und bekäme einen 400 -- dort die Grundfassung.
+    """
+    if supports_dynamic_search(model):
+        return tools
+    return [
+        {**t, "type": WEB_SEARCH_TYPE_BASIC} if t.get("type") in WEB_SEARCH_TYPES else t
+        for t in tools
+    ]
 
 
 def fetch_available_models(api_key: str, base_url: str = "") -> list[str]:
@@ -183,17 +204,20 @@ class ClaudeProvider(LLMProvider):
         Web search: on a direct Anthropic endpoint, Anthropic's built-in server-side
         web_search runs within a single response (native passthrough). Behind a custom
         base_url (corporate proxy / OpenRouter) the upstream often rejects the
-        web_search_20250305 tool (HTTP 400) — there we route search through Tavily
+        server-side web_search tool (HTTP 400) — there we route search through Tavily
         client-side if TAVILY_API_KEY is set, looping internally so callers see no
         difference; without a key we drop the tool so the call still succeeds.
+        ``strict`` an den Werkzeugen geht nur an Anthropic direkt; der Proxy bekommt
+        sie ohne, wie bisher.
+
+        Unterbricht der Server eine lange Runde (``pause_turn``), geht sie mit der
+        Antwort bis dahin weiter -- bis zu ``MAX_PAUSE_CONTINUATIONS`` Mal.
         """
         import os
         from core.search import tavily as _tavily
 
-        _WEB_SEARCH_SERVER = "web_search_20250305"
-
         def _is_web_search(t: dict) -> bool:
-            return t.get("type") == _WEB_SEARCH_SERVER or t.get("name") == "web_search"
+            return t.get("type") in WEB_SEARCH_TYPES or t.get("name") == "web_search"
 
         from core.secrets import get_secret
 
@@ -216,7 +240,9 @@ class ClaudeProvider(LLMProvider):
             # Proxy without native web_search and no Tavily key → drop the tool (no live search).
             resolved_tools = [t for t in tools if not _is_web_search(t)]
         else:
-            resolved_tools = tools
+            resolved_tools = tools_for_model(tools, self._model)
+        if _custom_endpoint:
+            resolved_tools = [{k: v for k, v in t.items() if k != "strict"} for t in resolved_tools]
 
         kwargs: dict = {
             "model": self._model,
@@ -244,7 +270,8 @@ class ClaudeProvider(LLMProvider):
         # using the final message alone would drop it (the bug that motivated f94abfd).
         content_parts: list[str] = []
 
-        for _ in range(10):  # safety net; only the Tavily path iterates more than once
+        _pauses = 0
+        for _ in range(10):  # safety net; only Tavily and pause_turn iterate more than once
             # Retry up to 3 times on rate limit errors
             for attempt in range(3):
                 try:
@@ -292,6 +319,12 @@ class ClaudeProvider(LLMProvider):
                     if other_calls:
                         break  # hand non-search client tools back to the caller
                     continue  # fetch next response with search results injected
+            if response.stop_reason == "pause_turn" and _pauses < MAX_PAUSE_CONTINUATIONS:
+                # Fortsetzen heißt: die unterbrochene Antwort unverändert zurück, kein
+                # "weiter" -- der Server erkennt es selbst.
+                _pauses += 1
+                kwargs["messages"].append({"role": "assistant", "content": list(response.content)})
+                continue
             break
 
         tool_calls: List[ClaudeToolCall] = []
@@ -345,6 +378,8 @@ class ClaudeProvider(LLMProvider):
         for r in requests:
             for k, v in reasoning.items():
                 r["params"].setdefault(k, v)
+            if "tools" in r["params"]:
+                r["params"]["tools"] = tools_for_model(r["params"]["tools"], r["params"]["model"])
         batch = await self._client.messages.batches.create(requests=requests)
         return batch.id
 

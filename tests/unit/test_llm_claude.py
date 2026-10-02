@@ -164,7 +164,7 @@ async def test_chat_with_tools_validates_output(provider):
 
     result = await provider.chat_with_tools(
         messages=[{"role": "user", "content": "What's your analysis?"}],
-        tools=[{"name": "web_search", "type": "web_search_20250305"}],
+        tools=[{"name": "web_search", "type": "web_search_20260209"}],
         system="You are an analyst.",
     )
 
@@ -187,12 +187,12 @@ async def test_native_web_search_passed_through(provider):
     with patch.dict(os.environ, {"TAVILY_API_KEY": "tav_test"}):
         await provider.chat_with_tools(
             messages=[{"role": "user", "content": "Analyse"}],
-            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
+            tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 3}],
             system="Analyst.",
         )
 
     tool_types = [t.get("type") for t in captured["tools"]]
-    assert "web_search_20250305" in tool_types  # native tool passed through, not swapped for Tavily
+    assert "web_search_20260209" in tool_types  # native tool passed through, not swapped for Tavily
 
 
 # ------------------------------------------------------------------
@@ -233,7 +233,7 @@ def proxy_provider():
 
 @pytest.mark.asyncio
 async def test_proxy_swaps_web_search_for_tavily(proxy_provider):
-    """Behind a proxy with TAVILY_API_KEY set: web_search_20250305 must NOT be sent;
+    """Behind a proxy with TAVILY_API_KEY set: web_search_20260209 must NOT be sent;
     Tavily runs the search client-side and prose from all turns is preserved."""
     import os
     calls = []
@@ -253,12 +253,12 @@ async def test_proxy_swaps_web_search_for_tavily(proxy_provider):
          patch("core.search.tavily.search", return_value="SEARCH RESULTS") as mock_search:
         result = await proxy_provider.chat_with_tools(
             messages=[{"role": "user", "content": "Analyse AAPL"}],
-            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
+            tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 3}],
             system="Analyst.",
         )
 
     # native tool never sent; Tavily executed; prose accumulated across both turns
-    assert "web_search_20250305" not in [t.get("type") for t in calls[0]["tools"]]
+    assert "web_search_20260209" not in [t.get("type") for t in calls[0]["tools"]]
     mock_search.assert_called_once()
     assert "Recherchiere AAPL" in result.content and "Fazit: solide." in result.content
     assert result.web_search_requests == 1
@@ -281,7 +281,7 @@ async def test_proxy_without_tavily_drops_web_search(proxy_provider):
         os.environ.pop("TAVILY_API_KEY", None)
         result = await proxy_provider.chat_with_tools(
             messages=[{"role": "user", "content": "Analyse"}],
-            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
+            tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 3}],
             system="Analyst.",
         )
 
@@ -300,7 +300,7 @@ def test_build_batch_request_structure():
         model="claude-haiku-4-5-20251001",
         system="You are an analyst.",
         messages=[{"role": "user", "content": "Analyse AAPL"}],
-        tools=[{"type": "web_search_20250305", "name": "web_search"}],
+        tools=[{"type": "web_search_20260209", "name": "web_search"}],
         max_tokens=1024,
     )
     assert req["custom_id"] == "sc_42"
@@ -477,3 +477,136 @@ async def test_chat_sends_effort(provider):
     provider._client.messages.create = fake_create
     await provider.chat([Message(role=Role.USER, content="Hi")])
     assert captured["output_config"] == {"effort": "medium"}
+
+
+# ------------------------------------------------------------------
+# Websuche mit dynamischer Filterung, strict, pause_turn (2026-10-02)
+# ------------------------------------------------------------------
+
+
+class TestWebSearchVersion:
+    def test_sonnet_keeps_dynamic_search(self):
+        from core.constants import WEB_SEARCH_TYPE
+        from core.llm.claude import tools_for_model
+        tools = [{"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 2}]
+        assert tools_for_model(tools, CLAUDE_SONNET) == tools
+
+    def test_haiku_gets_basic_search(self):
+        """Haiku kann keine dynamische Filterung -- sonst 400."""
+        from core.constants import WEB_SEARCH_TYPE, WEB_SEARCH_TYPE_BASIC
+        from core.llm.claude import tools_for_model
+        tools = [{"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 2}, {"name": "x"}]
+        out = tools_for_model(tools, CLAUDE_HAIKU)
+        assert out[0] == {"type": WEB_SEARCH_TYPE_BASIC, "name": "web_search", "max_uses": 2}
+        assert out[1] == {"name": "x"}
+        assert tools[0]["type"] == WEB_SEARCH_TYPE  # Vorlage unverändert
+
+    @pytest.mark.asyncio
+    async def test_haiku_live_call_sends_basic_search(self):
+        from core.constants import WEB_SEARCH_TYPE, WEB_SEARCH_TYPE_BASIC
+        haiku = ClaudeProvider(api_key="k", model=CLAUDE_HAIKU)
+        captured = {}
+
+        async def mock_create(**kwargs):
+            captured.update(kwargs)
+            return _resp([_TextBlock("ok")])
+
+        haiku._client.messages.create = mock_create
+        await haiku.chat_with_tools(messages=[{"role": "user", "content": "x"}],
+                                    tools=[{"type": WEB_SEARCH_TYPE, "name": "web_search"}])
+        assert captured["tools"][0]["type"] == WEB_SEARCH_TYPE_BASIC
+
+    @pytest.mark.asyncio
+    async def test_batch_swaps_per_request_model(self, provider):
+        from core.constants import WEB_SEARCH_TYPE, WEB_SEARCH_TYPE_BASIC
+        provider._client.messages.batches.create = AsyncMock(return_value=MagicMock(id="b"))
+        tool = {"type": WEB_SEARCH_TYPE, "name": "web_search"}
+        requests = [
+            ClaudeProvider.build_batch_request("h", CLAUDE_HAIKU, "", [{"role": "user", "content": "x"}], [tool], 256),
+            ClaudeProvider.build_batch_request("s", CLAUDE_SONNET, "", [{"role": "user", "content": "x"}], [tool], 256),
+        ]
+        await provider.submit_batch(requests)
+        assert requests[0]["params"]["tools"][0]["type"] == WEB_SEARCH_TYPE_BASIC
+        assert requests[1]["params"]["tools"][0]["type"] == WEB_SEARCH_TYPE
+
+
+class TestStrictTools:
+    def test_verdict_tools_are_strict(self):
+        """Jedes Client-Werkzeug der Cloud-Agenten ist strict und schließt Zusatzfelder aus."""
+        from agents.capital_allocator_agent import SUBMIT_CA_VERDICT_TOOL
+        from agents.consensus_gap_agent import SUBMIT_VERDICT_TOOL as CG
+        from agents.devils_advocate_agent import SUBMIT_DA_VERDICT_TOOL
+        from agents.fundamental_analyzer_agent import SUBMIT_FA_VERDICT_TOOL
+        from agents.research_agent import PROPOSE_FOR_WATCHLIST_TOOL as RA
+        from agents.search_agent import PROPOSE_FOR_WATCHLIST_TOOL as SA
+        from agents.sector_rotation_agent import SUBMIT_VERDICT_TOOL as SR
+        from agents.structural_change_agent import ADD_CANDIDATE_TOOL
+        for tool in (SUBMIT_CA_VERDICT_TOOL, CG, SUBMIT_DA_VERDICT_TOOL, SUBMIT_FA_VERDICT_TOOL,
+                     RA, SA, SR, ADD_CANDIDATE_TOOL):
+            assert tool["strict"] is True, tool["name"]
+            assert tool["input_schema"]["additionalProperties"] is False, tool["name"]
+
+    @pytest.mark.asyncio
+    async def test_strict_sent_direct(self, provider):
+        captured = {}
+
+        async def mock_create(**kwargs):
+            captured.update(kwargs)
+            return _resp([_TextBlock("ok")])
+
+        provider._client.messages.create = mock_create
+        tool = {"name": "t", "strict": True, "input_schema": {"type": "object", "properties": {}}}
+        await provider.chat_with_tools(messages=[{"role": "user", "content": "x"}], tools=[tool])
+        assert captured["tools"][0]["strict"] is True
+
+    @pytest.mark.asyncio
+    async def test_strict_stripped_behind_proxy(self, proxy_provider):
+        captured = {}
+
+        async def mock_create(**kwargs):
+            captured.update(kwargs)
+            return _resp([_TextBlock("ok")])
+
+        proxy_provider._client.messages.create = mock_create
+        tool = {"name": "t", "strict": True, "input_schema": {"type": "object", "properties": {}}}
+        await proxy_provider.chat_with_tools(messages=[{"role": "user", "content": "x"}], tools=[tool])
+        assert "strict" not in captured["tools"][0]
+        assert tool["strict"] is True  # Vorlage unverändert
+
+
+class TestPauseTurn:
+    @pytest.mark.asyncio
+    async def test_pause_turn_is_continued(self, provider):
+        """Eine unterbrochene Runde geht mit der Antwort bis dahin weiter; Text und
+        Urteil aus allen Teilen kommen beim Aufrufer an."""
+        calls = []
+
+        async def mock_create(**kwargs):
+            calls.append([dict(m) for m in kwargs["messages"]])
+            if len(calls) == 1:
+                return _resp([_TextBlock("Suche läuft… ")], stop_reason="pause_turn")
+            return _resp([_TextBlock("Fazit."), _ToolBlock("submit_da_verdict", "t1", {"verdict": "robust"})],
+                         stop_reason="tool_use")
+
+        provider._client.messages.create = mock_create
+        result = await provider.chat_with_tools(messages=[{"role": "user", "content": "x"}],
+                                                tools=[{"type": "web_search_20260209", "name": "web_search"}])
+        assert len(calls) == 2
+        assert calls[1][-1]["role"] == "assistant"  # unterbrochene Antwort zurück, kein "weiter"
+        assert len(calls[1]) == 2
+        assert result.content == "Suche läuft… Fazit."
+        assert [c.name for c in result.tool_calls] == ["submit_da_verdict"]
+
+    @pytest.mark.asyncio
+    async def test_pause_turn_gives_up_after_limit(self, provider):
+        from core.llm.claude import MAX_PAUSE_CONTINUATIONS
+        calls = []
+
+        async def mock_create(**kwargs):
+            calls.append(1)
+            return _resp([_TextBlock(".")], stop_reason="pause_turn")
+
+        provider._client.messages.create = mock_create
+        result = await provider.chat_with_tools(messages=[{"role": "user", "content": "x"}], tools=[])
+        assert len(calls) == MAX_PAUSE_CONTINUATIONS + 1
+        assert result.stop_reason == "pause_turn"

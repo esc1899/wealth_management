@@ -35,6 +35,7 @@ from core.storage.analyses import PositionAnalysesRepository
 from core.storage.consensus_gap import ConsensusGapRepository
 from core.storage.models import PublicPosition, ConsensusGapMessage
 from agents.agent_language import response_language_with_fixed_codes, current_date_context
+from core.constants import WEB_SEARCH_TYPE
 
 AGENT_NAME = "consensus_gap"
 
@@ -44,8 +45,10 @@ VALID_VERDICTS = {"wächst", "stabil", "schließt", "eingeholt"}
 SUBMIT_VERDICT_TOOL = {
     "name": "submit_consensus_verdict",
     "description": "Submit the consensus gap verdict for a portfolio position.",
+    "strict": True,
     "input_schema": {
         "type": "object",
+        "additionalProperties": False,
         "properties": {
             "position_id": {
                 "type": "integer",
@@ -170,7 +173,7 @@ class ConsensusGapAgent:
             response = await self._llm.chat_with_tools(
                 messages=[{"role": "user", "content": user_msg}],
                 tools=[
-                    {"type": "web_search_20250305", "name": "web_search", "max_uses": 1},
+                    {"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 1},
                     SUBMIT_VERDICT_TOOL,
                 ],
                 system=system,

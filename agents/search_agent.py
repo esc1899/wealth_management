@@ -22,6 +22,7 @@ from core.storage.models import Position, SearchSession
 from core.storage.positions import PositionsRepository
 from core.storage.search import SearchRepository
 from agents.agent_language import current_date_context
+from core.constants import WEB_SEARCH_TYPE
 
 
 logger = logging.getLogger(__name__)
@@ -51,13 +52,15 @@ Be factual and cite specific numbers wherever available."""
 # Tool definitions
 # ------------------------------------------------------------------
 
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 5}
+WEB_SEARCH_TOOL = {"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 5}
 
 PROPOSE_FOR_WATCHLIST_TOOL = {
     "name": "propose_for_watchlist",
     "description": "Propose an investment as a watchlist candidate. The user will review and confirm before it is added.",
+    "strict": True,
     "input_schema": {
         "type": "object",
+        "additionalProperties": False,
         "properties": {
             "ticker": {
                 "type": "string",

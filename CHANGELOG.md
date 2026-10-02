@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Neue Websuche und strikte Werkzeuge — 2026-10-02
+
+**Warum:** Die Websuche mit dynamischer Filterung (`web_search_20260209`) filtert die Treffer,
+bevor sie in den Kontext gehen; rund zwei Drittel einer Prüfung sind Eingabe-Tokens aus der
+Suche. Home-Ops und Maschinenraum nutzen sie schon. Und seit Opus/Sonnet 5.5 lässt sich ein
+Werkzeugaufruf nicht mehr erzwingen — `strict` sichert wenigstens, dass ein Aufruf, der kommt,
+zum Schema passt.
+
+**Änderungen:**
+- Alle Agenten nennen die Suche über `WEB_SEARCH_TYPE` (`core/constants.py`); für Haiku setzt
+  `tools_for_model()` die Grundfassung ein, live und im Batch. Tavily-Weg und Proxy erkennen
+  beide Fassungen.
+- `chat_with_tools` setzt eine vom Server unterbrochene Runde (`pause_turn`) fort, bis zu
+  viermal.
+- Urteils- und Vorschlagswerkzeuge sind `strict: true`; hinter einem Proxy wird `strict`
+  entfernt.
+- Nicht gebaut: das Urteil als Schema (`output_config.format`) — die API lehnt es zusammen mit
+  der Websuche ab. Siehe BACKLOG.md.
+
 ### „Denken aus“ folgt der Denktiefe des Hauses — 2026-10-02
 
 **Warum:** Die Denktiefe wird seit heute im Maschinenraum fürs ganze Haus gewählt (`effort`

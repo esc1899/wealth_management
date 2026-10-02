@@ -31,6 +31,7 @@ from core.storage.models import Position, StructuralScanRun
 from core.storage.positions import PositionsRepository
 from core.storage.structural_scans import StructuralScansRepository
 from agents.agent_language import response_language_instruction, current_date_context
+from core.constants import WEB_SEARCH_TYPE
 
 
 logger = logging.getLogger(__name__)
@@ -77,13 +78,15 @@ Be specific and analytical."""
 # Tool definitions
 # ------------------------------------------------------------------
 
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search"}
+WEB_SEARCH_TOOL = {"type": WEB_SEARCH_TYPE, "name": "web_search"}
 
 ADD_CANDIDATE_TOOL = {
     "name": "add_structural_candidate",
     "description": "Add a structural-change investment candidate to the watchlist.",
+    "strict": True,
     "input_schema": {
         "type": "object",
+        "additionalProperties": False,
         "properties": {
             "ticker": {
                 "type": "string",
@@ -290,7 +293,7 @@ class StructuralChangeAgent:
             # If only server-side tools (web_search) and no client tools, Claude
             # is still producing results — but we can't continue the loop without
             # client tool results. This shouldn't happen with models that support
-            # web_search_20250305 server-side. Break and return whatever we have.
+            # server-side web_search. Break and return whatever we have.
             if not client_calls:
                 break
 

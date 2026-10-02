@@ -31,6 +31,24 @@ def supports_effort(model: str) -> bool:
     return model.startswith("claude-") and "haiku" not in model
 
 
+# =========================================================================
+# Websuche (server-seitiges Werkzeug von Anthropic)
+# =========================================================================
+
+# Seit 2026-10-02 die Suche mit dynamischer Filterung: Claude filtert die Treffer per
+# Code, bevor sie in den Kontext gehen — weniger Eingabe-Tokens je Suche. Sie läuft
+# über Code-Ausführung, die nur Sonnet/Opus ab 4.6 können; für Haiku setzt
+# ClaudeProvider die Grundfassung ein. Erkannt werden beide (Tavily-Weg, Proxy).
+WEB_SEARCH_TYPE = "web_search_20260209"
+WEB_SEARCH_TYPE_BASIC = "web_search_20250305"
+WEB_SEARCH_TYPES = {WEB_SEARCH_TYPE, WEB_SEARCH_TYPE_BASIC}
+
+
+def supports_dynamic_search(model: str) -> bool:
+    """Kann dieses Modell die Websuche mit dynamischer Filterung? Haiku 4.5 nicht."""
+    return model.startswith("claude-") and "haiku" not in model
+
+
 # Per-agent default models (based on cost/capability trade-offs)
 CLAUDE_MODEL_DEFAULTS = {
     "haiku": CLAUDE_HAIKU,          # research, news, storychecker (lower cost)

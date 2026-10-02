@@ -91,9 +91,9 @@ class TestToOpenAITools:
         assert result[0]["function"]["parameters"]["type"] == "object"
 
     def test_anthropic_builtin_web_search_dropped(self):
-        """Anthropic built-in web_search_20250305 tool is filtered out."""
+        """Anthropic built-in web_search_20260209 tool is filtered out."""
         tools = [
-            {"type": "web_search_20250305"},
+            {"type": "web_search_20260209"},
             {
                 "name": "get_price",
                 "description": "Get stock price",
@@ -120,7 +120,7 @@ class TestToOpenAITools:
                 "input_schema": {"type": "object"},
             },
             # Format C: Anthropic built-in
-            {"type": "web_search_20250305"},
+            {"type": "web_search_20260209"},
         ]
         result = _to_openai_tools(tools)
         # Should have 2 tools: A passthrough + B converted, C dropped
@@ -268,7 +268,7 @@ class TestChatWithTools:
             result = await provider.chat_with_tools(
                 messages=[{"role": "user", "content": "Analysiere"}],
                 tools=[
-                    {"type": "web_search_20250305", "name": "web_search", "max_uses": 3},
+                    {"type": "web_search_20260209", "name": "web_search", "max_uses": 3},
                     {"name": "submit_fa_verdict", "description": "submit",
                      "input_schema": {"type": "object", "properties": {}}},
                 ],
@@ -335,7 +335,7 @@ class TestChatWithTools:
         provider._client.chat.completions.create = mock_create
 
         # Tools that will be filtered to empty list
-        tools = [{"type": "web_search_20250305"}]
+        tools = [{"type": "web_search_20260209"}]
         await provider.chat_with_tools(messages=[], tools=tools)
 
         assert "tools" not in captured
@@ -403,7 +403,7 @@ class TestChatWithTools:
 
     @pytest.mark.asyncio
     async def test_web_search_tool_dropped_tools_key_omitted(self, provider, monkeypatch):
-        """When only web_search_20250305 tool, tools key is omitted."""
+        """When only web_search_20260209 tool, tools key is omitted."""
         monkeypatch.delenv("TAVILY_API_KEY", raising=False)
         captured = {}
 
@@ -414,7 +414,7 @@ class TestChatWithTools:
         provider._client.chat.completions.create = mock_create
 
         # Only web search tool
-        tools = [{"type": "web_search_20250305"}]
+        tools = [{"type": "web_search_20260209"}]
         result = await provider.chat_with_tools(messages=[], tools=tools)
 
         assert "tools" not in captured

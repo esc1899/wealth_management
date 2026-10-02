@@ -696,6 +696,20 @@ keep their price of the day under the provider `claude_legacy`, which is **not**
 | Anthropic built-in (`web_search_20250305`) | no `TAVILY_API_KEY` | Anthropic / OpenRouter only |
 | Tavily (client-side) | `TAVILY_API_KEY` set | any provider with tool use |
 
+Since 2026-10-02 the agents name the search with dynamic filtering (`WEB_SEARCH_TYPE` =
+`web_search_20260209` in `core/constants.py`): Claude filters the results in code before they
+enter the context — fewer input tokens per search. It runs via code execution, which Haiku 4.5
+lacks; `tools_for_model()` in `core/llm/claude.py` swaps in the basic `web_search_20250305` for
+Haiku, live and in the batch. A long search turn may come back as `pause_turn`; `chat_with_tools`
+continues it up to `MAX_PAUSE_CONTINUATIONS` times. In a batch there is no continuing — such a
+position stays "ohne Ergebnis" like a missing verdict.
+
+Client tools (verdicts, watchlist proposals) are `strict: true` with `additionalProperties: false`:
+when the model calls one, the arguments match the schema. It does **not** guarantee the call
+itself — `tool_choice` `tool`/`any` is gone on Opus/Sonnet 5.5. Structured outputs
+(`output_config.format`) would, but the API rejects them together with web search (search
+results carry citations). Behind a proxy `strict` is stripped, as the proxy path predates it.
+
 Agents with web search (SearchAgent, StructuralChangeAgent, NewsAgent): on OpenRouter or other providers, enable via Tavily — or pick models with built-in search (Perplexity Sonar).
 
 ### Known Provider Configurations

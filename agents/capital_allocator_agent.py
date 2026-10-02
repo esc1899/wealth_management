@@ -27,6 +27,7 @@ from core.storage.analyses import PositionAnalysesRepository
 from core.storage.capital_allocator import CapitalAllocatorRepository
 from core.storage.models import PublicPosition, CapitalAllocatorMessage
 from agents.agent_language import response_language_with_fixed_codes, current_date_context
+from core.constants import WEB_SEARCH_TYPE
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +41,10 @@ VALID_VERDICTS = {"exzellent", "solide", "fragwürdig", "destruktiv"}
 SUBMIT_CA_VERDICT_TOOL = {
     "name": "submit_ca_verdict",
     "description": "Submit the capital allocator quality verdict after completing the analysis.",
+    "strict": True,
     "input_schema": {
         "type": "object",
+        "additionalProperties": False,
         "properties": {
             "position_id": {
                 "type": "integer",
@@ -182,7 +185,7 @@ class CapitalAllocatorAgent:
             response = await self._llm.chat_with_tools(
                 messages=[{"role": "user", "content": user_msg}],
                 tools=[
-                    {"type": "web_search_20250305", "name": "web_search", "max_uses": 1},
+                    {"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 1},
                     SUBMIT_CA_VERDICT_TOOL,
                 ],
                 system=system,
