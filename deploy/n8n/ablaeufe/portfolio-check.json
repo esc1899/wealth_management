@@ -1,6 +1,6 @@
 {
   "id": "wealthAgentenBld",
-  "name": "Wealth · Eingeplante Agenten",
+  "name": "Wealth · Portfolio-Check (automatisch)",
   "active": false,
   "isArchived": false,
   "nodes": [
@@ -107,8 +107,8 @@
     },
     {
       "parameters": {
-        "content": "### Portfolio",
-        "height": 810,
+        "content": "### Der Portfolio-Check",
+        "height": 820,
         "width": 300,
         "color": 5
       },
@@ -118,7 +118,7 @@
       "typeVersion": 1,
       "position": [
         1350,
-        -890
+        -800
       ]
     },
     {
@@ -129,7 +129,7 @@
       "typeVersion": 1,
       "position": [
         1400,
-        -820
+        -720
       ],
       "notes": "Positionen mit Story\nCode: core/scheduler.py::_run_storychecker_job",
       "notesInFlow": true
@@ -142,7 +142,7 @@
       "typeVersion": 1,
       "position": [
         1400,
-        -670
+        -570
       ],
       "notes": "Positionen mit Ticker, nur öffentliche Felder\nCode: core/scheduler.py::_run_fundamental_job",
       "notesInFlow": true
@@ -155,7 +155,7 @@
       "typeVersion": 1,
       "position": [
         1400,
-        -520
+        -420
       ],
       "notes": "Positionen mit Story\nCode: core/scheduler.py::_run_consensus_gap_job",
       "notesInFlow": true
@@ -168,7 +168,7 @@
       "typeVersion": 1,
       "position": [
         1400,
-        -370
+        -270
       ],
       "notes": "Positionen mit Ticker\nCode: core/scheduler.py::_run_sector_rotation_job",
       "notesInFlow": true
@@ -181,54 +181,25 @@
       "typeVersion": 1,
       "position": [
         1400,
-        -220
+        -120
       ],
       "notes": "alle Positionen des Portfolios\nCode: core/scheduler.py::_run_news_job",
       "notesInFlow": true
     },
     {
       "parameters": {
-        "content": "### Watchlist",
-        "height": 210,
+        "content": "### Außerdem im selben Lauf",
+        "height": 820,
         "width": 300,
-        "color": 5
+        "color": 7
       },
-      "id": "6a6a2972-3a9a-589e-8870-1ec520e5cd6e",
-      "name": "Gruppe Watchlist",
+      "id": "2b0f1157-de14-5980-87a4-149881dfd238",
+      "name": "Gruppe nebenbei",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
         1350,
-        -50
-      ]
-    },
-    {
-      "parameters": {},
-      "id": "8e4d3148-66dc-57ee-bd54-0e30814af0e5",
-      "name": "Devil's Advocate",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [
-        1400,
-        20
-      ],
-      "notes": "Watchlist-Titel, die nicht im Portfolio sind\nCode: core/scheduler.py::_run_devils_advocate_job",
-      "notesInFlow": true
-    },
-    {
-      "parameters": {
-        "content": "### Markt",
-        "height": 360,
-        "width": 300,
-        "color": 5
-      },
-      "id": "44599705-9544-57e4-9e33-ff8c0cf76e7c",
-      "name": "Gruppe Markt",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        1350,
-        190
+        60
       ]
     },
     {
@@ -239,9 +210,9 @@
       "typeVersion": 1,
       "position": [
         1400,
-        260
+        140
       ],
-      "notes": "ohne Positionen\nCode: core/scheduler.py::_run_structural_scan_job",
+      "notes": "Markt, ohne Positionen\nCode: core/scheduler.py::_run_structural_scan_job",
       "notesInFlow": true
     },
     {
@@ -252,26 +223,10 @@
       "typeVersion": 1,
       "position": [
         1400,
-        410
+        290
       ],
-      "notes": "ohne Positionen\nCode: core/scheduler.py::_run_search_agent_job",
+      "notes": "Markt, ohne Positionen\nCode: core/scheduler.py::_run_search_agent_job",
       "notesInFlow": true
-    },
-    {
-      "parameters": {
-        "content": "### Ohne Sprachmodell",
-        "height": 510,
-        "width": 300,
-        "color": 7
-      },
-      "id": "177b84a8-1a26-5562-9f50-d707b02fb7e8",
-      "name": "Gruppe Ohne Sprachmodell",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        1350,
-        580
-      ]
     },
     {
       "parameters": {},
@@ -281,9 +236,9 @@
       "typeVersion": 1,
       "position": [
         1400,
-        650
+        440
       ],
-      "notes": "rechnet nur\nCode: core/scheduler.py::_run_wealth_snapshot_job",
+      "notes": "rechnet nur, kein Sprachmodell\nCode: core/scheduler.py::_run_wealth_snapshot_job",
       "notesInFlow": true
     },
     {
@@ -294,9 +249,9 @@
       "typeVersion": 1,
       "position": [
         1400,
-        800
+        590
       ],
-      "notes": "rechnet nur\nCode: core/scheduler.py::_run_monthly_digest_job",
+      "notes": "rechnet nur, kein Sprachmodell\nCode: core/scheduler.py::_run_monthly_digest_job",
       "notesInFlow": true
     },
     {
@@ -307,9 +262,38 @@
       "typeVersion": 1,
       "position": [
         1400,
-        950
+        740
       ],
-      "notes": "rechnet nur\nCode: core/scheduler.py::_run_yearly_digest_job",
+      "notes": "rechnet nur, kein Sprachmodell\nCode: core/scheduler.py::_run_yearly_digest_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "### Ließe sich einplanen",
+        "height": 220,
+        "width": 300,
+        "color": 3
+      },
+      "id": "6a6a2972-3a9a-589e-8870-1ec520e5cd6e",
+      "name": "Gruppe Watchlist",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1350,
+        920
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "8e4d3148-66dc-57ee-bd54-0e30814af0e5",
+      "name": "Devil's Advocate",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        1000
+      ],
+      "notes": "auf der Seite „Scheduler“ wählbar – gehört zum Watchlist-Check (eigenes Bild)\nCode: core/scheduler.py::_run_devils_advocate_job",
       "notesInFlow": true
     },
     {
@@ -453,9 +437,51 @@
       "notesInFlow": true
     },
     {
+      "parameters": {},
+      "id": "31eb9adc-53ad-5c26-88dd-6f63228b41bd",
+      "name": "Knopf auf „Portfolio-Story“",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        980
+      ],
+      "notes": "dasselbe von Hand, je Zeile oder für alle fehlenden\nCode: pages/portfolio_story.py",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "6b8c70d2-9550-5e5c-bd10-eb27bf789286",
+      "name": "Story, Konsens, Fundamental ☁️",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        260,
+        980
+      ],
+      "notes": "sofort und live, parallel, nie als Batch\nCode: core/background_jobs.py::run_storychecker_job\nCode: core/background_jobs.py::run_consensus_gap_job\nCode: core/background_jobs.py::run_fundamental_job",
+      "notesInFlow": true
+    },
+    {
       "parameters": {
-        "content": "## Wealth · Eingeplante Agenten\n**Prozessbild** – läuft nie und enthält keine Daten, nur den Weg durch den Code. Stündlich fragt ops-core die App, welche der Jobs von der Seite „Scheduler“ fällig sind; sie laufen nacheinander.\n\n**Portfolio und Watchlist**: Fünf Agenten prüfen das Portfolio, nur Devil's Advocate die Watchlist – und dort nur Titel, die nicht im Portfolio sind.\n\n**Eingeplant heißt Batch, wartend heißt live**: Ein Batch kostet die Hälfte, sein Ergebnis holt erst der nächste Lauf ab. Bis dahin meldet die App „wartet“, sonst zeigte die Kachel „gut“, während das Ergebnis fehlt.\n\n**Strom weg mitten im Lauf?** Der nächste schließt den verwaisten Lauf und holt nach.\n\n☁️ Sprachmodell außer Haus",
-        "height": 400,
+        "content": "### Per Knopf: dieselben Checks, sofort",
+        "height": 300,
+        "width": 680,
+        "color": 4
+      },
+      "id": "bb08a9b9-07d4-5426-8237-ca2eebd729b7",
+      "name": "Per Knopf",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        860
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Wealth · Portfolio-Check (automatisch)\n**Prozessbild** – läuft nie und enthält keine Daten, nur den Weg durch den Code. Stündlich fragt ops-core die App, welche Jobs der Seite „Scheduler“ fällig sind; sie laufen nacheinander. Fünf davon prüfen das Portfolio – das ist der Portfolio-Check.\n\n**Die Watchlist prüft ein eigener Ablauf, auf Knopfdruck** (Bild „Wealth · Watchlist-Check“). Devil's Advocate ließe sich hier trotzdem einplanen – unten rechts.\n\n**Eingeplant heißt Batch, wartend heißt live**: Ein Batch kostet die Hälfte, sein Ergebnis holt erst der nächste Lauf ab; bis dahin meldet die App „wartet“.\n\n**Strom weg mitten im Lauf?** Der nächste schließt den verwaisten Lauf und holt nach.\n\n☁️ Sprachmodell außer Haus",
+        "height": 420,
         "width": 1180,
         "color": 7
       },
@@ -465,7 +491,7 @@
       "typeVersion": 1,
       "position": [
         -60,
-        -700
+        -760
       ]
     }
   ],
@@ -550,11 +576,6 @@
             "index": 0
           },
           {
-            "node": "Devil's Advocate",
-            "type": "main",
-            "index": 0
-          },
-          {
             "node": "Strukturwandel",
             "type": "main",
             "index": 0
@@ -576,6 +597,11 @@
           },
           {
             "node": "Jahresrückblick",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Devil's Advocate",
             "type": "main",
             "index": 0
           }
@@ -637,17 +663,6 @@
         ]
       ]
     },
-    "Devil's Advocate": {
-      "main": [
-        [
-          {
-            "node": "Modell auflösen",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Strukturwandel": {
       "main": [
         [
@@ -660,6 +675,17 @@
       ]
     },
     "Investment-Suche": {
+      "main": [
+        [
+          {
+            "node": "Modell auflösen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Devil's Advocate": {
       "main": [
         [
           {
@@ -803,6 +829,17 @@
         [
           {
             "node": "„Wartet“ melden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knopf auf „Portfolio-Story“": {
+      "main": [
+        [
+          {
+            "node": "Story, Konsens, Fundamental ☁️",
             "type": "main",
             "index": 0
           }

@@ -1,0 +1,429 @@
+{
+  "id": "wealthWatchlistB",
+  "name": "Wealth · Watchlist-Check (auf Knopfdruck)",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "82f463fc-0463-55be-a37f-64d539bf093b",
+      "name": "Seite „Watchlist Checker“",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "du öffnest sie – nichts davon läuft eingeplant\nCode: pages/watchlist_checker.py",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "1943f615-aaa9-5815-af79-436d5682f54c",
+      "name": "Status-Matrix",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        260,
+        0
+      ],
+      "notes": "je Kandidat fünf Checks: fehlt, aktuell oder älter als 7 Tage\nCode: pages/watchlist_checker.py::_is_stale",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "e8a413f5-9dbd-521e-9305-6aa3583f2137",
+      "name": "Knopf: eine Zeile",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        520,
+        -220
+      ],
+      "notes": "nur, was dem gewählten Titel fehlt oder veraltet ist\nCode: pages/watchlist_checker.py::_run_parallel",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "dff7cd98-ec77-5229-8b8d-f8a733a3cd45",
+      "name": "Knopf: alle fehlenden",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        520,
+        0
+      ],
+      "notes": "alle Kandidaten ohne Ergebnis\nCode: pages/watchlist_checker.py::_run_parallel",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "0381b790-35ad-5cea-b05f-35625044f225",
+      "name": "Knopf: alle veralteten",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        520,
+        220
+      ],
+      "notes": "älter als 7 Tage\nCode: pages/watchlist_checker.py::_run_parallel",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "a6f40d6a-77e2-5ae5-8eab-dce801df0a9a",
+      "name": "Parallel, live",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        820,
+        0
+      ],
+      "notes": "jeder Check in seinem Faden, nie als Batch – du wartest ja\nCode: pages/watchlist_checker.py::_run_parallel",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "05f5cfb1-0102-5273-9ad8-c96448b9a6b0",
+      "name": "Storychecker ☁️",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        -300
+      ],
+      "notes": "trägt die Story noch?\nCode: core/background_jobs.py::run_storychecker_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "f766df5a-5f4f-5047-b10d-db1517ae179e",
+      "name": "Konsens-Lücken ☁️",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        -150
+      ],
+      "notes": "wo weicht die Story vom Markt ab?\nCode: core/background_jobs.py::run_consensus_gap_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "7462c040-654d-54e2-b6be-d2152d0de6db",
+      "name": "Fundamentalwert ☁️",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        0
+      ],
+      "notes": "Bewertung aus öffentlichen Zahlen\nCode: core/background_jobs.py::run_fundamental_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "d8101a21-f1fe-570c-b15c-f4598ada6b9d",
+      "name": "Capital Allocator ☁️",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        150
+      ],
+      "notes": "wie das Management Kapital einsetzt – nur hier, nicht im Portfolio-Check\nCode: core/background_jobs.py::run_capital_allocator_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "b7909c5b-8ca5-56bf-a275-632796a416c0",
+      "name": "Devil's Advocate ☁️",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        300
+      ],
+      "notes": "die Gegenrede\nCode: core/background_jobs.py::run_devils_advocate_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "d08d750f-652a-534d-8a89-380ee39784cb",
+      "name": "Urteile gespeichert",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1480,
+        0
+      ],
+      "notes": "je Check sein Urteil – die Matrix zeigt sie beim nächsten Öffnen\nCode: core/background_jobs.py",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "11a1b33d-1110-5189-a6a6-35068977a2e4",
+      "name": "Knopf: Passt es ins Portfolio?",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        0
+      ],
+      "notes": "der eigentliche Watchlist-Check, eigener Knopf\nCode: pages/watchlist_checker.py",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "6b837bc1-4130-5569-9906-96ad03bcf009",
+      "name": "Watchlist-Checker 🔒",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2040,
+        0
+      ],
+      "notes": "Ollama auf dem Mini: Kandidaten gegen die Aufteilung des Portfolios\nCode: agents/watchlist_checker_agent.py::check_watchlist",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "0fe81fec-7044-5471-b00d-07da515c493d",
+      "name": "Passung je Titel",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2300,
+        0
+      ],
+      "notes": "Ergebnis auf der Seite\nCode: agents/watchlist_checker_agent.py::WatchlistFit",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "### Fünf Checks je Titel",
+        "height": 860,
+        "width": 300,
+        "color": 5
+      },
+      "id": "52e7fc66-3778-5a43-b908-68c986e9fc92",
+      "name": "Fünf Checks",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1130,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Wealth · Watchlist-Check (auf Knopfdruck)\n**Prozessbild** – läuft nie und enthält keine Daten. Die Watchlist wird nur geprüft, wenn du es auf der Seite auslöst: erst fünf Checks je Titel in der Cloud, dann – eigener Knopf – ob er ins Portfolio passt, lokal mit Ollama.\n\n**Anders als der Portfolio-Check**: live statt Batch, parallel statt nacheinander, dazu Capital Allocator und Devil's Advocate.\n\n☁️ Sprachmodell außer Haus · 🔒 Ollama auf dem Mini",
+        "height": 360,
+        "width": 1100,
+        "color": 7
+      },
+      "id": "6495c6e8-d07d-52ee-b8e6-f97424bc208a",
+      "name": "Über dieses Bild",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -760
+      ]
+    }
+  ],
+  "connections": {
+    "Seite „Watchlist Checker“": {
+      "main": [
+        [
+          {
+            "node": "Status-Matrix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status-Matrix": {
+      "main": [
+        [
+          {
+            "node": "Knopf: eine Zeile",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Knopf: alle fehlenden",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Knopf: alle veralteten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knopf: eine Zeile": {
+      "main": [
+        [
+          {
+            "node": "Parallel, live",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knopf: alle fehlenden": {
+      "main": [
+        [
+          {
+            "node": "Parallel, live",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knopf: alle veralteten": {
+      "main": [
+        [
+          {
+            "node": "Parallel, live",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parallel, live": {
+      "main": [
+        [
+          {
+            "node": "Storychecker ☁️",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Konsens-Lücken ☁️",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fundamentalwert ☁️",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Capital Allocator ☁️",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Devil's Advocate ☁️",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Storychecker ☁️": {
+      "main": [
+        [
+          {
+            "node": "Urteile gespeichert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Konsens-Lücken ☁️": {
+      "main": [
+        [
+          {
+            "node": "Urteile gespeichert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fundamentalwert ☁️": {
+      "main": [
+        [
+          {
+            "node": "Urteile gespeichert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capital Allocator ☁️": {
+      "main": [
+        [
+          {
+            "node": "Urteile gespeichert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Devil's Advocate ☁️": {
+      "main": [
+        [
+          {
+            "node": "Urteile gespeichert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Urteile gespeichert": {
+      "main": [
+        [
+          {
+            "node": "Knopf: Passt es ins Portfolio?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knopf: Passt es ins Portfolio?": {
+      "main": [
+        [
+          {
+            "node": "Watchlist-Checker 🔒",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Watchlist-Checker 🔒": {
+      "main": [
+        [
+          {
+            "node": "Passung je Titel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  },
+  "pinData": {},
+  "tags": []
+}
