@@ -4,7 +4,7 @@
 
 ```mermaid
 graph TD
-    subgraph UI["Streamlit UI (30 Pages)"]
+    subgraph UI["Streamlit UI"]
         PG1["Dashboard / Positionen / Marktdaten"]
         PG2["Portfolio Chat / Portfolio Checker / Position Dashboard"]
         PG3["Storychecker / Watchlist Checker / Watchlist-Analyse"]
@@ -98,7 +98,7 @@ sequenceDiagram
 | **PortfolioRobustnessAgent** | Ollama | Local | Stateless | `analyze()` | Portfolio-level stress assessment (FEAT-48) |
 | **TaxLossHarvestingAgent** | Ollama | Local | Stateless | `analyze()` | Loss positions + tax impact + replacements (FEAT-44) |
 | **DividendCalendarAgent** | Ollama | Local | Stateless | `analyze()` | Dividend cashflow commentary (FEAT-45) |
-| **MarketDataAgent** | — | — | Stateless | APScheduler | Price fetch + history |
+| **MarketDataAgent** | — | — | Stateless | ops-core job `kurse` | Price fetch + history |
 | **ResearchAgent** | Claude | Haiku | DB-persisted | `start_session()` + `chat()` | Research per position |
 | **NewsAgent** | Claude | Haiku | Stateless | `analyze_portfolio()` | News digest |
 | **SearchAgent** | Claude | Sonnet | DB-persisted | `start_session()` + `chat()` | Watchlist screening |
@@ -238,13 +238,11 @@ All agents are **lazy-loaded via `@st.cache_resource` factory functions**. Two a
 - `get_portfolio_agent()` — Portfolio Chat critical path
 - `get_market_agent()` — market data for the pages
 
-**No schedule runs in the app** (since 2026-10-02). Everything that runs regularly is an
-ops-core job (`scripts/job.py`, schedule in `~/.ops-core/jobs.toml`): `agenten` (hourly
+**No schedule runs in the app.** Everything that runs regularly is an ops-core job (`scripts/job.py`, schedule in `~/.ops-core/jobs.toml`): `agenten` (hourly
 and at login — runs the due jobs of the Scheduler page), `kurse` (login and 18:05 — the
 daily fetch with history and snapshots) and `kosten` (hourly — real OpenRouter costs).
-Streamlit executes `app.py` only when a browser opens the page, so the APScheduler that
-used to run there missed every run of a day without a visit, and none of it showed in the
-house's run log. Frequency and time of an agent job are still set on the Scheduler page;
+Streamlit executes `app.py` only when a browser opens the page, and a scheduler in the
+app would bypass the house's run log. Frequency and time of an agent job are still set on the Scheduler page;
 the job decides what is due (`core.scheduler.ist_faellig`: the most recent scheduled time
 has passed and the job has not run since). After three failed scheduled attempts since
 that time a job waits for its next one, and `agenten` stays red meanwhile
@@ -428,7 +426,7 @@ Each position has ONE ROLE describing its contribution:
 - 🟣 **Diversifikationselement** — low correlation (gold, commodities)
 - 🔴 **Fehlplatzierung** — doesn't fit story
 
-### Self-Contained Wealth Snapshots (2026-06-17)
+### Self-Contained Wealth Snapshots
 `wealth_snapshots.holdings` (JSON, nullable) stores the full portfolio composition **at
 capture time** — per position `{name, ticker, asset_class, quantity, unit, price_eur,
 value_eur, annual_dividend_eur, dividend_yield_pct}`. Written by `take_snapshot`.
@@ -441,7 +439,7 @@ against its *actual* holdings (`WealthSnapshotAgent._reprice_holdings`), and it 
 foundation for composition-aware analytics (weight/sector drift, per-position dividend
 growth, contribution of since-sold positions).
 
-**Limitation — forward-only**: snapshots taken before this change have `holdings = NULL`
+**Limitation — forward-only**: older snapshots have `holdings = NULL`
 and cannot be reconstructed accurately. `rebuild_wealth_history` re-prices only
 holdings-bearing snapshots and reports legacy ones under `skipped_legacy`; the per-row
 🔄 falls back to a current-portfolio approximation (note `recalculated`) for legacy dates.
@@ -463,7 +461,10 @@ Pages use `core.currency.symbol()` and `core.currency.fmt()` for display.
 
 ## Encryption & Storage
 
-- **Prod**: Full encryption via Cryptography/Fernet on: position names, stories, notes, extra_data (JSON)
+- **Prod**: Fernet encrypts five columns of `positions`: `quantity`, `purchase_price`, `notes`,
+  `extra_data` (JSON), `story`. **Names, ticker, ISIN and `position_analyses` are plaintext** —
+  the encryption protects against losing the file, not against local code. Authoritative:
+  `_serialize()` in `core/storage/positions.py` (table in CLAUDE.md).
 - **Demo**: Plaintext (PassthroughEncryptionService)
 - **Migrations**: Auto-run on startup via `migrate_db()` — idempotent, no data loss
 
@@ -471,11 +472,11 @@ Pages use `core.currency.symbol()` and `core.currency.fmt()` for display.
 
 ## Testing Strategy
 
-- **Unit tests**: Agent logic, repository CRUD, parsing; smoke tests for all 30 pages (AppTest)
+- **Unit tests**: Agent logic, repository CRUD, parsing; smoke tests for all pages (AppTest)
 - **Integration tests**: Full workflows with real SQLite (`:memory:`)
 - **No mocking of repositories**: Always use real storage for higher fidelity
 - **Test-first on bugs**: write the failing test before the fix (see CLAUDE.md Test-Disziplin)
-- **Volume**: 996 tests, ~38s wall time, coverage 71% (target: 50%+)
+- **Coverage** must stay at 50%+ (`pytest.ini`); the suite runs in about a minute
 
 ```bash
 pytest tests/                 # All
@@ -486,20 +487,11 @@ pytest -k consensus_gap       # Specific agent
 
 ---
 
-## Known Technical Debt
-
-**DEBT Stack Completed (2026-04-16):** ✅
-- ✅ [DEBT-9] asyncio.get_event_loop() → asyncio.run() (Python 3.12+ safe)
-- ✅ [DEBT-7] state.py decomposed (437 → 60 lines + 5 modules, zero page disruption)
-- ✅ [DEBT-4] Service Layer + Agent Encapsulation (AnalysisService, PortfolioService; agents own persistence)
-
----
-
 ## Multi-Language Support (i18n)
 
 **UI Language Selection**: Settings page allows German ↔ English switching via `core.i18n` module.
 
-**Agent Response Language** (2026-04-17):
+**Agent Response Language**:
 - Agents accept `language: str = "de"` parameter on execution methods
 - System prompts dynamically inject language instruction via `agents/agent_language.py` helpers
 - Pages capture `current_language()` in main thread before background thread spawn (session_state safety)
@@ -517,33 +509,7 @@ pytest -k consensus_gap       # Specific agent
 
 ---
 
-## Recent Changes (May–June 2026)
-
-✅ **MCP Research Loop complete** (FEAT-49–55, 2026-06-09 through 2026-06-11)
-   - MCP server (stdio + optional HTTP), research queue, UserPromptSubmit hook
-   - Research Answers UI, global request form, Position Dashboard integration
-
-✅ **Security: SEC-4 + SEC-5** (2026-06-09 / 2026-06-11)
-   - Path traversal, prompt-injection framing, length limits, constant-time bearer
-     comparison, XML escaping in the hook, limit sync across both write paths
-
-✅ **New agents** (May–June 2026)
-   - DevilsAdvocateAgent + PortfolioRobustnessAgent (FEAT-47/48)
-   - SectorRotationAgent (FEAT-46), TaxLossHarvestingAgent (FEAT-44), DividendCalendarAgent (FEAT-45)
-
-✅ **Batch API** (2026-06-07/08) — 50% cheaper scheduled jobs via `pending_batches` + scheduler polling. Since 2026-10-02 switched by the household (`modelle.toml`, Maschinenraum), only for scheduled runs (`_BATCH_ERLAUBT`), same effort/max_tokens as live, booked with `source="batch"` at half price, all eight cloud agents incl. News and Devil's Advocate (no second verdict call in batch), and the job reports `wartet` to the run log. See heimnetzwerk `docs/haus/integrationen.md` (Claude).
-
-✅ **Attribution & digests** (FEAT-34–39, May 2026) — monthly/yearly attribution incl. dividends, digest reports, macro chips
-
-✅ **Status matrix & background jobs** (FEAT-40/41) — `core/background_jobs.py` shared across SC/CG/FA/CA, watchlist cockpit
-
-✅ **Provider flexibility** (May 2026) — OpenRouter/DeepSeek migration, Tavily search, `OpenAICompatibleProvider`
-
-For older changes see CHANGELOG.md.
-
----
-
-## Service Layer (Post-DEBT-4)
+## Service Layer
 
 ### Core Services
 
@@ -560,12 +526,8 @@ For older changes see CHANGELOG.md.
 - `get_watchlist_positions()` — Convenience method for watchlist only
 
 ### Usage Pattern
-Pages no longer call `analyses_repo.get_latest_bulk()` or `positions_repo.get_*()` directly:
+Pages do not call `analyses_repo.get_latest_bulk()` or `positions_repo.get_*()` directly:
 ```python
-# Before DEBT-4:
-verdicts = analyses_repo.get_latest_bulk(ids, "storychecker")
-
-# After DEBT-4:
 verdicts = analysis_service.get_verdicts(ids, "storychecker")
 ```
 
@@ -575,20 +537,15 @@ verdicts = analysis_service.get_verdicts(ids, "storychecker")
 - `pages/watchlist_checker.py` — AnalysisService, PortfolioService
 - `pages/portfolio_story.py` — AnalysisService, PortfolioService
 - `pages/consensus_gap.py` — AnalysisService, PortfolioService
-- `pages/fundamental_analyzer.py` — PortfolioService  
-✅ Portfolio Story subsystem (role-based fit)  
-✅ 550 tests passing, 76% coverage  
+- `pages/fundamental_analyzer.py` — PortfolioService
 
 ---
 
-## Household LLM Accounting (2026-09-22)
+## Household LLM Accounting
 
-Four side projects on this machine talk to the same three providers
-(Claude, Ollama, OpenRouter). Each one knew its own token counts; nobody
-knew what the household spent, and nothing lined the numbers up. Since
-2026-09-22 they all book into the shared run log of **ops-core** (in the
-`heimnetzwerk` repo), where the Home-Ops agent sums the running
-calendar month per provider and holds it against a budget.
+All apps on this machine talk to the same providers (Claude, Ollama, OpenRouter). Every call
+is booked into the shared run log of **ops-core** (in the `heimnetzwerk` repo), where the
+Maschinenraum sums the running calendar month per provider and holds it against a budget.
 
 **Where it hooks in.** `UsageRepository.record()` — the one choke point
 every call already passes through — writes the usage row and then books
@@ -622,9 +579,9 @@ is a deliberate copy, no import, so nothing here depends on ops-core
 being installed. Without `~/.ops-core` nothing is booked and nothing is
 created; the test suite points `OPS_CORE_HOME` at a throwaway directory.
 
-## Running on the Home Server (2026-09-20 … 26)
+## Running on the Home Server
 
-The app runs on the household Mac mini next to four other side projects.
+The app runs on the household Mac mini next to the other systems of the house.
 Everything that ties them together lives in the `heimnetzwerk` repo, not
 here; this repo only delivers the pieces the house asks for:
 
@@ -635,8 +592,10 @@ here; this repo only delivers the pieces the house asks for:
 | The tile | `scripts/kachel.py --fetch` writes `~/.dienste/www/kacheln/wealth.json`: day change, positions, biggest mover | job `kachel`, hourly at :40 and at login |
 | The notice | `core/story_meldung.py`: once the Story Checker has judged every position with a story, the tile carries the sum of its verdicts, red if one is endangered, linking to `/wealth/storychecker` | written by the tile job — never when the tile is opened |
 | The ✕ on the notice | `scripts/meldungen_dienst.py`, stdlib only, `127.0.0.1:8656`; a POST remembers the dismissed pass in `app_config` and drops the notice from the file | service `meldungen`; Caddy routes `/kacheln/wealth/*` there (it must sit under the tile's path, or the start page shows no ✕) |
-| LLM accounting | `core/ops_events.py` (see above) | read back by the Home-Ops agent |
-| House model | model name `home` → `core/house_models.py`, resolved in `core.llm.router.resolve_house_model` at call time | `~/.ops-core/modelle.toml`, edited on the Home-Ops page |
+| LLM accounting | `core/ops_events.py` (see above) | read back by the Maschinenraum |
+| House model | model name `home` → `core/house_models.py`, resolved in `core.llm.router.resolve_house_model` at call time; `batch` and `effort` from the same file | `~/.ops-core/modelle.toml`, edited in the Maschinenraum |
+| Batch | scheduled runs go as an Anthropic batch when the household switch is on (`_BATCH_ERLAUBT`): half price, same effort/max_tokens as live, booked with `source="batch"`; the `agenten` job reports `wartet` to the run log. "Run now" stays live | switch in the Maschinenraum; see `docs/haus/integrationen.md` (Claude) |
+| Process diagrams | `deploy/n8n/ablaeufe/`: portfolio-check and watchlist-check, never run; `tests/unit/test_prozessbilder.py` checks the named code | imported with `deploy/ops-core/n8n-ablaeufe.sh` |
 
 Two rules carry over from the house. **Nothing on the start page is
 computed when it is opened** — the hourly job decides, the page reads a
@@ -696,7 +655,7 @@ keep their price of the day under the provider `claude_legacy`, which is **not**
 | Anthropic built-in (`web_search_20250305`) | no `TAVILY_API_KEY` | Anthropic / OpenRouter only |
 | Tavily (client-side) | `TAVILY_API_KEY` set | any provider with tool use |
 
-Since 2026-10-02 the agents name the search with dynamic filtering (`WEB_SEARCH_TYPE` =
+The agents name the search with dynamic filtering (`WEB_SEARCH_TYPE` =
 `web_search_20260209` in `core/constants.py`): Claude filters the results in code before they
 enter the context — fewer input tokens per search. It runs via code execution, which Haiku 4.5
 lacks; `tools_for_model()` in `core/llm/claude.py` swaps in the basic `web_search_20250305` for
@@ -774,8 +733,6 @@ streamlit run app.py
 
 ---
 
----
-
 ## MCP Server Architecture (FEAT-49/50/51/52)
 
 ### What is MCP?
@@ -791,18 +748,19 @@ The server declares tools as plain Python functions with `@mcp.tool()`. Claude C
 
 ### Dual-Venv Architecture
 
-The MCP SDK requires Python ≥ 3.10, the main app runs on Python 3.9.6. Solution: two separate virtual environments.
+The MCP server runs in its own virtual environment, so the MCP SDK and its dependencies stay
+out of the app's.
 
 ```
-.venv/        (Python 3.9.6)  — main app, all tests, all imports
-mcp_venv/     (Python 3.11.15) — only mcp_server/wealth_mcp.py
+.venv/        — main app, all tests, all imports
+mcp_venv/     — only mcp_server/wealth_mcp.py
 ```
 
 The separation is clean: `mcp_server/_helpers.py` contains the testable logic (no MCP import) — YAML building, atomic file writes, input validation (`validate_answer_input`), and the `BearerTokenMiddleware` — importable from `.venv`. `wealth_mcp.py` imports `_helpers` + FastMCP and runs only in `mcp_venv`.
 
 ```
 mcp_server/
-├── _helpers.py       # pure Python 3.9 — testable from .venv (incl. auth middleware + validation)
+├── _helpers.py       # no MCP import — testable from .venv (incl. auth middleware + validation)
 ├── wealth_mcp.py     # FastMCP server — runs in mcp_venv
 ├── check_queue.py    # hook script — /usr/bin/python3
 ├── requirements.txt  # mcp[cli]>=1.0.0, pyyaml>=6.0, uvicorn
@@ -927,9 +885,7 @@ The MCP server is the first external write path that does not go through the Str
 | HTTP transport auth | Bearer token required, `hmac.compare_digest` (constant-time), websocket scope rejected, bound to `127.0.0.1` |
 | DB access | Convention + checklist (CLAUDE.md): tools touch only `research_requests`/`research_answers` |
 
-**Bisherige Security Reviews:** 2026-04-24 (Red Team, alle HIGH/MEDIUM fixes), 2026-05-09 (Cowork ingest: URL-Injection, Markdown-Injection, Dateigrößen-Limit), 2026-05-11 (FEAT-34–39 + Sonnet-Switch: SQL-Injection, Privacy-Boundary, LLM-Prompt-Injection, XSS — alle clean), 2026-06-09 (SEC-4, MCP-Tools FEAT-50/51/52: Path-Traversal in Outbox-Filename, Prompt-Injection im Hook, fehlende Längenlimits — alle gefixt), 2026-06-11 (Full-Review: getrackte 0-Byte-DB aus Git entfernt + `*.db` ignoriert, SEC-4 V1-A Privacy-Hinweis, SEC-5 MCP-Härtung: constant-time Bearer-Vergleich, Websocket-Reject, XML-Escaping im Hook, Limits auf beiden Schreibpfaden — alle gefixt)
-
-### New Storage Tables
+### Storage Tables
 
 ```sql
 CREATE TABLE research_requests (
@@ -953,6 +909,3 @@ CREATE TABLE research_answers (
 );
 ```
 
----
-
-*Last updated: 2026-06-11*

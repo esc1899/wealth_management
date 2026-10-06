@@ -1314,6 +1314,39 @@ Pipeline: `.md`-Datei in `~/wealth-research/outbox/` → Parser → Importer →
 
 ---
 
+### Aus ARCHITECTURE.md übernommen — Stand 2026-06-11
+
+(Bis 2026-10-06 in ARCHITECTURE.md; die Datei beschreibt seitdem nur den Stand.)
+
+**Recent Changes (May–June 2026)**
+
+✅ **MCP Research Loop complete** (FEAT-49–55, 2026-06-09 through 2026-06-11)
+   - MCP server (stdio + optional HTTP), research queue, UserPromptSubmit hook
+   - Research Answers UI, global request form, Position Dashboard integration
+
+✅ **Security: SEC-4 + SEC-5** (2026-06-09 / 2026-06-11)
+   - Path traversal, prompt-injection framing, length limits, constant-time bearer
+     comparison, XML escaping in the hook, limit sync across both write paths
+
+✅ **New agents** (May–June 2026)
+   - DevilsAdvocateAgent + PortfolioRobustnessAgent (FEAT-47/48)
+   - SectorRotationAgent (FEAT-46), TaxLossHarvestingAgent (FEAT-44), DividendCalendarAgent (FEAT-45)
+
+✅ **Batch API** (2026-06-07/08) — 50% cheaper scheduled jobs via `pending_batches` + scheduler polling. Since 2026-10-02 switched by the household (`modelle.toml`, Maschinenraum), only for scheduled runs (`_BATCH_ERLAUBT`), same effort/max_tokens as live, booked with `source="batch"` at half price, all eight cloud agents incl. News and Devil's Advocate (no second verdict call in batch), and the job reports `wartet` to the run log. See heimnetzwerk `docs/haus/integrationen.md` (Claude).
+
+✅ **Attribution & digests** (FEAT-34–39, May 2026) — monthly/yearly attribution incl. dividends, digest reports, macro chips
+
+✅ **Status matrix & background jobs** (FEAT-40/41) — `core/background_jobs.py` shared across SC/CG/FA/CA, watchlist cockpit
+
+✅ **Provider flexibility** (May 2026) — OpenRouter/DeepSeek migration, Tavily search, `OpenAICompatibleProvider`
+
+**DEBT Stack Completed (2026-04-16):** ✅
+- ✅ [DEBT-9] asyncio.get_event_loop() → asyncio.run() (Python 3.12+ safe)
+- ✅ [DEBT-7] state.py decomposed (437 → 60 lines + 5 modules, zero page disruption)
+- ✅ [DEBT-4] Service Layer + Agent Encapsulation (AnalysisService, PortfolioService; agents own persistence)
+
+**Bisherige Security Reviews:** 2026-04-24 (Red Team, alle HIGH/MEDIUM fixes), 2026-05-09 (Cowork ingest: URL-Injection, Markdown-Injection, Dateigrößen-Limit), 2026-05-11 (FEAT-34–39 + Sonnet-Switch: SQL-Injection, Privacy-Boundary, LLM-Prompt-Injection, XSS — alle clean), 2026-06-09 (SEC-4, MCP-Tools FEAT-50/51/52: Path-Traversal in Outbox-Filename, Prompt-Injection im Hook, fehlende Längenlimits — alle gefixt), 2026-06-11 (Full-Review: getrackte 0-Byte-DB aus Git entfernt + `*.db` ignoriert, SEC-4 V1-A Privacy-Hinweis, SEC-5 MCP-Härtung: constant-time Bearer-Vergleich, Websocket-Reject, XML-Escaping im Hook, Limits auf beiden Schreibpfaden — alle gefixt)
+
 ## [1.6.0] — 2026-04-11
 
 ### Added — Portfolio Story: Role-Based Story Fits
