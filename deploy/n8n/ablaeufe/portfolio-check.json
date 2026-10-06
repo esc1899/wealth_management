@@ -40,7 +40,7 @@
         520,
         0
       ],
-      "notes": "Takt und Uhrzeit stellst du auf der Seite „Scheduler“ ein\nCode: core/scheduler.py::ist_faellig",
+      "notes": "Takt und Uhrzeit stellst du auf der Seite „Scheduler“ ein\nnie Devil's Advocate: nur auf Knopfdruck\nCode: core/scheduler.py::ist_faellig\nCode: core/scheduler.py::NUR_AUF_KNOPFDRUCK",
       "notesInFlow": true
     },
     {
@@ -268,35 +268,6 @@
       "notesInFlow": true
     },
     {
-      "parameters": {
-        "content": "### Ließe sich einplanen",
-        "height": 220,
-        "width": 300,
-        "color": 3
-      },
-      "id": "6a6a2972-3a9a-589e-8870-1ec520e5cd6e",
-      "name": "Gruppe Watchlist",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        1350,
-        920
-      ]
-    },
-    {
-      "parameters": {},
-      "id": "8e4d3148-66dc-57ee-bd54-0e30814af0e5",
-      "name": "Devil's Advocate",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [
-        1400,
-        1000
-      ],
-      "notes": "auf der Seite „Scheduler“ wählbar – gehört zum Watchlist-Check (eigenes Bild)\nCode: core/scheduler.py::_run_devils_advocate_job",
-      "notesInFlow": true
-    },
-    {
       "parameters": {},
       "id": "e5a6b7f2-ec7e-544d-8f7a-b21a9fb796c9",
       "name": "Modell auflösen",
@@ -480,7 +451,7 @@
     },
     {
       "parameters": {
-        "content": "## Wealth · Portfolio-Check (automatisch)\n**Prozessbild** – läuft nie und enthält keine Daten, nur den Weg durch den Code. Stündlich fragt ops-core die App, welche Jobs der Seite „Scheduler“ fällig sind; sie laufen nacheinander. Fünf davon prüfen das Portfolio – das ist der Portfolio-Check.\n\n**Die Watchlist prüft ein eigener Ablauf, auf Knopfdruck** (Bild „Wealth · Watchlist-Check“). Devil's Advocate ließe sich hier trotzdem einplanen – unten rechts.\n\n**Eingeplant heißt Batch, wartend heißt live**: Ein Batch kostet die Hälfte, sein Ergebnis holt erst der nächste Lauf ab; bis dahin meldet die App „wartet“.\n\n**Strom weg mitten im Lauf?** Der nächste schließt den verwaisten Lauf und holt nach.\n\n☁️ Sprachmodell außer Haus",
+        "content": "## Wealth · Portfolio-Check (automatisch)\n**Prozessbild** – läuft nie und enthält keine Daten, nur den Weg durch den Code. Stündlich fragt ops-core die App, welche Jobs der Seite „Scheduler“ fällig sind; sie laufen nacheinander. Fünf davon prüfen das Portfolio – das ist der Portfolio-Check.\n\n**Die Watchlist prüft ein eigener Ablauf, auf Knopfdruck** (Bild „Wealth · Watchlist-Check“). Devil's Advocate lässt sich seit dem 06.10.2026 nicht mehr einplanen; ein älterer Job läuft nicht mehr von selbst.\n\n**Eingeplant heißt Batch, wartend heißt live**: Ein Batch kostet die Hälfte, sein Ergebnis holt erst der nächste Lauf ab; bis dahin meldet die App „wartet“.\n\n**Strom weg mitten im Lauf?** Der nächste schließt den verwaisten Lauf und holt nach.\n\n☁️ Sprachmodell außer Haus",
         "height": 420,
         "width": 1180,
         "color": 7
@@ -599,11 +570,6 @@
             "node": "Jahresrückblick",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Devil's Advocate",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -675,17 +641,6 @@
       ]
     },
     "Investment-Suche": {
-      "main": [
-        [
-          {
-            "node": "Modell auflösen",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Devil's Advocate": {
       "main": [
         [
           {

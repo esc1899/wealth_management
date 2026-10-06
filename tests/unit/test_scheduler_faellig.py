@@ -124,6 +124,18 @@ def _lief_um(repo, job_id, lokal: datetime):
 
 
 class TestLaufenLassen:
+    def test_devils_advocate_laeuft_nie_eingeplant(self, db):
+        # Die Watchlist prueft Erik auf Knopfdruck (2026-10-06); ein frueher
+        # angelegter Job laeuft nicht mehr von selbst, auch wenn er faellig waere.
+        pfad, repo = db
+        _neu(repo, agent_name="devils_advocate")
+        news = _neu(repo, agent_name="news")
+        d = _dienst(pfad)
+        d._execute_job = AsyncMock()
+        gelaufen, fehl, _ = d.laufen_lassen(now=datetime(2026, 10, 1, 12, 0), aus=lambda _: None)
+        assert (gelaufen, fehl) == (1, [])
+        d._execute_job.assert_awaited_once_with(news.id)
+
     def test_laesst_nur_faellige_laufen(self, db):
         pfad, repo = db
         faellig = _neu(repo, agent_name="news")

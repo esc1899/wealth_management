@@ -65,6 +65,12 @@ VERWAIST_NACH = timedelta(hours=2)
 # waits for the next one (2026-10-02). "Run now" on the page does not count.
 FEHLVERSUCHE_JE_TERMIN = 3
 
+# Agents that run only on demand, never on schedule (2026-10-06, Erik): Devil's
+# Advocate checks the watchlist, and the watchlist is checked when he asks for it
+# on the Watchlist Checker page. The Scheduler page no longer offers it; a job
+# created before is skipped here. "Run now" on the page still runs it.
+NUR_AUF_KNOPFDRUCK = frozenset({"devils_advocate"})
+
 
 def letzte_feuerzeit(job: ScheduledJob, now: datetime) -> Optional[datetime]:
     """The most recent scheduled time of this job at or before `now` (local, naive).
@@ -146,7 +152,8 @@ class AgentSchedulerService:
         now = now or datetime.now()
         conn = self._open_conn()
         try:
-            return [j for j in ScheduledJobsRepository(conn).get_enabled() if ist_faellig(j, now)]
+            return [j for j in ScheduledJobsRepository(conn).get_enabled()
+                    if j.agent_name not in NUR_AUF_KNOPFDRUCK and ist_faellig(j, now)]
         finally:
             conn.close()
 

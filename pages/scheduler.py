@@ -95,8 +95,11 @@ _SCHEDULABLE_AGENTS = {
     "fundamental_analyzer": t("settings.agent_fundamental"),
     "sector_rotation": t("settings.agent_sector_rotation"),
     "search_agent": t("settings.agent_search"),
-    "devils_advocate": t("devils_advocate.da_header"),
 }
+# Devil's Advocate prueft die Watchlist und laeuft nur auf Knopfdruck im Watchlist
+# Checker (Erik, 2026-10-06) -- nicht mehr waehlbar, ein bestehender Job laeuft nicht
+# mehr von selbst (core.scheduler.NUR_AUF_KNOPFDRUCK). Der Name bleibt fuer den Titel.
+_AGENT_LABELS = {**_SCHEDULABLE_AGENTS, "devils_advocate": t("devils_advocate.da_header")}
 
 # System jobs are auto-seeded and shown as read-only (no delete).
 _SYSTEM_AGENT_NAMES = {"monthly_digest", "yearly_digest", "wealth_snapshot"}
@@ -111,6 +114,18 @@ _SKILL_CAPABLE_AGENTS = {
     "devils_advocate": "devils_advocate",
 }
 
+# Die Jobs in Rahmen (2026-10-06): Was ueber das Portfolio laeuft, ist der
+# Portfolio-Check -- die Watchlist prueft der Watchlist Checker auf Knopfdruck.
+_PORTFOLIO_CHECK = {"news", "consensus_gap", "storychecker", "fundamental_analyzer", "sector_rotation"}
+_MARKT = {"structural_scan", "search_agent"}
+_GRUPPEN = [
+    ("Portfolio-Check",
+     "Läuft eingeplant über dein Portfolio. Die Watchlist prüfst du auf Knopfdruck im Watchlist Checker.",
+     _PORTFOLIO_CHECK),
+    ("Markt", "Läuft eingeplant, ohne deine Positionen.", _MARKT),
+    ("System", "Legt die App selbst an; rechnet nur, ohne Sprachmodell.", _SYSTEM_AGENT_NAMES),
+]
+
 _WEEKDAY_NAMES = [
     t("settings.weekday_mon"), t("settings.weekday_tue"), t("settings.weekday_wed"),
     t("settings.weekday_thu"), t("settings.weekday_fri"), t("settings.weekday_sat"),
@@ -124,122 +139,140 @@ _SOURCE_LABELS = {"scheduled": "Geplant", "manual": "Manuell", "catchup": "Nachg
 # Existing jobs
 # ------------------------------------------------------------------
 
+def _job_zeigen(_job) -> None:
+    _is_system = _job.agent_name in _SYSTEM_AGENT_NAMES
+    with st.container(border=True):
+        _jc1, _jc2, _jc3, _jc4 = st.columns([4, 1, 1, 1])
+        with _jc1:
+            _freq_label = t(f"settings.freq_{_job.frequency}")
+            if _job.frequency == "weekly" and _job.run_weekday is not None:
+                _freq_label += f" ({_WEEKDAY_NAMES[_job.run_weekday]})"
+            elif _job.frequency == "monthly" and _job.run_day:
+                _freq_label += f" ({t('settings.day_of_month')} {_job.run_day})"
+            elif _job.frequency == "yearly":
+                _m = _job.run_month or 1
+                _d = _job.run_day or 1
+                _freq_label += f" ({_d:02d}.{_m:02d}.)"
+            if _job.frequency != "manual":
+                _freq_label += f" {_job.run_hour:02d}:{_job.run_minute:02d}"
+            _agent_label = _AGENT_LABELS.get(_job.agent_name, "")
+            if _agent_label and _job.skill_name and _job.skill_name != _agent_label:
+                _job_title = f"{_agent_label} · {_job.skill_name}"
+            else:
+                _job_title = _job.skill_name or _agent_label or _job.agent_name.capitalize()
+            if _is_system:
+                _job_title += " ⚙️"
+            st.markdown(f"**{_job_title}**")
+            st.caption(
+                f"{_freq_label}"
+                + (f" · {t('settings.last_run')}: {_job.last_run.strftime('%d.%m.%Y %H:%M') if _job.last_run else '—'}")
+                + (" · System-Job" if _is_system else "")
+            )
+        with _jc2:
+            _new_enabled = st.toggle(
+                t("settings.job_enabled"),
+                value=_job.enabled,
+                key=f"_job_enabled_{_job.id}",
+            )
+            if _new_enabled != _job.enabled:
+                _sched_repo.set_enabled(_job.id, _new_enabled)
+                st.rerun()
+        with _jc3:
+            if st.button(t("settings.run_now_button"), key=f"_job_run_{_job.id}", type="primary"):
+                get_agent_scheduler().run_job_now(_job.id)
+                st.toast(t("settings.job_started"), icon="▶️")
+        with _jc4:
+            if _is_system:
+                st.write("")  # no delete for system jobs
+            elif st.button(t("settings.delete_button"), key=f"_job_del_{_job.id}", type="secondary"):
+                _sched_repo.delete(_job.id)
+                st.rerun()
+
+        # Inline model + skill selectors (non-system jobs only)
+        if not _is_system:
+            _model_opts_inline = [""] + _AVAILABLE_MODELS
+            _cur_model = _job.model or ""
+            _cur_model_idx = _model_opts_inline.index(_cur_model) if _cur_model in _model_opts_inline else 0
+            _mc1, _mc2 = st.columns([2, 3])
+            with _mc1:
+                _sel_model = st.selectbox(
+                    t("settings.job_model_label"),
+                    options=_model_opts_inline,
+                    index=_cur_model_idx,
+                    format_func=lambda x: x if x else t("settings.job_model_default"),
+                    key=f"_job_model_{_job.id}",
+                    label_visibility="collapsed",
+                )
+            if _sel_model != _cur_model:
+                _sched_repo.update_model(_job.id, _sel_model or None)
+                st.rerun()
+
+            if _job.agent_name in _SKILL_CAPABLE_AGENTS:
+                _inline_area = _SKILL_CAPABLE_AGENTS[_job.agent_name]
+                _inline_skills = get_skills_repo().get_by_area(_inline_area)
+                if _inline_skills:
+                    _skill_opts_inline = [None] + _inline_skills
+                    _cur_skill_idx = next(
+                        (i + 1 for i, s in enumerate(_inline_skills) if s.name == _job.skill_name),
+                        0,
+                    )
+                    with _mc2:
+                        _sel_skill_inline = st.selectbox(
+                            "Skill",
+                            options=_skill_opts_inline,
+                            index=_cur_skill_idx,
+                            format_func=lambda s: "— kein Skill —" if s is None else f"{s.name}",
+                            key=f"_job_skill_{_job.id}",
+                            label_visibility="collapsed",
+                        )
+                    _new_skill_name = _sel_skill_inline.name if _sel_skill_inline else ""
+                    _new_skill_prompt = _sel_skill_inline.prompt if _sel_skill_inline else ""
+                    if _new_skill_name != _job.skill_name:
+                        _sched_repo.update_skill(_job.id, _new_skill_name, _new_skill_prompt)
+                        st.rerun()
+
+        # Run history
+        _runs = _runs_repo.get_for_job(_job.id, limit=10)
+        if _runs:
+            with st.expander(f"▼ Ausführungshistorie ({len(_runs)} Einträge)", expanded=False):
+                for _run in _runs:
+                    _icon = _STATUS_ICONS.get(_run.status, "⚪")
+                    _src = _SOURCE_LABELS.get(_run.source, _run.source)
+                    _start_str = _run.started_at.astimezone().strftime("%d.%m.%Y %H:%M")
+                    if _run.completed_at and _run.started_at:
+                        _dur = int((_run.completed_at - _run.started_at).total_seconds())
+                        _dur_str = f"{_dur}s"
+                    else:
+                        _dur_str = "—"
+                    _line = f"{_icon} **{_start_str}** · {_src} · {_dur_str}"
+                    st.markdown(_line)
+                    if _run.log_output:
+                        st.code(_run.log_output, language=None)
+                    if _run.error_msg:
+                        st.caption(f"❌ {_run.error_msg}")
+
+
 _all_jobs = _sched_repo.get_all()
 
 if not _all_jobs:
     st.info(t("settings.no_scheduled_jobs"))
 else:
-    for _job in _all_jobs:
-        _is_system = _job.agent_name in _SYSTEM_AGENT_NAMES
+    _bekannt = set().union(*(namen for _, _, namen in _GRUPPEN))
+    _uebrig = [j for j in _all_jobs if j.agent_name not in _bekannt]
+    _rahmen = [(titel, satz, [j for j in _all_jobs if j.agent_name in namen])
+               for titel, satz, namen in _GRUPPEN]
+    if _uebrig:
+        _rahmen.append(("Nicht mehr eingeplant",
+                        "Devil's Advocate gehört zum Watchlist-Check und läuft nicht mehr von selbst; "
+                        "„Jetzt ausführen“ geht weiter, Löschen auch.", _uebrig))
+    for _titel, _satz, _jobs in _rahmen:
+        if not _jobs:
+            continue
         with st.container(border=True):
-            _jc1, _jc2, _jc3, _jc4 = st.columns([4, 1, 1, 1])
-            with _jc1:
-                _freq_label = t(f"settings.freq_{_job.frequency}")
-                if _job.frequency == "weekly" and _job.run_weekday is not None:
-                    _freq_label += f" ({_WEEKDAY_NAMES[_job.run_weekday]})"
-                elif _job.frequency == "monthly" and _job.run_day:
-                    _freq_label += f" ({t('settings.day_of_month')} {_job.run_day})"
-                elif _job.frequency == "yearly":
-                    _m = _job.run_month or 1
-                    _d = _job.run_day or 1
-                    _freq_label += f" ({_d:02d}.{_m:02d}.)"
-                if _job.frequency != "manual":
-                    _freq_label += f" {_job.run_hour:02d}:{_job.run_minute:02d}"
-                _agent_label = _SCHEDULABLE_AGENTS.get(_job.agent_name, "")
-                if _agent_label and _job.skill_name and _job.skill_name != _agent_label:
-                    _job_title = f"{_agent_label} · {_job.skill_name}"
-                else:
-                    _job_title = _job.skill_name or _agent_label or _job.agent_name.capitalize()
-                if _is_system:
-                    _job_title += " ⚙️"
-                st.markdown(f"**{_job_title}**")
-                st.caption(
-                    f"{_freq_label}"
-                    + (f" · {t('settings.last_run')}: {_job.last_run.strftime('%d.%m.%Y %H:%M') if _job.last_run else '—'}")
-                    + (" · System-Job" if _is_system else "")
-                )
-            with _jc2:
-                _new_enabled = st.toggle(
-                    t("settings.job_enabled"),
-                    value=_job.enabled,
-                    key=f"_job_enabled_{_job.id}",
-                )
-                if _new_enabled != _job.enabled:
-                    _sched_repo.set_enabled(_job.id, _new_enabled)
-                                    st.rerun()
-            with _jc3:
-                if st.button(t("settings.run_now_button"), key=f"_job_run_{_job.id}", type="primary"):
-                    get_agent_scheduler().run_job_now(_job.id)
-                    st.toast(t("settings.job_started"), icon="▶️")
-            with _jc4:
-                if _is_system:
-                    st.write("")  # no delete for system jobs
-                elif st.button(t("settings.delete_button"), key=f"_job_del_{_job.id}", type="secondary"):
-                    _sched_repo.delete(_job.id)
-                                    st.rerun()
-
-            # Inline model + skill selectors (non-system jobs only)
-            if not _is_system:
-                _model_opts_inline = [""] + _AVAILABLE_MODELS
-                _cur_model = _job.model or ""
-                _cur_model_idx = _model_opts_inline.index(_cur_model) if _cur_model in _model_opts_inline else 0
-                _mc1, _mc2 = st.columns([2, 3])
-                with _mc1:
-                    _sel_model = st.selectbox(
-                        t("settings.job_model_label"),
-                        options=_model_opts_inline,
-                        index=_cur_model_idx,
-                        format_func=lambda x: x if x else t("settings.job_model_default"),
-                        key=f"_job_model_{_job.id}",
-                        label_visibility="collapsed",
-                    )
-                if _sel_model != _cur_model:
-                    _sched_repo.update_model(_job.id, _sel_model or None)
-                    st.rerun()
-
-                if _job.agent_name in _SKILL_CAPABLE_AGENTS:
-                    _inline_area = _SKILL_CAPABLE_AGENTS[_job.agent_name]
-                    _inline_skills = get_skills_repo().get_by_area(_inline_area)
-                    if _inline_skills:
-                        _skill_opts_inline = [None] + _inline_skills
-                        _cur_skill_idx = next(
-                            (i + 1 for i, s in enumerate(_inline_skills) if s.name == _job.skill_name),
-                            0,
-                        )
-                        with _mc2:
-                            _sel_skill_inline = st.selectbox(
-                                "Skill",
-                                options=_skill_opts_inline,
-                                index=_cur_skill_idx,
-                                format_func=lambda s: "— kein Skill —" if s is None else f"{s.name}",
-                                key=f"_job_skill_{_job.id}",
-                                label_visibility="collapsed",
-                            )
-                        _new_skill_name = _sel_skill_inline.name if _sel_skill_inline else ""
-                        _new_skill_prompt = _sel_skill_inline.prompt if _sel_skill_inline else ""
-                        if _new_skill_name != _job.skill_name:
-                            _sched_repo.update_skill(_job.id, _new_skill_name, _new_skill_prompt)
-                            st.rerun()
-
-            # Run history
-            _runs = _runs_repo.get_for_job(_job.id, limit=10)
-            if _runs:
-                with st.expander(f"▼ Ausführungshistorie ({len(_runs)} Einträge)", expanded=False):
-                    for _run in _runs:
-                        _icon = _STATUS_ICONS.get(_run.status, "⚪")
-                        _src = _SOURCE_LABELS.get(_run.source, _run.source)
-                        _start_str = _run.started_at.astimezone().strftime("%d.%m.%Y %H:%M")
-                        if _run.completed_at and _run.started_at:
-                            _dur = int((_run.completed_at - _run.started_at).total_seconds())
-                            _dur_str = f"{_dur}s"
-                        else:
-                            _dur_str = "—"
-                        _line = f"{_icon} **{_start_str}** · {_src} · {_dur_str}"
-                        st.markdown(_line)
-                        if _run.log_output:
-                            st.code(_run.log_output, language=None)
-                        if _run.error_msg:
-                            st.caption(f"❌ {_run.error_msg}")
+            st.subheader(_titel)
+            st.caption(_satz)
+            for _job in _jobs:
+                _job_zeigen(_job)
 
 st.divider()
 
