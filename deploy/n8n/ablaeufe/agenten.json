@@ -1,0 +1,821 @@
+{
+  "id": "wealthAgentenBld",
+  "name": "Wealth · Eingeplante Agenten",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "9fc930bd-a94f-59ef-9224-3f6ce37e0b47",
+      "name": "Anstoß: agenten",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "ops-core, stündlich um :05 und beim Login\nJob: wealth_management agenten\nCode: scripts/job.py::agenten",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "31d9e9f8-9c9a-5146-a3de-4078d0ca7587",
+      "name": "Verwaiste Läufe schließen",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        260,
+        0
+      ],
+      "notes": "läuft einer seit über 2 Stunden, war der Strom weg\nCode: core/scheduler.py::_close_orphaned_runs",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "4c491592-407e-5011-ad8b-687733fc5b4b",
+      "name": "Fällige Jobs",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        520,
+        0
+      ],
+      "notes": "Takt und Uhrzeit stellst du auf der Seite „Scheduler“ ein\nCode: core/scheduler.py::ist_faellig",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b5f43d50-15b7-5300-bb92-b493bedc378f",
+              "leftValue": "={{ true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "508df35f-8e60-5668-8ef9-fe446188773b",
+      "name": "3 Fehlversuche seit dem Termin?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        780,
+        0
+      ],
+      "notes": "sonst zahlte ein kaputter Job 15-mal am Tag\nCode: core/scheduler.py::_fehlversuche_seit_termin",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "53de3c88-508d-5d00-a4bf-9a2d25b6a94f",
+      "name": "Gebremst",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        -220
+      ],
+      "notes": "wartet auf den nächsten Termin; „Jetzt ausführen“ geht weiter\nCode: core/scheduler.py::laufen_lassen",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "21712787-34dd-5c84-8e6d-f3ad51e482c0",
+      "name": "Agent wählen",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        60
+      ],
+      "notes": "einer nach dem anderen; ein Fehler hält die anderen nicht auf\nCode: core/scheduler.py::_dispatch_agent",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "### Portfolio",
+        "height": 810,
+        "width": 300,
+        "color": 5
+      },
+      "id": "50c77d16-f6d8-5b9e-bb42-c6b34fd39be4",
+      "name": "Gruppe Portfolio",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1350,
+        -890
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "aea445f3-5b9a-5579-a21c-aaad3040d150",
+      "name": "Storychecker",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        -820
+      ],
+      "notes": "Positionen mit Story\nCode: core/scheduler.py::_run_storychecker_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "d130626b-f856-56a2-8b61-c75604cd0d8c",
+      "name": "Fundamentalwert",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        -670
+      ],
+      "notes": "Positionen mit Ticker, nur öffentliche Felder\nCode: core/scheduler.py::_run_fundamental_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "4493efa8-84a5-5f7f-b6f1-9f8c01785398",
+      "name": "Konsens-Lücken",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        -520
+      ],
+      "notes": "Positionen mit Story\nCode: core/scheduler.py::_run_consensus_gap_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "442fc965-ef0e-560b-99d7-c8d46919a7f8",
+      "name": "Sektor-Rotation",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        -370
+      ],
+      "notes": "Positionen mit Ticker\nCode: core/scheduler.py::_run_sector_rotation_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "e5cb85d3-0b44-5ef1-bfaf-3133703be52f",
+      "name": "News-Digest",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        -220
+      ],
+      "notes": "alle Positionen des Portfolios\nCode: core/scheduler.py::_run_news_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "### Watchlist",
+        "height": 210,
+        "width": 300,
+        "color": 5
+      },
+      "id": "6a6a2972-3a9a-589e-8870-1ec520e5cd6e",
+      "name": "Gruppe Watchlist",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1350,
+        -50
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "8e4d3148-66dc-57ee-bd54-0e30814af0e5",
+      "name": "Devil's Advocate",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        20
+      ],
+      "notes": "Watchlist-Titel, die nicht im Portfolio sind\nCode: core/scheduler.py::_run_devils_advocate_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "### Markt",
+        "height": 360,
+        "width": 300,
+        "color": 5
+      },
+      "id": "44599705-9544-57e4-9e33-ff8c0cf76e7c",
+      "name": "Gruppe Markt",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1350,
+        190
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "5e0136be-5d00-5255-8161-5cdaee870927",
+      "name": "Strukturwandel",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        260
+      ],
+      "notes": "ohne Positionen\nCode: core/scheduler.py::_run_structural_scan_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "f8cd8896-2e3b-50cc-9eeb-f855e0b817c7",
+      "name": "Investment-Suche",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        410
+      ],
+      "notes": "ohne Positionen\nCode: core/scheduler.py::_run_search_agent_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "### Ohne Sprachmodell",
+        "height": 510,
+        "width": 300,
+        "color": 7
+      },
+      "id": "177b84a8-1a26-5562-9f50-d707b02fb7e8",
+      "name": "Gruppe Ohne Sprachmodell",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1350,
+        580
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "6a097813-18e7-5321-945e-d257f75a58d2",
+      "name": "Vermögens-Snapshot",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        650
+      ],
+      "notes": "rechnet nur\nCode: core/scheduler.py::_run_wealth_snapshot_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "561a2aa3-3389-5606-9d0b-52372f184803",
+      "name": "Monatsrückblick",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        800
+      ],
+      "notes": "rechnet nur\nCode: core/scheduler.py::_run_monthly_digest_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "138dfd46-c882-5f54-a658-511161beaa28",
+      "name": "Jahresrückblick",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        950
+      ],
+      "notes": "rechnet nur\nCode: core/scheduler.py::_run_yearly_digest_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "e5a6b7f2-ec7e-544d-8f7a-b21a9fb796c9",
+      "name": "Modell auflösen",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        -300
+      ],
+      "notes": "„home“ und „neuestes“ werden hier zur echten ID\nCode: core/scheduler.py::_resolve_model",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "81f0d282-aad5-53ae-ae7a-e011869b9c43",
+              "leftValue": "={{ true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "75f61b7d-cb44-5e34-b454-a451a16c5c50",
+      "name": "Als Batch?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2040,
+        -300
+      ],
+      "notes": "eingeplant, Schalter im Maschinenraum an, Claude direkt\nCode: core/scheduler.py::_can_use_batch_api",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "8b544df3-c9f1-5826-b152-a2ab78feec31",
+      "name": "Batch einreichen ☁️",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2300,
+        -460
+      ],
+      "notes": "halber Preis, Ergebnis frühestens beim nächsten Lauf; je Agent ein Einreicher, hier der des Storycheckers\nCode: core/scheduler.py::_submit_storychecker_batch",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "205cf9d6-6d2a-5237-b289-c3ba488e1269",
+      "name": "Live fragen ☁️",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2300,
+        -140
+      ],
+      "notes": "Claude oder OpenRouter, je nach Modell\nCode: core/scheduler.py::_make_scheduled_llm",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "fb0808cc-ceb4-590b-970b-0ab1e1a74f85",
+      "name": "Ergebnis speichern",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2560,
+        -140
+      ],
+      "notes": "in die Datenbank der App, je Agent seine Tabelle\nCode: core/scheduler.py::_execute_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "00a03dea-402f-579c-ba9e-b20770959645",
+      "name": "Lauf vermerkt",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2560,
+        600
+      ],
+      "notes": "letzter Lauf gesetzt – erst danach gilt der Termin als bedient\nCode: core/scheduler.py::_execute_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "fbb48511-1bd5-5dc6-949f-ab49cc128021",
+      "name": "Batches abholen",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2880,
+        0
+      ],
+      "notes": "am Ende jedes Laufs, auch wenn nichts fällig war\nCode: core/scheduler.py::_poll_and_process_batches",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "2cdc48a0-130f-5878-8be3-d198bdbaab21",
+      "name": "Antworten auswerten",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3140,
+        0
+      ],
+      "notes": "je Agent sein eigener Leser; gebucht wie jeder Aufruf\nCode: core/scheduler.py::_process_batch_results",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "8d1850d7-2b65-5f34-8ccb-f810e5736e66",
+      "name": "„Wartet“ melden",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3400,
+        0
+      ],
+      "notes": "für die Kachel von ops-core: worauf noch gewartet wird\nCode: core/scheduler.py::wartet",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "## Wealth · Eingeplante Agenten\n**Prozessbild** – läuft nie und enthält keine Daten, nur den Weg durch den Code. Stündlich fragt ops-core die App, welche der Jobs von der Seite „Scheduler“ fällig sind; sie laufen nacheinander.\n\n**Portfolio und Watchlist**: Fünf Agenten prüfen das Portfolio, nur Devil's Advocate die Watchlist – und dort nur Titel, die nicht im Portfolio sind.\n\n**Eingeplant heißt Batch, wartend heißt live**: Ein Batch kostet die Hälfte, sein Ergebnis holt erst der nächste Lauf ab. Bis dahin meldet die App „wartet“, sonst zeigte die Kachel „gut“, während das Ergebnis fehlt.\n\n**Strom weg mitten im Lauf?** Der nächste schließt den verwaisten Lauf und holt nach.\n\n☁️ Sprachmodell außer Haus",
+        "height": 400,
+        "width": 1180,
+        "color": 7
+      },
+      "id": "02d95465-1b7c-5ef7-b577-1c8369e374ed",
+      "name": "Über dieses Bild",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -700
+      ]
+    }
+  ],
+  "connections": {
+    "Anstoß: agenten": {
+      "main": [
+        [
+          {
+            "node": "Verwaiste Läufe schließen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verwaiste Läufe schließen": {
+      "main": [
+        [
+          {
+            "node": "Fällige Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fällige Jobs": {
+      "main": [
+        [
+          {
+            "node": "3 Fehlversuche seit dem Termin?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3 Fehlversuche seit dem Termin?": {
+      "main": [
+        [
+          {
+            "node": "Gebremst",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Agent wählen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent wählen": {
+      "main": [
+        [
+          {
+            "node": "Storychecker",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fundamentalwert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Konsens-Lücken",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sektor-Rotation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "News-Digest",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Devil's Advocate",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Strukturwandel",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Investment-Suche",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Vermögens-Snapshot",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Monatsrückblick",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Jahresrückblick",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Storychecker": {
+      "main": [
+        [
+          {
+            "node": "Modell auflösen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fundamentalwert": {
+      "main": [
+        [
+          {
+            "node": "Modell auflösen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Konsens-Lücken": {
+      "main": [
+        [
+          {
+            "node": "Modell auflösen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sektor-Rotation": {
+      "main": [
+        [
+          {
+            "node": "Modell auflösen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "News-Digest": {
+      "main": [
+        [
+          {
+            "node": "Modell auflösen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Devil's Advocate": {
+      "main": [
+        [
+          {
+            "node": "Modell auflösen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Strukturwandel": {
+      "main": [
+        [
+          {
+            "node": "Modell auflösen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Investment-Suche": {
+      "main": [
+        [
+          {
+            "node": "Modell auflösen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modell auflösen": {
+      "main": [
+        [
+          {
+            "node": "Als Batch?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Als Batch?": {
+      "main": [
+        [
+          {
+            "node": "Batch einreichen ☁️",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Live fragen ☁️",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Live fragen ☁️": {
+      "main": [
+        [
+          {
+            "node": "Ergebnis speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vermögens-Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Lauf vermerkt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Monatsrückblick": {
+      "main": [
+        [
+          {
+            "node": "Lauf vermerkt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jahresrückblick": {
+      "main": [
+        [
+          {
+            "node": "Lauf vermerkt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ergebnis speichern": {
+      "main": [
+        [
+          {
+            "node": "Lauf vermerkt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch einreichen ☁️": {
+      "main": [
+        [
+          {
+            "node": "Lauf vermerkt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lauf vermerkt": {
+      "main": [
+        [
+          {
+            "node": "Batches abholen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gebremst": {
+      "main": [
+        [
+          {
+            "node": "Batches abholen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batches abholen": {
+      "main": [
+        [
+          {
+            "node": "Antworten auswerten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Antworten auswerten": {
+      "main": [
+        [
+          {
+            "node": "„Wartet“ melden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  },
+  "pinData": {},
+  "tags": []
+}

@@ -48,6 +48,9 @@ launchctl kickstart -k gui/$(id -u)/ops-core.wealth_management.meldungen
 # Scheduled jobs are ops-core jobs since 2026-10-02 (scripts/job.py): agenten (due jobs of
 # the Scheduler page, hourly), kurse (daily fetch, 18:05), kosten (OpenRouter, hourly).
 # Never a scheduler inside the app — Streamlit only runs app.py once a browser opens the page.
+# Process diagram of `agenten` in n8n (2026-10-06, deploy/n8n/ablaeufe/agenten.json): never runs,
+# no data, each node names its code (`Code: pfad::name`), tests/unit/test_prozessbilder.py checks it —
+# renaming a named function means updating the diagram. Import/export: heimnetzwerk/deploy/ops-core/n8n-ablaeufe.sh.
 ops status wealth_management                       # wann lief was zuletzt gut?
 ops runs wealth_management --job agenten --days 2  # Läufe; die Ausgabe steht im Mitschnitt
 ops run wealth_management agenten                  # von Hand: führt aus, was fällig ist
