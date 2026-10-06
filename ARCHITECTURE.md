@@ -927,6 +927,8 @@ The MCP server is the first external write path that does not go through the Str
 | HTTP transport auth | Bearer token required, `hmac.compare_digest` (constant-time), websocket scope rejected, bound to `127.0.0.1` |
 | DB access | Convention + checklist (CLAUDE.md): tools touch only `research_requests`/`research_answers` |
 
+**Bisherige Security Reviews:** 2026-04-24 (Red Team, alle HIGH/MEDIUM fixes), 2026-05-09 (Cowork ingest: URL-Injection, Markdown-Injection, Dateigrößen-Limit), 2026-05-11 (FEAT-34–39 + Sonnet-Switch: SQL-Injection, Privacy-Boundary, LLM-Prompt-Injection, XSS — alle clean), 2026-06-09 (SEC-4, MCP-Tools FEAT-50/51/52: Path-Traversal in Outbox-Filename, Prompt-Injection im Hook, fehlende Längenlimits — alle gefixt), 2026-06-11 (Full-Review: getrackte 0-Byte-DB aus Git entfernt + `*.db` ignoriert, SEC-4 V1-A Privacy-Hinweis, SEC-5 MCP-Härtung: constant-time Bearer-Vergleich, Websocket-Reject, XML-Escaping im Hook, Limits auf beiden Schreibpfaden — alle gefixt)
+
 ### New Storage Tables
 
 ```sql

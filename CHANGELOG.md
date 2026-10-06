@@ -113,6 +113,75 @@ App hatte seit dem 22.09. keinen, also sah er nichts.
   Modell kommt ungeprüft (Opus 5.5 lehnte am 27.09. erzwungenes `tool_choice` ab). Wer das
   nicht will, stellt den Agenten fest ein; nur dann erscheint die Meldung oben.
 
+### Backup-Button: warum er ein Terminal öffnet — 2026-09-07 bis 2026-09-27
+
+(Bis 2026-10-06 in CLAUDE.md; dort steht jetzt nur die Regel.)
+
+`pages/settings.py` startet `~/scripts/wm_backup.sh` als Subprozess des laufenden Streamlit-
+Prozesses. Dieser Button **schlägt auf dem Dock-App-Prozess reproduzierbar fehl**:
+`restic` meldet `List(key) failed: open .../restic-repo/keys: operation not permitted`, obwohl
+Festplattenvollzugriff (Systemeinstellungen → Datenschutz & Sicherheit) für alle beteiligten
+Prozesse gesetzt war — durchprobiert:
+
+- `Python.app` (`/opt/homebrew/Cellar/python@3.11/.../Resources/Python.app`, der reale
+  Elternprozess des via LaunchAgent gestarteten Streamlit — der Agent (seit 21.09.2026
+  `ops-core.wealth_management.app`, davor `com.erik.wealth-management.plist` mit
+  `~/scripts/wm_start.sh`) ruft `launchd` → `Python.app` → `streamlit` → `bash` →
+  `wm_backup.sh` → `restic`, ohne Terminal-Vorfahren)
+- `restic` selbst, nach Neu-Signierung mit eindeutiger Identität (Homebrews Build hatte vorher
+  nur die generische Ad-hoc-Signatur `Identifier=a.out`, `TeamIdentifier=not set` — nicht
+  eindeutig genug, damit macOS einen Grant zuverlässig daran verankert; neu signiert mit
+  `codesign --force --sign - --identifier "com.restic.restic" <Pfad>`)
+- Beide gleichzeitig in der Liste
+- LaunchAgent-Reload nach jeder Berechtigungsänderung (frischer Prozess, kein Stale-Cache)
+
+Nichts davon hat den Fehler behoben. **Funktioniert zuverlässig: `wm_backup.sh` direkt im
+eigenen Terminal ausführen** — dort lief es sauber durch (Snapshot erstellt, `restic check`
+grün). Der Unterschied zum App-Button war lange ungeklärt (Ursache unten); vermutlich eine macOS-26-TCC-Eigenart bei
+Ad-hoc-signierten CLI-Tools ohne Terminal-Vorfahren im Prozessbaum, aber nicht verifiziert.
+
+**Für zukünftige Sessions:** Nicht wieder bei null anfangen — der Button ist ein bekanntes,
+noch ungelöstes Problem, kein neuer Bug. Backup-Bedarf → Terminal nutzen, nicht den Button.
+Falls jemand die tatsächliche Ursache findet: hier dokumentieren, nicht nur fixen.
+
+**Spur vom 26.09.2026 (nicht am Button geprüft):** Dasselbe Muster trat bei der Sicherung von
+ops-core auf (heimnetzwerk, `docs/ops-core/README.md`, Nachtrag zu Schritt 17): aus dem
+Terminal gut, unter launchd „Operation not permitted" — sogar für `/bin/ls`. Gelöst hat es
+dort erst eine Freigabe für **das Programm, das launchd selbst startet**; Freigaben für
+Programme weiter unten in der Kette (dort Python) halfen nicht. macOS rechnet den Zugriff
+dem Prozess zu, den launchd gestartet hat, nicht dem, der die Datei öffnet. Beim Button
+steht vorn im App-Agenten `.venv/bin/streamlit` — ein Skript; welches Programm macOS dort
+zählt, ist ungeprüft, `Python.app` und `restic` waren es jedenfalls nicht allein.
+Die Lösung bei ops-core war ein eigenes kleines Startprogramm mit Festplattenvollzugriff
+(`~/.ops-core/bin/ops-vollzugriff`, per `full_disk_access = true` nur vor einem Job). Für
+das Backup läge nahe, den Job `wealth_management backup` genauso zu starten statt über den
+Button — der nächste Versuch sollte dort ansetzen. Die Platte muss trotzdem stecken.
+(Nachtrag: Dieses Startprogramm ist am selben Tag zurückgebaut worden, weil es jedem
+Prozess als Erik den ganzen Rechner öffnete — kein Weg mehr.)
+
+**Ursache gefunden am 26.09.2026** (Button-Lauf 17:10, `log show`, Subsystem `com.apple.TCC`):
+Gefragt wird `kTCCServiceSystemPolicyAllFiles` — Festplattenvollzugriff, nicht
+„Wechseldatenträger“, obwohl die WD Passport per USB hängt. Als verantwortlich zählt
+`/opt/homebrew/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/bin/python3.11`,
+also das Python, das launchd für die App startet (Streamlit-Agent) — **nicht** `Python.app`
+(nur `binary_path`) und nicht `restic` (abgelehnt wird schon das `/bin/ls` der Vorprüfung).
+Die damaligen Freigaben saßen also am falschen Programm. Die „richtige“ Freigabe ist trotzdem
+keine: Sie gäbe jedem Skript, das mit Homebrews Python 3.11 als Erik läuft, den ganzen
+Rechner — genau das, was bei ops-core verworfen wurde. Im Terminal geht es, weil dort
+Terminal verantwortlich ist und Terminal den Vollzugriff hat (Voraussetzung 4 im Skriptkopf).
+Derselbe Grund bremst `ops run wealth_management backup` unter launchd; aus dem Terminal
+aufgerufen läuft es.
+
+**Seither startet der Button das Skript über `open -a Terminal`** (`pages/settings.py`):
+Launch Services startet Terminal, Terminal ist verantwortlich, keine neue Freigabe. Der Button
+wartet nicht auf das Ende — das Ergebnis steht im Terminal-Fenster und im Log darunter.
+
+**Seit 27.09.2026 öffnet das Fenster `scripts/backup_im_terminal.command`**, und das ruft
+`ops run wealth_management backup` statt des nackten Skripts. Am 26.09. lief die Sicherung
+direkt und erfolgreich, die ops-core-Kachel zeigte trotzdem „übersprungen, nie gut“ — sie
+liest nur das Run-Log, und dort war der Lauf nie angekommen. Terminal bleibt verantwortlich,
+ops und das Skript sind seine Kinder.
+
 ### Claude-Modelle und -Preise aus dem Modellkatalog des Hauses — 2026-09-27
 
 **Warum:** Opus 5.5 war erschienen und fehlte überall: in der Preisliste dieser App, in der
