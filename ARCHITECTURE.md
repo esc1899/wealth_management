@@ -600,10 +600,14 @@ here; this repo only delivers the pieces the house asks for:
 Two rules carry over from the house. **Nothing on the start page is
 computed when it is opened** — the hourly job decides, the page reads a
 file. And **no app imports another**: the contracts are files
-(`jobs.toml`, the run log, the tile JSON) and HTTP. Wealth Management is
-deliberately *not* in the house's nightly iCloud backup — it keeps its
-own restic backup to an external drive (`~/scripts/wm_backup.sh`, outside
-the repo, run by hand via `ops run wealth_management backup`).
+(`jobs.toml`, the run log, the tile JSON) and HTTP. Since 2026-10-09
+Wealth Management is in the house's daily backup (`backup = ["data",
+".env"]` in `jobs.toml`): an AES-256 disk image that goes to iCloud. Inside
+it the portfolio is only readable with `ENCRYPTION_KEY`, which therefore
+lives off the Mini in the Passwords app, never in the image. The own
+restic backup to an external drive stays as a second path
+(`~/scripts/wm_backup.sh`, outside the repo, run by hand via `ops run
+wealth_management backup`).
 
 ---
 
