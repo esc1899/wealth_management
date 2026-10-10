@@ -155,6 +155,10 @@ pg = st.navigation({
     t("kacheln.nav_gruppe"): _neu_pages,
     t("nav.group_pflege"): _pflege_pages,
     t("nav.group_performance"): _performance_pages,
+    # Einstellungen gleich hinter der Basis: Sprache, lokale und Cloud-Modelle (10.10.2026).
+    t("nav.settings"): [
+        st.Page("pages/settings.py", title=t("nav.settings"), icon=":material/settings:"),
+    ],
     t("nav.group_portfolio"): _portfolio_pages,
     _assistant_group: _assistant_pages,
     t("nav.group_research"): [
@@ -181,7 +185,6 @@ pg = st.navigation({
         st.Page("pages/verdict_hindsight.py", title=t("nav.verdict_hindsight"), icon=":material/history_toggle_off:"),
         st.Page("pages/skills.py",          title="Skills",                  icon=":material/psychology:"),
         st.Page("pages/scheduler.py",       title="Scheduler",               icon=":material/schedule:"),
-        st.Page("pages/settings.py",        title=t("nav.settings"),         icon=":material/settings:"),
     ],
 })
 

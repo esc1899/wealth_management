@@ -17,6 +17,7 @@ Formular. Gegliedert wie die Basis: erst das Allgemeine, dann je Art von Sprachm
 - Tabs „Generell“ (Sprache zuerst, Systemzustand, Backup), „Lokale LLM“ (Modelle je Agent,
   Kommentarstil) und „Cloud LLM“ (Modelle je Agent, Modellpreise).
 - Lokale und Cloud-Modelle speichern je mit eigenem Knopf, nur ihre eigenen Einstellungen.
+- Im Menü als eigener Bereich direkt hinter Performance, nicht mehr unter System.
 
 ### Pflege und Performance: die Basis ohne Sprachmodell — 2026-10-10
 
