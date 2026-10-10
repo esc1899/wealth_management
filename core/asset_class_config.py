@@ -42,6 +42,7 @@ class AssetClassConfig(BaseModel):
     manual_valuation: bool = False
     extra_fields: List[str] = []
     anlagearten: List[str] = []
+    farbe: str = "#5E6B7A"   # Farbe der Klasse, ueberall in der App dieselbe
 
     @field_validator("visible_fields")
     @classmethod

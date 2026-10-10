@@ -112,6 +112,8 @@ _assistant_group = (
 _portfolio_pages = [
     st.Page("pages/dashboard.py",          title=t("nav.dashboard"),   icon=":material/dashboard:"),
     st.Page("pages/positionen.py",         title=t("nav.positions"),   icon=":material/edit_note:"),
+    st.Page("pages/kacheln_depot.py",      title=t("kacheln.nav_depot"),     icon=":material/grid_view:"),
+    st.Page("pages/kacheln_watchlist.py",  title=t("kacheln.nav_watchlist"), icon=":material/visibility:"),
     st.Page("pages/marktdaten.py",         title=t("nav.market_data"), icon=":material/trending_up:"),
     st.Page("pages/analyse.py",            title=t("nav.analysis"),    icon=":material/bar_chart:"),
     st.Page("pages/position_dashboard.py", title="Positionsanalyse",   icon=":material/person_search:"),

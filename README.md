@@ -22,6 +22,7 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Live Market Data** — automatic and on-demand prices via yfinance with EUR conversion
 - **P&L Analysis** — daily gains/losses, allocation charts, day performance
 - **Position Dashboard** — single-page aggregation per position: all agent verdicts, price chart, news digest, and research answers
+- **Tiles (Kacheln)** — portfolio and watchlist as a grid, one tile per holding: the one sentence that matters now (thesis at risk, strong move, latest checker summary, or "never checked"), sorted by that priority, with day move, P&L (watchlist: change since added) and dividend yield as chips and one box per checker verdict that jumps to that check. Header in the asset-class colour instead of a logo. Reads only what the checkers stored; starts no check
 - **Performance Attribution** — monthly and yearly contribution per position (incl. estimated dividends), with auto-generated digest reports and macro context chips
 - **Dividend Calendar** — 12-month cash flow forecast, top payers, dividend aristocrat badges
 

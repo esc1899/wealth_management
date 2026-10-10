@@ -8,6 +8,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Depot und Watchlist als Kacheln — 2026-10-10
+
+**Warum:** Die Checker laufen, gelesen werden aber nur wenige ihrer Ergebnisse; die Kacheln der
+Startseite und der Serien-Watchlist werden gelesen. Die Kachel zeigt je Titel den einen Satz,
+der gerade zählt — zuerst als zusätzlicher Menüeintrag, bis sich zeigt, ob das trägt. Zugleich
+der Vorlauf für Wealth als Lotsee-App (lotsee `docs/plan.md`, "Kandidat Wealth").
+
+**Änderungen:**
+- `core/kacheln.py` wählt den Satz nach festem Vorrang (gefährdet, starke Bewegung ab 4 %,
+  jüngster Checker-Satz, nie geprüft) und sortiert danach; `core/ui/kacheln.py` zeichnet die
+  Kachel in der Gestalt der Serien-Watchlist (Farbe je Anlageklasse statt Logo).
+- Zwei neue Seiten unter Portfolio: „Positionen (Kacheln)“, „Watchlist (Kacheln)“, Zeile für
+  Zeile ausgerichtet. Der Titel springt in die Positions- bzw. Watchlist-Analyse, je Check ein
+  Kästchen („Devil's Advocate Fragil“) in genau diesen Check: `?position=…&check=…`
+  (`core/ui/vorauswahl.py`) wählt die Position vor und klappt die Analyse auf. Die
+  Positionsanalyse zeigt dafür auch Capital Allocator und Devil's Advocate, wenn es ein Urteil gibt.
+- Jede Anlageklasse hat ihre Farbe in `config/asset_classes.yaml` (`farbe`), überall dieselbe.
+- Kopf der Kachel in der Farbe der Anlageklasse (Name, darunter Anlageart und Ticker), dieselbe
+  Farbe als Streifen links; der Satz hat eine feste Höhe und scrollt, wenn er länger ist.
+  Watchlist-Kacheln zeigen die Kursveränderung seit Aufnahme (gespeicherter Schlusskurs am
+  Aufnahmetag).
+- Nicht gebaut: Termine (Zahlen, Ex-Tag) und Zielkurse — dafür hat die App keine Quelle.
+
 ### Neue Websuche und strikte Werkzeuge — 2026-10-02
 
 **Warum:** Die Websuche mit dynamischer Filterung (`web_search_20260209`) filtert die Treffer,

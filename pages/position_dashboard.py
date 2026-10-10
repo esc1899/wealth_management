@@ -20,6 +20,7 @@ from core.i18n import t
 from core.ui.markdown import llm_markdown
 from core.ui.research_request_form import render_research_request_form
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge
+from core.ui.vorauswahl import vorauswahl
 from core.accumulation import accumulation_for_position
 from core.shareholder_yield import cached_buyback_yield_map
 from state import (
@@ -31,6 +32,8 @@ from state import (
     get_fundamental_analyzer_agent,
     get_consensus_gap_agent,
     get_research_queue_repo,
+    get_capital_allocator_repo,
+    get_devils_advocate_repo,
 )
 
 st.set_page_config(
@@ -56,8 +59,10 @@ news_repo = get_news_repo()
 # ------------------------------------------------------------------
 
 
-def _render_checker_card(title: str, verdict_obj, config, full_text_fn):
-    """Render a full-width analysis card: badge + summary + details expander."""
+def _render_checker_card(title: str, verdict_obj, config, full_text_fn, offen: bool = False):
+    """Render a full-width analysis card: badge + summary + details expander.
+
+    ``offen``: the check a tile link pointed at (``?check=``) shows its analysis expanded."""
     with st.container():
         if verdict_obj is None:
             st.markdown(f"**{title}**")
@@ -85,7 +90,7 @@ def _render_checker_card(title: str, verdict_obj, config, full_text_fn):
             st.warning(f"Could not retrieve full text: {e}")
 
         if full_text:
-            with st.expander("▼ Vollständige Analyse"):
+            with st.expander("▼ Vollständige Analyse", expanded=offen):
                 llm_markdown(full_text)
 
 
@@ -205,8 +210,8 @@ position_display = {
     for p in portfolio_positions
 }
 
-# Pre-selection from Portfolio Story deeplink (via session_state)
-preselect_id = st.session_state.pop("pd_preselect_position_id", None)
+# Pre-selection from Portfolio Story deeplink (session_state) or a tile link (?position=&check=)
+preselect_id, offener_check = vorauswahl("pd_preselect_position_id")
 position_keys = list(position_display.keys())
 
 default_index = 0
@@ -295,6 +300,7 @@ _render_checker_card(
     lambda: sc_agent.get_messages(sc_verdict.session_id)[-1].content
     if sc_verdict and sc_verdict.session_id
     else None,
+    offen=offener_check == "storychecker",
 )
 
 st.write("")
@@ -306,6 +312,7 @@ _render_checker_card(
     lambda: cg_agent.get_messages(cg_verdict.session_id)[-1].content
     if cg_verdict and cg_verdict.session_id
     else None,
+    offen=offener_check == "consensus_gap",
 )
 
 st.write("")
@@ -317,9 +324,30 @@ _render_checker_card(
     lambda: fa_agent.get_messages(fa_verdict.session_id)[-1].content
     if fa_verdict and fa_verdict.session_id
     else None,
+    offen=offener_check == "fundamental_analyzer",
 )
 
 st.write("")
+
+# Kapital und Devil's Advocate nur, wenn es ein Urteil gibt -- die Kacheln springen hierher.
+_ca_verdict = analysis_service.get_verdict(selected_position.id, "capital_allocator")
+_da_verdict = analysis_service.get_verdict(selected_position.id, "devils_advocate")
+for _titel, _verdict, _agent, _repo_fn in (
+    ("Capital Allocator", _ca_verdict, "capital_allocator", get_capital_allocator_repo),
+    ("Devil's Advocate", _da_verdict, "devils_advocate", get_devils_advocate_repo),
+):
+    if _verdict is None:
+        continue
+    _render_checker_card(
+        _titel,
+        _verdict,
+        VERDICT_CONFIGS[_agent],
+        lambda _v=_verdict, _r=_repo_fn: next(
+            (m.content for m in reversed(_r().get_messages(_v.session_id)) if m.role == "assistant"), None
+        ) if _v.session_id else None,
+        offen=offener_check == _agent,
+    )
+    st.write("")
 
 # Accumulation indicator (FEAT-68 B1) — deterministic, derived from yield + SC/FA verdicts.
 # Yield from the valuation layer (overrides + cross-currency), not the raw dividend_data table.

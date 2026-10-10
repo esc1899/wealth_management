@@ -9,11 +9,13 @@
 #   watchlist_eligible: false — portfolio-only (Festgeld, Immobilien, etc.)
 #   manual_valuation: true — "Schätzwert aktualisieren" button shown in detail view
 #   extra_fields — type-specific fields stored in extra_data (JSON, encrypted)
+#   farbe — the class colour, the same everywhere in the app (tiles; monogram instead of a logo)
 
 asset_classes:
 
   Aktie:
     investment_type: Wertpapiere
+    farbe: "#2F5D8A"
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
@@ -35,6 +37,7 @@ asset_classes:
 
   Aktienfonds:
     investment_type: Wertpapiere
+    farbe: "#5B4B9A"
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
@@ -56,6 +59,7 @@ asset_classes:
 
   Rentenfonds:
     investment_type: Renten
+    farbe: "#3E7C6E"
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
@@ -77,6 +81,7 @@ asset_classes:
 
   Immobilienfonds:
     investment_type: Immobilien
+    farbe: "#A0573A"
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
@@ -99,6 +104,7 @@ asset_classes:
 
   Infrastrukturfonds:
     investment_type: Immobilien
+    farbe: "#6A7A2E"
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
@@ -121,6 +127,7 @@ asset_classes:
 
   Edelmetall:
     investment_type: Rohstoffe
+    farbe: "#A07A1C"
     default_unit: Troy Oz
     unit_options:
       - Troy Oz
@@ -143,6 +150,7 @@ asset_classes:
 
   Kryptowährung:
     investment_type: Krypto
+    farbe: "#2E7D9A"
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
@@ -161,6 +169,7 @@ asset_classes:
 
   Anleihe:
     investment_type: Renten
+    farbe: "#4F6B5B"
     default_unit: Stück
     auto_fetch: false
     watchlist_eligible: false
@@ -186,6 +195,7 @@ asset_classes:
 
   Festgeld:
     investment_type: Geld
+    farbe: "#5E6B7A"
     default_unit: Stück
     auto_fetch: false
     watchlist_eligible: false
@@ -209,6 +219,7 @@ asset_classes:
 
   Bargeld:
     investment_type: Bargeld
+    farbe: "#7A8290"
     default_unit: €
     auto_fetch: false
     watchlist_eligible: false
@@ -229,6 +240,7 @@ asset_classes:
 
   Immobilie:
     investment_type: Immobilien
+    farbe: "#8A4B3C"
     default_unit: Stück
     auto_fetch: false
     watchlist_eligible: false
@@ -250,6 +262,7 @@ asset_classes:
 
   Grundstück:
     investment_type: Immobilien
+    farbe: "#6E5B3C"
     default_unit: Stück
     auto_fetch: false
     watchlist_eligible: false
@@ -268,6 +281,7 @@ asset_classes:
 
   Altersvorsorge-Rente:
     investment_type: Renten
+    farbe: "#7A4F7A"
     default_unit: Stück
     auto_fetch: false
     watchlist_eligible: false
@@ -289,6 +303,7 @@ asset_classes:
 
   Altersvorsorge-Festgeld:
     investment_type: Geld
+    farbe: "#5A5F86"
     default_unit: Stück
     auto_fetch: false
     watchlist_eligible: false

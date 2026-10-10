@@ -15,6 +15,7 @@ import plotly.express as px
 import streamlit as st
 
 from config import config
+from core.ui.vorauswahl import vorauswahl
 from core.background_jobs import (
     run_capital_allocator_job,
     run_consensus_gap_job,
@@ -70,7 +71,8 @@ if not all_positions:
 # Position selector (with pre-selection from session_state)
 # ------------------------------------------------------------------
 
-preselect_id = st.session_state.pop("wla_preselect_pos_id", None)
+# Aus dem Watchlist Checker (session_state) oder von einer Kachel (?position=&check=)
+preselect_id, offener_check = vorauswahl("wla_preselect_pos_id")
 
 position_display = {
     f"{p.name} ({p.ticker})" if p.ticker else p.name: p
@@ -142,7 +144,7 @@ def _is_stale(verdict_obj) -> bool:
 # Helper: render checker card
 # ------------------------------------------------------------------
 
-def _render_checker_card(title: str, verdict_obj, config_vc, full_text_fn):
+def _render_checker_card(title: str, verdict_obj, config_vc, full_text_fn, offen: bool = False):
     with st.container():
         if verdict_obj is None:
             st.markdown(f"**{title}**")
@@ -172,7 +174,7 @@ def _render_checker_card(title: str, verdict_obj, config_vc, full_text_fn):
             pass
 
         if full_text:
-            with st.expander(t("capital_allocator.full_analysis"), expanded=False):
+            with st.expander(t("capital_allocator.full_analysis"), expanded=offen):
                 llm_markdown(full_text)
 
 
@@ -241,6 +243,7 @@ _render_checker_card(
     VERDICT_CONFIGS["storychecker"],
     lambda: sc_agent.get_messages(sc_verdict.session_id)[-1].content
     if sc_verdict and sc_verdict.session_id else None,
+    offen=offener_check == "storychecker",
 )
 
 st.write("")
@@ -251,6 +254,7 @@ _render_checker_card(
     VERDICT_CONFIGS["consensus_gap"],
     lambda: cg_agent.get_messages(cg_verdict.session_id)[-1].content
     if cg_verdict and cg_verdict.session_id else None,
+    offen=offener_check == "consensus_gap",
 )
 
 st.write("")
@@ -261,6 +265,7 @@ _render_checker_card(
     VERDICT_CONFIGS["fundamental_analyzer"],
     lambda: fa_agent.get_messages(fa_verdict.session_id)[-1].content
     if fa_verdict and fa_verdict.session_id else None,
+    offen=offener_check == "fundamental_analyzer",
 )
 
 st.divider()
