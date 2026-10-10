@@ -67,17 +67,19 @@ anfordern" ist geloescht (Erik). Die Gruppe "Portfolio" entfaellt damit. Alle au
 Seiten stehen in `app.py` in einer Liste `_ausgeblendet`.
 
 Offen:
-- **Eine Titelseite statt Positions- und Watchlist-Analyse** (Vorschlag 10.10.2026, wartet
-  auf Eriks Wahl): eine Funktion `titelseite(art, position)` in `core/ui/titelseite.py`, beide
-  Seiten werden duenn wie `kacheln_depot.py`. Oben der Kopf der Kachel mit demselben Satz
+- **Eine Titelseite statt Positions- und Watchlist-Analyse** (Erik 10.10.2026: Fassung A,
+  eine lange Seite, Reihenfolge je Art): https://claude.ai/artifact/Sywgqgw2jsqzhrUcede8x8.
+  Eine Funktion `titelseite(art, position)` in `core/ui/titelseite.py`, beide Seiten werden
+  duenn wie `kacheln_depot.py`. Oben der Kopf der Kachel mit demselben Satz
   (`core/kacheln.py`), dann feste Abschnitte, je erst ein Satz, Zahlen im Klapper: Kurs,
-  Urteile (eine Zeile je Agent statt fuenf Karten, `?check=` oeffnet die Zeile, "nie
-  geprueft" statt leerer Karte, Konfluenz als Satz), je Art ein eigener Abschnitt (Depot:
-  "Nachkaufen?" aus dem Akkumulations-Indikator; Watchlist: "Checks erneuern"), Nachrichten,
-  Recherche mit Claude Code (nur wenn es Antworten gibt). Die Auswahlbox und das Formular
-  "Research anfordern" fallen weg. Zwei Fassungen als Artefakt:
-  https://claude.ai/artifact/Sywgqgw2jsqzhrUcede8x8 -- A eine lange Seite (Reihenfolge je
-  Art), B Kopf und Reiter.
+  Urteile, je Art ein eigener Abschnitt (Depot: "Nachkaufen?" aus dem
+  Akkumulations-Indikator), Nachrichten, Recherche mit Claude Code (nur wenn es Antworten
+  gibt). Die Auswahlbox und das Formular "Research anfordern" fallen weg. **Urteile** nach dem
+  Durchgang (unten, "Checks je Liste"): je Check nur Urteil und der eine Satz (`summary`), der
+  Volltext nur im Klapper; darueber, was sich seit dem Durchgang davor geaendert hat; unten
+  "Fruehere Pruefungen" als Liste, ein Klick zeigt die Seite im alten Stand. Der Knopf "Titel
+  pruefen" startet einen Durchgang mit der Auswahl der Liste. Bauen in zwei Schritten: erst
+  die Seite mit den Urteilen, wie sie heute liegen (je Zeile ihr Datum), dann der Durchgang.
 - **Die uebrigen Seiten unten einzeln angehen**, jede fuer sich: in einen der vier Bereiche
   oben ziehen, in die Kacheln aufgehen lassen oder ausblenden. Uebrig: Assistent (Portfolio
   Checker, Watchlist Checker), Research, Strategie, System.
@@ -110,22 +112,44 @@ Was dabei zu klaeren ist:
 Liegt, weil sich erst zeigen soll, ob die Kacheln tragen (zusaetzlicher Menueeintrag seit
 10.10.2026).
 
-## Checks je Liste vereinheitlichen (10.10.2026)
+## Checks je Liste: eine Auswahl, ein Durchgang (10.10.2026)
 
-Auf den Kacheln stehen die Checks heute alphabetisch, und jeder hat sein eigenes Datum, weil
-jeder Check zu seiner Zeit laeuft. Wunsch (Erik): Die Kaestchen zeigen genau die Checks, die
-fuer Depot bzw. Watchlist eingestellt sind (Scheduler), in einer festen Reihenfolge je Liste.
-Alle Checks einer Liste laufen am selben Tag, und das Datum steht im Kaestchen.
+Heute laufen die Checks eines Titels einzeln: im Depot Storychecker, Fundamental und Consensus
+Gap je als eigener Job mit eigenem Takt, Capital Allocator und Devil's Advocate nur von Hand;
+auf der Watchlist startet der Knopf der Watchlist-Analyse alle fuenf zusammen. Darum hat jedes
+Urteil sein eigenes Datum, und alte stehen neben neuen.
 
-Was dabei zu klaeren ist:
-- Woher die Kachel weiss, welche Checks fuer eine Liste eingestellt sind: aus den geplanten
-  Jobs (`scheduled_jobs`), nicht aus einer zweiten Liste im Code.
-- "Am selben Tag": ein Job je Liste statt je Agent, oder die Agent-Jobs gleich takten.
-  Batch-Laeufe kommen erst am naechsten Morgen zurueck, das Datum ist dann das der Antwort.
-- Ein Check, der fuer die Liste eingestellt ist, aber fuer diesen Titel noch nie lief, braucht
-  ein leeres Kaestchen ("noch nie"), sonst faellt die Luecke nicht auf.
+Weg (Erik, 10.10.2026), wie spaeter in Lotsee:
+- **Je Liste (Depot, Watchlist) eine Einstellung, welche Checks zu einer Pruefung gehoeren**,
+  in fester Reihenfolge. Die Kaestchen der Kacheln zeigen genau diese Checks; einer, der fuer
+  den Titel nie lief, steht als "nie geprueft" da.
+- **Ausgeloest je Titel** von der Kachel oder der Titelseite ("Titel pruefen"), wie heute der
+  Knopf der Watchlist-Analyse. Ein Lauf ist ein **Durchgang**: alle gewaehlten Checks, ein
+  Datum; ein frueherer Durchgang ist eine alte Ausgabe der Titelseite.
+- **Eingeplant** ein Job je Liste im Scheduler ("Depot pruefen", "Watchlist pruefen"), der
+  genau die Auswahl der Liste fuer alle Titel laufen laesst. Die Agent-Jobs je Check fallen
+  weg, ebenso die Sonderregel `NUR_AUF_KNOPFDRUCK` (06.10.2026): Was laeuft, sagt die Auswahl.
+- **Die Seiten Portfolio Checker und Watchlist Checker entfallen.**
 
-Liegt, weil die Kachel-Ansicht noch erprobt wird (zusaetzlicher Menueeintrag seit 10.10.2026).
+Vorschlag, wartet auf Erik:
+- Der **Watchlist Checker** (lokal: passt der Titel zum Depot?) ist selbst ein Check und wird
+  ein Eintrag der Watchlist-Auswahl, standardmaessig an; nur seine Seite (Statusmatrix,
+  "alle fehlenden Checks") faellt weg.
+- Der **Portfolio Checker** prueft keinen Titel, sondern das Depot als Ganzes gegen die
+  Portfolio-Story (lokal). Er wird ein Depot-Check der Auswahl, laeuft im Depot-Job mit und
+  steht als ein Satz oben auf der Depot-Kachelseite.
+
+Zu bauen:
+- Eine Tabelle der Durchgaenge (Liste, Titel, Ausloeser Knopf/Job, Beginn, Ende) und eine
+  Spalte `durchgang_id` an den Analysen (`position_analyses` und die Tabellen der lokalen
+  Checker); Migration in `migrate_db()`. Aeltere Analysen ohne Durchgang werden je Titel und
+  Tag zusammengefasst und stehen als "einzeln geprueft" unter den frueheren Pruefungen.
+- Die Auswahl je Liste im Code einmal, in der Datenbank gespeichert, auf der Seite
+  Einstellungen oder Scheduler bearbeitet -- nicht als zweite Liste neben `scheduled_jobs`.
+- Batch-Laeufe kommen erst am naechsten Morgen zurueck; der Durchgang ist erst fertig, wenn
+  alle Antworten da sind, und meldet bis dahin `wartet` (Hausregel).
+- Bleiben eigene Jobs, weil sie keinen Titel pruefen: Sektor-Rotation, News Digest,
+  Strukturwandel, Investment-Suche, Snapshots und Rueckblicke.
 
 ## Wertzuwachs "Kurs vs. Anteile" mit echten Daten pruefen (10.10.2026)
 
