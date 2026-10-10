@@ -260,14 +260,81 @@ class TestValueDecomposition:
         assert last["cum_quantity_effect"] == pytest.approx(100.0)  # B: 5*20 full value
         assert last["cum_price_effect"] == pytest.approx(0.0)
 
-    def test_disappeared_ticker_dropped(self):
+    def test_sold_ticker_reduces_shares(self):
+        # Ein Verkauf ist negativer Anteilszuwachs -- sonst zaehlte jeder Wiederkauf voll,
+        # jeder Verkauf aber gar nicht, und die Summe passte nicht mehr zur Wertaenderung.
         snaps = [
             _snap("2026-01-01", holdings=[_hp("A", 1.0, 10.0), _hp("B", 1.0, 10.0)]),
             _snap("2026-02-01", holdings=[_hp("A", 1.0, 12.0)]),
         ]
         last = value_decomposition_series(snaps)[-1]
         assert last["cum_price_effect"] == pytest.approx(2.0)  # only A: 1*(12-10)
+        assert last["cum_quantity_effect"] == pytest.approx(-10.0)  # B sold at 10
+
+    def test_partial_outflow_reduces_shares(self):
+        # Teilverkauf eines Tagesgeld-Fonds: Abfluss ist negativer Anteilszuwachs.
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("XEON", 100.0, 140.0)]),
+            _snap("2026-02-01", holdings=[_hp("XEON", 40.0, 140.5)]),
+        ]
+        last = value_decomposition_series(snaps)[-1]
+        assert last["cum_quantity_effect"] == pytest.approx(-60.0 * 140.5)
+        assert last["cum_price_effect"] == pytest.approx(100.0 * 0.5)
+
+    def test_umschichtung_from_money_market_fund_nets_out(self):
+        # Tagesgeld-Fonds ganz verkauft, dafuer eine Aktie gekauft: kein Geld kam hinzu, also
+        # (fast) kein Anteilszuwachs -- nur die Kursbewegung bleibt.
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("XEON", 100.0, 140.0)]),
+            _snap("2026-02-01", holdings=[_hp("AAPL", 70.0, 200.0)]),
+        ]
+        last = value_decomposition_series(snaps)[-1]
+        assert last["cum_quantity_effect"] == pytest.approx(70.0 * 200.0 - 100.0 * 140.0)  # 0
+        assert last["cum_price_effect"] == pytest.approx(0.0)
+
+    def test_data_gap_is_not_a_new_position(self):
+        # Ein Snapshot ohne Preis fuer A darf A danach nicht noch einmal voll als Zukauf zaehlen.
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("A", 10.0, 100.0)]),
+            _snap("2026-02-01", holdings=[_hp("A", 10.0, None)]),
+            _snap("2026-03-01", holdings=[_hp("A", 10.0, 110.0)]),
+        ]
+        last = value_decomposition_series(snaps)[-1]
         assert last["cum_quantity_effect"] == pytest.approx(0.0)
+        assert last["cum_price_effect"] == pytest.approx(100.0)
+
+    def test_duplicate_ticker_lots_are_summed(self):
+        # Zwei Tranchen desselben Titels: nicht die eine durch die andere ersetzen.
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("A", 10.0, 100.0), _hp("A", 1.0, 100.0)]),
+            _snap("2026-02-01", holdings=[_hp("A", 1.0, 100.0), _hp("A", 10.0, 100.0)]),
+        ]
+        last = value_decomposition_series(snaps)[-1]
+        assert last["cum_quantity_effect"] == pytest.approx(0.0)
+        assert last["cum_price_effect"] == pytest.approx(0.0)
+
+    def test_gram_positions_use_stored_value(self):
+        # Gold in Gramm, Preis je Feinunze: q*p waere 31-mal zu viel. Der gespeicherte Wert stimmt.
+        gold = lambda q, p, v: {"ticker": "GC=F", "quantity": q, "price_eur": p, "value_eur": v, "unit": "g"}
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("A", 1.0, 10.0)]),
+            _snap("2026-02-01", holdings=[_hp("A", 1.0, 10.0), gold(31.1035, 2500.0, 2500.0)]),
+        ]
+        last = value_decomposition_series(snaps)[-1]
+        assert last["cum_quantity_effect"] == pytest.approx(2500.0)
+
+    def test_only_market_priced_classes(self):
+        # Bargeld und Festgeld haben keine "Anteile": eine Einzahlung ist kein Anteilszuwachs.
+        cash = lambda v: {"ticker": "Tagesgeld", "quantity": v, "price_eur": 1.0, "value_eur": v,
+                          "asset_class": "Bargeld"}
+        aktie = lambda q, p: {**_hp("A", q, p), "asset_class": "Aktie"}
+        snaps = [
+            _snap("2026-01-01", holdings=[aktie(1.0, 10.0), cash(5000.0)]),
+            _snap("2026-02-01", holdings=[aktie(1.0, 11.0), cash(9000.0)]),
+        ]
+        last = value_decomposition_series(snaps, classes={"Aktie"})[-1]
+        assert last["cum_quantity_effect"] == pytest.approx(0.0)
+        assert last["cum_price_effect"] == pytest.approx(1.0)
 
     def test_fewer_than_two_holdings_snapshots(self):
         assert value_decomposition_series([_snap("2026-01-01", holdings=[_hp("A", 1.0, 10.0)])]) == []

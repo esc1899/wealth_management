@@ -121,7 +121,7 @@ dividend_calendar:
   income_ts_help: "Expected annual dividend of the whole portfolio over time — the aggregate income ratchet."
   income_ts_yaxis: "Annual dividend (€)"
   decomp_section: "Value growth: price vs. shares"
-  decomp_help: "Splits cumulative value growth into price movement and share accumulation. Note: share accumulation includes every purchase incl. reinvested dividends — snapshots cannot separate reinvested dividends from fresh capital."
+  decomp_help: "Splits the cumulative value growth of listed holdings into price movement and share accumulation (purchases minus sales). Cash, fixed deposits and real estate are not included. Note: share accumulation includes every purchase incl. reinvested dividends — snapshots cannot separate reinvested dividends from fresh capital."
   decomp_price: "Price"
   decomp_quantity: "Share accumulation"
   decomp_yaxis: "Cumulative contribution (€)"

@@ -121,7 +121,7 @@ dividend_calendar:
   income_ts_help: "Erwartete jährliche Dividende des Gesamtportfolios über die Zeit — die aggregierte Income-Ratsche."
   income_ts_yaxis: "Jährliche Dividende (€)"
   decomp_section: "Wertzuwachs: Kurs vs. Anteile"
-  decomp_help: "Zerlegt den kumulierten Wertzuwachs in Kursbewegung und Anteilszuwachs. Hinweis: Der Anteilszuwachs umfasst jeden Zukauf inkl. reinvestierter Dividenden — Snapshots können reinvestierte Dividenden nicht von Frischkapital trennen."
+  decomp_help: "Zerlegt den kumulierten Wertzuwachs der börsennotierten Titel in Kursbewegung und Anteilszuwachs (Zukäufe minus Verkäufe). Bargeld, Festgeld und Immobilien zählen nicht mit. Hinweis: Der Anteilszuwachs umfasst jeden Zukauf inkl. reinvestierter Dividenden — Snapshots können reinvestierte Dividenden nicht von Frischkapital trennen."
   decomp_price: "Kurs"
   decomp_quantity: "Anteilszuwachs"
   decomp_yaxis: "Kumulierter Beitrag (€)"

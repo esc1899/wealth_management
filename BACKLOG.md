@@ -110,3 +110,14 @@ Was dabei zu klaeren ist:
   ein leeres Kaestchen ("noch nie"), sonst faellt die Luecke nicht auf.
 
 Liegt, weil die Kachel-Ansicht noch erprobt wird (zusaetzlicher Menueeintrag seit 10.10.2026).
+
+## Wertzuwachs "Kurs vs. Anteile" mit echten Daten pruefen (10.10.2026)
+
+Die Zerlegung auf der Dividenden-Seite ist am 10.10.2026 korrigiert (Bargeld/Festgeld ausser
+Rechnung, Gramm-Positionen, Datenluecken, Tranchen, Verkaeufe; siehe CHANGELOG). Eriks
+Eindruck danach: noch nicht ganz korrekt. Er sieht sich die Anlagearten seiner Positionen an,
+vor allem, wie Tagesgeld (Fonds mit Ticker oder Bargeld) eingeordnet ist.
+
+Moeglicher naechster Schritt, falls es hilft: ein Klapper "Woher kommt der Anteilszuwachs?"
+mit dem Beitrag je Titel und seiner Anlageklasse, sortiert nach Groesse -- so zeigt die Seite
+selbst, welche Position die Kurve treibt. Liegt, bis Erik die Anlagearten durchgesehen hat.

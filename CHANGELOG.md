@@ -48,6 +48,20 @@ einmal umzubauen: oben anfangen, Weggefallenes erst ausblenden, den Rest nach un
 - Ausgeblendet, über die Adresse weiter erreichbar: Dashboard, Marktdaten, Cowork Setup, Portfolio Chat,
   Investieren / Rebalancieren, Research Chat.
 
+### Wertzuwachs „Kurs vs. Anteile“ rechnet richtig — 2026-10-10
+
+**Warum:** Der Anteilszuwachs war viel zu hoch, obwohl kaum gekauft wurde. Die Zerlegung zählte
+Einzahlungen auf Bargeld und Festgeld als Anteile, rechnete Gold in Gramm mit dem Preis je
+Feinunze (31-fach), zählte einen Titel nach einer Datenlücke noch einmal voll als Zukauf,
+ersetzte bei zwei Tranchen desselben Tickers die eine durch die andere und ließ Verkäufe einfach
+weg, während jeder Kauf voll zählte.
+
+**Änderungen:**
+- `value_decomposition_series` summiert Tranchen je Ticker, nimmt den Preis aus dem gespeicherten
+  Wert, behält bei Datenlücken die letzte Referenz und bucht Verkäufe als negativen Anteilszuwachs;
+  die Summe beider Teile ist wieder genau die Wertänderung.
+- Die Dividenden-Seite zerlegt nur Klassen mit Marktpreis (`auto_fetch`).
+
 ### Depot und Watchlist als Kacheln — 2026-10-10
 
 **Warum:** Die Checker laufen, gelesen werden aber nur wenige ihrer Ergebnisse; die Kacheln der

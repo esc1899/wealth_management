@@ -122,15 +122,23 @@ def portfolio_income_series(snapshots) -> List[dict]:
     return series
 
 
-def value_decomposition_series(snapshots) -> List[dict]:
+def value_decomposition_series(snapshots, classes=None) -> List[dict]:
     """Decompose cumulative portfolio value growth into price vs. share-accumulation effects.
 
-    Over consecutive holdings-bearing snapshots, for every ticker present in BOTH:
+    Per ticker, lots are summed (quantity q, value v); the per-share price is p = v / q, taken
+    from the stored value_eur so that gram positions priced per troy ounce come out right
+    (q * price_eur would be 31x too high). Over consecutive holdings-bearing snapshots:
       quantity_effect += (q1 - q0) * p1   (value of shares added, at the new price)
       price_effect    += q0 * (p1 - p0)   (appreciation of the originally held shares)
-    This is the exact, residual-free two-factor split (their sum equals Δ(q*p)). A ticker new
-    to the later snapshot contributes its full value as quantity_effect (fresh position, not a
-    market move); a ticker that disappears is simply dropped from then on.
+    This is the exact, residual-free two-factor split (their sum equals the value change).
+
+    - A ticker new to the portfolio contributes its full value as quantity_effect.
+    - A ticker that leaves (sold, absent from the holdings) contributes minus its last value —
+      otherwise every re-purchase counted fully and every sale not at all.
+    - A ticker present but without quantity or price (data gap) keeps its last reference and
+      is compared against it once data returns — a gap is not a sale and re-purchase.
+    - ``classes``: only holdings of these asset classes (market-priced ones). Cash or fixed
+      deposits carry a quantity too, but a deposit is no share accumulation. None = all.
 
     Returns [{date, cum_price_effect, cum_quantity_effect}] cumulated forward, starting at 0.0
     on the first holdings-bearing date. Returns [] with fewer than two such snapshots.
@@ -142,13 +150,29 @@ def value_decomposition_series(snapshots) -> List[dict]:
     if len(holding_snaps) < 2:
         return []
 
-    def _by_ticker(snap) -> Dict[str, dict]:
-        out: Dict[str, dict] = {}
+    def _by_ticker(snap) -> Tuple[Dict[str, Tuple[float, float]], set]:
+        """({ticker: (quantity, value)} for complete lots, {tickers present at all})."""
+        werte: Dict[str, Tuple[float, float]] = {}
+        unvollstaendig: set = set()
+        da: set = set()
         for h in snap.holdings or []:
             ticker = h.get("ticker")
-            if ticker:
-                out[ticker] = h
-        return out
+            if not ticker or (classes is not None and h.get("asset_class") not in classes):
+                continue
+            da.add(ticker)
+            q = h.get("quantity")
+            v = h.get("value_eur")
+            if v is None and q is not None and h.get("price_eur") is not None:
+                v = q * h["price_eur"]
+            if q is None or v is None or q <= 0:
+                unvollstaendig.add(ticker)
+                continue
+            q_alt, v_alt = werte.get(ticker, (0.0, 0.0))
+            werte[ticker] = (q_alt + q, v_alt + v)
+        # Fehlt einer Tranche der Wert, ist der Titel als Ganzes eine Datenluecke.
+        for ticker in unvollstaendig:
+            werte.pop(ticker, None)
+        return werte, da
 
     cum_price = 0.0
     cum_qty = 0.0
@@ -158,29 +182,27 @@ def value_decomposition_series(snapshots) -> List[dict]:
         "cum_quantity_effect": 0.0,
     }]
 
-    prev = _by_ticker(holding_snaps[0])
+    ref, _ = _by_ticker(holding_snaps[0])   # letzte vollstaendige Werte je Titel
     for snap in holding_snaps[1:]:
-        cur = _by_ticker(snap)
-        for ticker, h in cur.items():
-            q1 = h.get("quantity")
-            p1 = h.get("price_eur")
-            if q1 is None or p1 is None:
+        cur, da = _by_ticker(snap)
+        for ticker, (q1, v1) in cur.items():
+            p1 = v1 / q1
+            alt = ref.get(ticker)
+            if alt is None:
+                cum_qty += v1                       # neue Position: voller Wert ist Zukauf
                 continue
-            old = prev.get(ticker)
-            if old is None or old.get("quantity") is None or old.get("price_eur") is None:
-                # New position this interval — full value is accumulation, not a price move.
-                cum_qty += q1 * p1
-                continue
-            q0 = old["quantity"]
-            p0 = old["price_eur"]
+            q0, v0 = alt
+            p0 = v0 / q0
             cum_qty += (q1 - q0) * p1
             cum_price += q0 * (p1 - p0)
+        for ticker in [t for t in ref if t not in da]:
+            cum_qty -= ref.pop(ticker)[1]           # verkauft: zum letzten Wert abgehen
+        ref.update(cur)                             # Datenluecken behalten ihre alte Referenz
         series.append({
             "date": snap.date,
             "cum_price_effect": cum_price,
             "cum_quantity_effect": cum_qty,
         })
-        prev = cur
     return series
 
 

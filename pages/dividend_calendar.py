@@ -24,6 +24,7 @@ from core.composition_drift import (
     portfolio_income_series,
     value_decomposition_series,
 )
+from core.asset_class_config import get_asset_class_registry
 from core.i18n import t
 from state import (
     get_market_agent,
@@ -234,7 +235,10 @@ st.subheader(t("dividend_calendar.accumulation_section"))
 
 _share_hist = share_count_series(_snapshots)
 _income_ts = portfolio_income_series(_snapshots)
-_decomp = value_decomposition_series(_snapshots)
+# Nur Klassen mit Marktpreis: Eine Einzahlung aufs Tagesgeld ist kein Anteilszuwachs.
+_decomp = value_decomposition_series(
+    _snapshots, classes=set(get_asset_class_registry().auto_fetch_names())
+)
 
 if not _share_hist and not _income_ts:
     st.info(t("dividend_calendar.history_building"))
