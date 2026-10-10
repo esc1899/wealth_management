@@ -132,16 +132,23 @@ _performance_pages = [
     st.Page("pages/wealth_history.py",    title=t("nav.wealth_history"),    icon=":material/show_chart:"),
 ]
 
-# Der Rest wie bisher, bis er einzeln angegangen ist. Watchlist-Analyse und Watchlist Checker
-# sind immer registriert -- die Watchlist-Kacheln springen dorthin --, ohne lokales Ollama
-# aber ausgeblendet wie bisher.
-_nur_lokal = "visible" if _is_local else _AUS
-_portfolio_pages = [
+# Ausgeblendet, aber registriert. Positions- und Watchlist-Analyse erreicht man ueber Titel und
+# Kaestchen der Kacheln, nicht mehr ueber das Menue; Cowork ganz (10.10.2026). Sie haengen an
+# der ersten Gruppe, damit keine Gruppe ohne sichtbare Seite eine leere Ueberschrift zeigt.
+_ausgeblendet = [
     st.Page("pages/dashboard.py",          title=t("nav.dashboard"),   icon=":material/dashboard:", visibility=_AUS),
     st.Page("pages/marktdaten.py",         title=t("nav.market_data"), icon=":material/trending_up:", visibility=_AUS),
-    st.Page("pages/position_dashboard.py", title="Positionsanalyse",   icon=":material/person_search:"),
-    st.Page("pages/watchlist_analysis.py", title="Watchlist-Analyse",  icon=":material/search:", visibility=_nur_lokal),
+    st.Page("pages/position_dashboard.py", title="Positionsanalyse",   icon=":material/person_search:", visibility=_AUS),
+    st.Page("pages/watchlist_analysis.py", title="Watchlist-Analyse",  icon=":material/search:", visibility=_AUS),
+    st.Page("pages/cowork_inbox.py",       title=t("nav.cowork_inbox"),     icon=":material/inbox:", visibility=_AUS),
+    st.Page("pages/research_answers.py",   title=t("nav.research_answers"), icon=":material/question_answer:", visibility=_AUS),
+    st.Page("pages/cowork_setup.py",       title="Cowork Setup",            icon=":material/settings_suggest:", visibility=_AUS),
 ]
+
+# Der Rest wie bisher, bis er einzeln angegangen ist. Der Watchlist Checker ist immer
+# registriert -- die Watchlist-Kacheln springen dorthin --, ohne lokales Ollama aber
+# ausgeblendet wie bisher.
+_nur_lokal = "visible" if _is_local else _AUS
 
 # Assistant pages
 _assistant_pages = [
@@ -152,14 +159,13 @@ _assistant_pages = [
 ]
 
 pg = st.navigation({
-    t("kacheln.nav_gruppe"): _neu_pages,
+    t("kacheln.nav_gruppe"): _neu_pages + _ausgeblendet,
     t("nav.group_pflege"): _pflege_pages,
     t("nav.group_performance"): _performance_pages,
     # Einstellungen gleich hinter der Basis: Sprache, lokale und Cloud-Modelle (10.10.2026).
     t("nav.settings"): [
         st.Page("pages/settings.py", title=t("nav.settings"), icon=":material/settings:"),
     ],
-    t("nav.group_portfolio"): _portfolio_pages,
     _assistant_group: _assistant_pages,
     t("nav.group_research"): [
         st.Page("pages/research_chat.py",        title=t("nav.research_chat"),    icon=":material/search:", visibility=_AUS),
@@ -173,12 +179,6 @@ pg = st.navigation({
         st.Page("pages/tax_loss_harvesting.py", title=t("nav.tax_loss_harvesting"), icon=":material/trending_down:"),
         st.Page("pages/structural_scan.py",     title=t("nav.structural_scan"),     icon=":material/radar:"),
         st.Page("pages/sector_rotation.py",     title=t("nav.sector_rotation"),     icon=":material/rotate_right:"),
-    ],
-    t("nav.group_cowork"): [
-        st.Page("pages/cowork_inbox.py",     title=t("nav.cowork_inbox"),    icon=":material/inbox:"),
-        st.Page("pages/research_request.py", title=t("research_request.nav_title"), icon=":material/add_circle:"),
-        st.Page("pages/research_answers.py", title=t("nav.research_answers"), icon=":material/question_answer:"),
-        st.Page("pages/cowork_setup.py",     title="Cowork Setup",           icon=":material/settings_suggest:", visibility=_AUS),
     ],
     t("nav.group_system"): [
         st.Page("pages/usage_statistics.py", title=t("nav.statistics"),       icon=":material/bar_chart:"),

@@ -40,8 +40,8 @@ These sehen.
 eigenem Schluessel laeuft.
 - Story Checker, Fundamental Analyzer, Consensus Gap, Capital Allocator, Sektor Rotation,
   News Digest, Research Chat
-- Research anfordern und Research-Antworten (heute "Cowork") als ein Eintrag
-  "Recherche mit Claude Code"
+- Cowork ist seit 10.10.2026 ausgeblendet, "Research anfordern" geloescht; Antworten aus
+  Claude Code bleiben auf der Titelseite (unten)
 - Urteils-Rueckblick (heute unter System; er bewertet die Checks)
 
 **System** ⚙️ -- Betrieb, nichts zum Lesen.
@@ -61,10 +61,26 @@ Research Chat. Alles andere steht darunter wie bisher.
 Seit 10.10.2026 folgen darunter "Pflege" (Positionen, Portfolio-Story) und "Performance"
 (Analyse, Dividenden, Vermoegenshistorie) -- zusammen die Basis ohne Sprachmodell.
 
+Seit 10.10.2026 abends sind auch Positions- und Watchlist-Analyse ausgeblendet (erreichbar nur
+ueber Titel und Kaestchen der Kacheln) und der ganze Cowork-Abschnitt; die Seite "Research
+anfordern" ist geloescht (Erik). Die Gruppe "Portfolio" entfaellt damit. Alle ausgeblendeten
+Seiten stehen in `app.py` in einer Liste `_ausgeblendet`.
+
 Offen:
-- **Die Seiten unten einzeln angehen**, jede fuer sich: in einen der vier Bereiche oben
-  ziehen, in die Kacheln aufgehen lassen oder ausblenden. Positions- und Watchlist-Analyse
-  werden ausgeblendet, sobald die Kacheln der einzige Weg dorthin sein sollen.
+- **Eine Titelseite statt Positions- und Watchlist-Analyse** (Vorschlag 10.10.2026, wartet
+  auf Eriks Wahl): eine Funktion `titelseite(art, position)` in `core/ui/titelseite.py`, beide
+  Seiten werden duenn wie `kacheln_depot.py`. Oben der Kopf der Kachel mit demselben Satz
+  (`core/kacheln.py`), dann feste Abschnitte, je erst ein Satz, Zahlen im Klapper: Kurs,
+  Urteile (eine Zeile je Agent statt fuenf Karten, `?check=` oeffnet die Zeile, "nie
+  geprueft" statt leerer Karte, Konfluenz als Satz), je Art ein eigener Abschnitt (Depot:
+  "Nachkaufen?" aus dem Akkumulations-Indikator; Watchlist: "Checks erneuern"), Nachrichten,
+  Recherche mit Claude Code (nur wenn es Antworten gibt). Die Auswahlbox und das Formular
+  "Research anfordern" fallen weg. Zwei Fassungen als Artefakt:
+  https://claude.ai/artifact/Sywgqgw2jsqzhrUcede8x8 -- A eine lange Seite (Reihenfolge je
+  Art), B Kopf und Reiter.
+- **Die uebrigen Seiten unten einzeln angehen**, jede fuer sich: in einen der vier Bereiche
+  oben ziehen, in die Kacheln aufgehen lassen oder ausblenden. Uebrig: Assistent (Portfolio
+  Checker, Watchlist Checker), Research, Strategie, System.
 - **News Digest und Investment Search** sind dem Namen nach auch Dialoge (`news_chat.py`,
   `search_chat.py`), liefern aber Ergebnisse: den Digest, den die Positionsanalyse liest, und
   Kandidaten fuer die Watchlist. Darum noch sichtbar -- Erik entscheidet.

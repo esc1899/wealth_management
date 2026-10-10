@@ -10,7 +10,7 @@ graph TD
         PG3["Storychecker / Watchlist Checker / Watchlist-Analyse"]
         PG4["Consensus Gap / Fundamental Analyzer / Capital Allocator"]
         PG5["Research Chat / News / Search / Sector Rotation"]
-        PG6["Research Inbox / Research Answers / Research anfordern"]
+        PG6["Research Inbox / Research Answers (ausgeblendet)"]
         PG7["Dividenden / Tax Loss Harvesting / Analyse"]
         PG8["System: Statistics / Skills / Scheduler / Settings"]
     end
