@@ -108,12 +108,22 @@ _assistant_group = (
     else t("nav.group_assistant_remote")
 )
 
+# Neu oben: die Kacheln, Depot ist die Startseite. Darunter steht der Rest wie bisher und wird
+# nach und nach abgeloest (BACKLOG.md, "Kacheln loesen die alten Ansichten ab").
+_neu_pages = [
+    st.Page("pages/kacheln_depot.py",      title=t("kacheln.nav_depot"),     icon=":material/grid_view:", default=True),
+    st.Page("pages/kacheln_watchlist.py",  title=t("kacheln.nav_watchlist"), icon=":material/visibility:"),
+]
+
+# Ausgeblendet (10.10.2026), nicht geloescht: Dashboard, Cowork Setup und die Dialoge. Die Seiten
+# bleiben ueber ihre Adresse und st.switch_page erreichbar; geloescht wird erst, wenn klar ist,
+# dass sie keiner vermisst.
+_AUS = "hidden"
+
 # Portfolio pages (Watchlist-Analyse + Dividenden local-only)
 _portfolio_pages = [
-    st.Page("pages/dashboard.py",          title=t("nav.dashboard"),   icon=":material/dashboard:"),
+    st.Page("pages/dashboard.py",          title=t("nav.dashboard"),   icon=":material/dashboard:", visibility=_AUS),
     st.Page("pages/positionen.py",         title=t("nav.positions"),   icon=":material/edit_note:"),
-    st.Page("pages/kacheln_depot.py",      title=t("kacheln.nav_depot"),     icon=":material/grid_view:"),
-    st.Page("pages/kacheln_watchlist.py",  title=t("kacheln.nav_watchlist"), icon=":material/visibility:"),
     st.Page("pages/marktdaten.py",         title=t("nav.market_data"), icon=":material/trending_up:"),
     st.Page("pages/analyse.py",            title=t("nav.analysis"),    icon=":material/bar_chart:"),
     st.Page("pages/position_dashboard.py", title="Positionsanalyse",   icon=":material/person_search:"),
@@ -129,7 +139,7 @@ if _is_local:
 
 # Assistant pages
 _assistant_pages = [
-    st.Page("pages/portfolio_chat.py",   title=t("nav.portfolio_chat"), icon=":material/chat:"),
+    st.Page("pages/portfolio_chat.py",   title=t("nav.portfolio_chat"), icon=":material/chat:", visibility=_AUS),
     st.Page("pages/portfolio_story.py",  title="Portfolio Checker",     icon=":material/fact_check:"),
 ]
 if _is_local:
@@ -137,14 +147,15 @@ if _is_local:
         st.Page("pages/watchlist_checker.py", title="Watchlist Checker", icon=":material/check_circle:"),
     )
 _assistant_pages.append(
-    st.Page("pages/rebalance_chat.py",   title=t("nav.rebalance_chat"), icon=":material/balance:"),
+    st.Page("pages/rebalance_chat.py",   title=t("nav.rebalance_chat"), icon=":material/balance:", visibility=_AUS),
 )
 
 pg = st.navigation({
+    t("kacheln.nav_gruppe"): _neu_pages,
     t("nav.group_portfolio"): _portfolio_pages,
     _assistant_group: _assistant_pages,
     t("nav.group_research"): [
-        st.Page("pages/research_chat.py",        title=t("nav.research_chat"),    icon=":material/search:"),
+        st.Page("pages/research_chat.py",        title=t("nav.research_chat"),    icon=":material/search:", visibility=_AUS),
         st.Page("pages/news_chat.py",            title=t("nav.news_chat"),        icon=":material/newspaper:"),
         st.Page("pages/search_chat.py",          title=t("nav.search_chat"),      icon=":material/manage_search:"),
         st.Page("pages/storychecker.py",         title=t("nav.storychecker"),     icon=":material/fact_check:"),
@@ -160,7 +171,7 @@ pg = st.navigation({
         st.Page("pages/cowork_inbox.py",     title=t("nav.cowork_inbox"),    icon=":material/inbox:"),
         st.Page("pages/research_request.py", title=t("research_request.nav_title"), icon=":material/add_circle:"),
         st.Page("pages/research_answers.py", title=t("nav.research_answers"), icon=":material/question_answer:"),
-        st.Page("pages/cowork_setup.py",     title="Cowork Setup",           icon=":material/settings_suggest:"),
+        st.Page("pages/cowork_setup.py",     title="Cowork Setup",           icon=":material/settings_suggest:", visibility=_AUS),
     ],
     t("nav.group_system"): [
         st.Page("pages/usage_statistics.py", title=t("nav.statistics"),       icon=":material/bar_chart:"),

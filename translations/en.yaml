@@ -1435,8 +1435,9 @@ portfolio_robustness:
   no_analysis: "⚪ No portfolio counter-analysis yet."
 
 kacheln:
-  nav_depot: "Positions (tiles)"
-  nav_watchlist: "Watchlist (tiles)"
+  nav_gruppe: "At a glance"
+  nav_depot: "Portfolio"
+  nav_watchlist: "Watchlist"
   titel_depot: "Positions"
   titel_watchlist: "Watchlist"
   einleitung: "One sentence per holding, the one that matters now — whatever calls for action comes first. Nothing is re-checked here; the tiles show what the checkers have stored."

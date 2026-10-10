@@ -1433,8 +1433,9 @@ portfolio_robustness:
   no_analysis: "⚪ Noch keine Portfolio-Gegenanalyse vorhanden."
 
 kacheln:
-  nav_depot: "Positionen (Kacheln)"
-  nav_watchlist: "Watchlist (Kacheln)"
+  nav_gruppe: "Auf einen Blick"
+  nav_depot: "Depot"
+  nav_watchlist: "Watchlist"
   titel_depot: "Positionen"
   titel_watchlist: "Watchlist"
   einleitung: "Je Titel der Satz, der gerade zählt — oben, was handeln lässt. Nichts wird hier neu geprüft; die Kacheln zeigen, was die Checker abgelegt haben."

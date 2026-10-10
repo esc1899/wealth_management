@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Kacheln oben, Dashboard und Dialoge ausgeblendet — 2026-10-10
+
+**Warum:** Die Kacheln sind gut genug, um die alten Ansichten abzulösen. Statt das Menü auf
+einmal umzubauen: oben anfangen, Weggefallenes erst ausblenden, den Rest nach und nach angehen
+(BACKLOG.md).
+
+**Änderungen:**
+- Neuer erster Bereich „Auf einen Blick“ mit Depot (Startseite) und Watchlist.
+- Ausgeblendet, über die Adresse weiter erreichbar: Dashboard, Cowork Setup, Portfolio Chat,
+  Investieren / Rebalancieren, Research Chat.
+
 ### Depot und Watchlist als Kacheln — 2026-10-10
 
 **Warum:** Die Checker laufen, gelesen werden aber nur wenige ihrer Ergebnisse; die Kacheln der

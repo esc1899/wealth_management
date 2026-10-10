@@ -50,22 +50,26 @@ eigenem Schluessel laeuft.
 Die Gruppen "Assistent", "Strategie" und "Cowork" entfallen. Das Schloss bzw. die Wolke steht
 am Bereich, nicht mehr an jedem Eintrag; der Watchlist Checker ist die Ausnahme.
 
-### In kleinen Schritten, je mit Abnahme
+### Weg (Erik, 10.10.2026): ausblenden, oben anfangen, Rest nach und nach
 
-1. **Kacheln werden Einstieg.** Depot-Kacheln sind die Startseite, die Seite Positionen heisst
-   "Positionen verwalten"; Positions- und Watchlist-Analyse werden `visibility="hidden"`
-   (`st.Page`, Streamlit 1.62) und bleiben ueber die Kacheln erreichbar. Die beiden
-   Zusatzeintraege "(Kacheln)" verschwinden.
-2. **Menue in vier Bereiche**, Bezeichnungen in `translations/*.yaml`; app.py baut die
-   Bereiche, Smoke-Tests je Seite bleiben.
-3. **Doppeltes pruefen**, erst nach zwei Wochen nur mit den Kacheln (das "gut genug" aus dem
-   Lotsee-Plan): Braucht es das Dashboard noch neben den Kacheln, oder wandert sein Kopf
-   (Tagesbild, Allokation) auf die Depot-Kacheln? Braucht die Watchlist-Tabelle in "Positionen
-   verwalten" noch eine eigene Ansicht? Abgeloestes wird geloescht, nicht versteckt.
+Seit 10.10.2026 steht oben "Auf einen Blick" mit Depot (Startseite) und Watchlist, die
+Kacheln. Ausgeblendet (`visibility="hidden"`, ueber die Adresse weiter erreichbar) sind
+Dashboard, Cowork Setup und die Dialoge Portfolio Chat, Investieren / Rebalancieren und
+Research Chat. Alles andere steht darunter wie bisher.
 
-Offen fuer Erik: Dashboard behalten oder in die Kacheln ziehen; ob Marktdaten wirklich nach
-System gehoert (heute auch zum Nachsehen einzelner Kurse genutzt?); ob "Neue Titel finden"
-ein eigener Bereich wird.
+Offen:
+- **Die Seiten unten einzeln angehen**, jede fuer sich: in einen der vier Bereiche oben
+  ziehen, in die Kacheln aufgehen lassen oder ausblenden. Positions- und Watchlist-Analyse
+  werden ausgeblendet, sobald die Kacheln der einzige Weg dorthin sein sollen.
+- **News Digest und Investment Search** sind dem Namen nach auch Dialoge (`news_chat.py`,
+  `search_chat.py`), liefern aber Ergebnisse: den Digest, den die Positionsanalyse liest, und
+  Kandidaten fuer die Watchlist. Darum noch sichtbar -- Erik entscheidet.
+- **Ausgeblendetes loeschen**, wenn es zwei Wochen keiner vermisst hat (das "gut genug" aus
+  dem Lotsee-Plan). Dashboard: vorher klaeren, ob sein Kopf (Tagesbild, Allokation) auf die
+  Depot-Kacheln wandert.
+
+Offen fuer Erik: ob Marktdaten nach System gehoert (heute auch zum Nachsehen einzelner Kurse
+genutzt?); ob "Neue Titel finden" ein eigener Bereich wird.
 
 ## Nachrichten bei grossen Kursbewegungen (10.10.2026)
 
