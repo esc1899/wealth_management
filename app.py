@@ -115,7 +115,7 @@ _neu_pages = [
     st.Page("pages/kacheln_watchlist.py",  title=t("kacheln.nav_watchlist"), icon=":material/visibility:"),
 ]
 
-# Ausgeblendet (10.10.2026), nicht geloescht: Dashboard, Cowork Setup und die Dialoge. Die Seiten
+# Ausgeblendet (10.10.2026), nicht geloescht: Dashboard, Marktdaten, Cowork Setup und die Dialoge. Die Seiten
 # bleiben ueber ihre Adresse und st.switch_page erreichbar; geloescht wird erst, wenn klar ist,
 # dass sie keiner vermisst.
 _AUS = "hidden"
@@ -124,7 +124,7 @@ _AUS = "hidden"
 _portfolio_pages = [
     st.Page("pages/dashboard.py",          title=t("nav.dashboard"),   icon=":material/dashboard:", visibility=_AUS),
     st.Page("pages/positionen.py",         title=t("nav.positions"),   icon=":material/edit_note:"),
-    st.Page("pages/marktdaten.py",         title=t("nav.market_data"), icon=":material/trending_up:"),
+    st.Page("pages/marktdaten.py",         title=t("nav.market_data"), icon=":material/trending_up:", visibility=_AUS),
     st.Page("pages/analyse.py",            title=t("nav.analysis"),    icon=":material/bar_chart:"),
     st.Page("pages/position_dashboard.py", title="Positionsanalyse",   icon=":material/person_search:"),
     st.Page("pages/wealth_history.py",     title=t("nav.wealth_history"), icon=":material/show_chart:"),

@@ -54,7 +54,8 @@ am Bereich, nicht mehr an jedem Eintrag; der Watchlist Checker ist die Ausnahme.
 
 Seit 10.10.2026 steht oben "Auf einen Blick" mit Depot (Startseite) und Watchlist, die
 Kacheln. Ausgeblendet (`visibility="hidden"`, ueber die Adresse weiter erreichbar) sind
-Dashboard, Cowork Setup und die Dialoge Portfolio Chat, Investieren / Rebalancieren und
+Dashboard, Marktdaten (Kurse aktualisieren geht auch auf Analyse und Vermoegenshistorie),
+Cowork Setup und die Dialoge Portfolio Chat, Investieren / Rebalancieren und
 Research Chat. Alles andere steht darunter wie bisher.
 
 Offen:

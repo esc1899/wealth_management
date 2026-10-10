@@ -16,7 +16,7 @@ einmal umzubauen: oben anfangen, Weggefallenes erst ausblenden, den Rest nach un
 
 **Änderungen:**
 - Neuer erster Bereich „Auf einen Blick“ mit Depot (Startseite) und Watchlist.
-- Ausgeblendet, über die Adresse weiter erreichbar: Dashboard, Cowork Setup, Portfolio Chat,
+- Ausgeblendet, über die Adresse weiter erreichbar: Dashboard, Marktdaten, Cowork Setup, Portfolio Chat,
   Investieren / Rebalancieren, Research Chat.
 
 ### Depot und Watchlist als Kacheln — 2026-10-10
