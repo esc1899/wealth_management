@@ -8,6 +8,65 @@ Regel fuer alle Backlogs im Haus seit dem 28.09.2026
 geleert, samt Archiv. Rueckmeldungen und Fehler von aussen:
 [GitHub Issues](https://github.com/esc1899/wealth_management/issues).
 
+## Kacheln loesen die alten Ansichten ab, das Menue wird neu sortiert (10.10.2026)
+
+Die Kacheln sind gut genug, um die alten Listen abzuloesen (Erik, 10.10.2026). Das ist die
+Gelegenheit, das Menue aufzuraeumen, und zwar so, wie Lotsee Wealth schneiden wuerde
+(lotsee `docs/plan.md`, "Kandidat Wealth"): **nach der Datengrenze, nicht nach dem Anbieter.**
+Heute sortiert das Menue nach Technik ("Assistent 🔒", "Research ☁️", "Strategie" fuer
+Claude-Agenten, "Cowork"); wer etwas sucht, muss wissen, welches Modell es rechnet.
+
+### Vorschlag: vier Bereiche
+
+**Depot** 🔒 -- was am Bestand haengt; nur das lokale Modell sieht es. In Lotsee der Kern auf
+dem Geraet, ohne Server.
+- Depot (die Kacheln, neuer Einstieg der App statt Dashboard)
+- Uebersicht (heute Dashboard), Vermoegen (Vermoegenshistorie), Entwicklung (Analyse),
+  Dividenden
+- Portfolio Checker, Portfolio Chat, Investieren / Rebalancieren, Tax Loss Harvesting
+  (lokal, heute unter "Strategie" -- dort steht es nur, weil es dort neu war)
+- Positionen verwalten (die heutige Seite Positionen: anlegen, bearbeiten, verschieben)
+- versteckt: Positionsanalyse -- erreichbar ueber Titel und Kaestchen der Kachel
+
+**Watchlist** -- Titel, die man beobachtet; Cloud-Checks erlaubt, weil sie nur Ticker und
+These sehen.
+- Watchlist (die Kacheln)
+- Watchlist Checker 🔒 (lokal, prueft die Passung zum Depot -- die eine Bruecke zwischen
+  beiden Seiten, darum mit Schloss)
+- Neue Titel finden: Investment Search, Strukturwandel-Scanner, Research Inbox
+- versteckt: Watchlist-Analyse -- erreichbar ueber die Kachel
+
+**Checks** ☁️ -- je Titel, mit Claude. In Lotsee der Teil, der zentral (Indizes) oder mit
+eigenem Schluessel laeuft.
+- Story Checker, Fundamental Analyzer, Consensus Gap, Capital Allocator, Sektor Rotation,
+  News Digest, Research Chat
+- Research anfordern und Research-Antworten (heute "Cowork") als ein Eintrag
+  "Recherche mit Claude Code"
+- Urteils-Rueckblick (heute unter System; er bewertet die Checks)
+
+**System** ⚙️ -- Betrieb, nichts zum Lesen.
+- Scheduler, Skills, Kosten (heute Statistiken), Marktdaten, Cowork Setup, Einstellungen
+
+Die Gruppen "Assistent", "Strategie" und "Cowork" entfallen. Das Schloss bzw. die Wolke steht
+am Bereich, nicht mehr an jedem Eintrag; der Watchlist Checker ist die Ausnahme.
+
+### In kleinen Schritten, je mit Abnahme
+
+1. **Kacheln werden Einstieg.** Depot-Kacheln sind die Startseite, die Seite Positionen heisst
+   "Positionen verwalten"; Positions- und Watchlist-Analyse werden `visibility="hidden"`
+   (`st.Page`, Streamlit 1.62) und bleiben ueber die Kacheln erreichbar. Die beiden
+   Zusatzeintraege "(Kacheln)" verschwinden.
+2. **Menue in vier Bereiche**, Bezeichnungen in `translations/*.yaml`; app.py baut die
+   Bereiche, Smoke-Tests je Seite bleiben.
+3. **Doppeltes pruefen**, erst nach zwei Wochen nur mit den Kacheln (das "gut genug" aus dem
+   Lotsee-Plan): Braucht es das Dashboard noch neben den Kacheln, oder wandert sein Kopf
+   (Tagesbild, Allokation) auf die Depot-Kacheln? Braucht die Watchlist-Tabelle in "Positionen
+   verwalten" noch eine eigene Ansicht? Abgeloestes wird geloescht, nicht versteckt.
+
+Offen fuer Erik: Dashboard behalten oder in die Kacheln ziehen; ob Marktdaten wirklich nach
+System gehoert (heute auch zum Nachsehen einzelner Kurse genutzt?); ob "Neue Titel finden"
+ein eigener Bereich wird.
+
 ## Nachrichten bei grossen Kursbewegungen (10.10.2026)
 
 Der News Digest sucht heute nur einmal im Monat. Bewegt sich ein Titel stark (die Kacheln
