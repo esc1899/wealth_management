@@ -60,6 +60,9 @@ accumulation:
   binding_no_dividend: "Weder Dividende noch Rückkäufe — Akkumulation nicht anwendbar."
 
 nav:
+  group_pflege: "Pflege"
+  group_performance: "Performance"
+  portfolio_narrativ: "Portfolio-Story"
   dashboard: "Dashboard"
   positions: "Positionen"
   market_data: "Marktdaten"
@@ -1006,6 +1009,9 @@ wealth_history:
   delete_help: "Snapshot löschen"
 
 portfolio_story:
+  pflege_title: "📖 Portfolio-Story"
+  pflege_subtitle: "Wofür das Depot da ist: Narrativ, Ziel-Jahr, Liquiditätsbedarf, Priorität. Der Portfolio Checker misst das Depot daran."
+  no_story_link: "Noch keine Portfolio-Story. Festhalten unter Pflege → Portfolio-Story; danach misst der Checker das Depot daran."
   cash_rule_title: "💰 Bargeldregel"
   cash_rule_total: "Gesamtportfolio"
   cash_rule_current: "Liquides Bargeld"
@@ -1041,7 +1047,7 @@ portfolio_story:
   cockpit_run_all_missing: "▶️ Alle fehlenden Checks ausführen"
   cockpit_run_row_missing: "▶️ {n} fehlende Checks ausführen"
   nav_to_pd: "Positionsanalyse"
-  story_check_section: "3️⃣ Portfolio Checker ausführen"
+  story_check_section: "Portfolio Checker ausführen"
   run_button: "🔍 Portfolio Checker ausführen"
   no_story_error: "❌ Bitte definiere zuerst eine Portfolio-Story."
   running_checks_spinner: "Führe {n} Story-Checks aus..."
@@ -1458,3 +1464,6 @@ kacheln:
   agent_capital_allocator: "Kapital"
   agent_devils_advocate: "Devil's Advocate"
   agent_watchlist_checker: "Watchlist Checker"
+
+lokales_modell:
+  hinweis: "Für den KI-Entwurf braucht es ein lokales Sprachmodell. Einrichten: Ollama installieren und starten (ollama.com), ein Modell laden (z. B. ollama pull qwen3:8b), dann unter System → Einstellungen auswählen. Speichern geht auch ohne."

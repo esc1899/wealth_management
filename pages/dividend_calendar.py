@@ -1,13 +1,11 @@
 """
 Dividenden-Kalender — 12-Monats-Cashflow-Prognose aus Portfolio-Dividenden.
 
-Lokal (Ollama). Stateless — kein DB-State.
+Ohne Sprachmodell (Bereich Performance); die KI-Analyse ist seit 10.10.2026 entfernt.
 Berechnet equal-monthly aus annual_dividend_eur (annual / 12 pro Position).
 """
 
-import asyncio
 import logging
-import threading
 
 import plotly.express as px
 import plotly.graph_objects as go
@@ -26,17 +24,11 @@ from core.composition_drift import (
     portfolio_income_series,
     value_decomposition_series,
 )
-from core.i18n import t, current_language
-from core.ui.verdicts import cloud_notice
-from core.ui.markdown import llm_markdown
+from core.i18n import t
 from state import (
     get_market_agent,
     get_market_repo,
     get_positions_repo,
-    get_dividend_calendar_agent,
-    get_app_config_repo,
-    get_portfolio_comment_model,
-    get_portfolio_comment_service,
     get_wealth_snapshot_repo,
 )
 
@@ -362,89 +354,3 @@ with _btn_col:
 with _info_col:
     if _latest_fetch:
         st.caption(f"Zuletzt aktualisiert: {_latest_fetch.strftime('%d.%m.%Y %H:%M')} UTC")
-
-st.divider()
-
-# ------------------------------------------------------------------
-# AI Analysis (Ollama, one-shot)
-# ------------------------------------------------------------------
-
-st.subheader("🤖 KI-Analyse")
-_dc_agent = get_dividend_calendar_agent()
-cloud_notice(_dc_agent._llm.model, provider="ollama")
-
-if "_dc_job" not in st.session_state:
-    st.session_state["_dc_job"] = {
-        "running": False,
-        "done": False,
-        "error": None,
-        "result": None,
-    }
-
-_JOB = st.session_state["_dc_job"]
-
-
-def _run_analysis(agent, forecasts, valuations, language, job):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        result = loop.run_until_complete(
-            agent.analyze(
-                forecasts=forecasts,
-                valuations=valuations,
-                language=language,
-            )
-        )
-        job["result"] = result
-        job.update({"running": False, "done": True, "error": None})
-    except Exception as exc:
-        job.update({"running": False, "done": True, "error": str(exc)})
-    finally:
-        loop.close()
-
-
-if not _JOB["running"] and not _JOB["done"]:
-    if st.button(t("dividend_calendar.run_analysis"), type="primary"):
-        _language = current_language()
-        _JOB.update({"running": True, "done": False, "error": None, "result": None})
-        _thread = threading.Thread(
-            target=_run_analysis,
-            args=(_dc_agent, _forecasts, _valuations, _language, _JOB),
-            daemon=False,
-        )
-        _thread.start()
-        st.rerun()
-
-if _JOB["running"]:
-    with st.spinner(t("dividend_calendar.analysis_running")):
-        st.rerun()
-
-if _JOB["done"]:
-    if _JOB["error"]:
-        st.error(f"{t('common.agent_error')}: {_JOB['error']}")
-    elif _JOB["result"]:
-        _result = _JOB["result"]
-        if _result.summary:
-            st.info(f"**Fazit:** {_result.summary}")
-        llm_markdown(_result.full_text)
-        st.caption(t("common.ai_disclaimer"))
-
-        # KI-Kommentarstil
-        from core.ui.ai_comment import render_ai_comment
-
-        render_ai_comment(
-            state_key="_dc",
-            ctx=f"Dividenden-Portfolio Analyse:\n{_result.full_text}",
-            style_id=get_app_config_repo().get("comment_style") or "humorvoll",
-            comment_service=get_portfolio_comment_service(get_portfolio_comment_model()),
-            section_title=t("dividend_calendar.ai_comment_section"),
-        )
-
-    if st.button(t("dividend_calendar.run_analysis") + " ↺"):
-        st.session_state["_dc_job"] = {
-            "running": False,
-            "done": False,
-            "error": None,
-            "result": None,
-        }
-        st.rerun()

@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Pflege und Performance: die Basis ohne Sprachmodell — 2026-10-10
+
+**Warum:** Unter den Kacheln sollen die Bereiche stehen, die ohne Sprachmodell funktionieren —
+eine Basis, wie sie Lotsee kostenlos auf dem Gerät anbieten würde. Vom Portfolio Checker blieb
+nach den Kacheln wenig übrig, die Story gehört zur Pflege.
+
+**Änderungen:**
+- Neue Bereiche „Pflege“ (Positionen, Portfolio-Story) und „Performance“ (Analyse, Dividenden,
+  Vermögenshistorie) direkt unter „Auf einen Blick“.
+- Neue Seite Portfolio-Story (`pages/portfolio_narrativ.py`), herausgelöst aus dem Portfolio
+  Checker; dort entfallen das Story-Formular und die Status-Matrix (die zeigen jetzt die Kacheln).
+  Behoben: Der KI-Entwurf brach mit `NameError` ab, wenn vorher nicht gespeichert wurde.
+- Muster für KI-Knöpfe in der Basis (`core/ui/lokales_modell.py`): ohne erreichbares Ollama
+  ausgegraut, mit Hinweis zum Einrichten. Zuerst am KI-Entwurf der Portfolio-Story.
+- Die KI-Analyse auf der Dividenden-Seite ist entfernt (mehr Spielerei als Nutzen).
+- Watchlist-Analyse und Watchlist Checker sind immer registriert (die Kacheln springen dorthin),
+  ohne lokales Ollama aber ausgeblendet.
+
 ### Kacheln oben, Dashboard und Dialoge ausgeblendet — 2026-10-10
 
 **Warum:** Die Kacheln sind gut genug, um die alten Ansichten abzulösen. Statt das Menü auf

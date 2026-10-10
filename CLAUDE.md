@@ -259,6 +259,15 @@ Vor dem ersten Commit prüfen (SEC-4):
 
 ---
 
+## Die Basis läuft ohne Sprachmodell
+
+Oben im Menü stehen „Auf einen Blick“ (Kacheln), „Pflege“ und „Performance“: die Basis, die ohne
+Sprachmodell vollständig funktioniert — so, wie Lotsee sie kostenlos auf dem Gerät anbieten würde.
+Ein KI-Knopf darin ist ein Extra und nutzt `core/ui/lokales_modell.py`: ohne erreichbares Ollama
+ausgegraut (`disabled=not lokales_modell_bereit()`), darunter `hinweis_einrichten()`. Warum: Ein
+Knopf, der erst beim Klick scheitert, sagt nicht, was fehlt; ein grauer mit Hinweis schon. Eine
+neue Seite mit Pflicht-Sprachmodell gehört nicht in diese Bereiche.
+
 ## 📍 Dokumentations-Struktur (Single Source of Truth)
 
 Damit zukünftige Sessions alles finden:

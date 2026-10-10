@@ -60,6 +60,9 @@ accumulation:
   binding_no_dividend: "Neither dividends nor buybacks — accumulation not applicable."
 
 nav:
+  group_pflege: "Upkeep"
+  group_performance: "Performance"
+  portfolio_narrativ: "Portfolio Story"
   dashboard: "Dashboard"
   positions: "Positions"
   market_data: "Market Data"
@@ -1008,6 +1011,9 @@ wealth_history:
   delete_help: "Delete snapshot"
 
 portfolio_story:
+  pflege_title: "📖 Portfolio Story"
+  pflege_subtitle: "What the portfolio is for: narrative, target year, liquidity need, priority. The Portfolio Checker measures the portfolio against it."
+  no_story_link: "No portfolio story yet. Write it down under Upkeep → Portfolio Story; the checker then measures the portfolio against it."
   cash_rule_title: "💰 Cash Rule"
   cash_rule_total: "Total Portfolio"
   cash_rule_current: "Liquid Cash"
@@ -1043,7 +1049,7 @@ portfolio_story:
   cockpit_run_all_missing: "▶️ Run all missing checks"
   cockpit_run_row_missing: "▶️ Run {n} missing checks"
   nav_to_pd: "Position Analysis"
-  story_check_section: "3️⃣ Run Portfolio Checker"
+  story_check_section: "Run Portfolio Checker"
   run_button: "🔍 Run Portfolio Checker"
   no_story_error: "❌ Please define a portfolio story first."
   running_checks_spinner: "Running {n} story checks..."
@@ -1460,3 +1466,6 @@ kacheln:
   agent_capital_allocator: "Capital"
   agent_devils_advocate: "Devil's Advocate"
   agent_watchlist_checker: "Watchlist Checker"
+
+lokales_modell:
+  hinweis: "The AI draft needs a local language model. To set it up: install and start Ollama (ollama.com), pull a model (e.g. ollama pull qwen3:8b), then select it under System → Settings. Saving works without it."

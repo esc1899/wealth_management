@@ -58,6 +58,9 @@ Dashboard, Marktdaten (Kurse aktualisieren geht auch auf Analyse und Vermoegensh
 Cowork Setup und die Dialoge Portfolio Chat, Investieren / Rebalancieren und
 Research Chat. Alles andere steht darunter wie bisher.
 
+Seit 10.10.2026 folgen darunter "Pflege" (Positionen, Portfolio-Story) und "Performance"
+(Analyse, Dividenden, Vermoegenshistorie) -- zusammen die Basis ohne Sprachmodell.
+
 Offen:
 - **Die Seiten unten einzeln angehen**, jede fuer sich: in einen der vier Bereiche oben
   ziehen, in die Kacheln aufgehen lassen oder ausblenden. Positions- und Watchlist-Analyse
