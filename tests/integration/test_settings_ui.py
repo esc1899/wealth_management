@@ -124,3 +124,17 @@ class TestHouseholdCatalog:
                 repo.delete("model_public_devils_advocate")
             else:
                 repo.set("model_public_devils_advocate", saved)
+
+
+def test_drei_bereiche_sprache_zuerst():
+    """Gliederung seit 10.10.2026: Generell (Sprache zuerst), Lokale LLM, Cloud LLM."""
+    at = AppTest.from_file(PAGES / "settings.py", default_timeout=30)
+    at.run()
+    assert not at.exception, at.exception
+    assert [tab.label for tab in at.tabs] == ["Generell", "Lokale LLM", "Cloud LLM"]
+    generell = at.tabs[0]
+    assert generell.radio, "Sprache steht unter Generell"
+    assert generell.subheader[0].value == at.tabs[0].radio[0].label
+    # Jeder LLM-Bereich speichert seine Modelle selbst.
+    assert any(b.key == "_save_models_lokal_btn" for b in at.tabs[1].button)
+    assert any(b.key == "_save_models_cloud_btn" for b in at.tabs[2].button)

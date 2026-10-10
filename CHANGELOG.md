@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Einstellungen in drei Bereichen — 2026-10-10
+
+**Warum:** Die Einstellungen waren eine lange Seite, Ollama- und Cloud-Modelle in einem
+Formular. Gegliedert wie die Basis: erst das Allgemeine, dann je Art von Sprachmodell.
+
+**Änderungen:**
+- Tabs „Generell“ (Sprache zuerst, Systemzustand, Backup), „Lokale LLM“ (Modelle je Agent,
+  Kommentarstil) und „Cloud LLM“ (Modelle je Agent, Modellpreise).
+- Lokale und Cloud-Modelle speichern je mit eigenem Knopf, nur ihre eigenen Einstellungen.
+
 ### Pflege und Performance: die Basis ohne Sprachmodell — 2026-10-10
 
 **Warum:** Unter den Kacheln sollen die Bereiche stehen, die ohne Sprachmodell funktionieren —

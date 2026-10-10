@@ -374,6 +374,9 @@ research_chat:
   analysing: "Analysiere…"
 
 settings:
+  tab_generell: "Generell"
+  tab_lokal: "Lokale LLM"
+  tab_cloud: "Cloud LLM"
   title: "Einstellungen"
   skills_header: "Skills"
   no_skills: "Noch keine Skills vorhanden."
