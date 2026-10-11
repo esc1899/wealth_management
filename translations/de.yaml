@@ -1435,7 +1435,7 @@ portfolio_robustness:
   verdict_fragil: "Fragil"
   verdict_kritisch: "Kritisch"
   section_header: "🐻 Portfolio-Gegenanalyse"
-  section_subtitle: "Systemische Risiken des Gesamtportfolios (lokal, Ollama)"
+  section_subtitle: "Das lokale Sprachmodell sucht, was dem ganzen Depot gefährlich werden kann: Klumpen, gemeinsame Risiken, Szenarien. Es läuft nur auf Knopfdruck."
   run_button: "Gegenanalyse starten"
   running_spinner: "Ollama analysiert Portfolio-Risiken …"
   verdict_label: "Portfolio-Robustheit"
@@ -1474,6 +1474,8 @@ lokales_modell:
   hinweis: "Für den KI-Entwurf braucht es ein lokales Sprachmodell. Einrichten: Ollama installieren und starten (ollama.com), ein Modell laden (z. B. ollama pull qwen3:8b), dann unter System → Einstellungen auswählen. Speichern geht auch ohne."
 
 titelseite:
+  checks_erneuern: "Alle Checks erneuern"
+  checks_erneuern_alt: "Checks erneuern ({n} veraltet)"
   zurueck_depot: "‹ Depot"
   zurueck_watchlist: "‹ Watchlist"
   ohne_titel: "Kein Titel gewählt"

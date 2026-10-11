@@ -37,15 +37,15 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Portfolio Chat** — natural language CRUD interface for your positions; data never leaves your machine
 - **Portfolio Story** — on the upkeep page next to the story itself: measures the portfolio and the story-check verdicts against your narrative; greyed out without a reachable Ollama
 - **Watchlist Checker** — evaluates which watchlist positions fit into current portfolio structure and strategy; its page is hidden and reached via its box on the watchlist tiles
-- **Portfolio Robustness** — portfolio-level stress assessment across scenarios (local, full portfolio visibility); for now only on the hidden Portfolio Checker page
+- **Portfolio Robustness** — portfolio-level stress assessment across scenarios (local, full portfolio visibility); below the story check on the Portfolio Story page
 - **Tax Loss Harvesting Assistant** — identifies loss positions, computes tax impact, suggests watchlist replacements, warns about wash-sale windows
 
 ### Research (cloud, Claude API + web search)
 - **Research Chat** — deep-dive research per position using Claude with multi-turn conversation
 - **News Digest** — recent news for all portfolio positions, filtered by investment strategy
 - **Investment Search** — screen for new opportunities; investment thesis saved automatically to watchlist
-- **Story Checker** — validates investment theses against current news and fundamentals (Claude API)
-- **Fundamental Analyzer** — in-depth fundamental analysis of individual positions with multi-turn chat (cloud, Claude)
+- **Story Checker** — validates investment theses against current news and fundamentals (Claude API); verdicts on tiles and title page, its own page is hidden
+- **Fundamental Analyzer** — in-depth fundamental analysis of individual positions (cloud, Claude); verdicts on tiles and title page, its own page with follow-up chat is hidden
 - **Research Inbox** — ingest AI-generated research from an external Claude Project; file watcher detects new `.md` files in `~/wealth-research/outbox/`, parses YAML frontmatter, and presents watchlist candidates for one-click review and import
 - **Research Queue** — bidirectional channel between app and Claude Code: the app posts open research questions; Claude Code answers via `submit_research_answer()` and the answers appear in a dedicated page
 - **Research Answers** — shows all answers submitted by Claude Code, filterable by ticker; includes queue management (mark done, delete)

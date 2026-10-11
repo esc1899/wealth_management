@@ -27,6 +27,7 @@ from core.tagesbild import prozent
 from core.titelseite import (FARBE, FARBE_SONST, band, kurs_veraenderung, news_abschnitt,
                              symbol, urteile_zaehlen)
 from core.ui import kacheln as kachel_ui
+from core.ui.ki import ki_knopf
 from core.ui.markdown import llm_markdown
 from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge
 from core.ui.vorauswahl import vorauswahl
@@ -216,12 +217,13 @@ def _urteile(art: str, position, offener_check: str | None) -> None:
                 with st.expander(t("titelseite.volltext"), expanded=offener_check == agent):
                     llm_markdown(text)
 
-    if art == "watchlist":
-        _checks_erneuern(position, jeweils)
+    # Auch im Depot (11.10.2026): Seit die Seiten der einzelnen Checks ausgeblendet sind, ist das
+    # der einzige Weg, einen Depot-Titel ausser der Reihe zu pruefen.
+    _checks_erneuern(position, jeweils)
 
 
 def _checks_erneuern(position, jeweils: dict) -> None:
-    """Der Knopf der Watchlist: alle fünf Cloud-Checks für diesen Titel neu, parallel."""
+    """Alle fünf Cloud-Checks für diesen Titel neu, parallel -- in Depot und Watchlist."""
     from config import config
     from core.background_jobs import (run_capital_allocator_job, run_consensus_gap_job,
                                       run_devils_advocate_job, run_fundamental_job,
@@ -239,9 +241,9 @@ def _checks_erneuern(position, jeweils: dict) -> None:
             run_capital_allocator_job, run_devils_advocate_job]
     agenten = ("storychecker", "consensus_gap", "fundamental_analyzer", "capital_allocator", "devils_advocate")
     veraltet = sum(alt(jeweils.get(a)) for a in agenten)
-    label = (t("watchlist_analysis.update_button_stale").format(n=veraltet) if veraltet
-             else t("watchlist_analysis.update_button"))
-    if not st.button(label, key="ts-checks", type="primary" if veraltet else "secondary"):
+    label = (t("titelseite.checks_erneuern_alt").format(n=veraltet) if veraltet
+             else t("titelseite.checks_erneuern"))
+    if not ki_knopf(label, wo="cloud", key="ts-checks", type="primary" if veraltet else "secondary"):
         return
 
     sprache = current_language()

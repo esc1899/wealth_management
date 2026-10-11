@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Gegenanalyse unter Portfolio-Story, Check-Seiten ausgeblendet — 2026-10-11
+
+**Warum:** Was die Depot-Checks sagen, steht auf Kacheln und Titelseite; eigene Seiten dafür
+zeigten es doppelt (Erik). Die Gegenanalyse liest wie der Story-Check das ganze Depot und
+gehört neben ihn.
+
+**Änderungen:**
+- Pflege → Portfolio-Story: unter dem Story-Check die Portfolio-Gegenanalyse (lokal, grau ohne
+  Ollama), mit den drei früheren Läufen eingeklappt. Der Portfolio Checker ist damit leer.
+- Die Titelseite lässt jetzt auch im Depot alle Checks eines Titels neu laufen („Alle Checks
+  erneuern“, Cloud-Stern) -- vorher nur auf der Watchlist.
+- Storychecker, Fundamental Analyzer und Consensus Gap sind ausgeblendet, nicht gelöscht.
+  Weggefallen im Menü: Skill-Wahl je Einzelcheck und die Nachfrage im Chat (Backlog).
+
 ### KI-Knöpfe zeigen, wo das Modell rechnet; Kästchen als halber Satz — 2026-10-11
 
 **Warum:** ✨ stand gleich beim lokalen KI-Entwurf und beim Cloud-Vorschlag der These, der

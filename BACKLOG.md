@@ -75,10 +75,11 @@ Offen:
 - **Die uebrigen Seiten unten einzeln angehen**, jede fuer sich: in einen der vier Bereiche
   oben ziehen, in die Kacheln aufgehen lassen oder ausblenden. Uebrig: Research, Strategie,
   System.
-- **Portfolio-Gegenanalyse** (`portfolio_story.py`, lokal) steht seit 11.10.2026 nur noch auf
-  der ausgeblendeten Seite Portfolio Checker; der Story-Check ist nach Pflege ->
-  Portfolio-Story gezogen. Erik entscheidet: mit dorthin, Depot-Check der Auswahl (unten,
-  "Checks je Liste") oder weg.
+- **Was die ausgeblendeten Check-Seiten noch konnten** (Storychecker, Fundamental, Konsens,
+  seit 11.10.2026 aus dem Menue): je Einzelcheck einen Skill waehlen und im Storychecker und
+  Fundamental Analyzer nachfragen (Chat). Die Titelseite prueft mit dem Skill aus dem
+  Scheduler und kennt keine Nachfrage. Faellt es Erik nicht auf, entfaellt beides mit dem
+  Loeschen; sonst gehoert es zum Durchgang (unten, "Checks je Liste").
 - **News Digest und Investment Search** sind dem Namen nach auch Dialoge (`news_chat.py`,
   `search_chat.py`), liefern aber Ergebnisse: den Digest, den die Positionsanalyse liest, und
   Kandidaten fuer die Watchlist. Darum noch sichtbar -- Erik entscheidet.

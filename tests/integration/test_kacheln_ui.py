@@ -93,6 +93,8 @@ def test_titelseite_zeigt_position_aus_der_adresse(depot_und_watchlist, seite, w
     assert not at.exception, at.exception
     assert any('class="ts-name"' in m.value and pos.name in m.value for m in at.markdown)
     assert not at.selectbox, "Die Auswahlbox ist weg -- man kommt ueber die Kachel"
+    knopf = next(b for b in at.button if b.key == "ts-checks")
+    assert "Cloud" in knopf.help, "die Checks neu pruefen geht in Depot und Watchlist, mit Cloud-Stern"
 
 
 @pytest.mark.parametrize("seite", ["position_dashboard.py", "watchlist_analysis.py"])

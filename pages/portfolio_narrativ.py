@@ -1,9 +1,9 @@
 """Portfolio-Story — das Narrativ des Depots definieren, pflegen und das Depot daran messen.
 
 Herausgelöst aus dem Portfolio Checker (10.10.2026): Die Story ist Pflege wie die Positionen
-und braucht kein Sprachmodell. Seit 11.10.2026 steht auch der Check gegen die Story hier,
-der Portfolio Checker ist ausgeblendet. KI-Entwurf und Check sind Extras; ohne erreichbares
-Ollama sind sie ausgegraut (core/ui/lokales_modell.py).
+und braucht kein Sprachmodell. Seit 11.10.2026 stehen auch der Check gegen die Story und die
+Gegenanalyse hier, der Portfolio Checker ist ausgeblendet. KI-Entwurf und beide Checks sind
+Extras; ohne erreichbares Ollama sind sie ausgegraut (core/ui/lokales_modell.py).
 """
 
 from __future__ import annotations
@@ -13,21 +13,29 @@ from datetime import datetime, timezone
 
 import streamlit as st
 
-from core.i18n import fmt_dt, t
+from core.i18n import current_language, fmt_dt, t
 from core.portfolio_snapshot import build_portfolio_snapshot
 from core.storage.models import PortfolioStory, PortfolioStoryAnalysis
 from core.ui.ki import ki_knopf
 from core.ui.lokales_modell import hinweis_einrichten, lokales_modell_bereit
 from core.ui.markdown import llm_markdown
+from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge
 from state import (
     get_analysis_service,
     get_market_agent,
+    get_portfolio_robustness_agent,
+    get_portfolio_robustness_repo,
     get_portfolio_service,
     get_portfolio_story_agent,
     get_portfolio_story_repo,
 )
 
 _ICON = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴"}
+
+
+def _zeit(dt) -> str:
+    """Zeitpunkt eines Laufs in Ortszeit; die Datenbank haelt UTC."""
+    return fmt_dt(dt.astimezone() if dt.tzinfo else dt)
 
 st.set_page_config(page_title="Portfolio-Story", page_icon="📖", layout="wide")
 st.title(t("portfolio_story.pflege_title"))
@@ -129,17 +137,23 @@ if "_ps_draft" in st.session_state:
 # ──────────────────────────────────────────────────────────────────────
 
 
-def _story_check(story: PortfolioStory) -> None:
-    """Ein Lauf: Snapshot mit Werten (das Modell fragt nach Gewichten und Dividenden, ohne Zahlen
-    erfaende es sie) und die Storychecker-Urteile je Position, Ergebnis in die Datenbank."""
+def _depot():
+    """Was beide Checks lesen: Positionen, Snapshot mit Werten (die Modelle fragen nach Gewichten
+    und Dividenden, ohne Zahlen erfaenden sie sie) und die Urteile aller Checks je Position."""
     positionen = get_portfolio_service().get_portfolio_positions()
     market_agent = get_market_agent()
     bewertungen = market_agent.get_portfolio_valuation() if market_agent else []
-    snapshot = (build_portfolio_snapshot(positionen, bewertungen) if positionen
-                else "## Portfolio\n" + t("portfolio_story.empty_portfolio") + "\n")
-
+    snapshot = build_portfolio_snapshot(positionen, bewertungen) if positionen else None
     ids = [p.id for p in positionen if p.id]
-    urteile = get_analysis_service().get_all_verdicts(ids).get("storychecker", {}) if ids else {}
+    alle_urteile = get_analysis_service().get_all_verdicts(ids) if ids else {}
+    return positionen, snapshot, alle_urteile
+
+
+def _story_check(story: PortfolioStory) -> None:
+    """Ein Lauf gegen die Story: Snapshot und die Storychecker-Urteile, Ergebnis in die Datenbank."""
+    positionen, snapshot, alle_urteile = _depot()
+    snapshot = snapshot or "## Portfolio\n" + t("portfolio_story.empty_portfolio") + "\n"
+    urteile = alle_urteile.get("storychecker", {})
     zeilen = []
     for p in positionen:
         v = urteile.get(p.id) if p.id else None
@@ -184,10 +198,7 @@ if letzte is None:
     st.info(t("portfolio_story.check_nie"))
 else:
     if letzte.created_at:
-        zeit = letzte.created_at
-        if zeit.tzinfo:
-            zeit = zeit.astimezone()
-        st.caption(t("portfolio_story.check_vom").format(ts=fmt_dt(zeit)))
+        st.caption(t("portfolio_story.check_vom").format(ts=_zeit(letzte.created_at)))
     links, rechts = st.columns(2)
     with links:
         st.metric(f"{_ICON.get(letzte.verdict, '⚪')} {t('portfolio_story.story_verdict_label')}",
@@ -202,3 +213,62 @@ else:
     if letzte.full_text:
         with st.expander(t("portfolio_story.full_analysis_label")):
             llm_markdown(letzte.full_text)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Die Gegenanalyse (lokal): sucht systemische Risiken des ganzen Depots, gegen die Story
+# gelesen -- darum hier, gleich unter dem Story-Check. Auch sie nur auf Knopfdruck.
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _gegenanalyse() -> None:
+    positionen, snapshot, alle_urteile = _depot()
+    zeilen = [f"- {p.name} ({agent}): {urteile[p.id].verdict}"
+              for agent, urteile in alle_urteile.items() for p in positionen if p.id in urteile]
+    with st.spinner(t("portfolio_robustness.running_spinner")):
+        ergebnis = asyncio.run(get_portfolio_robustness_agent().analyze(
+            portfolio_snapshot=snapshot or "(kein Portfolio)",
+            position_verdicts="\n".join(zeilen) or "(keine Verdicts)",
+            language=current_language(),
+            position_count=len(positionen),
+        ))
+    get_portfolio_robustness_repo().save(
+        verdict=ergebnis.verdict,
+        summary=ergebnis.summary,
+        analysis_text=ergebnis.analysis_text,
+        position_count=ergebnis.position_count,
+    )
+
+
+st.divider()
+st.subheader(t("portfolio_robustness.section_header"))
+st.caption(t("portfolio_robustness.section_subtitle"))
+
+if ki_knopf(t("portfolio_robustness.run_button"), wo="lokal", key="pr_check", disabled=not ki_bereit):
+    try:
+        _gegenanalyse()
+        st.rerun()
+    except Exception as fehler:  # das Modell antwortet nicht oder unlesbar: sagen, nicht abbrechen
+        st.error(f"Fehler: {fehler}")
+if not ki_bereit:
+    hinweis_einrichten()
+
+verlauf = get_portfolio_robustness_repo().list_recent(limit=4)
+if not verlauf:
+    st.info(t("portfolio_robustness.no_analysis"))
+else:
+    neueste = verlauf[0]
+    if neueste.created_at:
+        st.caption(t("portfolio_story.check_vom").format(ts=_zeit(neueste.created_at)))
+    st.markdown(f"**{verdict_badge(neueste.verdict, VERDICT_CONFIGS['portfolio_robustness'])}**")
+    if neueste.summary:
+        llm_markdown(f"_{neueste.summary}_")
+    with st.expander(t("portfolio_robustness.full_analysis")):
+        llm_markdown(neueste.analysis_text)
+    if len(verlauf) > 1:
+        with st.expander(t("portfolio_robustness.history_header")):
+            for frueher in verlauf[1:]:
+                zeit = _zeit(frueher.created_at) if frueher.created_at else "—"
+                st.markdown(f"**{zeit}** — {verdict_badge(frueher.verdict, VERDICT_CONFIGS['portfolio_robustness'])}")
+                if frueher.summary:
+                    st.caption(frueher.summary)

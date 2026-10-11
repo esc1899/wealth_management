@@ -1437,7 +1437,7 @@ portfolio_robustness:
   verdict_fragil: "Fragile"
   verdict_kritisch: "Critical"
   section_header: "🐻 Portfolio Counter-Analysis"
-  section_subtitle: "Systemic risks of the overall portfolio (local, Ollama)"
+  section_subtitle: "The local model looks for what could endanger the whole portfolio: clusters, shared risks, scenarios. It runs only on demand."
   run_button: "Start counter-analysis"
   running_spinner: "Ollama analyzing portfolio risks …"
   verdict_label: "Portfolio Robustness"
@@ -1476,6 +1476,8 @@ lokales_modell:
   hinweis: "The AI draft needs a local language model. To set it up: install and start Ollama (ollama.com), pull a model (e.g. ollama pull qwen3:8b), then select it under System → Settings. Saving works without it."
 
 titelseite:
+  checks_erneuern: "Renew all checks"
+  checks_erneuern_alt: "Renew checks ({n} stale)"
   zurueck_depot: "‹ Portfolio"
   zurueck_watchlist: "‹ Watchlist"
   ohne_titel: "No security selected"

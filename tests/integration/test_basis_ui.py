@@ -56,6 +56,7 @@ def test_story_check_ist_grau_ohne_ollama(ollama, erreichbar):
     at.run()
     assert not at.exception, at.exception
     assert _check_knopf(at).disabled is not erreichbar
+    assert next(b for b in at.button if b.key == "pr_check").disabled is not erreichbar
 
 
 def test_story_check_ohne_lauf_sagt_nie_gemessen(ollama):

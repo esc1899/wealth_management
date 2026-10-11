@@ -129,8 +129,9 @@ _performance_pages = [
 # Ausgeblendet, aber registriert. Positions- und Watchlist-Analyse erreicht man ueber Titel und
 # Kaestchen der Kacheln, nicht mehr ueber das Menue; Cowork ganz (10.10.2026). Sie haengen an
 # der ersten Gruppe, damit keine Gruppe ohne sichtbare Seite eine leere Ueberschrift zeigt.
-# Die Gruppe Assistent ist aufgeloest (11.10.2026): Der Check gegen die Story steht unter
-# Pflege -> Portfolio-Story, der Portfolio Checker haelt nur noch die Gegenanalyse. Der Watchlist
+# Die Gruppe Assistent ist aufgeloest (11.10.2026): Story-Check und Gegenanalyse stehen unter
+# Pflege -> Portfolio-Story, der Portfolio Checker ist damit leer. Storychecker, Fundamental und
+# Konsens stehen auf Kacheln und Titelseite, die auch neu pruefen laesst. Der Watchlist
 # Checker bleibt registriert, weil sein Kaestchen auf den Watchlist-Kacheln dorthin springt
 # -- die Titelseite kennt den lokalen Passungs-Check (noch) nicht.
 _ausgeblendet = [
@@ -145,6 +146,9 @@ _ausgeblendet = [
     st.Page("pages/portfolio_story.py",    title="Portfolio Checker",       icon=":material/fact_check:", visibility=_AUS),
     st.Page("pages/watchlist_checker.py",  title="Watchlist Checker",       icon=":material/check_circle:", visibility=_AUS),
     st.Page("pages/rebalance_chat.py",     title=t("nav.rebalance_chat"),   icon=":material/balance:", visibility=_AUS),
+    st.Page("pages/storychecker.py",         title=t("nav.storychecker"),   icon=":material/fact_check:", visibility=_AUS),
+    st.Page("pages/fundamental_analyzer.py", title="Fundamental Analyzer", icon=":material/calculate:", visibility=_AUS),
+    st.Page("pages/consensus_gap.py",        title=t("nav.consensus_gap"), icon=":material/target:", visibility=_AUS),
 ]
 
 pg = st.navigation({
@@ -159,9 +163,6 @@ pg = st.navigation({
         st.Page("pages/research_chat.py",        title=t("nav.research_chat"),    icon=":material/search:", visibility=_AUS),
         st.Page("pages/news_chat.py",            title=t("nav.news_chat"),        icon=":material/newspaper:"),
         st.Page("pages/search_chat.py",          title=t("nav.search_chat"),      icon=":material/manage_search:"),
-        st.Page("pages/storychecker.py",         title=t("nav.storychecker"),     icon=":material/fact_check:"),
-        st.Page("pages/fundamental_analyzer.py", title="Fundamental Analyzer",   icon=":material/calculate:"),
-        st.Page("pages/consensus_gap.py",        title=t("nav.consensus_gap"),   icon=":material/target:"),
     ],
     t("nav.group_claude_strategy"): [
         st.Page("pages/tax_loss_harvesting.py", title=t("nav.tax_loss_harvesting"), icon=":material/trending_down:"),
