@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Ein Cloud-Modell je Bereich: Depot, Watchlist, Research — 2026-10-11
+
+**Warum:** Seit der Prüfung je Liste laufen die Checks eines Titels zusammen, das Modell wählte
+man aber noch je Agent (elf Felder). So einfach wie möglich, mit Blick auf Lotsee (Erik): ein
+Modell fürs Depot, eins für die Watchlist, eins für Research -- dort darf es das stärkste sein.
+
+**Änderungen:**
+- Einstellungen, Cloud LLM: drei Felder statt elf, nach Datengrenze (`core/pruefung.py::BEREICHE`).
+  Depot: Checks im Depot, News Digest, Sektor-Rotation, Story-Entwurf. Watchlist: Checks auf
+  der Watchlist, Devil's Advocate. Research: Suche, Strukturwandel, Research-Chat.
+- Speichern schreibt die Einträge je Agent mit, die übrigen Wege lesen unverändert. Ein Check,
+  der in beiden Listen vorkommt, bekommt im Durchgang (Knopf und Job) das Modell seiner Liste.
+- Ohne gespeichertes Bereichsmodell gilt der bisherige Eintrag (Depot: Storychecker,
+  Watchlist: Devil's Advocate, Research: Research-Chat).
+
 ### Gescheiterte Websuche: kein Urteil ohne Beleg — 2026-10-11
 
 **Warum:** Beim ersten Durchgang meldete der Storychecker zu Schneider Electric „Gemischt

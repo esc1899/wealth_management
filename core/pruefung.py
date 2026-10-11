@@ -88,6 +88,41 @@ def skill_fuer(app_cfg, skills_repo, liste: str, check: str) -> tuple[str, str]:
 
 
 # ------------------------------------------------------------------
+# Ein Cloud-Modell je Bereich (Erik, 11.10.2026, mit Blick auf Lotsee: so einfach wie möglich)
+# ------------------------------------------------------------------
+
+#: Die drei Bereiche nach Datengrenze und die Agenten, deren Eintrag je Agent (``model_public_*``)
+#: der Bereich mitschreibt. Die Checks stehen im Depot, weil das ihr Rückfall ist; auf der
+#: Watchlist bekommen sie das Modell der Watchlist ausdrücklich (Knopf und Job). Devil's Advocate
+#: prüft nur die Watchlist.
+BEREICHE: dict[str, tuple[str, ...]] = {
+    "depot": ("storychecker", "fundamental_analyzer", "consensus_gap", "capital_allocator",
+              "news", "sector_rotation", "position_story"),
+    "watchlist": ("devils_advocate",),
+    "research": ("search", "structural_scan", "research"),
+}
+
+#: Woher ein Bereich sein Modell nimmt, solange er noch keins gespeichert hat.
+_BISHER = {"depot": "storychecker", "watchlist": "devils_advocate", "research": "research"}
+
+
+def modell(app_cfg, bereich: str) -> str:
+    """Das Cloud-Modell des Bereichs; "" = Standard der App."""
+    if app_cfg is None:
+        return ""
+    return (app_cfg.get(f"model_bereich_{bereich}")
+            or app_cfg.get(f"model_public_{_BISHER[bereich]}") or "")
+
+
+def modell_setzen(app_cfg, bereich: str, wert: str) -> None:
+    """Speichert das Modell des Bereichs und schreibt es in die Einträge seiner Agenten, die
+    alle übrigen Wege lesen (state_llm, background_jobs, scheduler)."""
+    app_cfg.set(f"model_bereich_{bereich}", wert)
+    for agent in BEREICHE[bereich]:
+        app_cfg.set(f"model_public_{agent}", wert)
+
+
+# ------------------------------------------------------------------
 # Die eingeplanten Jobs: einer je Liste statt einer je Check
 # ------------------------------------------------------------------
 

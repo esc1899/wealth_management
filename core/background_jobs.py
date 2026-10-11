@@ -35,7 +35,11 @@ logger = logging.getLogger(__name__)
 # Internal helpers (shared with both callers)
 # ------------------------------------------------------------------
 
-def _resolve_model_from_conn(conn, agent_key: str, default: str) -> str:
+def _resolve_model_from_conn(conn, agent_key: str, default: str, job: dict | None = None) -> str:
+    """Das Modell eines Laufs: im Durchgang das der Liste (``job["modell"]``, core/pruefung.py),
+    sonst der Eintrag des Agenten."""
+    if job and job.get("modell"):
+        return job["modell"]
     model_type = "openai" if config.OPENAI_BASE_URL else "claude"
     app_cfg = AppConfigRepository(conn)
     return (
@@ -132,7 +136,7 @@ def run_storychecker_job(positions: list, language: str, job: dict, db_path: str
         _usage_repo = UsageRepository(conn)
         job["agents"] = ["Story Checker"]
         skill_name, _ = _resolve_skill(jobs_repo, skills_repo, "storychecker", job)
-        _sc_model = _resolve_model_from_conn(conn, "storychecker", CLAUDE_HAIKU)
+        _sc_model = _resolve_model_from_conn(conn, "storychecker", CLAUDE_HAIKU, job)
         llm = _make_bg_llm(_sc_model, "storychecker", _usage_repo)
         llm.skill_context = skill_name
         agent = StorycheckerAgent(positions_repo=positions_repo, storychecker_repo=storychecker_repo, analyses_repo=analyses_repo, llm=llm, skills_repo=skills_repo)
@@ -170,7 +174,7 @@ def run_consensus_gap_job(positions: list, language: str, job: dict, db_path: st
         _usage_repo = UsageRepository(conn)
         job["agents"] = ["Konsens-Lücken"]
         skill_name, skill_prompt = _resolve_skill(jobs_repo, skills_repo, "consensus_gap", job)
-        _cg_model = _resolve_model_from_conn(conn, "consensus_gap", CLAUDE_SONNET)
+        _cg_model = _resolve_model_from_conn(conn, "consensus_gap", CLAUDE_SONNET, job)
         llm = _make_bg_llm(_cg_model, "consensus_gap", _usage_repo)
         agent = ConsensusGapAgent(llm=llm, analyses_repo=analyses_repo, cg_repo=cg_repo)
         pos_valid = [p for p in positions if p.id]
@@ -211,7 +215,7 @@ def run_fundamental_job(positions: list, language: str, job: dict, db_path: str,
         fund_skill_name, fund_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "fundamental_analyzer", job)
         _log_to_job(job, f"Skill resolved: '{fund_skill_name}'")
         _usage_repo = UsageRepository(conn)
-        _fa_model = _resolve_model_from_conn(conn, "fundamental_analyzer", CLAUDE_HAIKU)
+        _fa_model = _resolve_model_from_conn(conn, "fundamental_analyzer", CLAUDE_HAIKU, job)
         fund_llm = _make_bg_llm(_fa_model, "fundamental_analyzer", _usage_repo)
         fund_repo = FundamentalAnalyzerRepository(conn)
         fund_agent = FundamentalAnalyzerAgent(positions_repo=positions_repo, analyses_repo=analyses_repo, fa_repo=fund_repo, llm=fund_llm)
@@ -259,7 +263,7 @@ def run_capital_allocator_job(positions: list, language: str, job: dict, db_path
         ca_skill_name, ca_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "capital_allocator", job)
         _log_to_job(job, f"Skill resolved: '{ca_skill_name}'")
         _usage_repo = UsageRepository(conn)
-        _ca_model = _resolve_model_from_conn(conn, "capital_allocator", CLAUDE_SONNET)
+        _ca_model = _resolve_model_from_conn(conn, "capital_allocator", CLAUDE_SONNET, job)
         ca_llm = _make_bg_llm(_ca_model, "capital_allocator", _usage_repo)
         ca_repo = CapitalAllocatorRepository(conn)
         ca_agent = CapitalAllocatorAgent(llm=ca_llm, analyses_repo=analyses_repo, ca_repo=ca_repo)
@@ -310,7 +314,7 @@ def run_devils_advocate_job(positions: list, language: str, job: dict, db_path: 
         da_skill_name, da_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "devils_advocate", job)
         _log_to_job(job, f"Skill resolved: '{da_skill_name}'")
         _usage_repo = UsageRepository(conn)
-        _da_model = _resolve_model_from_conn(conn, "devils_advocate", CLAUDE_SONNET)
+        _da_model = _resolve_model_from_conn(conn, "devils_advocate", CLAUDE_SONNET, job)
         da_llm = _make_bg_llm(_da_model, "devils_advocate", _usage_repo)
         da_repo = DevilsAdvocateRepository(conn)
         da_agent = DevilsAdvocateAgent(llm=da_llm, analyses_repo=analyses_repo, da_repo=da_repo)
@@ -383,7 +387,7 @@ CHECK_JOBS = {
 
 
 def _parallel(checks, position, language: str, db_path: str, enc_key: str, api_key: str,
-              skill_je_check: dict | None = None) -> list[str]:
+              skill_je_check: dict | None = None, modell: str = "") -> list[str]:
     import threading
 
     zustaende, threads = [], []
@@ -391,6 +395,8 @@ def _parallel(checks, position, language: str, db_path: str, enc_key: str, api_k
         z = {"running": True, "done": False, "count": 0, "error": None}
         if skill_je_check and check in skill_je_check:
             z["skill"] = skill_je_check[check]
+        if modell:
+            z["modell"] = modell
         th = threading.Thread(target=CHECK_JOBS[check], daemon=True,
                               args=([position], language, z, db_path, enc_key, api_key))
         th.start()
@@ -418,7 +424,7 @@ def run_durchgang(position, liste: str, checks, language: str, job: dict, db_pat
         checks = tuple(checks)
         durchgang_id = repo.beginnen(liste, position.id, ausloeser, checks)
         job["durchgang_id"] = durchgang_id
-        from core.pruefung import SKILL_BEREICH, skill_fuer
+        from core.pruefung import SKILL_BEREICH, modell as modell_der_liste, skill_fuer
         from core.storage.skills import SkillsRepository
         app_cfg, skills_repo = AppConfigRepository(conn), SkillsRepository(conn)
         skill_je_check = {c: skill_fuer(app_cfg, skills_repo, liste, c)
@@ -427,7 +433,7 @@ def run_durchgang(position, liste: str, checks, language: str, job: dict, db_pat
         for stufe in reihenfolge(checks):
             if stufe:
                 fehler += _parallel(stufe, position, language, db_path, enc_key, api_key,
-                                    skill_je_check)
+                                    skill_je_check, modell_der_liste(app_cfg, liste))
         zugeordnet = repo.abschliessen(durchgang_id, "; ".join(fehler) or None)
         _log_to_job(job, f"Durchgang {durchgang_id}: {zugeordnet} Urteile, {len(fehler)} Fehler")
         job.update({"running": False, "done": True, "count": zugeordnet, "error": None, "fehler": fehler})

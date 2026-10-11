@@ -805,7 +805,7 @@ class AgentSchedulerService:
         Durchgang; die Cloud-Checks laufen einer nach dem anderen ueber alle Titel, als Batch
         oder live. Fertig wird der Durchgang in ``durchgaenge_nachziehen`` -- gleich am Ende,
         oder beim Abholen, wenn alle Batches seiner Checks da sind."""
-        from core.pruefung import auswahl, reihenfolge, skill_fuer
+        from core.pruefung import auswahl, modell, reihenfolge, skill_fuer
         from core.storage.app_config import AppConfigRepository
         from core.storage.durchgaenge import DurchgaengeRepository
         from core.storage.skills import SkillsRepository
@@ -829,8 +829,9 @@ class AgentSchedulerService:
         cloud = reihenfolge(checks)[0]
         for check in cloud:
             name, prompt = skill_fuer(app_cfg, skills_repo, liste, check)
+            # Das Modell der Liste (Einstellungen, Cloud LLM); "" = Standard der App.
             ersatz = ScheduledJob(agent_name=check, skill_name=name, skill_prompt=prompt,
-                                  frequency="manual")
+                                  frequency="manual", model=modell(app_cfg, liste) or None)
             _log(f"— {BATCH_NAMEN.get(check, check)}")
             try:
                 await getattr(self, self._CHECK_LAEUFE[check])(ersatz, conn, _log, positionen=titel)

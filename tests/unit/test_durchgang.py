@@ -400,3 +400,62 @@ def test_batch_antwort_ohne_gelungene_suche_wird_kein_urteil(dienst):
                              result=SimpleNamespace(type="succeeded", message=message))
     assert d._process_batch_results("capital_allocator", "Standard", [result], c) == (0, 1)
     assert PositionAnalysesRepository(c).get_for_position(a.id) == []
+
+
+# ------------------------------------------------------------------
+# Ein Cloud-Modell je Bereich
+# ------------------------------------------------------------------
+
+from core.pruefung import modell, modell_setzen
+
+
+def test_modell_je_bereich_rueckfall_und_mitschreiben(conn):
+    cfg = AppConfigRepository(conn)
+    cfg.set("model_public_storychecker", "claude-sonnet-5-5")
+    assert modell(cfg, "depot") == "claude-sonnet-5-5"        # bisheriger Eintrag
+    assert modell(cfg, "watchlist") == ""                     # Standard der App
+    modell_setzen(cfg, "research", "claude-opus-5-5")
+    modell_setzen(cfg, "watchlist", "claude-haiku-5-5")
+    assert cfg.get("model_public_research") == "claude-opus-5-5"
+    assert cfg.get("model_public_structural_scan") == "claude-opus-5-5"
+    assert cfg.get("model_public_devils_advocate") == "claude-haiku-5-5"
+    assert cfg.get("model_public_storychecker") == "claude-sonnet-5-5"   # Depot unberuehrt
+
+
+def test_knopf_reicht_modell_der_liste_weiter(tmp_path, monkeypatch):
+    pfad = str(tmp_path / "m.db")
+    c = get_connection(pfad)
+    init_db(c)
+    migrate_db(c)
+    AppConfigRepository(c).set("model_bereich_watchlist", "claude-haiku-5-5")
+    c.close()
+    gesehen = {}
+
+    def lauf(positions, language, job, db_path, enc_key, api_key):
+        gesehen["modell"] = job.get("modell")
+        job.update({"running": False, "error": None})
+
+    monkeypatch.setattr(bj, "CHECK_JOBS", {"fundamental_analyzer": lauf})
+    bj.run_durchgang(SimpleNamespace(id=1, name="X"), "watchlist", ("fundamental_analyzer",),
+                     "de", {"running": True}, pfad, "", "")
+    assert gesehen["modell"] == "claude-haiku-5-5"
+    assert bj._resolve_model_from_conn(None, "fundamental_analyzer", "x", {"modell": "m"}) == "m"
+
+
+def test_job_reicht_modell_der_liste_weiter(dienst):
+    d, c, enc = dienst
+    _titel(enc, c, "Alpha", in_portfolio=True)
+    AppConfigRepository(c).set("model_bereich_depot", "claude-opus-5-5")
+    AppConfigRepository(c).set_json("pruefung_auswahl_depot", ["storychecker"])
+    modelle = []
+
+    async def lauf(job, conn, log, positionen=None):
+        modelle.append(job.model)
+    d._run_storychecker_job = lauf
+
+    async def portfolio(conn):
+        return ""
+    d._portfolio_check_lauf = portfolio
+    job = ScheduledJob(agent_name="pruefung_depot", skill_name="", skill_prompt="", frequency="monthly")
+    asyncio.run(d._run_pruefung_job(job, c, lambda _: None, "depot"))
+    assert modelle == ["claude-opus-5-5"]

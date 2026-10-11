@@ -335,8 +335,8 @@ with tab_lokal:
         return st.selectbox(label, options=options, index=idx, format_func=_stale_label,
                             key=f"_model_claude_{agent_key}")
 
-    def _public_sel(agent_key: str, label: str) -> str:
-        saved = (
+    def _public_sel(agent_key: str, label: str, saved: str = "") -> str:
+        saved = saved or (
             app_config.get(f"model_public_{agent_key}")
             or app_config.get(f"model_openai_{agent_key}")
             or app_config.get(f"model_claude_{agent_key}")
@@ -428,50 +428,22 @@ with tab_cloud:
         _providers.append("OpenRouter")
     _provider_label = "☁️ Cloud (" + " + ".join(_providers) + ")" if _providers else "☁️ Cloud"
 
+    # Ein Modell je Bereich (11.10.2026): Depot, Watchlist, Research -- nach Datengrenze, wie
+    # Lotsee es schneiden wuerde (core/pruefung.py::BEREICHE).
+    from core.pruefung import BEREICHE, modell as _modell_bereich, modell_setzen
+
     st.markdown(f"**{_provider_label}**")
-    col_c1, col_c2, col_c3 = st.columns(3)
-    with col_c1:
-        sel_news = _public_sel("news", t("settings.agent_news"))
-    with col_c2:
-        sel_search = _public_sel("search", t("settings.agent_search"))
-    with col_c3:
-        sel_storychecker = _public_sel("storychecker", t("settings.agent_storychecker"))
-
-    st.markdown(f"**{_provider_label} Strategy**")
-    col_s1, col_s2, col_s3 = st.columns(3)
-    with col_s1:
-        sel_structural = _public_sel("structural_scan", t("settings.agent_structural_scan"))
-    with col_s2:
-        sel_consensus = _public_sel("consensus_gap", t("settings.agent_consensus_gap"))
-    with col_s3:
-        sel_fundamental = _public_sel("fundamental_analyzer", t("settings.agent_fundamental"))
-
-    col_s4, col_s5, col_s6 = st.columns([1, 1, 1])
-    with col_s4:
-        sel_capital_allocator = _public_sel("capital_allocator", "Capital Allocator")
-    with col_s5:
-        sel_sector_rotation = _public_sel("sector_rotation", t("settings.agent_sector_rotation"))
-    with col_s6:
-        sel_devils_advocate = _public_sel("devils_advocate", "🐻 Devil's Advocate")
-
-    col_s7, col_s8, _ = st.columns([1, 1, 1])
-    with col_s7:
-        sel_position_story = _public_sel("position_story", "✍️ Story-Entwurf")
-    with col_s8:
-        sel_research = _public_sel("research", "🔬 Research-Chat")
+    st.caption(t("settings.bereiche_satz"))
+    _wahl = {}
+    for _spalte, _bereich in zip(st.columns(len(BEREICHE)), BEREICHE):
+        with _spalte:
+            _wahl[_bereich] = _public_sel(f"bereich_{_bereich}", t(f"settings.bereich_{_bereich}"),
+                                          saved=_modell_bereich(app_config, _bereich))
+            st.caption(t(f"settings.bereich_{_bereich}_wer"))
 
     if st.button(t("settings.save_models_button"), key="_save_models_cloud_btn", width="content"):
-        app_config.set("model_public_news", sel_news)
-        app_config.set("model_public_search", sel_search)
-        app_config.set("model_public_storychecker", sel_storychecker)
-        app_config.set("model_public_structural_scan", sel_structural)
-        app_config.set("model_public_consensus_gap", sel_consensus)
-        app_config.set("model_public_fundamental_analyzer", sel_fundamental)
-        app_config.set("model_public_capital_allocator", sel_capital_allocator)
-        app_config.set("model_public_sector_rotation", sel_sector_rotation)
-        app_config.set("model_public_devils_advocate", sel_devils_advocate)
-        app_config.set("model_public_position_story", sel_position_story)
-        app_config.set("model_public_research", sel_research)
+        for _bereich, _m in _wahl.items():
+            modell_setzen(app_config, _bereich, _m)
         st.cache_resource.clear()
         st.success(t("settings.models_saved"))
 

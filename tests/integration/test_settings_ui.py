@@ -112,11 +112,12 @@ class TestHouseholdCatalog:
             boxes = [s for s in at.selectbox if s.key and s.key.startswith("_model_public_")]
             assert boxes
             # AppTest reports options as rendered labels (format_func applied).
-            fremd = [s for s in boxes if s.key != "_model_public_devils_advocate"]
+            fremd = [s for s in boxes if s.key != "_model_public_bereich_watchlist"]
             assert "claude-opus-5-5" in fremd[0].options
             assert not any(o.startswith("claude-opus-5 ") or o == "claude-opus-5"
                            for o in fremd[0].options)                 # retired: not offered
-            da = next(s for s in boxes if s.key == "_model_public_devils_advocate")
+            # Seit 11.10.2026 ein Feld je Bereich; die Watchlist faellt auf den Eintrag des DA zurueck.
+            da = next(s for s in boxes if s.key == "_model_public_bereich_watchlist")
             assert "claude-opus-5 — nicht mehr aktuell" in da.options \
                 or "claude-opus-5 — no longer current" in da.options  # saved: visible, marked
         finally:

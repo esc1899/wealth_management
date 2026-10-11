@@ -226,6 +226,10 @@ die lokale Schluss-Stufe: Watchlist Checker bzw. Portfolio Checker (`core/portfo
 liest die Urteile aller gewählten Depot-Checks). Ollama baut der Scheduler dafür selbst
 (`_make_scheduled_ollama`).
 
+Ein Cloud-Modell je Bereich (Depot, Watchlist, Research; `core/pruefung.py::BEREICHE`,
+`modell`/`modell_setzen`): Die Einstellungen schreiben die Einträge je Agent mit; im Durchgang
+reicht der Knopf `job["modell"]`, der Job `ScheduledJob.model` das Modell der Liste durch.
+
 Volltexte verfallen, Urteile bleiben (`core/storage/volltexte.py`, im Job `agenten`): je Titel
 und Check die Texte der zwei jüngsten Urteile, ältere Sitzungen ohne Nachrichten; Dialoge nie.
 
