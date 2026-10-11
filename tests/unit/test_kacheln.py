@@ -134,7 +134,7 @@ class TestHtml:
 class TestKaestchen:
     def test_storychecker_ascii_urteil_findet_wort(self):
         k = kachel(_pos(), "depot", _bew(), {"storychecker": _urteil("storychecker", "gefaehrdet")})
-        assert urteil_label(k.urteile[0]) == "Storychecker Gefährdet"
+        assert urteil_label(k.urteile[0]) == "Story gefährdet"
 
     def test_nach_text_sortiert(self):
         k = kachel(_pos(), "watchlist", _bew(), {

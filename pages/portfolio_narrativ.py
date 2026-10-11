@@ -16,6 +16,7 @@ import streamlit as st
 from core.i18n import fmt_dt, t
 from core.portfolio_snapshot import build_portfolio_snapshot
 from core.storage.models import PortfolioStory, PortfolioStoryAnalysis
+from core.ui.ki import ki_knopf
 from core.ui.lokales_modell import hinweis_einrichten, lokales_modell_bereit
 from core.ui.markdown import llm_markdown
 from state import (
@@ -94,7 +95,7 @@ with st.form("portfolio_story_form", clear_on_submit=False):
             st.rerun()
 
     with col2:
-        if st.form_submit_button(t("portfolio_story.ai_draft_button"), disabled=not ki_bereit):
+        if ki_knopf(t("portfolio_story.ai_draft_button"), wo="lokal", key="ps_entwurf", form=True, disabled=not ki_bereit):
             if not current_story or not current_story.story:
                 st.error(t("portfolio_story.ai_draft_no_story_error"))
             else:
@@ -169,7 +170,7 @@ st.divider()
 st.subheader(t("portfolio_story.check_title"))
 st.caption(t("portfolio_story.check_subtitle"))
 
-if st.button(t("portfolio_story.check_button"), disabled=not ki_bereit, key="ps_check"):
+if ki_knopf(t("portfolio_story.check_button"), wo="lokal", key="ps_check", disabled=not ki_bereit):
     if not current_story or not current_story.story:
         st.error(t("portfolio_story.no_story_error"))
     else:

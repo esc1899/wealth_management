@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### KI-Knöpfe zeigen, wo das Modell rechnet; Kästchen als halber Satz — 2026-10-11
+
+**Warum:** ✨ stand gleich beim lokalen KI-Entwurf und beim Cloud-Vorschlag der These, der
+Story-Check hatte eine Lupe; und „Storychecker Gefährdet“ las sich wie zwei Etiketten (Erik).
+
+**Änderungen:**
+- `core/ui/ki.py::ki_knopf`: ein Stern für alle KI-Knöpfe, grün lokal, blau Cloud, der
+  Tooltip sagt es in Worten. Umgestellt: KI-Entwurf und „Depot-Story checken“ (lokal),
+  „These vorschlagen/aktualisieren“ (Cloud).
+- Kästchen der Kacheln: „Story gefährdet“, „Konsens stabil“ -- das Urteil klein, außer es ist
+  ein Begriff wie „Fair Value“.
+
 ### Story-Check unter Portfolio-Story, Gruppe Assistent aufgelöst — 2026-10-11
 
 **Warum:** Vom Portfolio Checker war nur noch der Check gegen die Story übrig, und der gehört

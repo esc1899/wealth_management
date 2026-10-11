@@ -108,6 +108,13 @@ Was dabei zu klaeren ist:
 Liegt, weil sich erst zeigen soll, ob die Kacheln tragen (zusaetzlicher Menueeintrag seit
 10.10.2026).
 
+## Uebrige KI-Knoepfe auf den Stern umstellen (11.10.2026)
+
+Seit 11.10.2026 zeigt `core/ui/ki.py::ki_knopf` mit der Farbe des Sterns, ob ein Knopf lokal
+oder in der Cloud rechnet; umgestellt sind erst Portfolio-Story und These auf der Seite
+Positionen. Die Knoepfe in Research, Strategie und auf der Titelseite folgen, wenn die Seite
+beim Aufraeumen ohnehin dran ist -- vorher lohnt es nicht, weil manche Seite entfaellt.
+
 ## Checks je Liste: eine Auswahl, ein Durchgang (10.10.2026)
 
 Heute laufen die Checks eines Titels einzeln: im Depot Storychecker, Fundamental und Consensus

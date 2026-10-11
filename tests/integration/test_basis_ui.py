@@ -83,3 +83,12 @@ def test_portfolio_checker_ohne_story_formular():
     at = AppTest.from_file(PAGES / "portfolio_story.py", default_timeout=30)
     at.run()
     assert not at.text_area, "das Story-Formular gehoert jetzt zur Pflege"
+
+
+def test_ki_knoepfe_sagen_wo_das_modell_rechnet(ollama):
+    """Ein Stern fuer alle KI-Knoepfe; der Tooltip sagt lokal oder Cloud (core/ui/ki.py)."""
+    ollama(True)
+    at = AppTest.from_file(PAGES / "portfolio_narrativ.py", default_timeout=30)
+    at.run()
+    assert "Lokales Sprachmodell" in _check_knopf(at).help
+    assert "Lokales Sprachmodell" in _ki_knopf(at).help

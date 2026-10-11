@@ -106,6 +106,13 @@ All schema changes go into the single `migrate_db()` function in `core/storage/b
 2. Add `st.Page(...)` entry in the correct section dict inside `app.py`'s `st.navigation()` call
 3. Add a smoke test in `tests/unit/` (AppTest pattern, see existing smoke tests)
 
+## KI-Knöpfe
+
+Jeder Knopf, der ein Sprachmodell aufruft, geht über `core/ui/ki.py::ki_knopf` (`wo="lokal"`
+oder `"cloud"`): ein Stern für alle, grün lokal, blau Cloud, der Tooltip sagt es in Worten.
+Ein lokaler Knopf ist ohne erreichbares Ollama grau mit Hinweis (`core/ui/lokales_modell.py`).
+Warum: Wer klickt, soll vorher sehen, ob die Anfrage den Rechner verlässt.
+
 ## Toolchain
 
 **Python >= 3.10 erforderlich** (`.venv` läuft auf 3.11.15 via Homebrew). Streamlit >= 1.51 und

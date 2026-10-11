@@ -21,6 +21,7 @@ from core.asset_class_config import get_asset_class_registry
 from core.figi import RELEVANT_EXCH, openfigi_lookup, to_yahoo_ticker
 from core.i18n import t
 from core.storage.models import Position
+from core.ui.ki import ki_knopf
 from state import get_analysis_service, get_app_config_repo, get_market_agent, get_market_repo, get_position_story_service, get_positions_repo, get_skills_repo
 
 st.set_page_config(page_title="Positionen", page_icon="📋", layout="wide")
@@ -226,7 +227,7 @@ def _render_edit_form(pos_id: int | None, readonly: bool = False):
     _current_story = st.session_state.get("_pos_form_story") or ""
 
     _btn_label = t("positionen.story_update_button") if _current_story else t("positionen.story_suggest_button")
-    if _suggest_name and st.button(_btn_label, key="_pos_story_gen"):
+    if _suggest_name and ki_knopf(_btn_label, wo="cloud", key="_pos_story_gen"):
         _story_err = None
         with st.spinner(t("positionen.story_suggest_spinner")):
             try:

@@ -96,8 +96,12 @@ def _verdict_eintrag(u: Urteil) -> tuple[str, str]:
 
 
 def urteil_label(u: Urteil) -> str:
-    """Der Text eines Kästchens: "Fundamental Fair Value"."""
-    return f"{_agent(u.agent)} {_verdict_eintrag(u)[1]}"
+    """Der Text eines Kästchens, als halber Satz: "Story gefährdet", "Konsens stabil". Das Urteil
+    klein, ausser es traegt selbst Grossbuchstaben ("Fair Value") -- dann ist es ein Begriff."""
+    wort = _verdict_eintrag(u)[1]
+    if wort[1:] == wort[1:].lower():
+        wort = wort[:1].lower() + wort[1:]
+    return f"{_agent(u.agent)} {wort}"
 
 
 def urteile_sortiert(k: Kachel) -> list[Urteil]:
