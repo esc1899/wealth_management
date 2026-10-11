@@ -157,7 +157,9 @@ def inhalt_html(k: Kachel) -> str:
         rendite = f"{k.dividende_prozent:.1f}".replace(".", ",")
         chips.append(f'<span class="wk-chip">{rendite} % {escape(t("kacheln.dividende"))}</span>')
 
-    if k.grund == "bewegung":
+    if k.grund == "bewegung" and k.bewegung_grund:
+        satz = t("kacheln.bewegung_grund").format(prozent=prozent(k.tag_prozent), grund=k.bewegung_grund)
+    elif k.grund == "bewegung":
         satz = t("kacheln.bewegung").format(prozent=prozent(k.tag_prozent))
     elif k.grund == "nie":
         satz = t("kacheln.nie")
@@ -165,7 +167,9 @@ def inhalt_html(k: Kachel) -> str:
         satz = k.satz or t("kacheln.ohne_satz")
 
     quelle = ""
-    if k.satz_agent and k.grund != "bewegung":
+    if k.grund == "bewegung" and k.bewegung_grund:
+        quelle = f'<div class="wk-quelle">{escape(t("kacheln.agent_news"))}</div>'
+    elif k.satz_agent and k.grund != "bewegung":
         datum = f", {fmt_date(k.satz_datum)}" if k.satz_datum else ""
         quelle = f'<div class="wk-quelle">{escape(_agent(k.satz_agent))}{escape(datum)}</div>'
 
@@ -208,7 +212,11 @@ def karte(k: Kachel, art: str, position=None) -> None:
 def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:
     """Die Kacheln zu ``positionen`` (mit Ticker und ID), unsortiert. Auch die Titelseite baut
     ihren Kopf daraus, damit dort derselbe Satz steht wie auf der Kachel."""
-    from state import get_analysis_service, get_app_config_repo, get_market_agent, get_market_repo
+    from datetime import date as _date
+
+    from state import (get_analysis_service, get_app_config_repo, get_market_agent, get_market_repo,
+                       get_news_repo)
+    from core import bewegung
     from core.pruefung import auswahl
 
     # Nur gespeicherte Bewertungen — die Seite holt keine Kurse (das tun Kachel- und Kurs-Job).
@@ -221,6 +229,9 @@ def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:
     analysen = get_analysis_service()
     ids = [p.id for p in positionen]
     agenten = auswahl(get_app_config_repo(), art)
+    schwelle = bewegung.schwelle(get_app_config_repo())
+    # Der Grund einer starken Bewegung: was der Job kurse heute fuer den Titel gesucht hat.
+    gesucht = bewegung.heute_gesucht(get_news_repo().list_runs(limit=30), _date.today())
     je_agent = {a: analysen.get_verdicts(ids, a) for a in agenten}
 
     kacheln = []
@@ -234,7 +245,9 @@ def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:
             # Gespeicherter Schlusskurs am Aufnahmetag (oder der letzte davor) -- nie geholt.
             aufnahme = markt.get_price_for_date_or_prior(p.ticker, p.added_date.isoformat(), max_days_back=7)
         urteile = {a: je_agent[a][p.id] for a in agenten if p.id in je_agent[a]}
-        kacheln.append(kachel(p, art, v, urteile, vortag, aufnahme, agenten=agenten))
+        lauf = gesucht.get((p.ticker or "").upper())
+        kacheln.append(kachel(p, art, v, urteile, vortag, aufnahme, agenten=agenten, schwelle=schwelle,
+                              bewegung_grund=bewegung.grund(lauf.result, p.ticker) if lauf else None))
     return kacheln
 
 

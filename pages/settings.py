@@ -86,10 +86,17 @@ with tab_generell:
                         format_func=lambda n: n or t("settings.pruefung_skill_standard"),
                         key=f"pruefung_skill_{_liste}_{_check}",
                     )
+        # Ab wann ein Titel als stark bewegt gilt: Kachel und Job kurse lesen dieselbe Schwelle.
+        from core import bewegung
+        _schwelle = st.number_input(t("settings.bewegung_label"), min_value=0.5, max_value=50.0,
+                                    value=float(bewegung.schwelle(_cfg)), step=0.5, format="%.1f",
+                                    help=t("settings.bewegung_hilfe").format(deckel=bewegung.DECKEL),
+                                    key="pruefung_bewegung")
         if st.form_submit_button(t("settings.pruefung_speichern")):
             for _liste, _checks in _neu.items():
                 auswahl_setzen(_cfg, _liste, _checks)
                 skills_setzen(_cfg, _liste, _neue_skills[_liste])
+            bewegung.schwelle_setzen(_cfg, _schwelle)
             st.success(t("settings.pruefung_gespeichert"))
 
     st.divider()

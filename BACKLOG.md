@@ -82,25 +82,6 @@ Offen:
 Offen fuer Erik: ob Marktdaten unter Einstellungen gehoert (heute auch zum Nachsehen einzelner Kurse
 genutzt?).
 
-## Nachrichten bei grossen Kursbewegungen (10.10.2026)
-
-Der News Digest sucht heute nur einmal im Monat. Bewegt sich ein Titel stark (die Kacheln
-nennen ab 4 % am Tag "Starke Bewegung heute"), steht auf der Kachel nur die Zahl, nicht der
-Grund. Frage: Soll eine starke Bewegung eine Suche nur fuer diesen Titel ausloesen, damit die
-Kachel den Grund nennen kann?
-
-Was dabei zu klaeren ist:
-- Ausloeser im Job `kurse` (taeglich 18:05), nie beim Oeffnen der Seite: Die Kachel misst und
-  sucht nicht (Hausregel).
-- Kosten: eine Websuche je Ausreisser, mit einem Deckel je Tag. Als Batch kaeme das Ergebnis
-  erst am naechsten Morgen.
-- Nur Ticker und Name gehen an das Cloud-Modell, wie beim News Digest heute, nie Stueckzahlen
-  (Privacy-Grenze, CLAUDE.md). Fuer Lotsee gilt strenger: auch nicht, ob ein Titel gehalten
-  wird (lotsee `docs/plan.md`, "Kandidat Wealth").
-
-Anlass (11.10.2026): Schneider Electric, Uebernahme angekuendigt, Kurs stark bewegt -- der Digest
-vom 01.10. wusste nichts davon. Erik hat den Punkt in den Fahrplan genommen, gleich als Naechstes.
-
 ## Suche: Kandidaten und gemerktes Nein (11.10.2026)
 
 Seit 11.10.2026 ist die Suche eine Seite (`pages/suche.py`, Fassung A des Entwurfs): oben die

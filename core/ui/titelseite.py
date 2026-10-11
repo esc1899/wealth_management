@@ -305,13 +305,16 @@ def _nachrichten(position) -> None:
     if not position.ticker:
         st.markdown(t("titelseite.ohne_ticker"))
         return
-    laeufe = get_news_repo().list_runs(limit=1)
+    laeufe = get_news_repo().list_runs(limit=30)
     if not laeufe:
         st.markdown(t("titelseite.news_keiner"))
         return
-    lauf = laeufe[0]
+    # Der juengste Lauf, der den Titel kennt: ein Digest oder die Suche nach einer starken
+    # Bewegung (core/bewegung.py). Bis 11.10.2026 nur der letzte Digest -- der kannte die
+    # Uebernahme bei Schneider Electric nicht.
+    lauf, abschnitt = next(((l, a) for l in laeufe if (a := news_abschnitt(l.result, position.ticker))),
+                           (laeufe[0], None))
     datum = fmt_date(lauf.created_at) if lauf.created_at else "?"
-    abschnitt = news_abschnitt(lauf.result, position.ticker)
     if not abschnitt:
         st.markdown(t("titelseite.news_nichts").format(datum=datum, ticker=position.ticker))
         return

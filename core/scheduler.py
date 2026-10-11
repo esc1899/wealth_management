@@ -849,6 +849,67 @@ class AgentSchedulerService:
         if cloud and len(fehler) == len(cloud):
             raise RuntimeError("; ".join(fehler))
 
+    def bewegungen_nachrichten(self, now: Optional[datetime] = None,
+                               aus: Callable[[str], None] = print) -> int:
+        """Fuer die staerksten Kursbewegungen des Tages Nachrichten nur zu diesem Titel suchen
+        (core/bewegung.py): ab der Schwelle der Einstellungen, hoechstens DECKEL je Tag, jeder
+        einmal -- idempotent ueber die Laeufe von heute. Live, nicht als Batch: Der Grund soll am
+        selben Abend auf der Kachel stehen. Nur Ticker und Name gehen an das Cloud-Modell.
+        Gibt die Zahl der Suchen zurueck."""
+        from agents.news_agent import NewsAgent
+        from core import bewegung
+        from core.llm.claude import WebsucheGescheitert
+        from core.storage.app_config import AppConfigRepository
+        from core.storage.market_data import MarketDataRepository
+
+        heute = (now or datetime.now()).date()
+        conn = self._open_conn()
+        try:
+            enc = build_encryption_service(self._enc_key, self._salt_path)
+            positions_repo = PositionsRepository(conn, enc)
+            markt = MarketDataRepository(conn)
+            titel = {}
+            for p in positions_repo.get_portfolio() + positions_repo.get_watchlist():
+                if p.ticker and not p.analysis_excluded:
+                    titel.setdefault(p.ticker.upper(), p)
+            bewegt = {}
+            for ticker in titel:
+                preis = markt.get_price(ticker)
+                if preis is None:
+                    continue
+                vortag = preis.previous_close_eur or markt.get_prev_close(ticker)
+                bewegt[ticker] = bewegung.tagesbewegung(preis.price_eur, vortag)
+
+            news_repo = NewsRepository(conn)
+            schon = bewegung.heute_gesucht(news_repo.list_runs(limit=30), heute)
+            grenze = bewegung.schwelle(AppConfigRepository(conn))
+            auswahl = bewegung.staerkste(bewegt, grenze, schon)
+            if not auswahl:
+                aus(f"Bewegungen: keine neue ab {grenze:.1f} % (heute schon gesucht: {len(schon)}).")
+                return 0
+
+            model = self._resolve_model("news", "", conn)
+            agent = NewsAgent(llm=self._make_scheduled_llm("news_digest", model, conn))
+            gesucht = 0
+            for ticker, prozent in auswahl:
+                p = titel[ticker]
+                try:
+                    asyncio.run(agent.start_run(
+                        tickers=[p.ticker], ticker_names={p.ticker: p.name}, skill_name=bewegung.LAUF,
+                        skill_prompt=bewegung.auftrag(p.name, p.ticker, prozent),
+                        user_context=f"Starke Bewegung: {prozent:+.1f} %", repo=news_repo,
+                        websuche_pflicht=True))
+                    gesucht += 1
+                    aus(f"Bewegung {p.ticker} {prozent:+.1f} %: Nachrichten gesucht.")
+                except WebsucheGescheitert as exc:
+                    aus(f"Bewegung {p.ticker} {prozent:+.1f} %: {exc}")
+                except Exception as exc:
+                    logger.exception("Nachrichten zu %s", p.ticker)
+                    aus(f"Bewegung {p.ticker} {prozent:+.1f} %: fehlgeschlagen ({type(exc).__name__})")
+            return gesucht
+        finally:
+            conn.close()
+
     def volltexte_verfallen(self) -> int:
         """Volltexte aelter als die juengsten je Titel und Check loeschen, Urteile bleiben
         (core/storage/volltexte.py). Idempotent; laeuft im Job ``agenten``."""

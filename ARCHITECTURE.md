@@ -230,6 +230,11 @@ Ein Cloud-Modell je Bereich (Depot, Watchlist, Research; `core/pruefung.py::BERE
 `modell`/`modell_setzen`): Die Einstellungen schreiben die Einträge je Agent mit; im Durchgang
 reicht der Knopf `job["modell"]`, der Job `ScheduledJob.model` das Modell der Liste durch.
 
+Starke Kursbewegung (`core/bewegung.py`): Schwelle aus `app_config` (`bewegung_prozent`), von
+Kachel und Job `kurse` gelesen; der Job sucht live höchstens 3 Titel je Tag
+(`AgentSchedulerService.bewegungen_nachrichten`), gespeichert als News-Lauf „Bewegung“, den
+Kachel und Titelseite lesen.
+
 Volltexte verfallen, Urteile bleiben (`core/storage/volltexte.py`, im Job `agenten`): je Titel
 und Check die Texte der zwei jüngsten Urteile, ältere Sitzungen ohne Nachrichten; Dialoge nie.
 

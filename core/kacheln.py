@@ -8,7 +8,8 @@ Neues und startet keinen Check.
 Welcher Satz oben steht, entscheidet ein fester Vorrang, nicht der Agent:
 
 1. **gefährdet** — Storychecker "gefährdet" oder Devil's Advocate "kritisch"
-2. **Bewegung** — heute mindestens ``BEWEGUNG_PROZENT`` in eine Richtung
+2. **Bewegung** — heute mindestens die Schwelle (Einstellung, ``core/bewegung.py``) in eine
+   Richtung; seit 11.10.2026 mit dem Grund aus den Nachrichten, wenn der Job ihn gefunden hat
 3. **geprüft** — sonst der jüngste Satz irgendeines Checkers, mit Datum
 4. **nie geprüft** — ohne jedes Urteil; Blindzeit ist eine Aussage, kein "alles gut"
 
@@ -22,10 +23,12 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Iterable, Optional, Sequence
 
+from core.bewegung import STANDARD_PROZENT
 from core.pruefung import MOEGLICH
 
-#: Ab dieser Tagesbewegung (in Prozent, beide Richtungen) rückt sie nach oben.
-BEWEGUNG_PROZENT = 4.0
+#: Ab dieser Tagesbewegung (in Prozent, beide Richtungen) rückt sie nach oben -- solange die
+#: Einstellung nichts anderes sagt (core/bewegung.py::schwelle).
+BEWEGUNG_PROZENT = STANDARD_PROZENT
 
 #: Die Checks, die je Liste auf einer Kachel stehen können, in Anzeigereihenfolge. Welche davon
 #: tatsächlich stehen, sagt die Auswahl der Liste (core/pruefung.py).
@@ -66,6 +69,7 @@ class Kachel:
     dividende_prozent: Optional[float]
     urteile: list[Urteil] = field(default_factory=list)   # je Agent das juengste
     nie: list[str] = field(default_factory=list)          # gewaehlte Checks ohne Urteil
+    bewegung_grund: Optional[str] = None                  # warum er sich heute bewegt (Nachrichten)
 
 
 def _utc(ts: Optional[datetime]) -> Optional[datetime]:
@@ -87,7 +91,8 @@ def tagesprozent(day_pnl_pct: Optional[float], kurs: Optional[float],
 
 def kachel(position, art: str, valuation=None, urteile: Optional[dict] = None,
            vortag: Optional[float] = None, aufnahme_kurs: Optional[float] = None,
-           agenten: Optional[Sequence[str]] = None) -> Kachel:
+           agenten: Optional[Sequence[str]] = None, schwelle: float = BEWEGUNG_PROZENT,
+           bewegung_grund: Optional[str] = None) -> Kachel:
     """Eine Kachel aus Position, Bewertung (``PortfolioValuation`` oder None) und den
     jüngsten Urteilen je Agent (``{agent: PositionAnalysis}``). ``aufnahme_kurs``: der
     gespeicherte Schlusskurs am Tag, an dem der Titel auf die Watchlist kam. ``agenten``: die
@@ -110,7 +115,7 @@ def kachel(position, art: str, valuation=None, urteile: Optional[dict] = None,
                       reverse=True)
     if angriff:
         grund, quelle = "gefaehrdet", angriff[0]
-    elif tag is not None and abs(tag) >= BEWEGUNG_PROZENT:
+    elif tag is not None and abs(tag) >= schwelle:
         grund = "bewegung"
     elif mit_satz:
         grund, quelle = "geprueft", mit_satz[0]
@@ -139,6 +144,7 @@ def kachel(position, art: str, valuation=None, urteile: Optional[dict] = None,
                            if valuation and valuation.dividend_yield_pct else None),
         urteile=vorhanden,
         nie=[a for a in agenten if a not in {u.agent for u in vorhanden}],
+        bewegung_grund=bewegung_grund if grund == "bewegung" else None,
     )
 
 

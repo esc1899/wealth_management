@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Starke Kursbewegung: der Grund aus den Nachrichten — 2026-10-11
+
+**Warum:** Bei Schneider Electric war eine Übernahme angekündigt, der Kurs sprang -- die Kachel
+zeigte nur die Zahl, die Titelseite den Digest vom 01.10., der nichts davon wusste.
+
+**Änderungen:**
+- Job `kurse`: Nach dem Tagesabruf sucht er für die stärksten Bewegungen des Tages Nachrichten
+  nur zu diesem Titel (`core/scheduler.py::bewegungen_nachrichten`, `core/bewegung.py`): live,
+  höchstens 3 Titel je Tag, jeder einmal; nur Ticker und Name gehen an das Modell, die Suche ist
+  Pflicht. Modell: das des Depots.
+- Kachel: „Heute +6,2 %: <Grund>“ mit Quelle „Nachrichten“, wenn der Job ihn gefunden hat.
+- Titelseite: Nachrichten aus dem jüngsten Lauf, der den Titel kennt -- Digest oder Bewegung.
+- Einstellungen, Prüfung je Liste: „Starke Bewegung ab (% am Tag)“; Kachel und Job lesen dieselbe
+  Schwelle (vorher fest 4 %).
+
 ### Ein Cloud-Modell je Bereich: Depot, Watchlist, Research — 2026-10-11
 
 **Warum:** Seit der Prüfung je Liste laufen die Checks eines Titels zusammen, das Modell wählte

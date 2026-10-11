@@ -116,12 +116,15 @@ def agenten(dienst, batch_api: bool) -> int:
     return 1 if fehlgeschlagen or gebremst else 0
 
 
-def kurse(markt, fetch_hour: int) -> int:
+def kurse(markt, fetch_hour: int, dienst=None) -> int:
     if markt.tagesabruf_wenn_faellig(fetch_hour=fetch_hour):
         print("Tagesabruf gelaufen: Kurse mit Historie, Snapshots.")
     else:
         print(f"Nicht fällig: {fetch_hour:02d}:00 ist heute noch nicht erreicht, "
               f"oder der Tagesabruf lief seitdem schon.")
+    if dienst is not None:
+        # Der Grund starker Bewegungen (core/bewegung.py): je Titel einmal am Tag, live.
+        dienst.bewegungen_nachrichten()
     return 0
 
 
@@ -149,7 +152,7 @@ def main(argv: list[str]) -> int:
         # eingereichter Batch liegen bleiben. Ohne offene Batches kein Netz.
         return agenten(_agenten_dienst(), True)
     if args.job == "kurse":
-        return kurse(_marktdaten_agent(), config.MARKET_DATA_FETCH_HOUR)
+        return kurse(_marktdaten_agent(), config.MARKET_DATA_FETCH_HOUR, _agenten_dienst())
     return kosten(_agenten_dienst())
 
 

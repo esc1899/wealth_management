@@ -109,6 +109,7 @@ class NewsAgent:
         skill_prompt: str,
         user_context: str,
         repo: NewsRepository,
+        websuche_pflicht: bool = False,
     ) -> Tuple[NewsRun, str]:
         """
         Run a news digest, persist run + messages in DB, return (run, digest).
@@ -123,7 +124,7 @@ class NewsAgent:
         """
         self._llm.skill_context = skill_name
         self._llm.position_count = len(tickers)  # Track how many tickers in digest
-        digest = await self._run_digest(tickers, ticker_names, skill_name, skill_prompt)
+        digest = await self._run_digest(tickers, ticker_names, skill_name, skill_prompt, websuche_pflicht)
         run = repo.save_run(skill_name=skill_name, tickers=tickers, result=digest)
 
         user_message = user_context.strip() if user_context.strip() else (
@@ -189,6 +190,7 @@ class NewsAgent:
         ticker_names: Optional[dict[str, str]],
         skill_name: str,
         skill_prompt: str,
+        websuche_pflicht: bool = False,
     ) -> str:
         """Execute the web-search digest and return the markdown result."""
         if not tickers:
@@ -202,5 +204,6 @@ class NewsAgent:
             tools=[web_search_tool],
             system=system,
             max_tokens=4096,
+            websuche_pflicht=websuche_pflicht,
         )
         return response.content or "No news digest generated."
