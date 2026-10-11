@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Websuche: das Limit ist kein Ausfall — 2026-10-11
+
+**Warum:** Der zweite Test bei Schneider Electric brachte wieder „Websuche nicht verfügbar“. Das
+neue Log zeigte: 3 Suchen gelungen, 2 mit `max_uses_exceeded` abgewiesen. Sonnet las das Limit
+als Ausfall und verwarf Urteil und Ergebnisse; gespeichert wurde „unknown“.
+
+**Änderungen:**
+- Jeder Aufruf mit begrenzter Websuche, live und im Batch, sagt dem Modell, was
+  `max_uses_exceeded` heißt (`core/llm/claude.py::LIMIT_HINWEIS`).
+- Storychecker: 5 statt 3 Suchen.
+- Eine Suche ohne Treffer zählt nicht mehr als gelungen.
+- Storychecker ohne Ampel speichert nichts (`KeinUrteil`); der Knopf zeigt den Satz des Modells,
+  das belegte Urteil davor bleibt auf der Kachel. Im Batch ebenso.
+
 ### Starke Kursbewegung: der Grund aus den Nachrichten — 2026-10-11
 
 **Warum:** Bei Schneider Electric war eine Übernahme angekündigt, der Kurs sprang -- die Kachel

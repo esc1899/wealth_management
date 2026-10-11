@@ -1344,6 +1344,11 @@ class AgentSchedulerService:
         content = self._text_from_batch_message(result.result.message)
         if not content:
             return False
+        if _extract_verdict(content) == "unknown":
+            # Keine Ampel: nicht als "unknown" speichern, das alte Urteil bliebe sonst
+            # verdeckt (wie live, agents/storychecker_agent.py::KeinUrteil).
+            logger.warning("Batch storychecker %s: kein Ampel-Urteil, nicht gespeichert", cid)
+            return False
 
         pos = self._lookup_position(position_id, conn)
         pos_name = pos.name if pos else f"Position {position_id}"

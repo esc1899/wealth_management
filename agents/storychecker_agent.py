@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 
 # Server-side web search — Anthropic executes this, no client handling needed
-WEB_SEARCH_TOOL = {"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 3}
+WEB_SEARCH_TOOL = {"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 5}
 
 MAX_TOOL_ITERATIONS = 5
 
@@ -193,14 +193,7 @@ class StorycheckerAgent:
         response = self._run_llm(session.id, [{"role": "user", "content": initial_msg}], language=language,
                                  websuche_pflicht=True)
         # Persist structured result for trend tracking
-        self._analyses.save(
-            position_id=position.id,
-            agent="storychecker",
-            skill_name=skill_name,
-            verdict=_extract_verdict(response),
-            summary=_extract_summary(response),
-            session_id=session.id,
-        )
+        _urteil_speichern(self._analyses, position.id, skill_name, response, session.id)
         return session
 
     async def start_session_async(self, position: Position, language: str = "de") -> StorycheckerSession:
@@ -223,14 +216,7 @@ class StorycheckerAgent:
         self._storychecker.add_message(session.id, "user", initial_msg)
         response = await self._run_llm_async(session.id, [{"role": "user", "content": initial_msg}], language=language,
                                              websuche_pflicht=True)
-        self._analyses.save(
-            position_id=position.id,
-            agent="storychecker",
-            skill_name=skill_name,
-            verdict=_extract_verdict(response),
-            summary=_extract_summary(response),
-            session_id=session.id,
-        )
+        _urteil_speichern(self._analyses, position.id, skill_name, response, session.id)
         return session
 
     async def batch_check_all(self, positions: List[Position], language: str = "de") -> List[Tuple[str, str | None]]:
@@ -397,6 +383,26 @@ Schreibe nur die These selbst, keine Einleitung oder Überschrift."""
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
+
+class KeinUrteil(RuntimeError):
+    """Das Modell gab keine Ampel ab. Gespeichert wuerde "unknown" -- das alte, belegte Urteil
+    verschwaende von der Kachel. Der Satz des Modells steht in der Meldung."""
+
+
+def _urteil_speichern(analyses, position_id: int, skill_name: str, response: str, session_id: int) -> None:
+    verdict = _extract_verdict(response)
+    if verdict == "unknown":
+        satz = _extract_summary(response) or (response or "").strip()[:300]
+        raise KeinUrteil(f"kein Ampel-Urteil, nicht gespeichert: {satz}")
+    analyses.save(
+        position_id=position_id,
+        agent="storychecker",
+        skill_name=skill_name,
+        verdict=verdict,
+        summary=_extract_summary(response),
+        session_id=session_id,
+    )
 
 
 def _extract_verdict(text: str) -> str:

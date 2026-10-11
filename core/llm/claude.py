@@ -55,6 +55,13 @@ def tools_for_model(tools: list[dict], model: str) -> list[dict]:
     ]
 
 
+#: Steht in jedem Aufruf mit begrenzter Websuche (siehe chat_with_tools).
+LIMIT_HINWEIS = ("Zur Websuche: Du hast höchstens {n} Suchen. Meldet die Suche "
+                 "max_uses_exceeded, ist dieses Limit erreicht -- die Suche ist nicht ausgefallen. "
+                 "Urteile dann mit den Ergebnissen, die du schon hast, und erwähne das Limit nicht "
+                 "als Ausfall.")
+
+
 class WebsucheGescheitert(RuntimeError):
     """Ein Check sollte suchen, und keine einzige Suche kam durch. Sein Urteil beruhte nur auf
     dem Wissen des Modells -- ein Platzhalter, der auf der Kachel wie ein Befund aussähe. Darum
@@ -70,7 +77,11 @@ def websuche_bilanz(blocks) -> tuple[int, list[str]]:
             continue
         inhalt = getattr(b, "content", None)
         if isinstance(inhalt, list):
-            ok += 1
+            # Eine Suche ohne einen einzigen Treffer belegt nichts.
+            if inhalt:
+                ok += 1
+            else:
+                fehler.append("keine_treffer")
         else:
             code = getattr(inhalt, "error_code", None) or (inhalt.get("error_code") if isinstance(inhalt, dict) else None)
             fehler.append(code or "unbekannt")
@@ -272,6 +283,12 @@ class ClaudeProvider(LLMProvider):
         if _custom_endpoint:
             resolved_tools = [{k: v for k, v in t.items() if k != "strict"} for t in resolved_tools]
 
+        # Am 11.10.2026 las Sonnet das Limit (max_uses_exceeded) als "Websuche nicht verfuegbar"
+        # und verwarf drei gelungene Suchen samt Urteil. Darum sagt jeder Aufruf mit Suche, was
+        # das Limit heisst.
+        if _has_web_search and _web_search_max_uses:
+            system = (system + "\n\n" if system else "") + LIMIT_HINWEIS.format(n=_web_search_max_uses)
+
         kwargs: dict = {
             "model": self._model,
             "max_tokens": max_tokens,
@@ -400,7 +417,12 @@ class ClaudeProvider(LLMProvider):
         tools: list[dict],
         max_tokens: int,
     ) -> dict:
-        """Build one request dict for the Message Batches API."""
+        """Build one request dict for the Message Batches API. Wie live sagt eine Anfrage mit
+        begrenzter Websuche, was das Limit heisst (``LIMIT_HINWEIS``)."""
+        grenze = next((t.get("max_uses") for t in tools or []
+                       if t.get("type") in WEB_SEARCH_TYPES or t.get("name") == "web_search"), None)
+        if grenze:
+            system = (system + "\n\n" if system else "") + LIMIT_HINWEIS.format(n=grenze)
         params: dict = {"model": model, "max_tokens": max_tokens, "messages": messages}
         if system:
             params["system"] = system

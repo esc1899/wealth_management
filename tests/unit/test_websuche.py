@@ -122,3 +122,47 @@ def test_storychecker_speichert_ohne_beleg_kein_urteil():
     assert gesehen["websuche_pflicht"] is True
     assert "unavailable" in fehler
     assert PositionAnalysesRepository(conn).get_for_position(7) == []
+
+
+def test_leere_trefferliste_belegt_nichts():
+    leer = SimpleNamespace(type="web_search_tool_result", content=[])
+    assert websuche_bilanz([leer]) == (0, ["keine_treffer"])
+
+
+@pytest.mark.asyncio
+async def test_jeder_aufruf_mit_suche_sagt_was_das_limit_heisst():
+    """11.10.2026: Sonnet las max_uses_exceeded als Ausfall und verwarf drei gelungene Suchen."""
+    from core.llm.claude import LIMIT_HINWEIS
+    p = ClaudeProvider(api_key="k", model=CLAUDE_SONNET)
+    gesehen = {}
+
+    async def create(**kwargs):
+        gesehen.update(kwargs)
+        return _antwort([_text("ok")])
+    p._client.messages.create = create
+    await p.chat_with_tools(messages=[{"role": "user", "content": "x"}], system="Analyst.",
+                            tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 5}])
+    text = gesehen["system"][0]["text"]
+    assert text.startswith("Analyst.") and "max_uses_exceeded" in text and "höchstens 5" in text
+    anfrage = ClaudeProvider.build_batch_request(
+        "sc_1", CLAUDE_SONNET, "S.", [], [{"type": "web_search_20260209", "name": "web_search", "max_uses": 2}], 100)
+    assert LIMIT_HINWEIS.format(n=2) in anfrage["params"]["system"]
+
+
+def test_storychecker_ohne_ampel_speichert_nichts():
+    import sqlite3
+
+    from agents.storychecker_agent import KeinUrteil, _urteil_speichern
+    from core.storage.analyses import PositionAnalysesRepository
+    from core.storage.base import init_db, migrate_db
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_db(conn)
+    migrate_db(conn)
+    repo = PositionAnalysesRepository(conn)
+    with pytest.raises(KeinUrteil, match="nicht gespeichert"):
+        _urteil_speichern(repo, 1, "s", "Ein belastbares Ampel-Urteil ist nicht möglich.", 1)
+    assert repo.get_for_position(1) == []
+    _urteil_speichern(repo, 1, "s", "### Fazit\nHält. 🟢 Intakt", 1)
+    assert repo.get_for_position(1)[0].verdict == "intact"
