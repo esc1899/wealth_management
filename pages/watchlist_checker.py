@@ -390,31 +390,13 @@ if st.button(t("watchlist_checker.run_button"), key="check_watchlist_btn"):
     _lang = current_language()
 
     with st.spinner(t("watchlist_checker.checking_spinner")):
-        from collections import Counter
-        portfolio = _portfolio_service.get_portfolio_positions()
-
-        portfolio_snapshot = "## Portfolio Allocation (Josef's Regel)\n"
-        if portfolio:
-            counts = Counter(p.asset_class for p in portfolio if p.asset_class)
-            total = len(portfolio)
-            for asset_class, count in counts.most_common():
-                pct = 100 * count / total if total else 0
-                portfolio_snapshot += f"- {asset_class}: {count} Positionen ({pct:.0f}%)\n"
-        else:
-            portfolio_snapshot += t("watchlist_checker.empty_portfolio") + "\n"
-
-        story_analysis_text = None
-        story_analysis = portfolio_story_repo.get_latest_analysis()
-        if story_analysis:
-            story_analysis_text = f"""## Portfolio Story Context
-Story: {story_analysis.verdict}
-Summary: {story_analysis.summary}
-Performance: {story_analysis.perf_verdict} - {story_analysis.perf_summary}
-{t("watchlist_checker.stability_label")} {story_analysis.stability_verdict} - {story_analysis.stability_summary}
-
-Full Analysis:
-{story_analysis.full_text}
-"""
+        from core.pruefung import depot_kontext
+        portfolio_snapshot, story_analysis_text = depot_kontext(
+            _portfolio_service.get_portfolio_positions(),
+            portfolio_story_repo.get_latest_analysis(),
+            stabilitaet=t("watchlist_checker.stability_label"),
+            leer=t("watchlist_checker.empty_portfolio"),
+        )
 
         try:
             result = asyncio.run(

@@ -6,8 +6,9 @@ Reihenfolge hängt an der Art: Im Depot zuerst der Kurs (man besitzt den Titel),
 Watchlist zuerst die Urteile (man entscheidet über ihn). Unter dem Kurschart liegt auf derselben
 Zeitachse das Urteilsband -- je Check, welches Urteil wann galt (``core/titelseite.py``).
 
-Die Seite rechnet nichts Neues und startet von selbst keinen Check; nur der Knopf der
-Watchlist holt die Checks eines Titels neu, wie bisher.
+Die Seite rechnet nichts Neues und startet von selbst keinen Check; nur der Knopf "Jetzt
+checken" lässt einen Durchgang laufen -- die Auswahl der Liste für diesen Titel, ein Datum
+(``core/pruefung.py``). Derselbe Knopf steht auf der Kachel.
 """
 
 from __future__ import annotations
@@ -22,7 +23,6 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from core.i18n import current_language, fmt_date, t
-from core.kacheln import DEPOT_AGENTEN, WATCHLIST_AGENTEN
 from core.tagesbild import prozent
 from core.titelseite import (FARBE, FARBE_SONST, band, kurs_veraenderung, news_abschnitt,
                              symbol, urteile_zaehlen)
@@ -104,7 +104,7 @@ def _kurs(art: str, position) -> None:
         st.markdown(t("titelseite.kurs_satz").format(jahr=prozent(jahr), monat=prozent(monat)))
 
     von = verlauf[0].date if verlauf else heute - timedelta(days=365)
-    agenten = DEPOT_AGENTEN if art == "depot" else WATCHLIST_AGENTEN
+    agenten = auswahl_der_liste(art)
     strecken = band(get_analyses_repo().get_for_position(position.id, limit=1000), agenten, von, heute)
     if not verlauf and not strecken:
         return
@@ -190,7 +190,7 @@ def _urteile(art: str, position, offener_check: str | None) -> None:
     from state import get_analysis_service
 
     st.subheader(t("titelseite.urteile"))
-    agenten = DEPOT_AGENTEN if art == "depot" else WATCHLIST_AGENTEN
+    agenten = auswahl_der_liste(art)
     dienst = get_analysis_service()
     jeweils = {a: dienst.get_verdict(position.id, a) for a in agenten}
 
@@ -217,47 +217,51 @@ def _urteile(art: str, position, offener_check: str | None) -> None:
                 with st.expander(t("titelseite.volltext"), expanded=offener_check == agent):
                     llm_markdown(text)
 
-    # Auch im Depot (11.10.2026): Seit die Seiten der einzelnen Checks ausgeblendet sind, ist das
-    # der einzige Weg, einen Depot-Titel ausser der Reihe zu pruefen.
-    _checks_erneuern(position, jeweils)
+    jetzt_checken(art, position, jeweils, key="ts-checks")
 
 
-def _checks_erneuern(position, jeweils: dict) -> None:
-    """Alle fünf Cloud-Checks für diesen Titel neu, parallel -- in Depot und Watchlist."""
+def auswahl_der_liste(art: str) -> tuple[str, ...]:
+    """Die gewählten Checks der Liste (Einstellungen), in fester Reihenfolge."""
+    from core.pruefung import auswahl
+    from state import get_app_config_repo
+    return auswahl(get_app_config_repo(), art)
+
+
+def _veraltet(u, jetzt: datetime) -> bool:
+    if u is None or u.created_at is None:
+        return True
+    erstellt = u.created_at if u.created_at.tzinfo else u.created_at.replace(tzinfo=timezone.utc)
+    return (jetzt - erstellt).days >= 7
+
+
+def jetzt_checken(art: str, position, jeweils: dict, key: str, klein: bool = False) -> None:
+    """Der Knopf "Jetzt checken": ein Durchgang mit der Auswahl der Liste für diesen Titel
+    (``core/background_jobs.py::run_durchgang``). Auf der Titelseite und auf der Kachel;
+    ``jeweils`` = je Check das jüngste Urteil oder None."""
     from config import config
-    from core.background_jobs import (run_capital_allocator_job, run_consensus_gap_job,
-                                      run_devils_advocate_job, run_fundamental_job,
-                                      run_storychecker_job)
+    from core.background_jobs import run_durchgang
 
+    agenten = auswahl_der_liste(art)
+    if not agenten:
+        return
     jetzt = datetime.now(timezone.utc)
-
-    def alt(u) -> bool:
-        if u is None or u.created_at is None:
-            return True
-        erstellt = u.created_at if u.created_at.tzinfo else u.created_at.replace(tzinfo=timezone.utc)
-        return (jetzt - erstellt).days >= 7
-
-    jobs = [run_storychecker_job, run_consensus_gap_job, run_fundamental_job,
-            run_capital_allocator_job, run_devils_advocate_job]
-    agenten = ("storychecker", "consensus_gap", "fundamental_analyzer", "capital_allocator", "devils_advocate")
-    veraltet = sum(alt(jeweils.get(a)) for a in agenten)
+    veraltet = sum(_veraltet(jeweils.get(a), jetzt) for a in agenten)
     label = (t("titelseite.checks_erneuern_alt").format(n=veraltet) if veraltet
              else t("titelseite.checks_erneuern"))
-    if not ki_knopf(label, wo="cloud", key="ts-checks", type="primary" if veraltet else "secondary"):
+    if not ki_knopf(label, wo="cloud", key=key,
+                    type="primary" if veraltet and not klein else "secondary",
+                    width="stretch" if klein else "content"):
         return
 
-    sprache = current_language()
-    zustaende = []
-    for job in jobs:
-        z = {"running": True, "done": False, "count": 0, "error": None}
-        threading.Thread(target=job, daemon=True, args=(
-            [position], sprache, z, config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY,
-        )).start()
-        zustaende.append(z)
-    with st.spinner(t("watchlist_checker.running_parallel_spinner").format(n=len(jobs))):
-        while any(z["running"] for z in zustaende):
+    zustand = {"running": True, "done": False, "count": 0, "error": None}
+    threading.Thread(target=run_durchgang, daemon=True, args=(
+        position, art, agenten, current_language(), zustand,
+        config.DB_PATH, config.ENCRYPTION_KEY, config.LLM_API_KEY,
+    )).start()
+    with st.spinner(t("titelseite.checks_laufen").format(n=len(agenten), name=position.name)):
+        while zustand["running"]:
             time.sleep(1)
-    fehler = [z["error"] for z in zustaende if z["error"]]
+    fehler = zustand.get("fehler") or ([zustand["error"]] if zustand["error"] else [])
     for f in fehler:
         st.error(f)
     if not fehler:

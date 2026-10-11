@@ -726,6 +726,23 @@ def migrate_db(conn: sqlite3.Connection) -> None:
             "ALTER TABLE wealth_snapshots ADD COLUMN is_edited INTEGER NOT NULL DEFAULT 0"
         )
 
+    # Durchgang (11.10.2026): eine Pruefung eines Titels mit allen gewaehlten Checks, ein
+    # Datum (core/pruefung.py). Die Analysen bekommen die ID beim Abschluss
+    # (core/storage/durchgaenge.py); aeltere bleiben ohne.
+    conn.execute("""CREATE TABLE IF NOT EXISTS durchgaenge (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        liste       TEXT NOT NULL,
+        position_id INTEGER NOT NULL,
+        ausloeser   TEXT NOT NULL,
+        checks      TEXT NOT NULL,
+        begonnen    TEXT NOT NULL,
+        beendet     TEXT,
+        fehler      TEXT
+    )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_durchgaenge_position ON durchgaenge(position_id, begonnen)")
+    if "durchgang_id" not in {row[1] for row in conn.execute("PRAGMA table_info(position_analyses)")}:
+        conn.execute("ALTER TABLE position_analyses ADD COLUMN durchgang_id INTEGER")
+
     conn.commit()
 
 

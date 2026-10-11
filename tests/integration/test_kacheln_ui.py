@@ -82,6 +82,16 @@ def test_watchlist_ohne_urteil_sagt_nie_geprueft(depot_und_watchlist):
     assert len(karten) == 1 and "Noch nie geprüft." in karten[0]
 
 
+def test_kachel_zeigt_die_auswahl_und_jetzt_checken(depot_und_watchlist):
+    """Je gewaehlter Check ein Kaestchen, auch ohne Urteil; darunter der Knopf je Titel."""
+    rms = depot_und_watchlist["rms"]
+    at = _app("kacheln_watchlist.py")
+    at.run()
+    assert not at.exception, at.exception
+    knopf = next(b for b in at.button if b.key == f"wk-checken-{rms.id}")
+    assert knopf.label.startswith("Jetzt checken") and "Cloud" in knopf.help
+
+
 @pytest.mark.parametrize("seite,wer", [("position_dashboard.py", "muv"), ("watchlist_analysis.py", "rms")])
 def test_titelseite_zeigt_position_aus_der_adresse(depot_und_watchlist, seite, wer):
     """Der Absprung einer Kachel: ?position=&check= zeigt die Titelseite dieser Position."""
@@ -113,5 +123,5 @@ def test_titelseite_urteile_und_band(depot_und_watchlist):
     at.run()
     assert not at.exception, at.exception
     texte = " ".join(m.value for m in at.markdown)
-    assert "Von 5 Checks: 1 kritisch, 4 nie geprüft." in texte
+    assert "Von 4 Checks: 1 kritisch, 3 nie geprüft." in texte
     assert "nie geprüft" in texte

@@ -332,3 +332,92 @@ def run_devils_advocate_job(positions: list, language: str, job: dict, db_path: 
         loop.close()
         if conn:
             conn.close()
+
+
+def run_watchlist_checker_job(positions: list, language: str, job: dict, db_path: str, enc_key: str, api_key: str) -> None:
+    """Der Watchlist Checker (lokal, Ollama) fuer diese Titel: passen sie zum Depot? Liest die
+    Urteile der anderen Checks -- im Durchgang darum zuletzt (core/pruefung.py)."""
+    from core.pruefung import depot_kontext
+    from core.i18n import t
+    from state import get_portfolio_service, get_portfolio_story_repo, get_watchlist_checker_agent
+    count = 0
+    try:
+        job["agents"] = ["Watchlist Checker"]
+        valid = [p for p in positions if p.id]
+        snapshot, story = depot_kontext(
+            get_portfolio_service().get_portfolio_positions(),
+            get_portfolio_story_repo().get_latest_analysis(),
+            stabilitaet=t("watchlist_checker.stability_label"),
+            leer=t("watchlist_checker.empty_portfolio"),
+        )
+        _log_to_job(job, f"WatchlistCheckerAgent: {len(valid)} positions")
+        result = asyncio.run(get_watchlist_checker_agent().check_watchlist(
+            portfolio_snapshot=snapshot, watchlist_positions=valid,
+            story_analysis_text=story, selected_skill=None, language=language,
+        ))
+        count = len(result.position_fits)
+        error_msg = None if count else "Watchlist Checker: kein Urteil erhalten"
+        job.update({"running": False, "done": True, "count": count, "error": error_msg})
+    except Exception as exc:
+        logger.exception("Background Watchlist Checker job failed")
+        job.update({"running": False, "done": True, "count": count, "error": str(exc)})
+
+
+#: Je Check der Lauf im Hintergrund; alle mit derselben Signatur.
+CHECK_JOBS = {
+    "storychecker": run_storychecker_job,
+    "consensus_gap": run_consensus_gap_job,
+    "fundamental_analyzer": run_fundamental_job,
+    "capital_allocator": run_capital_allocator_job,
+    "devils_advocate": run_devils_advocate_job,
+    "watchlist_checker": run_watchlist_checker_job,
+}
+
+
+def _parallel(checks, position, language: str, db_path: str, enc_key: str, api_key: str) -> list[str]:
+    import threading
+
+    zustaende, threads = [], []
+    for check in checks:
+        z = {"running": True, "done": False, "count": 0, "error": None}
+        th = threading.Thread(target=CHECK_JOBS[check], daemon=True,
+                              args=([position], language, z, db_path, enc_key, api_key))
+        th.start()
+        zustaende.append(z)
+        threads.append(th)
+    for th in threads:
+        th.join()
+    return [z["error"] for z in zustaende if z["error"]]
+
+
+def run_durchgang(position, liste: str, checks, language: str, job: dict, db_path: str,
+                  enc_key: str, api_key: str, ausloeser: str = "knopf") -> None:
+    """Ein Durchgang fuer einen Titel: die gewaehlten Checks, ein Datum. Erst die Cloud-Checks
+    parallel, dann die, die deren Urteile lesen; ein scheiternder Check haelt die anderen nicht
+    auf. ``job`` wie bei den anderen Laeufen, dazu ``durchgang_id``."""
+    from core.pruefung import reihenfolge
+    from core.storage.durchgaenge import DurchgaengeRepository
+
+    conn = None
+    try:
+        conn = get_connection(db_path)
+        init_db(conn)
+        migrate_db(conn)
+        repo = DurchgaengeRepository(conn)
+        checks = tuple(checks)
+        durchgang_id = repo.beginnen(liste, position.id, ausloeser, checks)
+        job["durchgang_id"] = durchgang_id
+        fehler: list[str] = []
+        for stufe in reihenfolge(checks):
+            if stufe:
+                fehler += _parallel(stufe, position, language, db_path, enc_key, api_key)
+        zugeordnet = repo.abschliessen(durchgang_id, "; ".join(fehler) or None)
+        _log_to_job(job, f"Durchgang {durchgang_id}: {zugeordnet} Urteile, {len(fehler)} Fehler")
+        job.update({"running": False, "done": True, "count": zugeordnet, "error": None, "fehler": fehler})
+    except Exception as exc:
+        logger.exception("Durchgang failed")
+        job.update({"running": False, "done": True, "count": 0, "error": str(exc),
+                    "fehler": [str(exc)]})
+    finally:
+        if conn:
+            conn.close()

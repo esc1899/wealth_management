@@ -52,6 +52,31 @@ with tab_generell:
     st.divider()
 
     # ------------------------------------------------------------------
+    # Section: Pruefung je Liste (core/pruefung.py)
+    # ------------------------------------------------------------------
+
+    from core.pruefung import MOEGLICH, auswahl, auswahl_setzen
+
+    st.subheader(t("settings.pruefung_header"))
+    st.markdown(t("settings.pruefung_satz"))
+    _cfg = get_app_config_repo()
+    with st.form("pruefung_auswahl"):
+        _neu = {
+            _liste: st.multiselect(
+                t(f"settings.pruefung_{_liste}"), options=list(MOEGLICH[_liste]),
+                default=list(auswahl(_cfg, _liste)), format_func=lambda a: t(f"kacheln.agent_{a}"),
+                key=f"pruefung_{_liste}",
+            )
+            for _liste in MOEGLICH
+        }
+        if st.form_submit_button(t("settings.pruefung_speichern")):
+            for _liste, _checks in _neu.items():
+                auswahl_setzen(_cfg, _liste, _checks)
+            st.success(t("settings.pruefung_gespeichert"))
+
+    st.divider()
+
+    # ------------------------------------------------------------------
     # Section: System Health
     # ------------------------------------------------------------------
 

@@ -8,6 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Checks je Liste, Schritt 1: Auswahl und „Jetzt checken“ als Durchgang — 2026-10-11
+
+**Warum:** Die Checks eines Titels liefen einzeln, jedes Urteil hatte sein eigenes Datum, und die
+Kacheln zeigten fest verdrahtete Checks. Jetzt gehört je Liste eine Auswahl zu einer Prüfung,
+und ein Knopf lässt sie für einen Titel in einem Durchgang laufen (Erik, 10./11.10.2026).
+
+**Änderungen:**
+- Einstellungen, Generell: „Prüfung je Liste“ mit je einer Auswahl für Depot und Watchlist
+  (`core/pruefung.py`). Devil's Advocate gehört nur auf die Watchlist; im Depot stand er bisher
+  auf der Kachel, und der Knopf der Titelseite startete ihn, obwohl er Depot-Titel überspringt.
+- „Jetzt checken“ auf jeder Kachel und auf der Titelseite, in Depot und Watchlist: die Auswahl
+  für diesen Titel, Cloud-Checks parallel, der Watchlist Checker (lokal) zuletzt.
+- Kacheln und Titelseite zeigen genau die gewählten Checks; einer, der für den Titel nie lief,
+  steht als „<Check> nie geprüft“ da. Das Kästchen des Watchlist Checkers springt auf die
+  Titelseite statt auf seine ausgeblendete Seite.
+- **DB-Schema-Änderung:** Tabelle `durchgaenge`, Spalte `position_analyses.durchgang_id`
+  (Streamlit neu starten).
+- Den Kontext des Watchlist Checkers (Verteilung, Portfolio-Story) baut `depot_kontext()`,
+  die Seite und der Durchgang nutzen ihn gemeinsam.
+
 ### Suche: eine Seite mit Strategieauswahl und Einzeltitel — 2026-10-11
 
 **Warum:** Drei Seiten für eine Frage („was könnte ich neu kaufen?“) ließen erst die Seite

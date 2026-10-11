@@ -375,6 +375,12 @@ research_chat:
   analysing: "Analysing…"
 
 settings:
+  pruefung_header: "Checks per list"
+  pruefung_satz: "These checks make up one review. The tiles show exactly these, and “Check now” runs them for one title in a single pass."
+  pruefung_depot: "Portfolio"
+  pruefung_watchlist: "Watchlist"
+  pruefung_speichern: "Save selection"
+  pruefung_gespeichert: "Selection saved."
   tab_generell: "General"
   tab_lokal: "Local LLM"
   tab_cloud: "Cloud LLM"
@@ -1449,6 +1455,7 @@ portfolio_robustness:
 
 kacheln:
   nav_gruppe: "At a glance"
+  check_nie: "{check} never checked"
   nav_depot: "Portfolio"
   nav_watchlist: "Watchlist"
   titel_depot: "Positions"
@@ -1478,8 +1485,9 @@ lokales_modell:
   hinweis: "The AI draft needs a local language model. To set it up: install and start Ollama (ollama.com), pull a model (e.g. ollama pull qwen3:8b), then select it under System → Settings. Saving works without it."
 
 titelseite:
-  checks_erneuern: "Renew all checks"
-  checks_erneuern_alt: "Renew checks ({n} stale)"
+  checks_erneuern: "Check now"
+  checks_erneuern_alt: "Check now ({n} stale)"
+  checks_laufen: "{n} checks running for {name} …"
   zurueck_depot: "‹ Portfolio"
   zurueck_watchlist: "‹ Watchlist"
   ohne_titel: "No security selected"

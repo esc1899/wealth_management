@@ -148,5 +148,6 @@ class TestKaestchen:
         assert ziel("depot").endswith("pages/position_dashboard.py")
         assert ziel("depot", "devils_advocate").endswith("pages/position_dashboard.py")
         assert ziel("watchlist", "storychecker").endswith("pages/watchlist_analysis.py")
-        assert ziel("watchlist", "watchlist_checker").endswith("pages/watchlist_checker.py")
+        # Seit dem Durchgang (11.10.2026) auch der Watchlist Checker: seine Seite entfaellt.
+        assert ziel("watchlist", "watchlist_checker").endswith("pages/watchlist_analysis.py")
         assert Path(ziel("depot")).is_file()

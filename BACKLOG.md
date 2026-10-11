@@ -72,8 +72,7 @@ Statistiken unter Einstellungen.
 Offen:
 - **Titelseite nach dem Durchgang** (Erik, 10./11.10.2026; die Seite selbst steht seit
   11.10.2026, `core/ui/titelseite.py`): Ueber den Urteilen, was sich seit dem Durchgang davor
-  geaendert hat; der Knopf "Titel pruefen" auch im Depot, mit der Auswahl der Liste. Liegt,
-  bis der Durchgang gebaut ist (unten, "Checks je Liste").
+  geaendert hat. Schritt 3 von "Checks je Liste" (unten).
 - **Was die ausgeblendeten Check-Seiten noch konnten** (Storychecker, Fundamental, Konsens,
   seit 11.10.2026 aus dem Menue): je Einzelcheck einen Skill waehlen und im Storychecker und
   Fundamental Analyzer nachfragen (Chat). Die Titelseite prueft mit dem Skill aus dem
@@ -146,49 +145,39 @@ beim Aufraeumen ohnehin dran ist -- vorher lohnt es nicht, weil manche Seite ent
 
 ## Checks je Liste: eine Auswahl, ein Durchgang (10.10.2026)
 
-Heute laufen die Checks eines Titels einzeln: im Depot Storychecker, Fundamental und Consensus
-Gap je als eigener Job mit eigenem Takt, Capital Allocator und Devil's Advocate nur von Hand;
-auf der Watchlist startet der Knopf der Watchlist-Analyse alle fuenf zusammen. Darum hat jedes
-Urteil sein eigenes Datum, und alte stehen neben neuen.
+Seit 11.10.2026 steht Schritt 1: je Liste eine Auswahl (Einstellungen, `core/pruefung.py`),
+Kacheln und Titelseite zeigen genau sie, "Jetzt checken" auf Kachel und Titelseite laesst sie
+fuer einen Titel als Durchgang laufen (Tabelle `durchgaenge`). Devil's Advocate gehoert nur auf
+die Watchlist (Erik, 11.10.2026). Offen, in dieser Reihenfolge (Erik, 11.10.2026):
 
-Weg (Erik, 10.10.2026), wie spaeter in Lotsee:
-- **Je Liste (Depot, Watchlist) eine Einstellung, welche Checks zu einer Pruefung gehoeren**,
-  in fester Reihenfolge. Die Kaestchen der Kacheln zeigen genau diese Checks; einer, der fuer
-  den Titel nie lief, steht als "nie geprueft" da.
-- **Ausgeloest je Titel** von der Kachel oder der Titelseite ("Titel pruefen"), wie heute der
-  Knopf der Watchlist-Analyse. Ein Lauf ist ein **Durchgang**: alle gewaehlten Checks, ein
-  Datum; ein frueherer Durchgang ist eine alte Ausgabe der Titelseite.
-- **Eingeplant** ein Job je Liste im Scheduler ("Depot pruefen", "Watchlist pruefen"), der
-  genau die Auswahl der Liste fuer alle Titel laufen laesst. Die Agent-Jobs je Check fallen
-  weg, ebenso die Sonderregel `NUR_AUF_KNOPFDRUCK` (06.10.2026): Was laeuft, sagt die Auswahl.
-- **Die Seiten Portfolio Checker und Watchlist Checker entfallen.**
-
-Vorschlag, wartet auf Erik:
-- Der **Watchlist Checker** (lokal: passt der Titel zum Depot?) ist selbst ein Check und wird
-  ein Eintrag der Watchlist-Auswahl, standardmaessig an; nur seine Seite (Statusmatrix,
-  "alle fehlenden Checks") faellt weg.
-- Der **Portfolio Checker** prueft keinen Titel, sondern das Depot als Ganzes gegen die
-  Portfolio-Story (lokal). Er wird ein Depot-Check der Auswahl, laeuft im Depot-Job mit und
-  steht als ein Satz oben auf der Depot-Kachelseite.
-
-Zu bauen:
-- Eine Tabelle der Durchgaenge (Liste, Titel, Ausloeser Knopf/Job, Beginn, Ende) und eine
-  Spalte `durchgang_id` an den Analysen (`position_analyses` und die Tabellen der lokalen
-  Checker); Migration in `migrate_db()`. Aeltere Analysen ohne Durchgang werden je Titel und
-  Tag zusammengefasst und stehen als "einzeln geprueft" unter den frueheren Pruefungen.
-- Die Auswahl je Liste im Code einmal, in der Datenbank gespeichert, auf der Seite
-  Einstellungen oder Scheduler bearbeitet -- nicht als zweite Liste neben `scheduled_jobs`.
+**Schritt 2: ein Job je Liste statt der Agent-Jobs.**
+- Im Scheduler "Depot pruefen" und "Watchlist pruefen", die genau die Auswahl der Liste fuer
+  alle Titel laufen lassen. Der Watchlist-Job wird angelegt, ist aber aus: Die Watchlist wird
+  geprueft, wenn Erik es will (06.10.2026). Die Agent-Jobs je Check fallen weg, ebenso
+  `NUR_AUF_KNOPFDRUCK`.
+- Der Skill je Check wandert in die Auswahl; heute kommt er noch aus dem Scheduler-Job des
+  Checks (`core/background_jobs.py::_resolve_skill`).
 - Batch-Laeufe kommen erst am naechsten Morgen zurueck; der Durchgang ist erst fertig, wenn
-  alle Antworten da sind, und meldet bis dahin `wartet` (Hausregel).
-- **Volltexte verfallen, Urteile bleiben** (Erik, 11.10.2026: die Texte sind irgendwann
-  Schnee von gestern, die Entwicklung der Urteile nicht). Urteil und Satz in
-  `position_analyses` bleiben fuer immer -- der Urteils-Rueckblick und das Band auf der
-  Titelseite leben davon. Die Volltexte (letzte Antwort in den Sitzungen der Agenten)
-  loescht ein idempotenter Job; Vorschlag: behalten fuer die letzten zwei Durchgaenge eines
-  Titels, aelter weg. Nur Batch-Sitzungen der Checks, nie Dialoge (Fundamental Analyzer
-  Chat). Was weg ist, liegt noch in der Sicherung.
+  alle Antworten da sind (`DurchgaengeRepository.abschliessen` beim Abholen), und meldet bis
+  dahin `wartet` (Hausregel).
+- Der **Portfolio Checker** (lokal, Ollama) laeuft am Ende des Depot-Jobs: Er arbeitet mit den
+  vorhandenen Urteilen der gewaehlten Checks und der Portfolio-Story (Erik, 11.10.2026; pruefen,
+  was er heute genau liest). Sein Ergebnis steht als ein Satz oben auf der Depot-Kachelseite.
+- Die Seiten Portfolio Checker und Watchlist Checker entfallen danach.
 - Bleiben eigene Jobs, weil sie keinen Titel pruefen: Sektor-Rotation, News Digest,
   Strukturwandel, Investment-Suche, Snapshots und Rueckblicke.
+
+**Schritt 3: Titelseite nach dem Durchgang** (oben, "Kacheln loesen die alten Ansichten ab").
+Aeltere Analysen ohne Durchgang werden je Titel und Tag zusammengefasst und stehen als
+"einzeln geprueft" unter den frueheren Pruefungen.
+
+**Schritt 4: Volltexte verfallen, Urteile bleiben** (Erik, 11.10.2026: die Texte sind
+irgendwann Schnee von gestern, die Entwicklung der Urteile nicht). Urteil und Satz in
+`position_analyses` bleiben fuer immer -- der Urteils-Rueckblick und das Band auf der
+Titelseite leben davon. Die Volltexte (letzte Antwort in den Sitzungen der Agenten) loescht ein
+idempotenter Job; Vorschlag: behalten fuer die letzten zwei Durchgaenge eines Titels, aelter
+weg. Nur Batch-Sitzungen der Checks, nie Dialoge (Fundamental Analyzer Chat). Was weg ist,
+liegt noch in der Sicherung.
 
 ## Wertzuwachs "Kurs vs. Anteile" mit echten Daten pruefen (10.10.2026)
 

@@ -34,8 +34,6 @@ _SEITEN = Path(__file__).resolve().parents[2] / "pages"
 ANALYSE = {"depot": str(_SEITEN / "position_dashboard.py"), "watchlist": str(_SEITEN / "watchlist_analysis.py")}
 #: Zurück von der Titelseite auf die Kacheln.
 KACHELN = {"depot": str(_SEITEN / "kacheln_depot.py"), "watchlist": str(_SEITEN / "kacheln_watchlist.py")}
-#: Checks mit eigener Seite statt einer Karte in der Analyse.
-EIGENE_SEITE = {"watchlist_checker": str(_SEITEN / "watchlist_checker.py")}
 
 _SPALTEN = 3
 _FARBE_SONST = "#5E6B7A"
@@ -110,8 +108,9 @@ def urteile_sortiert(k: Kachel) -> list[Urteil]:
 
 
 def ziel(art: str, agent: Optional[str] = None) -> str:
-    """Die Seite, auf die Titel (agent=None) oder Kästchen springen."""
-    return EIGENE_SEITE.get(agent, ANALYSE[art]) if agent else ANALYSE[art]
+    """Die Seite, auf die Titel (agent=None) oder Kästchen springen: die Titelseite, die mit
+    ``check`` den angeklickten Check aufklappt."""
+    return ANALYSE[art]
 
 
 def farbe(anlageklasse: str) -> str:
@@ -175,16 +174,17 @@ def inhalt_html(k: Kachel) -> str:
         f'<div class="wk-notiz {_NOTIZ[k.grund]}">{escape(satz)}</div>{quelle}'
 
 
-def karte(k: Kachel, art: str) -> None:
-    """Eine Kachel: farbiger Kopf mit Name (Absprung), Anlageart und Ticker; darunter Inhalt
-    und die Kästchen."""
+def karte(k: Kachel, art: str, position=None) -> None:
+    """Eine Kachel: farbiger Kopf mit Name (Absprung), Anlageart und Ticker; darunter Inhalt,
+    die Kästchen der gewählten Checks (auch der nie gelaufenen) und mit ``position`` der Knopf
+    "Jetzt checken"."""
     st.markdown(farbe_css(k, farbe(k.anlageklasse)), unsafe_allow_html=True)
     with st.container(key=f"wk-karte-{k.position_id}"):
         with st.container(key=f"wk-kopf-{k.position_id}"):
             st.page_link(ziel(art), label=k.name, query_params={"position": k.position_id})
             st.markdown(unter_html(k), unsafe_allow_html=True)
         st.markdown(inhalt_html(k), unsafe_allow_html=True)
-        if k.urteile:
+        if k.urteile or k.nie:
             # Untereinander und volle Breite: alle Kaestchen gleich gross, nie zwei in einer Reihe.
             with st.container(key=f"wk-urteile-{k.position_id}"):
                 for u in urteile_sortiert(k):
@@ -192,13 +192,24 @@ def karte(k: Kachel, art: str) -> None:
                         ziel(art, u.agent), label=urteil_label(u), icon=_verdict_eintrag(u)[0],
                         query_params={"position": k.position_id, "check": u.agent}, width="stretch",
                     )
+                # Blindzeit ist eine Aussage: ein gewaehlter Check, der fuer den Titel nie lief.
+                for agent in k.nie:
+                    st.page_link(
+                        ziel(art, agent), label=t("kacheln.check_nie").format(check=_agent(agent)),
+                        icon="⚪", query_params={"position": k.position_id, "check": agent},
+                        width="stretch",
+                    )
+        if position is not None:
+            from core.ui.titelseite import jetzt_checken
+            jetzt_checken(art, position, {u.agent: u for u in k.urteile},
+                          key=f"wk-checken-{k.position_id}", klein=True)
 
 
 def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:
     """Die Kacheln zu ``positionen`` (mit Ticker und ID), unsortiert. Auch die Titelseite baut
     ihren Kopf daraus, damit dort derselbe Satz steht wie auf der Kachel."""
-    from state import get_analysis_service, get_market_agent, get_market_repo
-    from core.kacheln import DEPOT_AGENTEN, WATCHLIST_AGENTEN
+    from state import get_analysis_service, get_app_config_repo, get_market_agent, get_market_repo
+    from core.pruefung import auswahl
 
     # Nur gespeicherte Bewertungen — die Seite holt keine Kurse (das tun Kachel- und Kurs-Job).
     bewertungen = {
@@ -209,7 +220,7 @@ def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:
     markt = get_market_repo()
     analysen = get_analysis_service()
     ids = [p.id for p in positionen]
-    agenten = DEPOT_AGENTEN if art == "depot" else WATCHLIST_AGENTEN
+    agenten = auswahl(get_app_config_repo(), art)
     je_agent = {a: analysen.get_verdicts(ids, a) for a in agenten}
 
     kacheln = []
@@ -223,7 +234,7 @@ def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:
             # Gespeicherter Schlusskurs am Aufnahmetag (oder der letzte davor) -- nie geholt.
             aufnahme = markt.get_price_for_date_or_prior(p.ticker, p.added_date.isoformat(), max_days_back=7)
         urteile = {a: je_agent[a][p.id] for a in agenten if p.id in je_agent[a]}
-        kacheln.append(kachel(p, art, v, urteile, vortag, aufnahme))
+        kacheln.append(kachel(p, art, v, urteile, vortag, aufnahme, agenten=agenten))
     return kacheln
 
 
@@ -244,6 +255,7 @@ def seite(art: str) -> None:
         return
 
     kacheln = sortiert(kacheln_fuer(art, positionen))
+    je_id = {p.id: p for p in positionen}
 
     zahl = {g: sum(1 for k in kacheln if k.grund == g) for g in ("gefaehrdet", "bewegung", "nie")}
     st.markdown(f'<div class="wk-zaehler">{escape(t("kacheln.zaehler").format(**zahl))}</div>',
@@ -256,4 +268,4 @@ def seite(art: str) -> None:
         spalten = st.columns(_SPALTEN)
         for spalte, k in zip(spalten, kacheln[start:start + _SPALTEN]):
             with spalte:
-                karte(k, art)
+                karte(k, art, je_id[k.position_id])

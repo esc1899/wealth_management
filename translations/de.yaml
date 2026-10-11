@@ -375,6 +375,12 @@ research_chat:
 
 settings:
   tab_generell: "Generell"
+  pruefung_header: "Prüfung je Liste"
+  pruefung_satz: "Diese Checks gehören zu einer Prüfung. Die Kacheln zeigen genau sie, und „Jetzt checken“ lässt sie für einen Titel in einem Durchgang laufen."
+  pruefung_depot: "Depot"
+  pruefung_watchlist: "Watchlist"
+  pruefung_speichern: "Auswahl speichern"
+  pruefung_gespeichert: "Auswahl gespeichert."
   tab_lokal: "Lokale LLM"
   tab_cloud: "Cloud LLM"
   title: "Einstellungen"
@@ -1447,6 +1453,7 @@ portfolio_robustness:
 
 kacheln:
   nav_gruppe: "Auf einen Blick"
+  check_nie: "{check} nie geprüft"
   nav_depot: "Depot"
   nav_watchlist: "Watchlist"
   titel_depot: "Positionen"
@@ -1476,8 +1483,9 @@ lokales_modell:
   hinweis: "Für den KI-Entwurf braucht es ein lokales Sprachmodell. Einrichten: Ollama installieren und starten (ollama.com), ein Modell laden (z. B. ollama pull qwen3:8b), dann unter System → Einstellungen auswählen. Speichern geht auch ohne."
 
 titelseite:
-  checks_erneuern: "Alle Checks erneuern"
-  checks_erneuern_alt: "Checks erneuern ({n} veraltet)"
+  checks_erneuern: "Jetzt checken"
+  checks_erneuern_alt: "Jetzt checken ({n} veraltet)"
+  checks_laufen: "{n} Checks für {name} laufen …"
   zurueck_depot: "‹ Depot"
   zurueck_watchlist: "‹ Watchlist"
   ohne_titel: "Kein Titel gewählt"

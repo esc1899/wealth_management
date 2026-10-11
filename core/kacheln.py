@@ -20,16 +20,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Sequence
+
+from core.pruefung import MOEGLICH
 
 #: Ab dieser Tagesbewegung (in Prozent, beide Richtungen) rückt sie nach oben.
 BEWEGUNG_PROZENT = 4.0
 
-#: Die Agenten, deren Urteile auf einer Kachel stehen können, in Anzeigereihenfolge.
-DEPOT_AGENTEN = ("storychecker", "fundamental_analyzer", "consensus_gap",
-                 "capital_allocator", "devils_advocate")
-WATCHLIST_AGENTEN = ("watchlist_checker", "devils_advocate", "fundamental_analyzer",
-                     "capital_allocator", "consensus_gap", "storychecker")
+#: Die Checks, die je Liste auf einer Kachel stehen können, in Anzeigereihenfolge. Welche davon
+#: tatsächlich stehen, sagt die Auswahl der Liste (core/pruefung.py).
+DEPOT_AGENTEN = MOEGLICH["depot"]
+WATCHLIST_AGENTEN = MOEGLICH["watchlist"]
 
 # Urteile, die die These angreifen. Der Storychecker hat beide Schreibweisen abgelegt.
 _GEFAEHRDET = {("storychecker", "gefährdet"), ("storychecker", "gefaehrdet"),
@@ -64,6 +65,7 @@ class Kachel:
     kurs_eur: Optional[float]
     dividende_prozent: Optional[float]
     urteile: list[Urteil] = field(default_factory=list)   # je Agent das juengste
+    nie: list[str] = field(default_factory=list)          # gewaehlte Checks ohne Urteil
 
 
 def _utc(ts: Optional[datetime]) -> Optional[datetime]:
@@ -84,11 +86,14 @@ def tagesprozent(day_pnl_pct: Optional[float], kurs: Optional[float],
 
 
 def kachel(position, art: str, valuation=None, urteile: Optional[dict] = None,
-           vortag: Optional[float] = None, aufnahme_kurs: Optional[float] = None) -> Kachel:
+           vortag: Optional[float] = None, aufnahme_kurs: Optional[float] = None,
+           agenten: Optional[Sequence[str]] = None) -> Kachel:
     """Eine Kachel aus Position, Bewertung (``PortfolioValuation`` oder None) und den
     jüngsten Urteilen je Agent (``{agent: PositionAnalysis}``). ``aufnahme_kurs``: der
-    gespeicherte Schlusskurs am Tag, an dem der Titel auf die Watchlist kam."""
-    agenten = DEPOT_AGENTEN if art == "depot" else WATCHLIST_AGENTEN
+    gespeicherte Schlusskurs am Tag, an dem der Titel auf die Watchlist kam. ``agenten``: die
+    Auswahl der Liste; ohne sie alles, was die Liste kennt."""
+    if agenten is None:
+        agenten = MOEGLICH[art]
     vorhanden = [
         Urteil(a, u.verdict, u.summary, _utc(u.created_at))
         for a in agenten
@@ -133,6 +138,7 @@ def kachel(position, art: str, valuation=None, urteile: Optional[dict] = None,
         dividende_prozent=(valuation.dividend_yield_pct * 100
                            if valuation and valuation.dividend_yield_pct else None),
         urteile=vorhanden,
+        nie=[a for a in agenten if a not in {u.agent for u in vorhanden}],
     )
 
 

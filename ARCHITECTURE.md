@@ -130,6 +130,7 @@ sequenceDiagram
 | **ConsensusGapRepository** | Consensus gap sessions | `consensus_gap_sessions`, `consensus_gap_messages` |
 | **CapitalAllocatorRepository** | Capital allocator quality sessions | `capital_allocator_sessions`, `capital_allocator_messages` |
 | **PositionAnalysesRepository** | Verdicts for all checker agents | `position_analyses` |
+| **DurchgaengeRepository** | One review of a title: all selected checks, one date | `durchgaenge` (+ `position_analyses.durchgang_id`) |
 | **StructuralScansRepository** | Structural change scan runs | `structural_scan_runs`, `structural_scan_messages` |
 | **WealthSnapshotRepository** | Historical portfolio snapshots | `wealth_snapshots` |
 | **ScheduledJobsRepository** | Periodic agent runs + run history | `scheduled_jobs`, `scheduled_job_runs` |
@@ -202,6 +203,19 @@ repo.add(PositionAnalysis(
 verdicts = repo.get_latest_bulk(position_ids=[...], agent="storychecker")
 # returns Dict[position_id, PositionAnalysis]
 ```
+
+### 3a. Durchgang: eine Auswahl je Liste (2026-10-11)
+Welche Checks zu einer Prüfung gehören, steht je Liste in `app_config`
+(`pruefung_auswahl_depot`, `pruefung_auswahl_watchlist`), gelesen über
+`core/pruefung.py::auswahl` und bearbeitet auf der Seite Einstellungen. Möglich ist je Liste
+eine feste Reihe (`MOEGLICH`); Devil's Advocate nur auf der Watchlist. Kacheln und Titelseite
+zeigen genau die Auswahl, ein gewählter Check ohne Urteil steht als „nie geprüft“ da.
+
+„Jetzt checken“ (Kachel und Titelseite) ruft `core/background_jobs.py::run_durchgang`: einen
+Durchgang beginnen, die Cloud-Checks parallel, danach der Watchlist Checker (er liest deren
+Urteile), abschließen. Der Abschluss ordnet dem Durchgang per UPDATE die Analysen zu, die seit
+seinem Beginn für diesen Titel von seinen Checks ohne Durchgang entstanden sind -- kein Agent
+braucht dafür eine neue Signatur. Der eingeplante Job je Liste folgt (BACKLOG.md).
 
 ### 4. Session Persistence Pattern (Architektur-Guard)
 
