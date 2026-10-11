@@ -109,6 +109,33 @@ Was dabei zu klaeren ist:
 Liegt, weil sich erst zeigen soll, ob die Kacheln tragen (zusaetzlicher Menueeintrag seit
 10.10.2026).
 
+## Suche: Strategien, Kandidaten, Entscheidung (11.10.2026)
+
+Research und Strategie werden ein Abschnitt **Suche** unter Performance (Erik, 11.10.2026).
+Was eine Suche ist: ein Weg zu neuen Titeln, wie die Vorschlagsseiten der Serien ("drei Wege
+zu etwas Neuem"). Gedanken von Erik: verschiedene Strategien wie heute; die gezielte Suche
+nach einer Anlage ist auch eine; Ergebnisse kommen nur nach Auswahl auf die Watchlist.
+
+Vorschlag, wartet auf Erik:
+- **Je Strategie eine Seite** unter Suche: Strukturwandel (Scanner), Investment Search
+  (freie Suche, auch nach einer bestimmten Anlage), spaeter die Research-Inbox als "fremder
+  Tipp". Was keine Titel vorschlaegt, gehoert nicht dorthin: Tax Loss Harvesting (verkauft,
+  lokal) unter Performance; News Digest in Job und Titelseite (sie liest ihn schon);
+  Sektorrotation misst das Depot gegen die Sektorstroeme -- Performance oder Suche?
+- **Zwei Stufen.** Ein Lauf liefert Kandidaten als kleine Kacheln wie die Watchlist, mit
+  Link auf ihre Titelseite. "Genauer pruefen" laesst die Checks der Watchlist laufen
+  (Cloud, kostet je Kandidat Websuche -- darum per Knopf, nicht fuer alle). Dann "Auf die
+  Watchlist" oder "Nicht interessant".
+- **Ein Nein wird gemerkt**, wie abgebrochene Serien: mit Datum, Strategie und These, nie
+  geloescht, in einer Liste "Verworfen" mit "wieder aufnehmen". Die Strategien bekommen die
+  verworfenen und bekannten Ticker mit, damit sie sie nicht wieder vorschlagen.
+- **Technisch** ist ein Kandidat eine Position auf keiner der beiden Listen, mit Zustand
+  (neu, verworfen); so funktionieren Checks, Urteilsband und Titelseite ohne Umbau -- sie
+  haengen an der Positions-ID. Heute legen Search und Scanner die Auswahl direkt als
+  Watchlist-Position an (`add_from_proposal`).
+- **Reihenfolge:** Kandidaten sind eine dritte Liste mit eigener Auswahl an Checks; darum
+  nach "Checks je Liste". Das Umhaengen der Seiten in den Abschnitt Suche geht vorher.
+
 ## Uebrige KI-Knoepfe auf den Stern umstellen (11.10.2026)
 
 Seit 11.10.2026 zeigt `core/ui/ki.py::ki_knopf` mit der Farbe des Sterns, ob ein Knopf lokal
