@@ -181,6 +181,8 @@ class FundamentalAnalyzerAgent:
         self._llm = llm
         self._skills_repo = skills_repo
         self._market = market_repo
+        # Je Titel, warum er kein Urteil bekam (z. B. Websuche gescheitert) -- fuer den Lauf.
+        self.fehler: list[str] = []
 
     @property
     def model(self) -> str:
@@ -230,7 +232,7 @@ class FundamentalAnalyzerAgent:
         self._fa_repo.add_message(session.id, "user", initial_msg)
 
         system = _build_system_prompt(position.asset_class, language, verdict_via=self._verdict_via())
-        cr = self._run_llm(session.id, language=language, system=system,
+        cr = self._run_llm(session.id, language=language, websuche_pflicht=True, system=system,
                            tools=self._initial_tools())
         self._fa_repo.add_message(session.id, "assistant", cr.content)
 
@@ -275,7 +277,7 @@ class FundamentalAnalyzerAgent:
     # LLM execution
     # ------------------------------------------------------------------
 
-    def _run_llm(self, session_id: int, language: str = "de",
+    def _run_llm(self, session_id: int, language: str = "de", websuche_pflicht: bool = False,
                  system: Optional[str] = None, tools: Optional[list] = None):
         """Execute LLM call (sync). Returns ClaudeResponse."""
         self._llm.skill_context = "fundamental_analyzer"
@@ -291,10 +293,11 @@ class FundamentalAnalyzerAgent:
                 tools=tools,
                 system=system,
                 max_tokens=_FA_MAX_TOKENS,
+                websuche_pflicht=websuche_pflicht,
             )
         )
 
-    async def _run_llm_async(self, session_id: int, language: str = "de",
+    async def _run_llm_async(self, session_id: int, language: str = "de", websuche_pflicht: bool = False,
                               system: Optional[str] = None, tools: Optional[list] = None):
         """Async version of _run_llm. Returns ClaudeResponse."""
         self._llm.skill_context = "fundamental_analyzer"
@@ -309,6 +312,7 @@ class FundamentalAnalyzerAgent:
             tools=tools,
             system=system,
             max_tokens=_FA_MAX_TOKENS,
+            websuche_pflicht=websuche_pflicht,
         )
 
     async def start_session_async(
@@ -338,7 +342,7 @@ class FundamentalAnalyzerAgent:
         self._fa_repo.add_message(session.id, "user", initial_msg)
 
         system = _build_system_prompt(position.asset_class, language, verdict_via=self._verdict_via())
-        cr = await self._run_llm_async(session.id, language=language, system=system,
+        cr = await self._run_llm_async(session.id, language=language, websuche_pflicht=True, system=system,
                                         tools=self._initial_tools())
         self._fa_repo.add_message(session.id, "assistant", cr.content)
 
@@ -379,6 +383,7 @@ class FundamentalAnalyzerAgent:
         Returns list of (position_id, verdict, summary).
         Verdicts are persisted in position_analyses under "fundamental_analyzer" agent.
         """
+        self.fehler = []
         eligible = [p for p in positions if p.ticker and p.id is not None]
         if not eligible:
             return []
@@ -397,6 +402,7 @@ class FundamentalAnalyzerAgent:
                     return (pos.id, verdict, summary)
                 except Exception as exc:
                     logger.warning("FA analyze_portfolio: error for %s: %s", pos.name, exc)
+                    self.fehler.append(f"{pos.name}: {exc}")
                     return None
 
         raw = await asyncio.gather(*[_analyze_one(pos) for pos in eligible])

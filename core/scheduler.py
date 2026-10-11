@@ -630,6 +630,8 @@ class AgentSchedulerService:
             skill_prompt=job.skill_prompt,
             language="de",
         )
+        for f in agent.fehler:
+            _log(f"ohne Urteil: {f}")
         _log(f"Konsens-Lücken abgeschlossen")
 
     async def _run_storychecker_job(self, job, conn, log_fn=None, positionen=None) -> None:
@@ -668,7 +670,9 @@ class AgentSchedulerService:
             llm=llm,
             skills_repo=skills_repo,
         )
-        await agent.batch_check_all(positions=positions, language="de")
+        for name, fehler in await agent.batch_check_all(positions=positions, language="de"):
+            if fehler:
+                _log(f"ohne Urteil: {name}: {fehler}")
         _log("Storychecker abgeschlossen")
 
     async def _run_fundamental_job(self, job, conn, log_fn=None, positionen=None) -> None:
@@ -707,6 +711,8 @@ class AgentSchedulerService:
             skill_prompt=job.skill_prompt,
             language="de",
         )
+        for f in agent.fehler:
+            _log(f"ohne Urteil: {f}")
         _log("Fundamental-Analyse abgeschlossen")
 
     async def _run_devils_advocate_job(self, job, conn, log_fn=None, positionen=None) -> None:
@@ -743,6 +749,8 @@ class AgentSchedulerService:
             skill_prompt=job.skill_prompt or "",
             language="de",
         )
+        for f in agent.fehler:
+            _log(f"ohne Urteil: {f}")
         _log(f"Devil's Advocate abgeschlossen: {len(results)} Verdicts")
 
     async def _run_capital_allocator_job(self, job, conn, log_fn=None, positionen=None) -> None:
@@ -776,6 +784,8 @@ class AgentSchedulerService:
                                       ca_repo=CapitalAllocatorRepository(conn))
         results = await agent.analyze_portfolio(positions=pub_positions, skill_name=skill_name,
                                                 skill_prompt=job.skill_prompt or "", language="de")
+        for f in agent.fehler:
+            _log(f"ohne Urteil: {f}")
         _log(f"Kapitalallokation abgeschlossen: {len(results)} Verdicts")
 
     # ------------------------------------------------------------------
@@ -1205,6 +1215,16 @@ class AgentSchedulerService:
                     errors += 1
                     continue
                 self._book_batch_usage(agent_name, skill_name, result.result.message, conn)
+                if agent_name in self._CHECK_LAEUFE:
+                    # Wie live (core/llm/claude.py::WebsucheGescheitert): Scheiterten alle Suchen
+                    # eines Checks, wird sein Urteil ohne Beleg nicht gespeichert.
+                    from core.llm.claude import websuche_bilanz
+                    ok_suchen, suchfehler = websuche_bilanz(result.result.message.content)
+                    if suchfehler and not ok_suchen:
+                        logger.warning("Batch %s %s: Websuche fehlgeschlagen (%s), kein Urteil",
+                                       agent_name, result.custom_id, ", ".join(suchfehler))
+                        errors += 1
+                        continue
                 if agent_name == "storychecker":
                     ok = self._process_sc_result(result, skill_name, conn)
                 elif agent_name == "consensus_gap":

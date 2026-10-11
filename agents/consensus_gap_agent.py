@@ -107,6 +107,8 @@ class ConsensusGapAgent:
         self._llm = llm
         self._analyses_repo = analyses_repo
         self._cg_repo = cg_repo
+        # Je Titel, warum er kein Urteil bekam (z. B. Websuche gescheitert) -- fuer den Lauf.
+        self.fehler: list[str] = []
 
     @property
     def model(self) -> str:
@@ -133,6 +135,7 @@ class ConsensusGapAgent:
         Returns list of (position_id, verdict, summary).
         Verdicts are also persisted in position_analyses.
         """
+        self.fehler = []
         eligible = [p for p in positions if p.story and p.id is not None]
         if not eligible:
             return []
@@ -178,9 +181,11 @@ class ConsensusGapAgent:
                 ],
                 system=system,
                 max_tokens=4096,
+                websuche_pflicht=True,
             )
         except Exception as exc:
             logger.warning("consensus_gap: LLM error for %s: %s", pos.name, exc)
+            self.fehler.append(f"{pos.name}: {exc}")
             return []
 
         parsed = [

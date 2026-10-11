@@ -385,3 +385,18 @@ def test_ca_batch_antwort_wird_urteil(dienst):
     assert (u.agent, u.verdict, u.summary) == ("capital_allocator", "solide", "Ordentlich.")
     falsch = SimpleNamespace(custom_id="ca_x", result=result.result)
     assert d._process_ca_result(falsch, "Standard", c) is False
+
+
+def test_batch_antwort_ohne_gelungene_suche_wird_kein_urteil(dienst):
+    d, c, enc = dienst
+    a = _titel(enc, c, "Alpha", in_portfolio=True)
+    fehler = SimpleNamespace(type="web_search_tool_result",
+                             content=SimpleNamespace(error_code="too_many_requests"))
+    block = SimpleNamespace(type="tool_use", name="submit_ca_verdict",
+                            input={"position_id": a.id, "verdict": "solide", "summary": "Ohne Beleg."})
+    message = SimpleNamespace(content=[fehler, block], model="claude-sonnet-5-5",
+                              usage=SimpleNamespace(input_tokens=1, output_tokens=1))
+    result = SimpleNamespace(custom_id=f"ca_{a.id}",
+                             result=SimpleNamespace(type="succeeded", message=message))
+    assert d._process_batch_results("capital_allocator", "Standard", [result], c) == (0, 1)
+    assert PositionAnalysesRepository(c).get_for_position(a.id) == []

@@ -83,6 +83,17 @@ class _OAIResponse:
         return len(self.tool_calls) > 0
 
 
+def _suche_pruefen(pflicht: bool, ok: int, fehler: list, wer) -> None:
+    """Wie im Claude-Provider: gescheiterte Suchen loggen; ein Check, dessen Suchen alle
+    scheiterten, bekommt ``WebsucheGescheitert`` statt eines Urteils ohne Beleg."""
+    from core.llm.claude import WebsucheGescheitert
+
+    if fehler:
+        _logger.warning("Websuche (%s): %d gelungen, %d gescheitert: %s", wer, ok, len(fehler), ", ".join(fehler))
+    if pflicht and fehler and not ok:
+        raise WebsucheGescheitert(f"Websuche fehlgeschlagen ({', '.join(sorted(set(fehler)))}) — kein Urteil gespeichert")
+
+
 class OpenAICompatibleProvider(LLMProvider):
     """
     Wraps OpenAI-compatible APIs (Perplexity Sonar, Groq, Together, etc.).
@@ -167,6 +178,7 @@ class OpenAICompatibleProvider(LLMProvider):
         system: str = "",
         max_tokens: int = 2048,
         enable_thinking: bool = False,  # accepted for API compatibility, ignored
+        websuche_pflicht: bool = False,
     ) -> _OAIResponse:
         """
         Call OpenAI-compatible API with tool definitions.
@@ -191,6 +203,7 @@ class OpenAICompatibleProvider(LLMProvider):
             None,
         )
         _tavily_call_count = 0
+        suche_ok, suche_fehler = 0, []
 
         # Normalize Anthropic multi-turn format → OpenAI format
         messages = self._normalize_messages(messages)
@@ -266,7 +279,9 @@ class OpenAICompatibleProvider(LLMProvider):
                         total_web_search += 1
                         try:
                             result = _tavily.search(query, tavily_key, search_depth=self._tavily_search_depth, **_tavily_kwargs)
+                            suche_ok += 1
                         except Exception as e:
+                            suche_fehler.append(f"tavily: {type(e).__name__}")
                             _logger.warning("Tavily search failed for query %r: %s", query, e)
                             result = f"Search unavailable: {e}"
                     oai_messages.append({"role": "tool", "tool_call_id": tc_id, "content": result})
@@ -284,6 +299,7 @@ class OpenAICompatibleProvider(LLMProvider):
             _duration_ms = int((time.monotonic() - _t0) * 1000)
             if self.on_usage:
                 self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count, None, None, total_web_search or None)
+            _suche_pruefen(websuche_pflicht, suche_ok, suche_fehler, self.skill_context)
 
             oai_assistant_msg = {"role": "assistant", "content": msg.content or None}
             if other_calls:
@@ -303,4 +319,5 @@ class OpenAICompatibleProvider(LLMProvider):
         _duration_ms = int((time.monotonic() - _t0) * 1000)
         if self.on_usage:
             self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count, None, None, total_web_search or None)
+        _suche_pruefen(websuche_pflicht, suche_ok, suche_fehler, self.skill_context)
         return _OAIResponse(content="".join(content_parts), tool_calls=[], stop_reason="end_turn", raw_blocks=[])

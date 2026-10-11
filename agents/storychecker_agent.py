@@ -190,7 +190,8 @@ class StorycheckerAgent:
         self._llm.skill_context = skill_name or "storychecker"
         initial_msg = _build_initial_message(position, skill_name, skill_prompt, self._metrics_block(position, language))
         self._storychecker.add_message(session.id, "user", initial_msg)
-        response = self._run_llm(session.id, [{"role": "user", "content": initial_msg}], language=language)
+        response = self._run_llm(session.id, [{"role": "user", "content": initial_msg}], language=language,
+                                 websuche_pflicht=True)
         # Persist structured result for trend tracking
         self._analyses.save(
             position_id=position.id,
@@ -220,7 +221,8 @@ class StorycheckerAgent:
         self._llm.skill_context = skill_name or "storychecker"
         initial_msg = _build_initial_message(position, skill_name, skill_prompt, self._metrics_block(position, language))
         self._storychecker.add_message(session.id, "user", initial_msg)
-        response = await self._run_llm_async(session.id, [{"role": "user", "content": initial_msg}], language=language)
+        response = await self._run_llm_async(session.id, [{"role": "user", "content": initial_msg}], language=language,
+                                             websuche_pflicht=True)
         self._analyses.save(
             position_id=position.id,
             agent="storychecker",
@@ -339,12 +341,17 @@ Schreibe nur die These selbst, keine Einleitung oder Überschrift."""
             return skill.name, skill.prompt
         return "", ""
 
-    def _run_llm(self, session_id: int, api_messages: list[dict], language: str = "de") -> str:
+    def _run_llm(self, session_id: int, api_messages: list[dict], language: str = "de",
+                 websuche_pflicht: bool = False) -> str:
         """Run the tool-calling loop and persist the final assistant response."""
         import asyncio
-        return asyncio.run(self._run_llm_async(session_id, api_messages, language=language))
+        return asyncio.run(self._run_llm_async(session_id, api_messages, language=language,
+                                               websuche_pflicht=websuche_pflicht))
 
-    async def _run_llm_async(self, session_id: int, api_messages: list[dict], language: str = "de") -> str:
+    async def _run_llm_async(self, session_id: int, api_messages: list[dict], language: str = "de",
+                             websuche_pflicht: bool = False) -> str:
+        """Die Pruefung (``websuche_pflicht``) speichert ohne gelungene Suche kein Urteil
+        (core/llm/claude.py::WebsucheGescheitert); eine Nachfrage im Dialog darf ohne."""
         messages = list(api_messages)
         # Build an asset-class-aware system prompt (fund vs. company framing) from the session's
         # position. Fallback to company framing if the position can't be resolved.
@@ -360,6 +367,7 @@ Schreibe nur die These selbst, keine Einleitung oder Überschrift."""
                 tools=[WEB_SEARCH_TOOL],
                 system=system_prompt,
                 max_tokens=4096,
+                websuche_pflicht=websuche_pflicht,
             )
             # Web search is server-side — no client tool calls to handle.
             # Loop exits when there are no remaining tool calls (stop_reason != "tool_use")

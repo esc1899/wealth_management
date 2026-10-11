@@ -98,8 +98,8 @@ Was dabei zu klaeren ist:
   (Privacy-Grenze, CLAUDE.md). Fuer Lotsee gilt strenger: auch nicht, ob ein Titel gehalten
   wird (lotsee `docs/plan.md`, "Kandidat Wealth").
 
-Liegt, weil sich erst zeigen soll, ob die Kacheln tragen (zusaetzlicher Menueeintrag seit
-10.10.2026).
+Anlass (11.10.2026): Schneider Electric, Uebernahme angekuendigt, Kurs stark bewegt -- der Digest
+vom 01.10. wusste nichts davon. Erik hat den Punkt in den Fahrplan genommen, gleich als Naechstes.
 
 ## Suche: Kandidaten und gemerktes Nein (11.10.2026)
 

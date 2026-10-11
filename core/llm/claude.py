@@ -55,6 +55,28 @@ def tools_for_model(tools: list[dict], model: str) -> list[dict]:
     ]
 
 
+class WebsucheGescheitert(RuntimeError):
+    """Ein Check sollte suchen, und keine einzige Suche kam durch. Sein Urteil beruhte nur auf
+    dem Wissen des Modells -- ein Platzhalter, der auf der Kachel wie ein Befund aussähe. Darum
+    wird es nicht gespeichert (Erik, 11.10.2026: Schneider Electric, "Gemischt (vorläufig)")."""
+
+
+def websuche_bilanz(blocks) -> tuple[int, list[str]]:
+    """(gelungene Suchen, Fehlercodes) aus den Blöcken einer Antwort. Der Server meldet eine
+    gescheiterte Suche als ``web_search_tool_result`` mit einem Fehlerobjekt statt einer Liste."""
+    ok, fehler = 0, []
+    for b in blocks or []:
+        if getattr(b, "type", None) != "web_search_tool_result":
+            continue
+        inhalt = getattr(b, "content", None)
+        if isinstance(inhalt, list):
+            ok += 1
+        else:
+            code = getattr(inhalt, "error_code", None) or (inhalt.get("error_code") if isinstance(inhalt, dict) else None)
+            fehler.append(code or "unbekannt")
+    return ok, fehler
+
+
 def fetch_available_models(api_key: str, base_url: str = "") -> list[str]:
     """Fetch available Claude models from Anthropic API. Returns empty list on error."""
     try:
@@ -197,9 +219,15 @@ class ClaudeProvider(LLMProvider):
         max_tokens: int = 2048,
         enable_thinking: Optional[bool] = None,
         tool_choice: Optional[dict] = None,
+        websuche_pflicht: bool = False,
     ) -> ClaudeResponse:
         """
         Tool-enabled call. Returns text content and any client-side tool calls.
+
+        Gescheiterte Suchen (Fehlercode statt Treffer) werden gezaehlt und geloggt. Mit
+        ``websuche_pflicht`` (die Checks je Titel) wirft der Aufruf ``WebsucheGescheitert``,
+        wenn Suchen versucht wurden und keine durchkam -- nach dem Buchen der Kosten. Sucht
+        das Modell gar nicht, ist das seine Wahl, kein Fehler der Suche.
 
         Web search: on a direct Anthropic endpoint, Anthropic's built-in server-side
         web_search runs within a single response (native passthrough). Behind a custom
@@ -271,6 +299,7 @@ class ClaudeProvider(LLMProvider):
         content_parts: list[str] = []
 
         _pauses = 0
+        suche_ok, suche_fehler = 0, []
         for _ in range(10):  # safety net; only Tavily and pause_turn iterate more than once
             # Retry up to 3 times on rate limit errors
             for attempt in range(3):
@@ -294,6 +323,9 @@ class ClaudeProvider(LLMProvider):
             for block in response.content:
                 if hasattr(block, "text"):
                     content_parts.append(block.text)
+            _ok, _fehler = websuche_bilanz(response.content)
+            suche_ok += _ok
+            suche_fehler += _fehler
 
             if use_tavily and response.stop_reason == "tool_use":
                 web_calls = [b for b in response.content
@@ -312,8 +344,10 @@ class ClaudeProvider(LLMProvider):
                             total_web_search += 1
                             try:
                                 result = _tavily.search(query, tavily_key, search_depth=self._tavily_search_depth)
+                                suche_ok += 1
                             except Exception as e:
                                 result = f"Search failed: {e}"
+                                suche_fehler.append(f"tavily: {type(e).__name__}")
                         tool_results.append({"type": "tool_result", "tool_use_id": call.id, "content": result})
                     kwargs["messages"].append({"role": "user", "content": tool_results})
                     if other_calls:
@@ -339,6 +373,12 @@ class ClaudeProvider(LLMProvider):
         _duration_ms = int((time.monotonic() - _t0) * 1000)
         if self.on_usage:
             self.on_usage(total_input, total_output, self.skill_context, _duration_ms, self.position_count, total_cache_read, total_cache_write, total_web_search)
+        if suche_fehler:
+            _logger.warning("Websuche (%s): %d gelungen, %d gescheitert: %s", self.skill_context or self._model,
+                            suche_ok, len(suche_fehler), ", ".join(suche_fehler))
+        if websuche_pflicht and suche_fehler and not suche_ok:
+            grund = ", ".join(sorted(set(suche_fehler)))
+            raise WebsucheGescheitert(f"Websuche fehlgeschlagen ({grund}) — kein Urteil gespeichert")
         return ClaudeResponse(
             content=content_text,
             tool_calls=tool_calls,

@@ -141,7 +141,8 @@ def run_storychecker_job(positions: list, language: str, job: dict, db_path: str
         results = loop.run_until_complete(agent.batch_check_all(positions=pos_valid, language=language))
         count = sum(1 for _, err in results if err is None)
         _log_to_job(job, f"StorycheckerAgent: {count}/{len(pos_valid)} completed")
-        job.update({"running": False, "done": True, "count": count, "error": None})
+        fehler = [f"Story Checker, {name}: {err}" for name, err in results if err]
+        job.update({"running": False, "done": True, "count": count, "error": "; ".join(fehler) or None})
     except Exception as exc:
         logger.exception("StorycheckerAgent job failed")
         job.update({"running": False, "done": True, "count": count, "error": str(exc)})
@@ -175,9 +176,10 @@ def run_consensus_gap_job(positions: list, language: str, job: dict, db_path: st
         pos_valid = [p for p in positions if p.id]
         _log_to_job(job, f"ConsensusGapAgent: {len(pos_valid)} positions")
         loop.run_until_complete(agent.analyze_portfolio(pos_valid, skill_name, skill_prompt, language=language))
-        count = len(pos_valid)
+        count = len(pos_valid) - len(agent.fehler)
         _log_to_job(job, f"ConsensusGapAgent: {count} completed")
-        job.update({"running": False, "done": True, "count": count, "error": None})
+        fehler = "; ".join(f"Konsens, {f}" for f in agent.fehler) or None
+        job.update({"running": False, "done": True, "count": count, "error": fehler})
     except Exception as exc:
         logger.exception("ConsensusGapAgent job failed")
         job.update({"running": False, "done": True, "count": count, "error": str(exc)})
@@ -224,8 +226,10 @@ def run_fundamental_job(positions: list, language: str, job: dict, db_path: str,
             results = loop.run_until_complete(
                 fund_agent.analyze_portfolio(positions=pub_positions, skill_name=fund_skill_name, skill_prompt=fund_skill_prompt, language=language)
             )
-            count = len(results) if results else len(valid)
+            count = len(results) if results else 0
             _log_to_job(job, f"✅ FundamentalAnalyzerAgent completed: {count} analyzed")
+            if fund_agent.fehler:
+                error_msg = "; ".join(f"Fundamental, {f}" for f in fund_agent.fehler)
         job.update({"running": False, "done": True, "count": count, "error": error_msg})
     except Exception as exc:
         logger.exception("Background Fundamental job failed")
@@ -274,7 +278,8 @@ def run_capital_allocator_job(positions: list, language: str, job: dict, db_path
             no_verdict = len(valid) - count
             if no_verdict > 0:
                 _log_to_job(job, f"⚠️ {no_verdict} position(s) got no verdict (LLM didn't call submit_ca_verdict)")
-                error_msg = f"{no_verdict} von {len(valid)} Positionen ohne Verdict — ggf. DeepSeek Tool-Use erneut versuchen"
+                error_msg = ("; ".join(f"Kapitalallokation, {f}" for f in ca_agent.fehler) if ca_agent.fehler
+                             else f"{no_verdict} von {len(valid)} Positionen ohne Verdict — ggf. DeepSeek Tool-Use erneut versuchen")
             _log_to_job(job, f"✅ CapitalAllocatorAgent completed: {count} analyzed")
         job.update({"running": False, "done": True, "count": count, "error": error_msg})
     except Exception as exc:
@@ -324,7 +329,8 @@ def run_devils_advocate_job(positions: list, language: str, job: dict, db_path: 
             no_verdict = len(valid) - count
             if no_verdict > 0:
                 _log_to_job(job, f"⚠️ {no_verdict} position(s) got no verdict")
-                error_msg = f"{no_verdict} von {len(valid)} Positionen ohne Verdict"
+                error_msg = ("; ".join(f"Devil's Advocate, {f}" for f in da_agent.fehler) if da_agent.fehler
+                             else f"{no_verdict} von {len(valid)} Positionen ohne Verdict")
             _log_to_job(job, f"✅ DevilsAdvocateAgent completed: {count} analyzed")
         job.update({"running": False, "done": True, "count": count, "error": error_msg})
     except Exception as exc:

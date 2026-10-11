@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Gescheiterte Websuche: kein Urteil ohne Beleg — 2026-10-11
+
+**Warum:** Beim ersten Durchgang meldete der Storychecker zu Schneider Electric „Gemischt
+(vorläufig, nicht durch aktuelle Daten belegt)“ – die Websuche war gescheitert, das Urteil
+wurde trotzdem gespeichert und stand auf der Kachel wie ein Befund. Dabei war gerade eine
+Übernahme angekündigt. Welche Suche woran scheiterte, hielt die App nirgends fest.
+
+**Änderungen:**
+- `core/llm/claude.py::websuche_bilanz`: zählt gelungene und gescheiterte Suchen (Fehlercode
+  des Servers); jede gescheiterte steht mit Code im Log, auch bei Tavily (OpenRouter).
+- Die fünf Checks fragen mit `websuche_pflicht`: Scheiterten alle Suchen, wirft der Aufruf
+  `WebsucheGescheitert` (nach dem Buchen der Kosten), es wird kein Urteil gespeichert, und
+  „Jetzt checken“ zeigt den Grund je Titel. Sucht das Modell gar nicht, ist das kein Fehler;
+  Nachfragen im Dialog bleiben ohne Pflicht.
+- Batch: Eine Antwort, deren Suchen alle scheiterten, zählt als „ohne Ergebnis“.
+- Story, Konsens und Fundamental melden fehlende Urteile jetzt wie Capital Allocator und Devil's
+  Advocate an den Knopf (vorher still).
+
 ### Volltexte verfallen, Urteile bleiben — 2026-10-11
 
 **Warum:** Die langen Texte der Checks sind irgendwann Schnee von gestern, die Entwicklung der
