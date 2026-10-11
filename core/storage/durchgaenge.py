@@ -61,14 +61,28 @@ class DurchgaengeRepository:
             f"AND agent IN ({platz})",
             (d.id, d.position_id, d.begonnen.isoformat(), *d.checks),
         )
+        gesamt = "; ".join(f for f in (d.fehler, fehler) if f) or None
         self._conn.execute("UPDATE durchgaenge SET beendet = ?, fehler = ? WHERE id = ?",
-                           (_jetzt(), fehler, d.id))
+                           (_jetzt(), gesamt, d.id))
         self._conn.commit()
         return cur.rowcount
+
+    def fehler_vermerken(self, ids: Iterable[int], fehler: str) -> None:
+        """Ein Check ist fuer diese Durchgaenge gescheitert; der Abschluss behaelt es."""
+        for i in ids:
+            self._conn.execute(
+                "UPDATE durchgaenge SET fehler = CASE WHEN fehler IS NULL THEN ? "
+                "ELSE fehler || '; ' || ? END WHERE id = ? AND beendet IS NULL", (fehler, fehler, i))
+        self._conn.commit()
 
     def get(self, durchgang_id: int) -> Optional[Durchgang]:
         row = self._conn.execute("SELECT * FROM durchgaenge WHERE id = ?", (durchgang_id,)).fetchone()
         return self._zeile(row) if row else None
+
+    def offene(self) -> list[Durchgang]:
+        rows = self._conn.execute(
+            "SELECT * FROM durchgaenge WHERE beendet IS NULL ORDER BY begonnen").fetchall()
+        return [self._zeile(r) for r in rows]
 
     def fuer_titel(self, position_id: int, limit: int = 20) -> list[Durchgang]:
         """Die Durchgaenge eines Titels, der juengste zuerst."""

@@ -1,7 +1,8 @@
 """
 Capital Allocator Agent — evaluates management quality as capital allocators.
 
-Cloud-only (ClaudeProvider). Watchlist positions only — not scheduled.
+Cloud-only (ClaudeProvider). Runs per title ("Jetzt checken") and in the list jobs
+(core/scheduler.py, batch via _submit_capital_allocator_batch).
 Analyzes 3 dimensions: historical decisions, insider ownership, communication quality.
 
 Verdict values:
@@ -104,7 +105,7 @@ Für jede Position: submit_ca_verdict aufrufen mit position_id, verdict, summary
 class CapitalAllocatorAgent:
     """
     Cloud agent (Claude ☁️) — analyzes management capital allocation quality.
-    Watchlist-only, on-demand. No scheduled batch jobs.
+    Per title on demand and in the list jobs (live or batch).
     """
 
     def __init__(
@@ -237,15 +238,20 @@ class CapitalAllocatorAgent:
     # ------------------------------------------------------------------
 
     def _format_position(self, pos: PublicPosition) -> str:
-        lines = [
-            f"Analysiere die Kapitalallokations-Qualität des Managements für diese Position.",
-            f"",
-            f"**Position ID:** {pos.id}",
-            f"**Name:** {pos.name}",
-            f"**Ticker:** {pos.ticker}",
-        ]
-        if pos.asset_class:
-            lines.append(f"**Asset-Klasse:** {pos.asset_class}")
-        if pos.isin:
-            lines.append(f"**ISIN:** {pos.isin}")
-        return "\n".join(lines)
+        return format_position(pos)
+
+
+def format_position(pos: PublicPosition) -> str:
+    """Die Nachricht je Titel -- live und im Batch (core/scheduler.py) dieselbe."""
+    lines = [
+        f"Analysiere die Kapitalallokations-Qualität des Managements für diese Position.",
+        f"",
+        f"**Position ID:** {pos.id}",
+        f"**Name:** {pos.name}",
+        f"**Ticker:** {pos.ticker}",
+    ]
+    if pos.asset_class:
+        lines.append(f"**Asset-Klasse:** {pos.asset_class}")
+    if pos.isin:
+        lines.append(f"**ISIN:** {pos.isin}")
+    return "\n".join(lines)

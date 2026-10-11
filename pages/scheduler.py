@@ -46,6 +46,12 @@ _AVAILABLE_MODELS = _ALL_PUBLIC_MODELS or _CLAUDE_MODELS
 _sched_repo = get_scheduled_jobs_repo()
 _runs_repo = get_scheduled_job_runs_repo()
 
+# Einmal: je Liste ein Pruefungs-Job statt der Jobs je Check (core/pruefung.py). Der Job
+# "agenten" tut dasselbe beim naechsten Lauf; hier, damit die Seite es sofort zeigt.
+from core.pruefung import jobs_umstellen
+from state import get_app_config_repo
+jobs_umstellen(_sched_repo, get_app_config_repo())
+
 # Auto-seed system jobs on first page load if they don't exist yet.
 _all_jobs_for_seed = _sched_repo.get_all()
 if not any(j.agent_name == "monthly_digest" for j in _all_jobs_for_seed):
@@ -90,19 +96,26 @@ if not any(j.agent_name == "wealth_snapshot" for j in _all_jobs_for_seed):
 _SCHEDULABLE_AGENTS = {
     "news": t("settings.agent_news"),
     "structural_scan": t("nav.structural_scan"),
-    "consensus_gap": t("nav.consensus_gap"),
-    "storychecker": t("settings.agent_storychecker"),
-    "fundamental_analyzer": t("settings.agent_fundamental"),
     "sector_rotation": t("settings.agent_sector_rotation"),
     "search_agent": t("settings.agent_search"),
 }
-# Devil's Advocate prueft die Watchlist und laeuft nur auf Knopfdruck im Watchlist
-# Checker (Erik, 2026-10-06) -- nicht mehr waehlbar, ein bestehender Job laeuft nicht
-# mehr von selbst (core.scheduler.NUR_AUF_KNOPFDRUCK). Der Name bleibt fuer den Titel.
-_AGENT_LABELS = {**_SCHEDULABLE_AGENTS, "devils_advocate": t("devils_advocate.da_header")}
+# Die Checks je Titel laufen seit 11.10.2026 nur noch in der Pruefung je Liste; ihre alten
+# Jobs sind aus und stehen unter "Nicht mehr eingeplant". Die Namen bleiben fuer den Titel.
+_AGENT_LABELS = {
+    **_SCHEDULABLE_AGENTS,
+    "pruefung_depot": t("scheduler.pruefung_depot"),
+    "pruefung_watchlist": t("scheduler.pruefung_watchlist"),
+    "consensus_gap": t("nav.consensus_gap"),
+    "storychecker": t("settings.agent_storychecker"),
+    "fundamental_analyzer": t("settings.agent_fundamental"),
+    "devils_advocate": t("devils_advocate.da_header"),
+    "capital_allocator": t("kacheln.agent_capital_allocator"),
+}
 
 # System jobs are auto-seeded and shown as read-only (no delete).
 _SYSTEM_AGENT_NAMES = {"monthly_digest", "yearly_digest", "wealth_snapshot"}
+# Die Pruefung je Liste: Checks, Skills und Modelle stehen unter Einstellungen, nicht am Job.
+_PRUEFUNG = {"pruefung_depot", "pruefung_watchlist"}
 
 _SKILL_CAPABLE_AGENTS = {
     "news": "news",
@@ -114,13 +127,13 @@ _SKILL_CAPABLE_AGENTS = {
     "devils_advocate": "devils_advocate",
 }
 
-# Die Jobs in Rahmen (2026-10-06): Was ueber das Portfolio laeuft, ist der
-# Portfolio-Check -- die Watchlist prueft die Titelseite eines Titels auf Knopfdruck.
-_PORTFOLIO_CHECK = {"news", "consensus_gap", "storychecker", "fundamental_analyzer", "sector_rotation"}
+# Die Jobs in Rahmen: zuerst die Pruefung je Liste (11.10.2026), dann was sonst ueber das
+# Depot laeuft, dann der Markt.
+_PORTFOLIO_CHECK = {"news", "sector_rotation"}
 _MARKT = {"structural_scan", "search_agent"}
 _GRUPPEN = [
-    ("Portfolio-Check",
-     "Läuft eingeplant über dein Portfolio. Die Watchlist prüfst du auf Knopfdruck, je Titel auf seiner Seite.",
+    (t("scheduler.pruefung_titel"), t("scheduler.pruefung_satz"), _PRUEFUNG),
+    ("Portfolio", "Läuft eingeplant über dein Portfolio, prüft aber keinen einzelnen Titel.",
      _PORTFOLIO_CHECK),
     ("Markt", "Läuft eingeplant, ohne deine Positionen.", _MARKT),
     ("System", "Legt die App selbst an; rechnet nur, ohne Sprachmodell.", _SYSTEM_AGENT_NAMES),
@@ -182,14 +195,16 @@ def _job_zeigen(_job) -> None:
                 get_agent_scheduler().run_job_now(_job.id)
                 st.toast(t("settings.job_started"), icon="▶️")
         with _jc4:
-            if _is_system:
+            if _is_system or _job.agent_name in _PRUEFUNG:
                 st.write("")  # no delete for system jobs
             elif st.button(t("settings.delete_button"), key=f"_job_del_{_job.id}", type="secondary"):
                 _sched_repo.delete(_job.id)
                 st.rerun()
 
         # Inline model + skill selectors (non-system jobs only)
-        if not _is_system:
+        if _job.agent_name in _PRUEFUNG:
+            st.caption(t("scheduler.pruefung_einstellungen"))
+        elif not _is_system:
             _model_opts_inline = [""] + _AVAILABLE_MODELS
             _cur_model = _job.model or ""
             _cur_model_idx = _model_opts_inline.index(_cur_model) if _cur_model in _model_opts_inline else 0
@@ -262,9 +277,7 @@ else:
     _rahmen = [(titel, satz, [j for j in _all_jobs if j.agent_name in namen])
                for titel, satz, namen in _GRUPPEN]
     if _uebrig:
-        _rahmen.append(("Nicht mehr eingeplant",
-                        "Devil's Advocate gehört zum Watchlist-Check und läuft nicht mehr von selbst; "
-                        "„Jetzt ausführen“ geht weiter, Löschen auch.", _uebrig))
+        _rahmen.append((t("scheduler.alte_titel"), t("scheduler.alte_satz"), _uebrig))
     for _titel, _satz, _jobs in _rahmen:
         if not _jobs:
             continue

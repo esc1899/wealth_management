@@ -376,10 +376,12 @@ research_chat:
 
 settings:
   pruefung_header: "Checks per list"
-  pruefung_satz: "These checks make up one review. The tiles show exactly these, and “Check now” runs them for one title in a single pass."
+  pruefung_satz: "These checks make up one review. The tiles show exactly these; “Check now” runs them for one title, the jobs “Review portfolio” and “Review watchlist” (Scheduler) for all. The model per check is set under Cloud LLM."
   pruefung_depot: "Portfolio"
   pruefung_watchlist: "Watchlist"
   pruefung_speichern: "Save selection"
+  pruefung_skill: "Skill {check}"
+  pruefung_skill_standard: "Default"
   pruefung_gespeichert: "Selection saved."
   tab_generell: "General"
   tab_lokal: "Local LLM"
@@ -1453,9 +1455,20 @@ portfolio_robustness:
   history_header: "Past Analyses"
   no_analysis: "⚪ No portfolio counter-analysis yet."
 
+scheduler:
+  pruefung_titel: "Review per list"
+  pruefung_satz: "One job per list: the selected checks for every title, one pass per title. As a batch the result arrives with the next run; then the local checks (Watchlist Checker, Portfolio Checker) run and the pass is complete."
+  pruefung_depot: "Review portfolio"
+  pruefung_watchlist: "Review watchlist"
+  pruefung_einstellungen: "Which checks, with which skill and model: see Settings."
+  alte_titel: "No longer scheduled"
+  alte_satz: "Per-title checks run in the review per list since 2026-10-11; their old jobs are off. “Run now” still works; delete them once the review holds."
 kacheln:
   nav_gruppe: "At a glance"
   check_nie: "{check} never checked"
+  portfolio_satz: "The portfolio as a whole against your story ({datum}): <b>{urteil}</b>. {satz}"
+  portfolio_nie: "The portfolio as a whole has never been checked against your story."
+  portfolio_link: "Portfolio story and Portfolio Checker"
   nav_depot: "Portfolio"
   nav_watchlist: "Watchlist"
   titel_depot: "Positions"

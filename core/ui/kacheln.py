@@ -238,6 +238,30 @@ def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:
     return kacheln
 
 
+#: Die Seite mit Story und Portfolio Checker (Pflege).
+PORTFOLIO_STORY = str(_SEITEN / "portfolio_narrativ.py")
+
+
+def _portfolio_satz() -> None:
+    """Oben auf dem Depot ein Satz des Portfolio Checkers: das Depot als Ganzes gegen die Story.
+    Er laeuft am Ende von "Depot pruefen" oder per Knopf auf der Seite Portfolio-Story."""
+    from streamlit.errors import StreamlitAPIException
+    from state import get_portfolio_story_repo
+
+    a = get_portfolio_story_repo().get_latest_analysis()
+    if a is None:
+        satz = t("kacheln.portfolio_nie")
+    else:
+        satz = t("kacheln.portfolio_satz").format(
+            urteil=escape(a.verdict or "?"), satz=escape(a.summary or ""),
+            datum=fmt_date(a.created_at) if a.created_at else "?")
+    st.markdown(f'<div class="wk-einl">{satz}</div>', unsafe_allow_html=True)
+    try:
+        st.page_link(PORTFOLIO_STORY, label=t("kacheln.portfolio_link"))
+    except (StreamlitAPIException, KeyError):
+        pass
+
+
 def seite(art: str) -> None:
     """Die ganze Seite für ``art`` = "depot" oder "watchlist"."""
     from state import get_portfolio_service
@@ -253,6 +277,9 @@ def seite(art: str) -> None:
     if not positionen:
         st.info(t(f"kacheln.leer_{art}"))
         return
+
+    if art == "depot":
+        _portfolio_satz()
 
     kacheln = sortiert(kacheln_fuer(art, positionen))
     je_id = {p.id: p for p in positionen}

@@ -215,7 +215,16 @@ zeigen genau die Auswahl, ein gewählter Check ohne Urteil steht als „nie gepr
 Durchgang beginnen, die Cloud-Checks parallel, danach der Watchlist Checker (er liest deren
 Urteile), abschließen. Der Abschluss ordnet dem Durchgang per UPDATE die Analysen zu, die seit
 seinem Beginn für diesen Titel von seinen Checks ohne Durchgang entstanden sind -- kein Agent
-braucht dafür eine neue Signatur. Der eingeplante Job je Liste folgt (BACKLOG.md).
+braucht dafür eine neue Signatur.
+
+Eingeplant laufen je Liste ein Job, `pruefung_depot` und `pruefung_watchlist`
+(`core/scheduler.py::_run_pruefung_job`): je Titel ein Durchgang, je gewähltem Cloud-Check die
+vorhandene Lauf-Funktion über alle Titel (Batch oder live), Skill aus der Auswahl, Modell aus
+den Einstellungen. `durchgaenge_nachziehen` (im Job `agenten` nach dem Abholen, idempotent)
+schließt Job-Durchgänge, für deren Checks kein Batch mehr aussteht -- vorher einmal je Liste
+die lokale Schluss-Stufe: Watchlist Checker bzw. Portfolio Checker (`core/portfolio_check.py`,
+liest die Urteile aller gewählten Depot-Checks). Ollama baut der Scheduler dafür selbst
+(`_make_scheduled_ollama`).
 
 ### 4. Session Persistence Pattern (Architektur-Guard)
 

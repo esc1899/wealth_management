@@ -142,14 +142,14 @@ Stimmt das Portfolio noch mit der Geschichte des Investors überein?
 **Positions-Urteil:** Schreibe NUR EINES: 🟢 Unterstützen Story ODER 🟡 Gemischt ODER 🔴 Gefährden Story
 > {{EIN-SATZ-FAZIT}}
 
-Welche Positionen stärken oder schwächen die Story? (Nutze die Verdicts unten.)
+Welche Positionen stärken oder schwächen die Story? (Nutze die Urteile der Checks unten.)
 
 ---
 
 Portfolio-Daten:
 {portfolio_snapshot}
 
-Positions-Story-Checker Verdicts:
+Urteile der Checks je Position:
 {position_verdicts}"""
 
         user_message = "Bitte analysiere mein Portfolio gegen die angegebene These und Ziele."

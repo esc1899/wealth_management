@@ -40,7 +40,7 @@
         520,
         0
       ],
-      "notes": "Takt und Uhrzeit stellst du auf der Seite „Scheduler“ ein\nnie Devil's Advocate: nur auf Knopfdruck\nCode: core/scheduler.py::ist_faellig\nCode: core/scheduler.py::NUR_AUF_KNOPFDRUCK",
+      "notes": "Takt und Uhrzeit stellst du auf der Seite „Scheduler“ ein; beim ersten Mal werden die Jobs je Check zur Prüfung je Liste\nCode: core/scheduler.py::ist_faellig\nCode: core/pruefung.py::jobs_umstellen",
       "notesInFlow": true
     },
     {
@@ -107,8 +107,8 @@
     },
     {
       "parameters": {
-        "content": "### Der Portfolio-Check",
-        "height": 820,
+        "content": "### Die Prüfung je Liste",
+        "height": 1100,
         "width": 300,
         "color": 5
       },
@@ -118,7 +118,7 @@
       "typeVersion": 1,
       "position": [
         1350,
-        -800
+        -1180
       ]
     },
     {
@@ -129,7 +129,7 @@
       "typeVersion": 1,
       "position": [
         1400,
-        -720
+        -950
       ],
       "notes": "Positionen mit Story\nCode: core/scheduler.py::_run_storychecker_job",
       "notesInFlow": true
@@ -142,7 +142,7 @@
       "typeVersion": 1,
       "position": [
         1400,
-        -570
+        -800
       ],
       "notes": "Positionen mit Ticker, nur öffentliche Felder\nCode: core/scheduler.py::_run_fundamental_job",
       "notesInFlow": true
@@ -155,7 +155,7 @@
       "typeVersion": 1,
       "position": [
         1400,
-        -420
+        -650
       ],
       "notes": "Positionen mit Story\nCode: core/scheduler.py::_run_consensus_gap_job",
       "notesInFlow": true
@@ -168,7 +168,7 @@
       "typeVersion": 1,
       "position": [
         1400,
-        -270
+        140
       ],
       "notes": "Positionen mit Ticker\nCode: core/scheduler.py::_run_sector_rotation_job",
       "notesInFlow": true
@@ -181,7 +181,7 @@
       "typeVersion": 1,
       "position": [
         1400,
-        -120
+        290
       ],
       "notes": "alle Positionen des Portfolios\nCode: core/scheduler.py::_run_news_job",
       "notesInFlow": true
@@ -189,7 +189,7 @@
     {
       "parameters": {
         "content": "### Außerdem im selben Lauf",
-        "height": 820,
+        "height": 1120,
         "width": 300,
         "color": 7
       },
@@ -210,7 +210,7 @@
       "typeVersion": 1,
       "position": [
         1400,
-        140
+        440
       ],
       "notes": "Markt, ohne Positionen\nCode: core/scheduler.py::_run_structural_scan_job",
       "notesInFlow": true
@@ -223,7 +223,7 @@
       "typeVersion": 1,
       "position": [
         1400,
-        290
+        590
       ],
       "notes": "Markt, ohne Positionen\nCode: core/scheduler.py::_run_search_agent_job",
       "notesInFlow": true
@@ -236,7 +236,7 @@
       "typeVersion": 1,
       "position": [
         1400,
-        440
+        740
       ],
       "notes": "rechnet nur, kein Sprachmodell\nCode: core/scheduler.py::_run_wealth_snapshot_job",
       "notesInFlow": true
@@ -249,7 +249,7 @@
       "typeVersion": 1,
       "position": [
         1400,
-        590
+        890
       ],
       "notes": "rechnet nur, kein Sprachmodell\nCode: core/scheduler.py::_run_monthly_digest_job",
       "notesInFlow": true
@@ -262,7 +262,7 @@
       "typeVersion": 1,
       "position": [
         1400,
-        740
+        1040
       ],
       "notes": "rechnet nur, kein Sprachmodell\nCode: core/scheduler.py::_run_yearly_digest_job",
       "notesInFlow": true
@@ -326,7 +326,7 @@
         2300,
         -460
       ],
-      "notes": "halber Preis, Ergebnis frühestens beim nächsten Lauf; je Agent ein Einreicher, hier der des Storycheckers\nCode: core/scheduler.py::_submit_storychecker_batch",
+      "notes": "halber Preis, Ergebnis frühestens beim nächsten Lauf; je Agent ein Einreicher, hier der des Storycheckers und der Kapitalallokation\nCode: core/scheduler.py::_submit_storychecker_batch\nCode: core/scheduler.py::_submit_capital_allocator_batch",
       "notesInFlow": true
     },
     {
@@ -408,34 +408,8 @@
       "notesInFlow": true
     },
     {
-      "parameters": {},
-      "id": "31eb9adc-53ad-5c26-88dd-6f63228b41bd",
-      "name": "Knopf auf „Portfolio-Story“",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [
-        0,
-        980
-      ],
-      "notes": "dasselbe von Hand, je Zeile oder für alle fehlenden\nCode: pages/portfolio_story.py",
-      "notesInFlow": true
-    },
-    {
-      "parameters": {},
-      "id": "6b8c70d2-9550-5e5c-bd10-eb27bf789286",
-      "name": "Story, Konsens, Fundamental ☁️",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [
-        260,
-        980
-      ],
-      "notes": "sofort und live, parallel, nie als Batch\nCode: core/background_jobs.py::run_storychecker_job\nCode: core/background_jobs.py::run_consensus_gap_job\nCode: core/background_jobs.py::run_fundamental_job",
-      "notesInFlow": true
-    },
-    {
       "parameters": {
-        "content": "### Per Knopf: dieselben Checks, sofort",
+        "content": "### Per Knopf: dieselbe Auswahl, ein Titel, sofort",
         "height": 300,
         "width": 680,
         "color": 4
@@ -451,7 +425,7 @@
     },
     {
       "parameters": {
-        "content": "## Wealth · Portfolio-Check (automatisch)\n**Prozessbild** – läuft nie und enthält keine Daten, nur den Weg durch den Code. Stündlich fragt ops-core die App, welche Jobs der Seite „Scheduler“ fällig sind; sie laufen nacheinander. Fünf davon prüfen das Portfolio – das ist der Portfolio-Check.\n\n**Die Watchlist prüft ein eigener Ablauf, auf Knopfdruck** (Bild „Wealth · Watchlist-Check“). Devil's Advocate lässt sich seit dem 06.10.2026 nicht mehr einplanen; ein älterer Job läuft nicht mehr von selbst.\n\n**Eingeplant heißt Batch, wartend heißt live**: Ein Batch kostet die Hälfte, sein Ergebnis holt erst der nächste Lauf ab; bis dahin meldet die App „wartet“.\n\n**Strom weg mitten im Lauf?** Der nächste schließt den verwaisten Lauf und holt nach.\n\n☁️ Sprachmodell außer Haus",
+        "content": "## Wealth · Portfolio-Check (automatisch)\n**Prozessbild** – läuft nie und enthält keine Daten, nur den Weg durch den Code. Stündlich fragt ops-core die App, welche Jobs der Seite „Scheduler“ fällig sind; sie laufen nacheinander.\n\n**Die Prüfung je Liste** (seit 11.10.2026): „Depot prüfen“ und „Watchlist prüfen“ lassen die unter Einstellungen gewählten Checks für alle Titel laufen, je Titel ein Durchgang mit einem Datum. „Watchlist prüfen“ ist aus; die Watchlist prüfst du per Knopf.\n\n**Eingeplant heißt Batch, wartend heißt live**: Ein Batch kostet die Hälfte, sein Ergebnis holt erst der nächste Lauf ab; bis dahin meldet die App „wartet“. Erst dann laufen die lokalen Checks und der Durchgang ist fertig.\n\n**Strom weg mitten im Lauf?** Der nächste schließt den verwaisten Lauf und zieht offene Durchgänge nach.\n\n☁️ Sprachmodell außer Haus · 🔒 lokal",
         "height": 420,
         "width": 1180,
         "color": 7
@@ -464,6 +438,110 @@
         -60,
         -760
       ]
+    },
+    {
+      "parameters": {},
+      "id": "c101fd0a-5924-5491-bd40-512638f94b3c",
+      "name": "Depot prüfen / Watchlist prüfen",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        -1100
+      ],
+      "notes": "die gewählten Checks der Liste für alle Titel; je Titel beginnt ein Durchgang\nCode: core/scheduler.py::_run_pruefung_job\nCode: core/pruefung.py::auswahl",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "266a4df6-e68f-51b8-a468-642027f04f2e",
+      "name": "Kapitalallokation",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        -500
+      ],
+      "notes": "Positionen mit Ticker, nur öffentliche Felder\nCode: core/scheduler.py::_run_capital_allocator_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "8bddffd0-1eb9-5f83-aa2b-e7935ce95f5b",
+      "name": "Devil's Advocate",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        -350
+      ],
+      "notes": "nur auf der Watchlist, nur öffentliche Felder\nCode: core/scheduler.py::_run_devils_advocate_job",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "1cb30db5-aae0-58d0-a6e5-0ab0a901661d",
+      "name": "Durchgänge nachziehen",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3660,
+        0
+      ],
+      "notes": "fertig, wenn kein Batch seiner Checks mehr aussteht; auch nach Stromausfall\nCode: core/scheduler.py::durchgaenge_nachziehen",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "39973600-5041-5dca-8145-f2a3b53f38de",
+      "name": "Schluss-Stufe 🔒",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3920,
+        0
+      ],
+      "notes": "einmal je Liste, lokal: Watchlist Checker über die Titel bzw. Portfolio Checker gegen die Story\nCode: core/scheduler.py::_watchlist_checker_lauf\nCode: core/scheduler.py::_portfolio_check_lauf\nCode: core/portfolio_check.py::story_check",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "5630d130-02af-5bd8-a024-b5de57b54a56",
+      "name": "Durchgang fertig",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4180,
+        0
+      ],
+      "notes": "die Urteile seit seinem Beginn bekommen seine Nummer; ein Datum für alle Checks\nCode: core/storage/durchgaenge.py::DurchgaengeRepository",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "a79c64a7-8ea2-5ab2-97aa-8986578b88e7",
+      "name": "Knopf „Jetzt checken“",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        980
+      ],
+      "notes": "auf jeder Kachel und auf der Titelseite, Depot und Watchlist\nCode: core/ui/titelseite.py::jetzt_checken",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "fdf0df7a-32a4-5a5c-bde7-ecf761b0ca17",
+      "name": "Ein Durchgang ☁️🔒",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        260,
+        980
+      ],
+      "notes": "sofort und live: Cloud-Checks parallel, Watchlist Checker zuletzt\nCode: core/background_jobs.py::run_durchgang",
+      "notesInFlow": true
     }
   ],
   "connections": {
@@ -522,17 +600,7 @@
       "main": [
         [
           {
-            "node": "Storychecker",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Fundamentalwert",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Konsens-Lücken",
+            "node": "Depot prüfen / Watchlist prüfen",
             "type": "main",
             "index": 0
           },
@@ -790,11 +858,108 @@
         ]
       ]
     },
-    "Knopf auf „Portfolio-Story“": {
+    "Depot prüfen / Watchlist prüfen": {
       "main": [
         [
           {
-            "node": "Story, Konsens, Fundamental ☁️",
+            "node": "Storychecker",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fundamentalwert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Konsens-Lücken",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Kapitalallokation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Devil's Advocate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kapitalallokation": {
+      "main": [
+        [
+          {
+            "node": "Modell auflösen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Devil's Advocate": {
+      "main": [
+        [
+          {
+            "node": "Modell auflösen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "„Wartet“ melden": {
+      "main": [
+        [
+          {
+            "node": "Durchgänge nachziehen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Durchgänge nachziehen": {
+      "main": [
+        [
+          {
+            "node": "Schluss-Stufe 🔒",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schluss-Stufe 🔒": {
+      "main": [
+        [
+          {
+            "node": "Durchgang fertig",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knopf „Jetzt checken“": {
+      "main": [
+        [
+          {
+            "node": "Ein Durchgang ☁️🔒",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ein Durchgang ☁️🔒": {
+      "main": [
+        [
+          {
+            "node": "Durchgang fertig",
             "type": "main",
             "index": 0
           }

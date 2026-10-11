@@ -9,13 +9,12 @@ Extras; ohne erreichbares Ollama sind sie ausgegraut (core/ui/lokales_modell.py)
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
 
 import streamlit as st
 
 from core.i18n import current_language, fmt_dt, t
 from core.portfolio_snapshot import build_portfolio_snapshot
-from core.storage.models import PortfolioStory, PortfolioStoryAnalysis
+from core.storage.models import PortfolioStory
 from core.ui.ki import ki_knopf
 from core.ui.lokales_modell import hinweis_einrichten, lokales_modell_bereit
 from core.ui.markdown import llm_markdown
@@ -150,34 +149,26 @@ def _depot():
 
 
 def _story_check(story: PortfolioStory) -> None:
-    """Ein Lauf gegen die Story: Snapshot und die Storychecker-Urteile, Ergebnis in die Datenbank."""
-    positionen, snapshot, alle_urteile = _depot()
-    snapshot = snapshot or "## Portfolio\n" + t("portfolio_story.empty_portfolio") + "\n"
-    urteile = alle_urteile.get("storychecker", {})
-    zeilen = []
-    for p in positionen:
-        v = urteile.get(p.id) if p.id else None
-        if v:
-            zeilen.append(f"- {p.name} ({p.ticker}): {_ICON.get(v.verdict, '⚪')} {v.summary or v.verdict}")
-        elif p.story and p.ticker:
-            zeilen.append(f"- {p.name} ({p.ticker}): {t('portfolio_story.verdict_pending')}")
+    """Ein Lauf gegen die Story mit den Urteilen aller gewählten Depot-Checks
+    (``core/portfolio_check.py``, derselbe Weg wie am Ende des Jobs "Depot prüfen")."""
+    from core.portfolio_check import story_check, urteile_der_checks
+    from core.pruefung import auswahl
+    from state import get_analyses_repo, get_app_config_repo
 
+    positionen = get_portfolio_service().get_portfolio_positions()
+    market_agent = get_market_agent()
+    bewertungen = market_agent.get_portfolio_valuation() if market_agent else []
+    checks = auswahl(get_app_config_repo(), "depot")
     with st.spinner(t("portfolio_story.analyze_spinner")):
-        ergebnis = asyncio.run(get_portfolio_story_agent().analyze_story_and_performance(
-            story=story,
-            portfolio_snapshot=snapshot,
-            position_verdicts="\n".join(zeilen) or t("portfolio_story.no_verdicts"),
+        analyse = asyncio.run(story_check(
+            get_portfolio_story_agent(), story, positionen, bewertungen,
+            urteile_der_checks(get_analyses_repo(), positionen, checks), checks,
+            name_von=lambda c: t(f"kacheln.agent_{c}"),
+            leer=t("portfolio_story.empty_portfolio"),
+            ausstehend=t("portfolio_story.verdict_pending"),
+            keine=t("portfolio_story.no_verdicts"),
         ))
-    repo.save_analysis(PortfolioStoryAnalysis(
-        verdict=ergebnis.verdict,
-        summary=ergebnis.summary,
-        perf_verdict=ergebnis.perf_verdict,
-        perf_summary=ergebnis.perf_summary,
-        stability_verdict=None,
-        stability_summary=None,
-        full_text=ergebnis.full_text,
-        created_at=datetime.now(timezone.utc),
-    ))
+    repo.save_analysis(analyse)
 
 
 st.divider()

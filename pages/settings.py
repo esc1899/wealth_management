@@ -55,23 +55,41 @@ with tab_generell:
     # Section: Pruefung je Liste (core/pruefung.py)
     # ------------------------------------------------------------------
 
-    from core.pruefung import MOEGLICH, auswahl, auswahl_setzen
+    from core.pruefung import MOEGLICH, SKILL_BEREICH, auswahl, auswahl_setzen, skills, skills_setzen
 
     st.subheader(t("settings.pruefung_header"))
     st.markdown(t("settings.pruefung_satz"))
     _cfg = get_app_config_repo()
+    _skills_repo = get_skills_repo()
     with st.form("pruefung_auswahl"):
-        _neu = {
-            _liste: st.multiselect(
+        _neu, _neue_skills = {}, {}
+        for _liste in MOEGLICH:
+            _neu[_liste] = st.multiselect(
                 t(f"settings.pruefung_{_liste}"), options=list(MOEGLICH[_liste]),
                 default=list(auswahl(_cfg, _liste)), format_func=lambda a: t(f"kacheln.agent_{a}"),
                 key=f"pruefung_{_liste}",
             )
-            for _liste in MOEGLICH
-        }
+            # Je Check mit Skill-Bereich der Skill; ohne Skills im Bereich gilt der Standard.
+            _gewaehlt = skills(_cfg, _liste)
+            _neue_skills[_liste] = {}
+            _mit_skill = [(c, _skills_repo.get_by_area(SKILL_BEREICH[c]))
+                          for c in MOEGLICH[_liste] if c in SKILL_BEREICH]
+            _mit_skill = [(c, sk) for c, sk in _mit_skill if sk]
+            if _mit_skill:
+                _spalten = st.columns(len(_mit_skill))
+                for _sp, (_check, _sk) in zip(_spalten, _mit_skill):
+                    _namen = [""] + [x.name for x in _sk]
+                    _jetzt = _gewaehlt.get(_check, "")
+                    _neue_skills[_liste][_check] = _sp.selectbox(
+                        t("settings.pruefung_skill").format(check=t(f"kacheln.agent_{_check}")),
+                        options=_namen, index=_namen.index(_jetzt) if _jetzt in _namen else 0,
+                        format_func=lambda n: n or t("settings.pruefung_skill_standard"),
+                        key=f"pruefung_skill_{_liste}_{_check}",
+                    )
         if st.form_submit_button(t("settings.pruefung_speichern")):
             for _liste, _checks in _neu.items():
                 auswahl_setzen(_cfg, _liste, _checks)
+                skills_setzen(_cfg, _liste, _neue_skills[_liste])
             st.success(t("settings.pruefung_gespeichert"))
 
     st.divider()

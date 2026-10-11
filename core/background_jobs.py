@@ -90,17 +90,19 @@ def _log_to_job(job: dict, msg: str) -> None:
     logger.info(msg)
 
 
-def _resolve_skill(jobs_repo: ScheduledJobsRepository, skills_repo, agent_name: str) -> tuple[str, str]:
+def _resolve_skill(jobs_repo: ScheduledJobsRepository, skills_repo, agent_name: str,
+                   job: dict | None = None) -> tuple[str, str]:
+    """Der Skill eines Checks: aus dem Durchgang (``job["skill"]``), sonst aus der Auswahl der
+    Listen (Einstellungen, core/pruefung.py), sonst der Standard. Die Jobs je Check sind seit
+    Schritt 2 abgeschaltet und tragen keinen Skill mehr."""
+    if job and job.get("skill"):
+        return job["skill"]
     try:
-        for job in jobs_repo.get_all():
-            if job.agent_name == agent_name and job.enabled:
-                skill_name = job.skill_name or "Standard"
-                skill_prompt = ""
-                if job.skill_name:
-                    skill = skills_repo.get_by_name(job.skill_name)
-                    if skill:
-                        skill_prompt = skill.prompt or ""
-                return skill_name, skill_prompt
+        from core.pruefung import MOEGLICH, skill_fuer, skills
+        app_cfg = AppConfigRepository(jobs_repo._conn)
+        for liste in MOEGLICH:
+            if agent_name in skills(app_cfg, liste):
+                return skill_fuer(app_cfg, skills_repo, liste, agent_name)
     except Exception as exc:
         logger.warning(f"Error resolving skill for {agent_name}: {exc}")
     return AGENT_SKILL_DEFAULTS.get(agent_name, "Standard"), ""
@@ -129,7 +131,7 @@ def run_storychecker_job(positions: list, language: str, job: dict, db_path: str
         jobs_repo = ScheduledJobsRepository(conn)
         _usage_repo = UsageRepository(conn)
         job["agents"] = ["Story Checker"]
-        skill_name, _ = _resolve_skill(jobs_repo, skills_repo, "storychecker")
+        skill_name, _ = _resolve_skill(jobs_repo, skills_repo, "storychecker", job)
         _sc_model = _resolve_model_from_conn(conn, "storychecker", CLAUDE_HAIKU)
         llm = _make_bg_llm(_sc_model, "storychecker", _usage_repo)
         llm.skill_context = skill_name
@@ -166,7 +168,7 @@ def run_consensus_gap_job(positions: list, language: str, job: dict, db_path: st
         jobs_repo = ScheduledJobsRepository(conn)
         _usage_repo = UsageRepository(conn)
         job["agents"] = ["Konsens-Lücken"]
-        skill_name, skill_prompt = _resolve_skill(jobs_repo, skills_repo, "consensus_gap")
+        skill_name, skill_prompt = _resolve_skill(jobs_repo, skills_repo, "consensus_gap", job)
         _cg_model = _resolve_model_from_conn(conn, "consensus_gap", CLAUDE_SONNET)
         llm = _make_bg_llm(_cg_model, "consensus_gap", _usage_repo)
         agent = ConsensusGapAgent(llm=llm, analyses_repo=analyses_repo, cg_repo=cg_repo)
@@ -204,7 +206,7 @@ def run_fundamental_job(positions: list, language: str, job: dict, db_path: str,
         analyses_repo = PositionAnalysesRepository(conn)
         skills_repo = get_skills_repo()
         jobs_repo = ScheduledJobsRepository(conn)
-        fund_skill_name, fund_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "fundamental_analyzer")
+        fund_skill_name, fund_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "fundamental_analyzer", job)
         _log_to_job(job, f"Skill resolved: '{fund_skill_name}'")
         _usage_repo = UsageRepository(conn)
         _fa_model = _resolve_model_from_conn(conn, "fundamental_analyzer", CLAUDE_HAIKU)
@@ -250,7 +252,7 @@ def run_capital_allocator_job(positions: list, language: str, job: dict, db_path
         analyses_repo = PositionAnalysesRepository(conn)
         skills_repo = get_skills_repo()
         jobs_repo = ScheduledJobsRepository(conn)
-        ca_skill_name, ca_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "capital_allocator")
+        ca_skill_name, ca_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "capital_allocator", job)
         _log_to_job(job, f"Skill resolved: '{ca_skill_name}'")
         _usage_repo = UsageRepository(conn)
         _ca_model = _resolve_model_from_conn(conn, "capital_allocator", CLAUDE_SONNET)
@@ -300,7 +302,7 @@ def run_devils_advocate_job(positions: list, language: str, job: dict, db_path: 
         analyses_repo = PositionAnalysesRepository(conn)
         skills_repo = get_skills_repo()
         jobs_repo = ScheduledJobsRepository(conn)
-        da_skill_name, da_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "devils_advocate")
+        da_skill_name, da_skill_prompt = _resolve_skill(jobs_repo, skills_repo, "devils_advocate", job)
         _log_to_job(job, f"Skill resolved: '{da_skill_name}'")
         _usage_repo = UsageRepository(conn)
         _da_model = _resolve_model_from_conn(conn, "devils_advocate", CLAUDE_SONNET)
@@ -374,12 +376,15 @@ CHECK_JOBS = {
 }
 
 
-def _parallel(checks, position, language: str, db_path: str, enc_key: str, api_key: str) -> list[str]:
+def _parallel(checks, position, language: str, db_path: str, enc_key: str, api_key: str,
+              skill_je_check: dict | None = None) -> list[str]:
     import threading
 
     zustaende, threads = [], []
     for check in checks:
         z = {"running": True, "done": False, "count": 0, "error": None}
+        if skill_je_check and check in skill_je_check:
+            z["skill"] = skill_je_check[check]
         th = threading.Thread(target=CHECK_JOBS[check], daemon=True,
                               args=([position], language, z, db_path, enc_key, api_key))
         th.start()
@@ -407,10 +412,16 @@ def run_durchgang(position, liste: str, checks, language: str, job: dict, db_pat
         checks = tuple(checks)
         durchgang_id = repo.beginnen(liste, position.id, ausloeser, checks)
         job["durchgang_id"] = durchgang_id
+        from core.pruefung import SKILL_BEREICH, skill_fuer
+        from core.storage.skills import SkillsRepository
+        app_cfg, skills_repo = AppConfigRepository(conn), SkillsRepository(conn)
+        skill_je_check = {c: skill_fuer(app_cfg, skills_repo, liste, c)
+                          for c in checks if c in SKILL_BEREICH}
         fehler: list[str] = []
         for stufe in reihenfolge(checks):
             if stufe:
-                fehler += _parallel(stufe, position, language, db_path, enc_key, api_key)
+                fehler += _parallel(stufe, position, language, db_path, enc_key, api_key,
+                                    skill_je_check)
         zugeordnet = repo.abschliessen(durchgang_id, "; ".join(fehler) or None)
         _log_to_job(job, f"Durchgang {durchgang_id}: {zugeordnet} Urteile, {len(fehler)} Fehler")
         job.update({"running": False, "done": True, "count": zugeordnet, "error": None, "fehler": fehler})

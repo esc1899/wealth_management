@@ -92,6 +92,10 @@ def agenten(dienst, batch_api: bool) -> int:
         ops_events.report_waiting(**stand)
         if stand["anzahl"]:
             print(f"Wartet auf {', '.join(stand['was'])} seit {stand['seit'][11:16]}.")
+    # Durchgaenge, deren Batches jetzt alle da sind, fertig machen (Schluss-Stufe lokal);
+    # auch ohne Batch, falls ein Lauf mittendrin den Strom verlor.
+    for zeile in dienst.durchgaenge_nachziehen():
+        print(zeile)
     if gebremst:
         # Rot, obwohl nichts lief: Sonst wäre die Kachel nach dem dritten Fehlversuch
         # wieder grün, und der Job stünde still, ohne dass es jemand sieht.

@@ -177,3 +177,211 @@ def test_kachel_nennt_gewaehlte_checks_ohne_urteil():
         update={"agent": "consensus_gap"})}, agenten=("storychecker", "fundamental_analyzer"))
     assert [u.agent for u in k.urteile] == ["storychecker"]   # nicht gewaehlt: weg
     assert k.nie == ["fundamental_analyzer"]
+
+
+# ------------------------------------------------------------------
+# Schritt 2: ein Job je Liste
+# ------------------------------------------------------------------
+
+import asyncio
+from datetime import timedelta, timezone
+
+from core.pruefung import JOB, jobs_umstellen, skill_fuer, skills
+from core.portfolio_check import urteilszeilen
+from core.scheduler import AgentSchedulerService
+from core.storage.base import build_encryption_service
+from core.storage.batch_queue import BatchQueueRepository
+from core.storage.models import ScheduledJob, Skill
+from core.storage.positions import PositionsRepository
+from core.storage.scheduled_jobs import ScheduledJobsRepository
+from core.storage.skills import SkillsRepository
+
+
+def _job(repo, agent, **kw):
+    werte = dict(agent_name=agent, skill_name="", skill_prompt="", frequency="monthly",
+                 run_hour=8, run_minute=0, run_day=1)
+    werte.update(kw)
+    return repo.add(ScheduledJob(**werte))
+
+
+class TestJobsUmstellen:
+    def test_takt_des_storycheckers_alte_aus_skills_uebernommen(self, conn):
+        jobs, cfg = ScheduledJobsRepository(conn), AppConfigRepository(conn)
+        _job(jobs, "storychecker", frequency="weekly", run_weekday=0, run_hour=7, run_minute=30)
+        _job(jobs, "fundamental_analyzer", skill_name="Tiefenpruefung")
+        news = _job(jobs, "news")
+
+        assert jobs_umstellen(jobs, cfg) is True
+        alle = {j.agent_name: j for j in jobs.get_all()}
+        depot, wl = alle[JOB["depot"]], alle[JOB["watchlist"]]
+        assert (depot.frequency, depot.run_weekday, depot.run_hour, depot.run_minute) == ("weekly", 0, 7, 30)
+        assert depot.enabled and not wl.enabled
+        assert not alle["storychecker"].enabled and not alle["fundamental_analyzer"].enabled
+        assert alle["news"].enabled and news.id == alle["news"].id
+        assert skills(cfg, "depot") == {"fundamental_analyzer": "Tiefenpruefung"}
+        assert skills(cfg, "watchlist") == {"fundamental_analyzer": "Tiefenpruefung"}
+
+        # Ein zweites Mal aendert nichts -- auch nicht, wenn Erik einen alten Job wieder anschaltet.
+        jobs.set_enabled(alle["storychecker"].id, True)
+        assert jobs_umstellen(jobs, cfg) is False
+        assert len(jobs.get_all()) == 5
+        assert jobs.get(alle["storychecker"].id).enabled
+
+    def test_ohne_storychecker_monatlich(self, conn):
+        jobs, cfg = ScheduledJobsRepository(conn), AppConfigRepository(conn)
+        jobs_umstellen(jobs, cfg)
+        depot = next(j for j in jobs.get_all() if j.agent_name == JOB["depot"])
+        assert (depot.frequency, depot.run_day, depot.run_hour, depot.enabled) == ("monthly", 1, 6, True)
+
+
+def test_skill_fuer(conn):
+    cfg, sk = AppConfigRepository(conn), SkillsRepository(conn)
+    sk.add(Skill(name="Moat", area="consensus_gap", prompt="Achte auf den Burggraben."))
+    cfg.set_json("pruefung_skills_depot", {"consensus_gap": "Moat", "fundamental_analyzer": "fehlt"})
+    assert skill_fuer(cfg, sk, "depot", "consensus_gap") == ("Moat", "Achte auf den Burggraben.")
+    assert skill_fuer(cfg, sk, "depot", "fundamental_analyzer") == ("Standard", "")
+    assert skill_fuer(cfg, sk, "watchlist", "consensus_gap") == ("Standard", "")
+
+
+def test_urteilszeilen_lesen_alle_gewaehlten_checks():
+    p = SimpleNamespace(id=1, name="Munich Re", ticker="MUV2.DE")
+    u = SimpleNamespace(verdict="fair", summary="Preis passt.")
+    text = urteilszeilen([p], {"fundamental_analyzer": {1: u}}, ("storychecker", "fundamental_analyzer"))
+    assert "- Munich Re (MUV2.DE)" in text
+    assert "  - storychecker: noch nicht geprüft" in text
+    assert "  - fundamental_analyzer: fair — Preis passt." in text
+
+
+# --- Scheduler mit einer Datenbank im Testordner -----------------------------
+
+@pytest.fixture
+def dienst(tmp_path):
+    pfad = str(tmp_path / "wm.db")
+    c = get_connection(pfad)
+    init_db(c)
+    migrate_db(c)
+    d = AgentSchedulerService(db_path=pfad, encryption_key="test-key", anthropic_api_key="k",
+                              default_claude_model="claude-haiku-4-5-20251001")
+    # Derselbe Schluessel wie der Dienst, aus seinem eigenen Pfad im Testordner.
+    yield d, c, build_encryption_service("test-key", d._salt_path)
+    c.close()
+
+
+def _titel(enc, c, name, **kw):
+    return PositionsRepository(c, enc).add(Position(
+        asset_class="Aktie", investment_type="Wertpapiere", name=name, ticker=name[:3].upper(),
+        unit="Stück", added_date=date(2026, 1, 1), story="These", **kw))
+
+
+class TestNachziehen:
+    def test_wartet_auf_den_batch_seiner_checks(self, dienst):
+        d, c, _ = dienst
+        repo = DurchgaengeRepository(c)
+        did = repo.beginnen("depot", 1, "job", ["storychecker"])
+        BatchQueueRepository(c).create("b1", "storychecker", None, "de", 1)
+        aufrufe = []
+
+        async def portfolio(conn):
+            aufrufe.append("pc")
+            return "Portfolio Checker: ok"
+        d._portfolio_check_lauf = portfolio
+
+        assert asyncio.run(d._nachziehen(c)) == []
+        assert repo.get(did).beendet is None
+        BatchQueueRepository(c).mark_done("b1", 1, 0)
+        zeilen = asyncio.run(d._nachziehen(c))
+        assert repo.get(did).beendet is not None and aufrufe == ["pc"]
+        assert any("1 Durchgänge fertig" in z for z in zeilen)
+
+    def test_schluss_stufe_einmal_je_liste_und_ihr_fehler_bleibt(self, dienst):
+        d, c, _ = dienst
+        repo = DurchgaengeRepository(c)
+        ids = [repo.beginnen("watchlist", p, "job", ["storychecker", "watchlist_checker"]) for p in (1, 2)]
+        gesehen = []
+
+        async def wc(conn, position_ids):
+            gesehen.append(sorted(position_ids))
+            raise RuntimeError("Ollama nicht erreichbar")
+        d._watchlist_checker_lauf = wc
+
+        asyncio.run(d._nachziehen(c))
+        assert gesehen == [[1, 2]]
+        assert all("Ollama nicht erreichbar" in repo.get(i).fehler for i in ids)
+        assert all(repo.get(i).beendet for i in ids)
+
+    def test_verwaister_knopf_durchgang(self, dienst):
+        d, c, _ = dienst
+        repo = DurchgaengeRepository(c)
+        alt = repo.beginnen("depot", 1, "knopf", ["storychecker"])
+        neu = repo.beginnen("depot", 2, "knopf", ["storychecker"])
+        c.execute("UPDATE durchgaenge SET begonnen = ? WHERE id = ?",
+                  ((datetime.now(timezone.utc) - timedelta(hours=3)).isoformat(), alt))
+        c.commit()
+        asyncio.run(d._nachziehen(c))
+        assert repo.get(alt).fehler == "Abgebrochen (App beendet)"
+        assert repo.get(neu).beendet is None
+
+
+class TestPruefungsJob:
+    def _vorbereiten(self, d, c, enc, scheitern=()):
+        a = _titel(enc, c, "Alpha", in_portfolio=True)
+        b = _titel(enc, c, "Beta", in_portfolio=True)
+        _titel(enc, c, "Gamma", in_watchlist=True)
+        AppConfigRepository(c).set_json("pruefung_auswahl_depot", ["storychecker", "capital_allocator"])
+        laeufe = []
+
+        def fake(check):
+            async def lauf(job, conn, log, positionen=None):
+                laeufe.append((check, job.agent_name, sorted(p.name for p in positionen)))
+                if check in scheitern:
+                    raise RuntimeError(f"{check} kaputt")
+            return lauf
+        for check, methode in d._CHECK_LAEUFE.items():
+            setattr(d, methode, fake(check))
+
+        async def portfolio(conn):
+            return "Portfolio Checker: ok"
+        d._portfolio_check_lauf = portfolio
+        return a, b, laeufe
+
+    def _job(self):
+        return ScheduledJob(agent_name="pruefung_depot", skill_name="", skill_prompt="", frequency="monthly")
+
+    def test_live_alle_titel_je_titel_ein_durchgang(self, dienst):
+        d, c, enc = dienst
+        a, b, laeufe = self._vorbereiten(d, c, enc)
+        asyncio.run(d._run_pruefung_job(self._job(), c, lambda _: None, "depot"))
+        assert laeufe == [("storychecker", "storychecker", ["Alpha", "Beta"]),
+                          ("capital_allocator", "capital_allocator", ["Alpha", "Beta"])]
+        ds = DurchgaengeRepository(c)
+        for p in (a, b):
+            [x] = ds.fuer_titel(p.id)
+            assert x.beendet and x.ausloeser == "job" and x.fehler is None
+
+    def test_ein_check_scheitert_der_job_bleibt_gruen(self, dienst):
+        d, c, enc = dienst
+        a, _, _ = self._vorbereiten(d, c, enc, scheitern=("capital_allocator",))
+        asyncio.run(d._run_pruefung_job(self._job(), c, lambda _: None, "depot"))
+        [durchgang] = DurchgaengeRepository(c).fuer_titel(a.id)
+        assert "capital_allocator kaputt" in durchgang.fehler
+
+    def test_alle_checks_scheitern_der_job_ist_rot(self, dienst):
+        d, c, enc = dienst
+        self._vorbereiten(d, c, enc, scheitern=("storychecker", "capital_allocator"))
+        with pytest.raises(RuntimeError):
+            asyncio.run(d._run_pruefung_job(self._job(), c, lambda _: None, "depot"))
+
+
+def test_ca_batch_antwort_wird_urteil(dienst):
+    d, c, enc = dienst
+    a = _titel(enc, c, "Alpha", in_portfolio=True)
+    block = SimpleNamespace(type="tool_use", name="submit_ca_verdict",
+                            input={"position_id": a.id, "verdict": "solide", "summary": "Ordentlich.",
+                                   "analysis": "Rueckkaeufe guenstig."})
+    result = SimpleNamespace(custom_id=f"ca_{a.id}",
+                             result=SimpleNamespace(message=SimpleNamespace(content=[block])))
+    assert d._process_ca_result(result, "Standard", c) is True
+    [u] = PositionAnalysesRepository(c).get_for_position(a.id)
+    assert (u.agent, u.verdict, u.summary) == ("capital_allocator", "solide", "Ordentlich.")
+    falsch = SimpleNamespace(custom_id="ca_x", result=result.result)
+    assert d._process_ca_result(falsch, "Standard", c) is False

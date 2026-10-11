@@ -96,6 +96,10 @@ def db(tmp_path):
     conn = get_connection(pfad)
     init_db(conn)
     migrate_db(conn)
+    # Die einmalige Umstellung auf die Pruefung je Liste (core/pruefung.py) gilt hier als
+    # geschehen; sie hat ihre eigenen Tests (test_durchgang.py).
+    from core.storage.app_config import AppConfigRepository
+    AppConfigRepository(conn).set("pruefung_jobs_umgestellt", "1")
     yield pfad, ScheduledJobsRepository(conn)
     conn.close()
 
@@ -124,17 +128,21 @@ def _lief_um(repo, job_id, lokal: datetime):
 
 
 class TestLaufenLassen:
-    def test_devils_advocate_laeuft_nie_eingeplant(self, db):
-        # Die Watchlist prueft Erik auf Knopfdruck (2026-10-06); ein frueher
-        # angelegter Job laeuft nicht mehr von selbst, auch wenn er faellig waere.
+    def test_umstellung_schaltet_die_jobs_je_check_ab(self, db):
+        """11.10.2026: Was eingeplant laeuft, sagt die Pruefung je Liste. Ein alter Job je
+        Check laeuft nach der Umstellung nicht mehr, "Depot pruefen" an seiner Stelle."""
         pfad, repo = db
-        _neu(repo, agent_name="devils_advocate")
+        repo._conn.execute("DELETE FROM app_config WHERE key = 'pruefung_jobs_umgestellt'")
+        repo._conn.commit()
+        alt = _neu(repo, agent_name="devils_advocate")
         news = _neu(repo, agent_name="news")
         d = _dienst(pfad)
         d._execute_job = AsyncMock()
-        gelaufen, fehl, _ = d.laufen_lassen(now=datetime(2026, 10, 1, 12, 0), aus=lambda _: None)
-        assert (gelaufen, fehl) == (1, [])
-        d._execute_job.assert_awaited_once_with(news.id)
+        d.laufen_lassen(now=datetime(2026, 10, 1, 12, 0), aus=lambda _: None)
+        gelaufen = {c.args[0] for c in d._execute_job.await_args_list}
+        depot = next(j for j in repo.get_all() if j.agent_name == "pruefung_depot")
+        assert alt.id not in gelaufen
+        assert {news.id, depot.id} <= gelaufen
 
     def test_laesst_nur_faellige_laufen(self, db):
         pfad, repo = db

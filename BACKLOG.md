@@ -145,27 +145,13 @@ beim Aufraeumen ohnehin dran ist -- vorher lohnt es nicht, weil manche Seite ent
 
 ## Checks je Liste: eine Auswahl, ein Durchgang (10.10.2026)
 
-Seit 11.10.2026 steht Schritt 1: je Liste eine Auswahl (Einstellungen, `core/pruefung.py`),
-Kacheln und Titelseite zeigen genau sie, "Jetzt checken" auf Kachel und Titelseite laesst sie
-fuer einen Titel als Durchgang laufen (Tabelle `durchgaenge`). Devil's Advocate gehoert nur auf
-die Watchlist (Erik, 11.10.2026). Offen, in dieser Reihenfolge (Erik, 11.10.2026):
+Seit 11.10.2026 stehen Schritt 1 und 2: je Liste eine Auswahl mit Skill je Check
+(Einstellungen, `core/pruefung.py`), "Jetzt checken" je Titel, die Jobs "Depot pruefen" und
+"Watchlist pruefen" (aus) statt der Jobs je Check, der Portfolio Checker am Ende des
+Depot-Jobs. Offen, in dieser Reihenfolge (Erik, 11.10.2026):
 
-**Schritt 2: ein Job je Liste statt der Agent-Jobs.**
-- Im Scheduler "Depot pruefen" und "Watchlist pruefen", die genau die Auswahl der Liste fuer
-  alle Titel laufen lassen. Der Watchlist-Job wird angelegt, ist aber aus: Die Watchlist wird
-  geprueft, wenn Erik es will (06.10.2026). Die Agent-Jobs je Check fallen weg, ebenso
-  `NUR_AUF_KNOPFDRUCK`.
-- Der Skill je Check wandert in die Auswahl; heute kommt er noch aus dem Scheduler-Job des
-  Checks (`core/background_jobs.py::_resolve_skill`).
-- Batch-Laeufe kommen erst am naechsten Morgen zurueck; der Durchgang ist erst fertig, wenn
-  alle Antworten da sind (`DurchgaengeRepository.abschliessen` beim Abholen), und meldet bis
-  dahin `wartet` (Hausregel).
-- Der **Portfolio Checker** (lokal, Ollama) laeuft am Ende des Depot-Jobs: Er arbeitet mit den
-  vorhandenen Urteilen der gewaehlten Checks und der Portfolio-Story (Erik, 11.10.2026; pruefen,
-  was er heute genau liest). Sein Ergebnis steht als ein Satz oben auf der Depot-Kachelseite.
-- Die Seiten Portfolio Checker und Watchlist Checker entfallen danach.
-- Bleiben eigene Jobs, weil sie keinen Titel pruefen: Sektor-Rotation, News Digest,
-  Strukturwandel, Investment-Suche, Snapshots und Rueckblicke.
+**Nach dem ersten Lauf (Erik):** die abgeschalteten Jobs je Check loeschen, wenn "Depot
+pruefen" traegt; dann auch die Seiten Portfolio Checker und Watchlist Checker (ausgeblendet).
 
 **Schritt 3: Titelseite nach dem Durchgang** (oben, "Kacheln loesen die alten Ansichten ab").
 Aeltere Analysen ohne Durchgang werden je Titel und Tag zusammengefasst und stehen als

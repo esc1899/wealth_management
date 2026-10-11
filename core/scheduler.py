@@ -51,6 +51,7 @@ BATCH_NAMEN = {
     "consensus_gap": "Konsens-Lücken", "sector_rotation": "Sektor-Rotation",
     "structural_scan": "Strukturwandel", "search_agent": "Investment-Suche",
     "news_digest": "News-Digest", "devils_advocate": "Devil's Advocate",
+    "capital_allocator": "Kapitalallokation",
 }
 
 logger = logging.getLogger(__name__)
@@ -65,11 +66,9 @@ VERWAIST_NACH = timedelta(hours=2)
 # waits for the next one (2026-10-02). "Run now" on the page does not count.
 FEHLVERSUCHE_JE_TERMIN = 3
 
-# Agents that run only on demand, never on schedule (2026-10-06, Erik): Devil's
-# Advocate checks the watchlist, and the watchlist is checked when he asks for it
-# on the Watchlist Checker page. The Scheduler page no longer offers it; a job
-# created before is skipped here. "Run now" on the page still runs it.
-NUR_AUF_KNOPFDRUCK = frozenset({"devils_advocate"})
+# Was eingeplant laeuft, sagt die Auswahl je Liste (core/pruefung.py): je Liste ein Job,
+# "Depot pruefen" und "Watchlist pruefen". Die Jobs je Check sind seit 11.10.2026 aus
+# (jobs_umstellen); "Jetzt ausfuehren" geht bei ihnen weiter.
 
 
 def letzte_feuerzeit(job: ScheduledJob, now: datetime) -> Optional[datetime]:
@@ -149,11 +148,15 @@ class AgentSchedulerService:
     # ------------------------------------------------------------------
 
     def faellige_jobs(self, now: Optional[datetime] = None) -> list[ScheduledJob]:
+        from core.pruefung import jobs_umstellen
+        from core.storage.app_config import AppConfigRepository
+
         now = now or datetime.now()
         conn = self._open_conn()
         try:
-            return [j for j in ScheduledJobsRepository(conn).get_enabled()
-                    if j.agent_name not in NUR_AUF_KNOPFDRUCK and ist_faellig(j, now)]
+            jobs_repo = ScheduledJobsRepository(conn)
+            jobs_umstellen(jobs_repo, AppConfigRepository(conn))
+            return [j for j in jobs_repo.get_enabled() if ist_faellig(j, now)]
         finally:
             conn.close()
 
@@ -333,6 +336,11 @@ class AgentSchedulerService:
             await self._run_search_agent_job(job, conn, _log)
         elif job.agent_name == "devils_advocate":
             await self._run_devils_advocate_job(job, conn, _log)
+        elif job.agent_name == "capital_allocator":
+            await self._run_capital_allocator_job(job, conn, _log)
+        elif job.agent_name in ("pruefung_depot", "pruefung_watchlist"):
+            from core.pruefung import LISTE_DES_JOBS
+            await self._run_pruefung_job(job, conn, _log, LISTE_DES_JOBS[job.agent_name])
         elif job.agent_name == "wealth_snapshot":
             await self._run_wealth_snapshot_job(job, conn, _log)
         elif job.agent_name == "monthly_digest":
@@ -588,7 +596,7 @@ class AgentSchedulerService:
         _, proposals = await agent.chat(session_id=session.id, user_message=query)
         _log(f"Investment-Suche abgeschlossen — {len(proposals)} Vorschläge")
 
-    async def _run_consensus_gap_job(self, job, conn, log_fn=None) -> None:
+    async def _run_consensus_gap_job(self, job, conn, log_fn=None, positionen=None) -> None:
         from agents.consensus_gap_agent import ConsensusGapAgent
         from core.storage.analyses import PositionAnalysesRepository
         from core.storage.consensus_gap import ConsensusGapRepository
@@ -601,7 +609,8 @@ class AgentSchedulerService:
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         cg_repo = ConsensusGapRepository(conn)
-        positions = [p for p in positions_repo.get_portfolio() if p.story and not p.analysis_excluded]
+        quelle = positionen if positionen is not None else positions_repo.get_portfolio()
+        positions = [p for p in quelle if p.story and not p.analysis_excluded]
         if not positions:
             _log("Keine Positionen mit Story — übersprungen")
             return
@@ -623,7 +632,7 @@ class AgentSchedulerService:
         )
         _log(f"Konsens-Lücken abgeschlossen")
 
-    async def _run_storychecker_job(self, job, conn, log_fn=None) -> None:
+    async def _run_storychecker_job(self, job, conn, log_fn=None, positionen=None) -> None:
         from agents.storychecker_agent import StorycheckerAgent
         from core.storage.analyses import PositionAnalysesRepository
         from core.storage.skills import SkillsRepository
@@ -638,7 +647,8 @@ class AgentSchedulerService:
         analyses_repo = PositionAnalysesRepository(conn)
         storychecker_repo = StorycheckerRepository(conn)
         skills_repo = SkillsRepository(conn)
-        positions = [p for p in positions_repo.get_portfolio() if p.story and not p.analysis_excluded]
+        quelle = positionen if positionen is not None else positions_repo.get_portfolio()
+        positions = [p for p in quelle if p.story and not p.analysis_excluded]
         if not positions:
             _log("Keine Positionen mit Story — übersprungen")
             return
@@ -661,7 +671,7 @@ class AgentSchedulerService:
         await agent.batch_check_all(positions=positions, language="de")
         _log("Storychecker abgeschlossen")
 
-    async def _run_fundamental_job(self, job, conn, log_fn=None) -> None:
+    async def _run_fundamental_job(self, job, conn, log_fn=None, positionen=None) -> None:
         from agents.fundamental_analyzer_agent import FundamentalAnalyzerAgent
         from core.storage.analyses import PositionAnalysesRepository
         from core.storage.fundamental_analyzer import FundamentalAnalyzerRepository
@@ -675,7 +685,8 @@ class AgentSchedulerService:
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         fa_repo = FundamentalAnalyzerRepository(conn)
-        positions = [p for p in positions_repo.get_portfolio() if p.ticker and not p.analysis_excluded]
+        quelle = positionen if positionen is not None else positions_repo.get_portfolio()
+        positions = [p for p in quelle if p.ticker and not p.analysis_excluded]
         if not positions:
             _log("Keine Positionen mit Ticker — übersprungen")
             return
@@ -698,7 +709,7 @@ class AgentSchedulerService:
         )
         _log("Fundamental-Analyse abgeschlossen")
 
-    async def _run_devils_advocate_job(self, job, conn, log_fn=None) -> None:
+    async def _run_devils_advocate_job(self, job, conn, log_fn=None, positionen=None) -> None:
         from agents.devils_advocate_agent import DevilsAdvocateAgent
         from core.storage.analyses import PositionAnalysesRepository
         from core.storage.devils_advocate import DevilsAdvocateRepository
@@ -712,7 +723,8 @@ class AgentSchedulerService:
         positions_repo = PositionsRepository(conn, enc)
         analyses_repo = PositionAnalysesRepository(conn)
         da_repo = DevilsAdvocateRepository(conn)
-        positions = [p for p in positions_repo.get_watchlist() if p.ticker and p.id and not p.analysis_excluded and not p.in_portfolio]
+        quelle = positionen if positionen is not None else positions_repo.get_watchlist()
+        positions = [p for p in quelle if p.ticker and p.id and not p.analysis_excluded and not p.in_portfolio]
         if not positions:
             _log("Keine Watchlist-Positionen mit Ticker — übersprungen")
             return
@@ -732,6 +744,239 @@ class AgentSchedulerService:
             language="de",
         )
         _log(f"Devil's Advocate abgeschlossen: {len(results)} Verdicts")
+
+    async def _run_capital_allocator_job(self, job, conn, log_fn=None, positionen=None) -> None:
+        """Kapitalallokation je Titel mit Ticker; ohne ``positionen`` das Depot."""
+        from agents.capital_allocator_agent import CapitalAllocatorAgent
+        from core.storage.analyses import PositionAnalysesRepository
+        from core.storage.capital_allocator import CapitalAllocatorRepository
+        from core.storage.models import PublicPosition
+        _log = log_fn or logger.info
+
+        enc = build_encryption_service(self._enc_key, self._salt_path)
+        model = self._resolve_model("capital_allocator", job.model or "", conn)
+        _log(f"Modell: {model}")
+        positions_repo = PositionsRepository(conn, enc)
+        quelle = positionen if positionen is not None else positions_repo.get_portfolio()
+        positions = [p for p in quelle if p.ticker and p.id and not p.analysis_excluded]
+        if not positions:
+            _log("Keine Positionen mit Ticker — übersprungen")
+            return
+        _log(f"{len(positions)} Positionen werden analysiert")
+        pub_positions = [PublicPosition(id=p.id, name=p.name, ticker=p.ticker, isin=p.isin, asset_class=p.asset_class, anlageart=p.anlageart, story=p.story, story_skill=p.story_skill) for p in positions]
+        skill_name = job.skill_name or "Standard"
+        if self._can_use_batch_api(model):
+            batch_id = await self._submit_capital_allocator_batch(
+                pub_positions, skill_name, job.skill_prompt or "", model, conn)
+            _log(f"Batch submitted: {batch_id}")
+            return
+
+        llm = self._make_scheduled_llm("capital_allocator", model, conn)
+        agent = CapitalAllocatorAgent(llm=llm, analyses_repo=PositionAnalysesRepository(conn),
+                                      ca_repo=CapitalAllocatorRepository(conn))
+        results = await agent.analyze_portfolio(positions=pub_positions, skill_name=skill_name,
+                                                skill_prompt=job.skill_prompt or "", language="de")
+        _log(f"Kapitalallokation abgeschlossen: {len(results)} Verdicts")
+
+    # ------------------------------------------------------------------
+    # Pruefung je Liste: ein Job, alle gewaehlten Checks, je Titel ein Durchgang
+    # ------------------------------------------------------------------
+
+    _CHECK_LAEUFE = {
+        "storychecker": "_run_storychecker_job",
+        "fundamental_analyzer": "_run_fundamental_job",
+        "consensus_gap": "_run_consensus_gap_job",
+        "capital_allocator": "_run_capital_allocator_job",
+        "devils_advocate": "_run_devils_advocate_job",
+    }
+
+    async def _run_pruefung_job(self, job, conn, log_fn, liste: str) -> None:
+        """Die Auswahl der Liste fuer alle ihre Titel (core/pruefung.py). Je Titel beginnt ein
+        Durchgang; die Cloud-Checks laufen einer nach dem anderen ueber alle Titel, als Batch
+        oder live. Fertig wird der Durchgang in ``durchgaenge_nachziehen`` -- gleich am Ende,
+        oder beim Abholen, wenn alle Batches seiner Checks da sind."""
+        from core.pruefung import auswahl, reihenfolge, skill_fuer
+        from core.storage.app_config import AppConfigRepository
+        from core.storage.durchgaenge import DurchgaengeRepository
+        from core.storage.skills import SkillsRepository
+        _log = log_fn or logger.info
+
+        enc = build_encryption_service(self._enc_key, self._salt_path)
+        positions_repo = PositionsRepository(conn, enc)
+        quelle = positions_repo.get_portfolio() if liste == "depot" else positions_repo.get_watchlist()
+        titel = [p for p in quelle if p.id is not None and not p.analysis_excluded]
+        app_cfg, skills_repo = AppConfigRepository(conn), SkillsRepository(conn)
+        checks = auswahl(app_cfg, liste)
+        if not titel or not checks:
+            _log("Keine Titel oder keine Checks gewählt — übersprungen")
+            return
+        _log(f"{len(titel)} Titel, Checks: {', '.join(checks)}")
+
+        durchgaenge = DurchgaengeRepository(conn)
+        ids = [durchgaenge.beginnen(liste, p.id, "job", checks) for p in titel]
+
+        fehler: list[str] = []
+        cloud = reihenfolge(checks)[0]
+        for check in cloud:
+            name, prompt = skill_fuer(app_cfg, skills_repo, liste, check)
+            ersatz = ScheduledJob(agent_name=check, skill_name=name, skill_prompt=prompt,
+                                  frequency="manual")
+            _log(f"— {BATCH_NAMEN.get(check, check)}")
+            try:
+                await getattr(self, self._CHECK_LAEUFE[check])(ersatz, conn, _log, positionen=titel)
+            except Exception as exc:
+                # Ein Check, der scheitert, haelt die anderen nicht auf.
+                logger.exception("Check %s im Job %s", check, job.agent_name)
+                _log(f"{check}: fehlgeschlagen: {exc}")
+                fehler.append(f"{check}: {exc}")
+                durchgaenge.fehler_vermerken(ids, f"{check}: {exc}")
+        for zeile in await self._nachziehen(conn):
+            _log(zeile)
+        # Rot nur, wenn nichts ging: Sonst wiederholte der Scheduler stuendlich den ganzen Job
+        # und bezahlte die gelungenen Checks noch einmal. Ein einzelner Fehler steht im
+        # Durchgang und in der Ausgabe.
+        if cloud and len(fehler) == len(cloud):
+            raise RuntimeError("; ".join(fehler))
+
+    def durchgaenge_nachziehen(self) -> list[str]:
+        """Offene Durchgaenge fertig machen (scripts/job.py, nach dem Abholen der Batches)."""
+        conn = self._open_conn()
+        try:
+            return asyncio.run(self._nachziehen(conn))
+        finally:
+            conn.close()
+
+    async def _nachziehen(self, conn) -> list[str]:
+        """Offene Durchgaenge fertig machen, idempotent -- nach dem Job und bei jedem Abholen.
+
+        Ein Job-Durchgang ist fertig, wenn kein Batch eines seiner Checks mehr aussteht. Dann
+        laeuft je Liste einmal die Schluss-Stufe (Watchlist: Watchlist Checker ueber diese
+        Titel; Depot: Portfolio Checker gegen die Story), danach der Abschluss. Ein
+        Knopf-Durchgang, der nach VERWAIST_NACH noch offen ist, gehoert einer beendeten App."""
+        from core.pruefung import reihenfolge
+        from core.storage.batch_queue import BatchQueueRepository
+        from core.storage.durchgaenge import DurchgaengeRepository
+
+        zeilen: list[str] = []
+        repo = DurchgaengeRepository(conn)
+        offen = repo.offene()
+        if not offen:
+            return zeilen
+        ausstehend = {b.agent_name for b in BatchQueueRepository(conn).get_pending()}
+        grenze = datetime.now(timezone.utc) - VERWAIST_NACH
+
+        fertig: dict[str, list] = {}
+        for d in offen:
+            if d.ausloeser != "job":
+                if d.begonnen < grenze:
+                    repo.abschliessen(d.id, "Abgebrochen (App beendet)")
+                continue
+            if set(d.checks) & ausstehend:
+                continue
+            fertig.setdefault(d.liste, []).append(d)
+
+        for liste, ds in fertig.items():
+            fehler = None
+            schluss = set().union(*(reihenfolge(d.checks)[1] for d in ds))
+            try:
+                if liste == "watchlist" and "watchlist_checker" in schluss:
+                    zeilen.append(await self._watchlist_checker_lauf(conn, [d.position_id for d in ds]))
+                elif liste == "depot":
+                    zeilen.append(await self._portfolio_check_lauf(conn))
+            except Exception as exc:
+                logger.exception("Schluss-Stufe %s", liste)
+                fehler = f"Schluss-Stufe: {exc}"
+                zeilen.append(f"{liste}: {fehler}")
+            zugeordnet = sum(repo.abschliessen(d.id, fehler) for d in ds)
+            zeilen.append(f"Prüfung {liste}: {len(ds)} Durchgänge fertig, {zugeordnet} Urteile")
+        return [z for z in zeilen if z]
+
+    def _make_scheduled_ollama(self, agent_name: str, agent_key: str, conn, timeout: float = 300.0):
+        """Ollama fuer einen Job -- wie state_llm._make_ollama_provider, ohne Streamlit."""
+        from core.llm.local import OllamaProvider
+        from core.llm.router import resolve_house_model
+        from core.storage.app_config import AppConfigRepository
+
+        app_cfg = AppConfigRepository(conn)
+        model = (app_cfg.get(f"model_ollama_{agent_key}") or app_cfg.get("model_ollama")
+                 or config.OLLAMA_MODEL)
+        model = resolve_house_model(model, local=True, fallback=config.OLLAMA_MODEL)
+        params = app_cfg.get_ollama_params(model)
+        provider = OllamaProvider(host=config.OLLAMA_HOST, model=model, timeout=timeout,
+                                  think=params["think"],
+                                  num_ctx=params["num_ctx"] or config.OLLAMA_NUM_CTX)
+        usage_repo = UsageRepository(conn)
+        provider.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: usage_repo.record(
+            agent_name, model, i, o, skill=skill, source="scheduled", duration_ms=dur, position_count=pos)
+        return provider
+
+    async def _watchlist_checker_lauf(self, conn, position_ids: list[int]) -> str:
+        """Der Watchlist Checker ueber diese Titel, nach den Cloud-Checks (er liest ihre Urteile)."""
+        from agents.watchlist_checker_agent import WatchlistCheckerAgent
+        from core.pruefung import depot_kontext
+        from core.storage.analyses import PositionAnalysesRepository
+        from core.storage.portfolio_story import PortfolioStoryRepository
+        from core.storage.agent_runs import AgentRunsRepository
+        from core.storage.watchlist_checker_repo import WatchlistCheckerRepository
+
+        enc = build_encryption_service(self._enc_key, self._salt_path)
+        positions_repo = PositionsRepository(conn, enc)
+        ids = set(position_ids)
+        titel = [p for p in positions_repo.get_watchlist() if p.id in ids]
+        if not titel:
+            return ""
+        snapshot, story = depot_kontext(positions_repo.get_portfolio(),
+                                        PortfolioStoryRepository(conn, enc).get_latest_analysis())
+        agent = WatchlistCheckerAgent(
+            positions_repo=positions_repo, analyses_repo=PositionAnalysesRepository(conn),
+            llm=self._make_scheduled_ollama("watchlist_checker", "watchlist_checker", conn),
+            wc_repo=WatchlistCheckerRepository(conn), agent_runs_repo=AgentRunsRepository(conn))
+        ergebnis = await agent.check_watchlist(
+            portfolio_snapshot=snapshot, watchlist_positions=titel, story_analysis_text=story,
+            selected_skill=None, language="de")
+        return f"Watchlist Checker: {len(ergebnis.position_fits)} von {len(titel)} Titeln beurteilt"
+
+    async def _portfolio_check_lauf(self, conn) -> str:
+        """Der Portfolio Checker am Ende des Depot-Jobs, mit den Urteilen der gewaehlten Checks."""
+        from agents.portfolio_story_agent_v2 import PortfolioStoryAgentV2
+        from core.portfolio_check import story_check, urteile_der_checks
+        from core.pruefung import auswahl
+        from core.storage.analyses import PositionAnalysesRepository
+        from core.storage.app_config import AppConfigRepository
+        from core.storage.market_data import MarketDataRepository
+        from core.storage.portfolio_story import PortfolioStoryRepository
+
+        enc = build_encryption_service(self._enc_key, self._salt_path)
+        story_repo = PortfolioStoryRepository(conn, enc)
+        story = story_repo.get_current()
+        if not story or not story.story:
+            return "Portfolio Checker: keine Portfolio-Story — übersprungen"
+        positions_repo = PositionsRepository(conn, enc)
+        positionen = positions_repo.get_portfolio()
+        checks = auswahl(AppConfigRepository(conn), "depot")
+        market_repo = MarketDataRepository(conn)
+        agent = PortfolioStoryAgentV2(
+            llm=self._make_scheduled_ollama("portfolio_story_check", "portfolio_story", conn),
+            positions_repo=positions_repo, market_repo=market_repo)
+        analyse = await story_check(
+            agent, story, positionen, self._bewertungen(conn, positions_repo, market_repo),
+            urteile_der_checks(PositionAnalysesRepository(conn), positionen, checks), checks)
+        story_repo.save_analysis(analyse)
+        return f"Portfolio Checker: Story {analyse.verdict}, Positionen {analyse.perf_verdict}"
+
+    def _bewertungen(self, conn, positions_repo, market_repo) -> list:
+        """Gespeicherte Bewertungen des Depots -- der Job holt keine Kurse (das tut ``kurse``)."""
+        from agents.market_data_agent import MarketDataAgent
+        from agents.market_data_fetcher import MarketDataFetcher, RateLimiter
+        try:
+            return MarketDataAgent(
+                positions_repo=positions_repo, market_repo=market_repo,
+                fetcher=MarketDataFetcher(rate_limiter=RateLimiter(calls_per_second=1)),
+                db_path=self._db_path, encryption_key=self._enc_key,
+            ).get_portfolio_valuation()
+        except Exception:
+            logger.exception("Bewertungen fuer den Portfolio Checker")
+            return []
 
     async def _run_wealth_snapshot_job(self, job: ScheduledJob, conn, log_fn=None) -> None:
         """Create a periodic wealth snapshot (no LLM needed)."""
@@ -965,6 +1210,8 @@ class AgentSchedulerService:
                     ok = self._process_news_result(result, skill_name, kontext, conn)
                 elif agent_name == "devils_advocate":
                     ok = self._process_da_result(result, skill_name, conn)
+                elif agent_name == "capital_allocator":
+                    ok = self._process_ca_result(result, skill_name, conn)
                 else:
                     logger.warning("Unknown batch agent_name: %s", agent_name)
                     ok = False
@@ -1289,6 +1536,65 @@ class AgentSchedulerService:
         BatchQueueRepository(conn).create(batch_id, "devils_advocate", skill_name, "de", len(requests))
         return batch_id
 
+    async def _submit_capital_allocator_batch(self, pub_positions, skill_name, skill_prompt, model, conn) -> str:
+        from agents.agent_language import current_date_context, response_language_with_fixed_codes
+        from agents.capital_allocator_agent import ANALYSIS_SYSTEM_PROMPT, SUBMIT_CA_VERDICT_TOOL, VALID_VERDICTS, format_position
+        from core.llm.claude import ClaudeProvider
+        from core.storage.batch_queue import BatchQueueRepository
+
+        llm = ClaudeProvider(api_key=self._anthropic_key, model=model, base_url=self._llm_base_url)
+        system = (current_date_context() + ANALYSIS_SYSTEM_PROMPT + "\n"
+                  + response_language_with_fixed_codes("de", sorted(VALID_VERDICTS)))
+        if skill_prompt:
+            system += f"\n\n## Analyse-Fokus\n{skill_prompt}"
+        requests = [ClaudeProvider.build_batch_request(
+            custom_id=f"ca_{pos.id}", model=model, system=system,
+            messages=[{"role": "user", "content": format_position(pos)}],
+            tools=[{"type": WEB_SEARCH_TYPE, "name": "web_search", "max_uses": 1}, SUBMIT_CA_VERDICT_TOOL],
+            max_tokens=4000) for pos in pub_positions if pos.ticker and pos.id is not None]
+        if not requests:
+            return ""
+        batch_id = await llm.submit_batch(requests)
+        BatchQueueRepository(conn).create(batch_id, "capital_allocator", skill_name, "de", len(requests))
+        return batch_id
+
+    def _process_ca_result(self, result, skill_name: str, conn) -> bool:
+        """Wie live: Urteil aus dem Tool ``submit_ca_verdict``, Sitzung und Analyse; ohne
+        gueltiges Urteil zaehlt die Position als ohne Ergebnis."""
+        from agents.capital_allocator_agent import AGENT_NAME, VALID_VERDICTS, format_position
+        from core.storage.analyses import PositionAnalysesRepository
+        from core.storage.capital_allocator import CapitalAllocatorRepository
+
+        cid = result.custom_id
+        if not cid.startswith("ca_"):
+            return False
+        try:
+            position_id = int(cid[3:])
+        except ValueError:
+            return False
+        message = result.result.message
+        verdict = summary = analysis = None
+        for block in message.content:
+            if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == "submit_ca_verdict":
+                v = (block.input.get("verdict") or "").lower()
+                if v in VALID_VERDICTS:
+                    verdict, summary, analysis = v, block.input.get("summary", ""), block.input.get("analysis", "")
+                    break
+        if not verdict:
+            return False
+        pos = self._lookup_position(position_id, conn)
+        ca_repo = CapitalAllocatorRepository(conn)
+        session = ca_repo.create_session(
+            position_id=position_id, ticker=pos.ticker if pos else None,
+            position_name=pos.name if pos else f"Position {position_id}", skill_name=skill_name)
+        if pos:
+            ca_repo.add_message(session.id, "user", format_position(pos))
+        ca_repo.add_message(session.id, "assistant", self._text_from_batch_message(message) or analysis or summary)
+        PositionAnalysesRepository(conn).save(
+            position_id=position_id, agent=AGENT_NAME, skill_name=skill_name,
+            verdict=verdict, summary=summary, session_id=session.id)
+        return True
+
     async def _submit_sector_rotation_batch(self, pub_positions, skill_name: str, skill_prompt: str, model: str, conn, _log) -> str:
         from agents.sector_rotation_agent import BASE_SYSTEM_PROMPT, SUBMIT_VERDICT_TOOL, WEB_SEARCH_TOOL
         from agents.agent_language import current_date_context, response_language_instruction
@@ -1425,12 +1731,12 @@ class AgentSchedulerService:
         from core.storage.models import PublicPosition
 
         llm = ClaudeProvider(api_key=self._anthropic_key, model=model, base_url=self._llm_base_url)
-        enc = build_encryption_service(self._enc_key, self._salt_path)
-        raw = PositionsRepository(conn, enc).get_portfolio()
+        # Die uebergebenen Titel, nicht das Depot neu gelesen: Der Job der Watchlist reicht
+        # seine eigenen (bis 11.10.2026 las der Batch immer das Depot).
         eligible = [
             PublicPosition(id=p.id, name=p.name, ticker=p.ticker, isin=p.isin,
                            asset_class=p.asset_class, anlageart=p.anlageart, story=p.story, story_skill=p.story_skill)
-            for p in raw if p.story and not p.analysis_excluded and p.id is not None
+            for p in positions if p.story and not p.analysis_excluded and p.id is not None
         ]
         system = (current_date_context() + ANALYSIS_SYSTEM_PROMPT
                   + "\n" + response_language_with_fixed_codes("de", ["wächst", "stabil", "schließt", "eingeholt"])

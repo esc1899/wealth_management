@@ -8,6 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Checks je Liste, Schritt 2: ein Job je Liste — 2026-10-11
+
+**Warum:** Eingeplant liefen die Checks je Agent mit eigenem Takt; jedes Urteil hatte sein
+eigenes Datum, Capital Allocator lief nie eingeplant, und was die Kacheln zeigen, hing nicht an
+dem, was lief. Jetzt läuft eingeplant genau die Auswahl der Liste, wie per Knopf (Erik).
+
+**Änderungen:**
+- Scheduler: „Depot prüfen“ (Takt des bisherigen Storychecker-Jobs) und „Watchlist prüfen“
+  (aus). Je Titel ein Durchgang; je gewähltem Check ein Batch über alle Titel. Die Jobs je
+  Check sind abgeschaltet (`core/pruefung.py::jobs_umstellen`, einmal), ihre Skills stehen in
+  der Auswahl. `NUR_AUF_KNOPFDRUCK` entfällt.
+- Einstellungen: je Check mit Skill-Bereich die Auswahl des Skills; Knopf und Job nehmen ihn.
+- Ein Durchgang ist fertig, wenn kein Batch seiner Checks mehr aussteht
+  (`AgentSchedulerService.durchgaenge_nachziehen`, im Job `agenten` nach dem Abholen). Dann
+  laufen lokal Watchlist Checker bzw. Portfolio Checker. Scheitert ein Check, steht das im
+  Durchgang; rot wird der Job nur, wenn alle scheitern (sonst bezahlte die Wiederholung alles
+  noch einmal).
+- Capital Allocator als Batch (`_submit_capital_allocator_batch`, `_process_ca_result`).
+- Portfolio Checker (`core/portfolio_check.py`): liest die Urteile aller gewählten
+  Depot-Checks, nicht nur des Storycheckers; Knopf und Job teilen sich den Weg. Sein Satz steht
+  oben auf der Depot-Kachelseite.
+- Fix: Der Konsens-Batch las das Depot selbst neu ein und ignorierte die übergebenen Titel.
+- Prozessbild `portfolio-check` nachgezogen.
+
 ### Checks je Liste, Schritt 1: Auswahl und „Jetzt checken“ als Durchgang — 2026-10-11
 
 **Warum:** Die Checks eines Titels liefen einzeln, jedes Urteil hatte sein eigenes Datum, und die

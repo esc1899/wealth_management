@@ -141,9 +141,9 @@ _suche_pages = [
 # der ersten Gruppe, damit keine Gruppe ohne sichtbare Seite eine leere Ueberschrift zeigt.
 # Die Gruppe Assistent ist aufgeloest (11.10.2026): Story-Check und Gegenanalyse stehen unter
 # Pflege -> Portfolio-Story, der Portfolio Checker ist damit leer. Storychecker, Fundamental und
-# Konsens stehen auf Kacheln und Titelseite, die auch neu pruefen laesst. Der Watchlist
-# Checker bleibt registriert, weil sein Kaestchen auf den Watchlist-Kacheln dorthin springt
-# -- die Titelseite kennt den lokalen Passungs-Check (noch) nicht.
+# Konsens stehen auf Kacheln und Titelseite, die auch neu pruefen laesst. Portfolio Checker
+# und Watchlist Checker laufen seit 11.10.2026 in der Pruefung je Liste mit; ihre Seiten
+# fallen weg, wenn die abgeschalteten Jobs je Check geloescht sind (BACKLOG.md).
 _ausgeblendet = [
     st.Page("pages/dashboard.py",          title=t("nav.dashboard"),   icon=":material/dashboard:", visibility=_AUS),
     st.Page("pages/marktdaten.py",         title=t("nav.market_data"), icon=":material/trending_up:", visibility=_AUS),
