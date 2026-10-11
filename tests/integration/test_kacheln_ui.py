@@ -83,12 +83,33 @@ def test_watchlist_ohne_urteil_sagt_nie_geprueft(depot_und_watchlist):
 
 
 @pytest.mark.parametrize("seite,wer", [("position_dashboard.py", "muv"), ("watchlist_analysis.py", "rms")])
-def test_analyse_waehlt_position_aus_der_adresse(depot_und_watchlist, seite, wer):
-    """Der Absprung einer Kachel: ?position=&check= waehlt die Position vor."""
+def test_titelseite_zeigt_position_aus_der_adresse(depot_und_watchlist, seite, wer):
+    """Der Absprung einer Kachel: ?position=&check= zeigt die Titelseite dieser Position."""
     pos = depot_und_watchlist[wer]
     at = AppTest.from_file(PAGES / seite, default_timeout=30)
     at.query_params["position"] = str(pos.id)
     at.query_params["check"] = "storychecker"
     at.run()
     assert not at.exception, at.exception
-    assert pos.name in at.selectbox[0].value
+    assert any('class="ts-name"' in m.value and pos.name in m.value for m in at.markdown)
+    assert not at.selectbox, "Die Auswahlbox ist weg -- man kommt ueber die Kachel"
+
+
+@pytest.mark.parametrize("seite", ["position_dashboard.py", "watchlist_analysis.py"])
+def test_titelseite_ohne_position_verweist_auf_die_kacheln(seite):
+    at = AppTest.from_file(PAGES / seite, default_timeout=30)
+    at.run()
+    assert not at.exception, at.exception
+    assert at.title and at.title[0].value
+
+
+def test_titelseite_urteile_und_band(depot_und_watchlist):
+    """Ein Urteil steht mit Satz, die uebrigen Checks als "nie geprueft"; der Chart steht."""
+    pos = depot_und_watchlist["novo"]
+    at = AppTest.from_file(PAGES / "position_dashboard.py", default_timeout=30)
+    at.query_params["position"] = str(pos.id)
+    at.run()
+    assert not at.exception, at.exception
+    texte = " ".join(m.value for m in at.markdown)
+    assert "Von 5 Checks: 1 kritisch, 4 nie geprüft." in texte
+    assert "nie geprüft" in texte

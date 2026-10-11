@@ -21,7 +21,7 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Portfolio Management** — track 11 asset types: stocks, ETFs, funds, precious metals, crypto, bonds, fixed deposits, cash, real estate, and land
 - **Live Market Data** — automatic and on-demand prices via yfinance with EUR conversion
 - **P&L Analysis** — daily gains/losses, allocation charts, day performance
-- **Position Dashboard** — single-page aggregation per position: all agent verdicts, price chart, news digest, and research answers
+- **Title page (Titelseite)** — one page per holding, reached from its tile (portfolio and watchlist alike): the tile's header and sentence, then fixed sections that each open with one sentence — price chart with a verdict band below it on the same time axis (which verdict held when, per check), verdicts as one line each with the full text folded away, buy-more indicator (portfolio), news digest excerpt and research answers. Starts no check; the watchlist button re-runs the five cloud checks for that title
 - **Tiles (Kacheln)** — portfolio and watchlist as a grid, one tile per holding: the one sentence that matters now (thesis at risk, strong move, latest checker summary, or "never checked"), sorted by that priority, with day move, P&L (watchlist: change since added) and dividend yield as chips and one box per checker verdict that jumps to that check. Header in the asset-class colour instead of a logo. Reads only what the checkers stored; starts no check
 - **Performance Attribution** — monthly and yearly contribution per position (incl. estimated dividends), with auto-generated digest reports and macro context chips
 - **Dividend Calendar** — 12-month cash flow forecast, top payers, dividend aristocrat badges

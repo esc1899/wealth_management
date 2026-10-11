@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Titelseite statt Positions- und Watchlist-Analyse — 2026-10-11
+
+**Warum:** Man kommt nur noch über die Kacheln auf einen Titel; die alten Seiten hatten eine
+Auswahlbox, fünf Karten mit langem Text und kein Bild davon, wie sich die Urteile entwickelt
+haben (Erik, Fassung A).
+
+**Änderungen:**
+- Eine Seite für Depot und Watchlist (`core/ui/titelseite.py`, gerechnet in
+  `core/titelseite.py`): oben Kopf und Satz der Kachel, dann je Abschnitt erst ein Satz.
+- Unter dem Kurschart auf derselben Zeitachse das Urteilsband: je Check, welches Urteil wann
+  galt; ein Punkt je Prüfung, eine leere Zeile heißt nie geprüft.
+- Urteile als eine Zeile je Check mit Satz und Datum, der Volltext eingeklappt; `?check=`
+  klappt ihn auf. Darüber ein Satz, wie viele Checks positiv, kritisch oder nie geprüft sind.
+- Depot: „Nachkaufen?“ aus dem Akkumulations-Indikator; Watchlist: der Knopf für die fünf
+  Cloud-Checks wie bisher.
+- Auswahlbox und Formular „Research anfordern“ entfallen; ohne Position verweist die Seite
+  auf die Kacheln.
+
 ### Einstellungen in drei Bereichen — 2026-10-10
 
 **Warum:** Die Einstellungen waren eine lange Seite, Ollama- und Cloud-Modelle in einem

@@ -79,12 +79,15 @@ class TestResearchAnswersPage:
 
 class TestPositionDashboardAnswersSection:
     def test_dashboard_shows_answers_for_ticker(self, seeded):
+        pos, _, _ = seeded
         at = AppTest.from_file(PAGES / "position_dashboard.py")
+        at.query_params["position"] = str(pos.id)
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
-        # Answers section header rendered (2 answers for MSFT)
+        # Abschnitt Recherche mit seinem Satz (2 Antworten fuer MSFT)
         headers = [s.value for s in at.subheader]
-        assert any("Research-Antworten (2)" in h or "Research answers (2)" in h for h in headers), headers
+        assert any("Claude Code" in h for h in headers), headers
+        assert any(m.value.startswith("2 ") for m in at.markdown), [m.value for m in at.markdown]
 
 
 @pytest.fixture
@@ -148,12 +151,16 @@ def seeded_watchlist(request):
 class TestWatchlistAnalysisResearchSection:
     def test_page_loads_with_seeded_watchlist(self, seeded_watchlist):
         at = AppTest.from_file(PAGES / "watchlist_analysis.py")
+        at.query_params["position"] = str(seeded_watchlist.id)
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 
     def test_shows_answers_and_cowork_research(self, seeded_watchlist):
         at = AppTest.from_file(PAGES / "watchlist_analysis.py")
+        at.query_params["position"] = str(seeded_watchlist.id)
         at.run()
         headers = [s.value for s in at.subheader]
-        assert any("Research-Antworten (1)" in h or "Research answers (1)" in h for h in headers), headers
-        assert any("Cowork" in h for h in headers), headers
+        assert any("Claude Code" in h for h in headers), headers
+        texte = [m.value for m in at.markdown]
+        assert any(m.startswith("1 ") for m in texte), texte
+        assert any("wla-test-lin-001" in m for m in texte), texte

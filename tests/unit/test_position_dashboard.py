@@ -1,57 +1,6 @@
-"""Unit tests for position_dashboard.py helpers."""
+"""Der Abschnitt eines Titels aus dem News Digest (core/titelseite.py::news_abschnitt)."""
 
-from typing import Optional
-
-# Importiere aus der Page — aber wir können nur inline-Funktionen testen
-# Also schreiben wir eine eigenständige Test-Version der Funktion
-
-
-def extract_ticker_section(digest: str, ticker: str) -> Optional[str]:
-    """
-    Extract the section for a specific ticker from a news digest.
-    Pattern: "## TICKER —" ... until next "##" or end of string.
-    """
-    if not digest or not ticker:
-        return None
-
-    # Normalize ticker to uppercase
-    ticker = ticker.upper()
-
-    lines = digest.split("\n")
-    start_idx = None
-    end_idx = None
-
-    # Find the header line matching "## TICKER"
-    for i, line in enumerate(lines):
-        if line.strip().startswith("##"):
-            # Extract the ticket from this line: "## AAPL —" or "## AAPL"
-            header_content = line.replace("##", "").strip()
-            # Check if the first token (before space/dash) matches our ticker
-            first_token = header_content.split()[0] if header_content else ""
-            if first_token.upper() == ticker:
-                start_idx = i
-                break
-
-    if start_idx is None:
-        return None
-
-    # Find the end: next "##" or end of digest
-    for i in range(start_idx + 1, len(lines)):
-        if lines[i].strip().startswith("##"):
-            end_idx = i
-            break
-
-    if end_idx is None:
-        end_idx = len(lines)
-
-    section_lines = lines[start_idx:end_idx]
-    section = "\n".join(section_lines).strip()
-
-    # Remove the "---" separator at the end if present
-    if section.endswith("---"):
-        section = section[:-3].strip()
-
-    return section if section else None
+from core.titelseite import news_abschnitt as extract_ticker_section
 
 
 class TestExtractTickerSection:

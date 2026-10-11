@@ -67,22 +67,10 @@ anfordern" ist geloescht (Erik). Die Gruppe "Portfolio" entfaellt damit. Alle au
 Seiten stehen in `app.py` in einer Liste `_ausgeblendet`.
 
 Offen:
-- **Eine Titelseite statt Positions- und Watchlist-Analyse** (Erik 10.10.2026: Fassung A,
-  eine lange Seite, Reihenfolge je Art): https://claude.ai/artifact/Sywgqgw2jsqzhrUcede8x8.
-  Eine Funktion `titelseite(art, position)` in `core/ui/titelseite.py`, beide Seiten werden
-  duenn wie `kacheln_depot.py`. Oben der Kopf der Kachel mit demselben Satz
-  (`core/kacheln.py`), dann feste Abschnitte, je erst ein Satz, Zahlen im Klapper: Kurs,
-  Urteile, je Art ein eigener Abschnitt (Depot: "Nachkaufen?" aus dem
-  Akkumulations-Indikator), Nachrichten, Recherche mit Claude Code (nur wenn es Antworten
-  gibt). Die Auswahlbox und das Formular "Research anfordern" fallen weg. **Urteile** nach dem
-  Durchgang (unten, "Checks je Liste"): je Check nur Urteil und der eine Satz (`summary`), der
-  Volltext nur im Klapper; darueber, was sich seit dem Durchgang davor geaendert hat. Der
-  Knopf "Titel pruefen" startet einen Durchgang mit der Auswahl der Liste. **Urteile ueber die
-  Zeit** (Erik, 11.10.2026): direkt unter dem Kurschart ein Band je Check, auf derselben
-  Zeitachse; ein Urteil faerbt die Strecke bis zum naechsten, Luecken bleiben leer (nie
-  geprueft ist eine Aussage). Gelesen aus `position_analyses`, nie aus den Volltexten.
-  Bauen in zwei Schritten: erst die Seite mit den Urteilen, wie sie heute liegen (je Zeile
-  ihr Datum, Band aus allen bisherigen Urteilen), dann der Durchgang.
+- **Titelseite nach dem Durchgang** (Erik, 10./11.10.2026; die Seite selbst steht seit
+  11.10.2026, `core/ui/titelseite.py`): Ueber den Urteilen, was sich seit dem Durchgang davor
+  geaendert hat; der Knopf "Titel pruefen" auch im Depot, mit der Auswahl der Liste. Liegt,
+  bis der Durchgang gebaut ist (unten, "Checks je Liste").
 - **Die uebrigen Seiten unten einzeln angehen**, jede fuer sich: in einen der vier Bereiche
   oben ziehen, in die Kacheln aufgehen lassen oder ausblenden. Uebrig: Assistent (Portfolio
   Checker, Watchlist Checker), Research, Strategie, System.

@@ -32,6 +32,8 @@ from core.ui.verdicts import VERDICT_CONFIGS
 #: ein absoluter bleibt absolut -- so findet ``st.page_link`` die Seite auch im Test.
 _SEITEN = Path(__file__).resolve().parents[2] / "pages"
 ANALYSE = {"depot": str(_SEITEN / "position_dashboard.py"), "watchlist": str(_SEITEN / "watchlist_analysis.py")}
+#: Zurück von der Titelseite auf die Kacheln.
+KACHELN = {"depot": str(_SEITEN / "kacheln_depot.py"), "watchlist": str(_SEITEN / "kacheln_watchlist.py")}
 #: Checks mit eigener Seite statt einer Karte in der Analyse.
 EIGENE_SEITE = {"watchlist_checker": str(_SEITEN / "watchlist_checker.py")}
 
@@ -188,23 +190,11 @@ def karte(k: Kachel, art: str) -> None:
                     )
 
 
-def seite(art: str) -> None:
-    """Die ganze Seite für ``art`` = "depot" oder "watchlist"."""
-    from state import (get_analysis_service, get_market_agent, get_market_repo,
-                       get_portfolio_service)
+def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:
+    """Die Kacheln zu ``positionen`` (mit Ticker und ID), unsortiert. Auch die Titelseite baut
+    ihren Kopf daraus, damit dort derselbe Satz steht wie auf der Kachel."""
+    from state import get_analysis_service, get_market_agent, get_market_repo
     from core.kacheln import DEPOT_AGENTEN, WATCHLIST_AGENTEN
-
-    st.title(t(f"kacheln.titel_{art}"))
-    st.markdown(CSS, unsafe_allow_html=True)
-    st.markdown(f'<div class="wk-einl">{escape(t("kacheln.einleitung"))}</div>', unsafe_allow_html=True)
-
-    dienst = get_portfolio_service()
-    alle = dienst.get_portfolio_positions() if art == "depot" else dienst.get_watchlist_positions()
-    positionen = [p for p in alle if p.ticker and p.id is not None]
-    ohne = len(alle) - len(positionen)
-    if not positionen:
-        st.info(t(f"kacheln.leer_{art}"))
-        return
 
     # Nur gespeicherte Bewertungen — die Seite holt keine Kurse (das tun Kachel- und Kurs-Job).
     bewertungen = {
@@ -223,14 +213,33 @@ def seite(art: str) -> None:
         v = bewertungen.get(p.id)
         vortag = None
         aufnahme = None
-        if art == "watchlist":
+        if art == "watchlist" and p.ticker:
             if v is None or v.day_pnl_pct is None:
                 vortag = markt.get_prev_close(p.ticker)
             # Gespeicherter Schlusskurs am Aufnahmetag (oder der letzte davor) -- nie geholt.
             aufnahme = markt.get_price_for_date_or_prior(p.ticker, p.added_date.isoformat(), max_days_back=7)
         urteile = {a: je_agent[a][p.id] for a in agenten if p.id in je_agent[a]}
         kacheln.append(kachel(p, art, v, urteile, vortag, aufnahme))
-    kacheln = sortiert(kacheln)
+    return kacheln
+
+
+def seite(art: str) -> None:
+    """Die ganze Seite für ``art`` = "depot" oder "watchlist"."""
+    from state import get_portfolio_service
+
+    st.title(t(f"kacheln.titel_{art}"))
+    st.markdown(CSS, unsafe_allow_html=True)
+    st.markdown(f'<div class="wk-einl">{escape(t("kacheln.einleitung"))}</div>', unsafe_allow_html=True)
+
+    dienst = get_portfolio_service()
+    alle = dienst.get_portfolio_positions() if art == "depot" else dienst.get_watchlist_positions()
+    positionen = [p for p in alle if p.ticker and p.id is not None]
+    ohne = len(alle) - len(positionen)
+    if not positionen:
+        st.info(t(f"kacheln.leer_{art}"))
+        return
+
+    kacheln = sortiert(kacheln_fuer(art, positionen))
 
     zahl = {g: sum(1 for k in kacheln if k.grund == g) for g in ("gefaehrdet", "bewegung", "nie")}
     st.markdown(f'<div class="wk-zaehler">{escape(t("kacheln.zaehler").format(**zahl))}</div>',

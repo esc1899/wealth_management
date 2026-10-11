@@ -6,8 +6,8 @@
 graph TD
     subgraph UI["Streamlit UI"]
         PG1["Dashboard / Positionen / Marktdaten"]
-        PG2["Portfolio Chat / Portfolio Checker / Position Dashboard"]
-        PG3["Storychecker / Watchlist Checker / Watchlist-Analyse"]
+        PG2["Portfolio Chat / Portfolio Checker / Titelseite (Depot)"]
+        PG3["Storychecker / Watchlist Checker / Titelseite (Watchlist)"]
         PG4["Consensus Gap / Fundamental Analyzer / Capital Allocator"]
         PG5["Research Chat / News / Search / Sector Rotation"]
         PG6["Research Inbox / Research Answers (ausgeblendet)"]
@@ -815,7 +815,7 @@ Claude → App:  research_answers table   +  submit_research_answer() tool
 ```
 
 **App → Claude (posting requests):**
-1. User fills in the form on the Position Dashboard page (or the global Research Request page)
+1. User fills in the form on the Research Answers page (hidden since 2026-10-10, reachable by URL)
 2. `ResearchQueueRepository.create_request()` writes a row to the DB
 3. `mcp_server/check_queue.py` runs before every Claude Code message (hook)
 4. The hook reads open requests and injects them as `additionalContext`
