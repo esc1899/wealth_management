@@ -125,13 +125,13 @@ _performance_pages = [
     st.Page("pages/dividend_calendar.py", title=t("nav.dividend_calendar"), icon=":material/payments:"),
     st.Page("pages/wealth_history.py",    title=t("nav.wealth_history"),    icon=":material/show_chart:"),
     st.Page("pages/tax_loss_harvesting.py", title=t("nav.tax_loss_harvesting"), icon=":material/trending_down:"),
+    # Bewertet die Sektoren des eigenen Depots, sucht keine neuen Titel (11.10.2026).
+    st.Page("pages/sector_rotation.py",   title=t("nav.sector_rotation"),   icon=":material/rotate_right:"),
 ]
-# Suche: die Wege zu neuen Titeln (11.10.2026, aus Research und Strategie). Spaeter eine Seite mit
-# Strategieauswahl und Kandidaten (BACKLOG.md, "Suche").
+# Suche: eine Seite, oben die Strategie (Strukturwandel, freie Suche); die
+# frueheren Seiten sind ihre Teile (core/ui/suche/). Kandidaten folgen (BACKLOG.md, "Suche").
 _suche_pages = [
-    st.Page("pages/search_chat.py",     title=t("nav.search_chat"),     icon=":material/manage_search:"),
-    st.Page("pages/structural_scan.py", title=t("nav.structural_scan"), icon=":material/radar:"),
-    st.Page("pages/sector_rotation.py", title=t("nav.sector_rotation"), icon=":material/rotate_right:"),
+    st.Page("pages/suche.py", title=t("nav.suche"), icon=":material/manage_search:"),
 ]
 
 # Ausgeblendet, aber registriert. Positions- und Watchlist-Analyse erreicht man ueber Titel und

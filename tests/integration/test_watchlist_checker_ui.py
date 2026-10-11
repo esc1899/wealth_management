@@ -69,27 +69,24 @@ class TestPageLoadability:
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 
-    def test_structural_scan_page_loads(self):
-        """Structural Scan page should load without exceptions."""
-        at = AppTest.from_file(PAGES / "structural_scan.py")
-        at.run()
-        assert not at.exception, f"Page threw exception: {at.exception}"
-
     def test_sector_rotation_page_loads(self):
-        """Sector Rotation Monitor page should load without exceptions."""
+        """Sektorrotation: wieder eine eigene Seite unter Performance (11.10.2026)."""
         at = AppTest.from_file(PAGES / "sector_rotation.py")
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 
+    def test_suche_zeigt_jede_strategie(self):
+        """Suche (11.10.2026): eine Seite, oben die Strategie -- jeder Teil laedt."""
+        at = AppTest.from_file(PAGES / "suche.py")
+        at.run()
+        assert not at.exception, f"Page threw exception: {at.exception}"
+        for art in ("einzeltitel", "strukturwandel", "frei"):
+            at.button_group(key="suche_art").set_value(art).run()
+            assert not at.exception, f"{art}: {at.exception}"
+
     def test_research_chat_page_loads(self):
         """Research Chat page should load without exceptions."""
         at = AppTest.from_file(PAGES / "research_chat.py")
-        at.run()
-        assert not at.exception, f"Page threw exception: {at.exception}"
-
-    def test_search_chat_page_loads(self):
-        """Investment Search page should load without exceptions."""
-        at = AppTest.from_file(PAGES / "search_chat.py")
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 

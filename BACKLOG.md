@@ -105,18 +105,14 @@ Was dabei zu klaeren ist:
 Liegt, weil sich erst zeigen soll, ob die Kacheln tragen (zusaetzlicher Menueeintrag seit
 10.10.2026).
 
-## Suche: eine Seite, Strategien, Kandidaten, gemerktes Nein (11.10.2026)
+## Suche: Kandidaten und gemerktes Nein (11.10.2026)
 
-Seit 11.10.2026 steht im Menue ein Abschnitt **Suche** unter Performance: Investment Search,
-Strukturwandel-Scanner, Sektorrotation, je noch mit eigener Seite; Tax Loss Harvesting ist
-nach Performance gezogen, der News Digest ausgeblendet (er laeuft als Job, die Titelseite
-liest ihn). Eine Suche ist ein Weg zu neuen Titeln, wie die Vorschlagsseiten der Serien.
+Seit 11.10.2026 ist die Suche eine Seite (`pages/suche.py`, Fassung A des Entwurfs): oben die
+Strategie (freie Suche, Einzeltitel, Strukturwandel), ein Suchfeld mit Skill, ein Banner mit
+Link auf die Skills, darunter der letzte Lauf mit seinen Vorschlaegen als Ankreuzliste. Eine Suche ist ein Weg zu neuen Titeln, wie
+die Vorschlagsseiten der Serien.
 
 Entschieden (Erik, 11.10.2026), zu bauen:
-- **Eine Seite Suche, oben die Strategieauswahl.** Ein Banner zeigt, mit welcher Strategie
-  gesucht wird, daneben ein Link "Strategie einstellen" (heute die Skills unter System).
-  Strategien wie heute: Strukturwandel, Sektorrotation, freie Suche -- auch nach einer
-  bestimmten Anlage. Die drei Seiten gehen darin auf.
 - **Zwei Stufen.** Ein Lauf liefert Kandidaten als kleine Kacheln wie die Watchlist, mit
   Link auf ihre Titelseite. "Genauer pruefen" laesst die Checks der Watchlist laufen, je
   Kandidat per Knopf (Cloud, Websuche kostet). Dann "Auf die Watchlist" oder "Nicht
@@ -128,6 +124,16 @@ Entschieden (Erik, 11.10.2026), zu bauen:
   (neu, verworfen); so funktionieren Checks, Urteilsband und Titelseite ohne Umbau -- sie
   haengen an der Positions-ID. Heute legen Search und Scanner die Auswahl direkt als
   Watchlist-Position an (`add_from_proposal`).
+- **Eine stehende Liste, kein Lauf** (Erik, 11.10.2026). Ein Lauf legt seine Kandidaten in
+  die Liste "Offen"; unentschiedene bleiben stehen, nichts verfaellt oder wird still zum Nein.
+  Findet ein spaeterer Lauf denselben Titel, waechst seine Herkunft ("2x gefunden"), kein
+  zweiter Kandidat; offene gelten als bekannt und gehen mit den Tickern an die Strategien.
+  Nach 60 Tagen ohne Beruehrung rueckt ein Kandidat in einen eingeklappten Teil "Ignoriert".
+- **Unten nur "Verworfen" und "Ignoriert".** Fruehere Suchen und den Bericht des Laufs
+  braucht die Seite dann nicht mehr; jede Kachel verlinkt auf den Lauf, aus dem sie kommt.
+- **Einzeltitel, Stufe 2:** Seit 11.10.2026 bewertet die Suche einen Einzeltitel (Stufe 1)
+  und legt ihn auf Wunsch direkt auf die Watchlist; mit den Kandidaten wird er wie jeder
+  andere ein Kandidat mit "Genauer pruefen".
 - **Reihenfolge:** Kandidaten sind eine dritte Liste mit eigener Auswahl an Checks; darum
   nach "Checks je Liste".
 
@@ -135,7 +141,7 @@ Entschieden (Erik, 11.10.2026), zu bauen:
 
 Seit 11.10.2026 zeigt `core/ui/ki.py::ki_knopf` mit der Farbe des Sterns, ob ein Knopf lokal
 oder in der Cloud rechnet; umgestellt sind erst Portfolio-Story und These auf der Seite
-Positionen. Die Knoepfe in Research, Strategie und auf der Titelseite folgen, wenn die Seite
+Positionen, dazu die Startknoepfe der Suche. Die Knoepfe auf der Titelseite folgen, wenn die Seite
 beim Aufraeumen ohnehin dran ist -- vorher lohnt es nicht, weil manche Seite entfaellt.
 
 ## Checks je Liste: eine Auswahl, ein Durchgang (10.10.2026)

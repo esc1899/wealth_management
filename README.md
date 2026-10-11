@@ -43,7 +43,7 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 ### Research (cloud, Claude API + web search)
 - **Research Chat** — deep-dive research per position using Claude with multi-turn conversation
 - **News Digest** — recent news for all portfolio positions, filtered by investment strategy
-- **Investment Search** — screen for new opportunities; investment thesis saved automatically to watchlist
+- **Suche** — one page for new opportunities: pick a strategy (free search, single asset, structural change), a banner names the skill in use; proposals go to the watchlist
 - **Story Checker** — validates investment theses against current news and fundamentals (Claude API); verdicts on tiles and title page, its own page is hidden
 - **Fundamental Analyzer** — in-depth fundamental analysis of individual positions (cloud, Claude); verdicts on tiles and title page, its own page with follow-up chat is hidden
 - **Research Inbox** — ingest AI-generated research from an external Claude Project; file watcher detects new `.md` files in `~/wealth-research/outbox/`, parses YAML frontmatter, and presents watchlist candidates for one-click review and import

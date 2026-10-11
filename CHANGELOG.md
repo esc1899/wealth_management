@@ -8,6 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Suche: eine Seite mit Strategieauswahl und Einzeltitel — 2026-10-11
+
+**Warum:** Drei Seiten für eine Frage („was könnte ich neu kaufen?“) ließen erst die Seite
+wählen, dann die Strategie. Jetzt wählt man die Strategie, und ein Banner sagt, womit gesucht
+wird (Erik, Fassung A von drei Entwürfen).
+
+**Änderungen:**
+- `pages/suche.py`: oben Freie Suche / Einzeltitel / Strukturwandel, darunter ein Suchfeld mit
+  Skill und Cloud-Stern, ein Banner mit Skill, Anfang des Prompts und Link „Strategie
+  einstellen“, darunter der letzte Lauf: Vorschläge zum Ankreuzen, Bericht und Rückfrage
+  eingeklappt. Die Liste früherer Suchen entfällt; mit den Kandidaten verlinkt jede Kachel
+  ihren Lauf (BACKLOG.md, „Suche“).
+- Einzeltitel: Name, Ticker oder ISIN, bewertet wie früher im Research Chat, Vorschlag direkt
+  auf die Watchlist. Steht der Titel schon im Depot oder auf der Watchlist, sagt die Seite das
+  ohne Modell und verlinkt die Titelseite.
+- Die Teile liegen in `core/ui/suche/` (`modell`, `starten`, `lauf`), Gemeinsames in
+  `gemeinsam.py`.
+- Sektorrotation steht unter Performance: Sie bewertet die Sektoren des eigenen Depots und
+  schlägt keine neuen Titel vor, gehört also nicht zur Suche.
+
 ### Menü: Abschnitt Suche statt Research und Strategie — 2026-10-11
 
 **Warum:** Was neue Titel findet, gehört zusammen, egal welches Modell rechnet (Erik).

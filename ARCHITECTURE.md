@@ -532,7 +532,7 @@ verdicts = analysis_service.get_verdicts(ids, "storychecker")
 ```
 
 ### Pages Using Services
-- `pages/structural_scan.py` — AnalysisService, PortfolioService
+- `pages/sector_rotation.py` — PortfolioService
 - `pages/positionen.py` — AnalysisService
 - `pages/watchlist_checker.py` — AnalysisService, PortfolioService
 - `pages/portfolio_story.py` — AnalysisService, PortfolioService
