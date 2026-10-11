@@ -76,10 +76,13 @@ Offen:
   Akkumulations-Indikator), Nachrichten, Recherche mit Claude Code (nur wenn es Antworten
   gibt). Die Auswahlbox und das Formular "Research anfordern" fallen weg. **Urteile** nach dem
   Durchgang (unten, "Checks je Liste"): je Check nur Urteil und der eine Satz (`summary`), der
-  Volltext nur im Klapper; darueber, was sich seit dem Durchgang davor geaendert hat; unten
-  "Fruehere Pruefungen" als Liste, ein Klick zeigt die Seite im alten Stand. Der Knopf "Titel
-  pruefen" startet einen Durchgang mit der Auswahl der Liste. Bauen in zwei Schritten: erst
-  die Seite mit den Urteilen, wie sie heute liegen (je Zeile ihr Datum), dann der Durchgang.
+  Volltext nur im Klapper; darueber, was sich seit dem Durchgang davor geaendert hat. Der
+  Knopf "Titel pruefen" startet einen Durchgang mit der Auswahl der Liste. **Urteile ueber die
+  Zeit** (Erik, 11.10.2026): direkt unter dem Kurschart ein Band je Check, auf derselben
+  Zeitachse; ein Urteil faerbt die Strecke bis zum naechsten, Luecken bleiben leer (nie
+  geprueft ist eine Aussage). Gelesen aus `position_analyses`, nie aus den Volltexten.
+  Bauen in zwei Schritten: erst die Seite mit den Urteilen, wie sie heute liegen (je Zeile
+  ihr Datum, Band aus allen bisherigen Urteilen), dann der Durchgang.
 - **Die uebrigen Seiten unten einzeln angehen**, jede fuer sich: in einen der vier Bereiche
   oben ziehen, in die Kacheln aufgehen lassen oder ausblenden. Uebrig: Assistent (Portfolio
   Checker, Watchlist Checker), Research, Strategie, System.
@@ -148,6 +151,13 @@ Zu bauen:
   Einstellungen oder Scheduler bearbeitet -- nicht als zweite Liste neben `scheduled_jobs`.
 - Batch-Laeufe kommen erst am naechsten Morgen zurueck; der Durchgang ist erst fertig, wenn
   alle Antworten da sind, und meldet bis dahin `wartet` (Hausregel).
+- **Volltexte verfallen, Urteile bleiben** (Erik, 11.10.2026: die Texte sind irgendwann
+  Schnee von gestern, die Entwicklung der Urteile nicht). Urteil und Satz in
+  `position_analyses` bleiben fuer immer -- der Urteils-Rueckblick und das Band auf der
+  Titelseite leben davon. Die Volltexte (letzte Antwort in den Sitzungen der Agenten)
+  loescht ein idempotenter Job; Vorschlag: behalten fuer die letzten zwei Durchgaenge eines
+  Titels, aelter weg. Nur Batch-Sitzungen der Checks, nie Dialoge (Fundamental Analyzer
+  Chat). Was weg ist, liegt noch in der Sicherung.
 - Bleiben eigene Jobs, weil sie keinen Titel pruefen: Sektor-Rotation, News Digest,
   Strukturwandel, Investment-Suche, Snapshots und Rueckblicke.
 
