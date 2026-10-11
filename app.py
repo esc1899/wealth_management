@@ -127,8 +127,10 @@ _performance_pages = [
     st.Page("pages/tax_loss_harvesting.py", title=t("nav.tax_loss_harvesting"), icon=":material/trending_down:"),
     # Bewertet die Sektoren des eigenen Depots, sucht keine neuen Titel (11.10.2026).
     st.Page("pages/sector_rotation.py",   title=t("nav.sector_rotation"),   icon=":material/rotate_right:"),
+    # Wie gut die Urteile der Checks gealtert sind; rechnet nur, ruft kein Modell (11.10.2026).
+    st.Page("pages/verdict_hindsight.py", title=t("nav.verdict_hindsight"), icon=":material/history_toggle_off:"),
 ]
-# Suche: eine Seite, oben die Strategie (Strukturwandel, freie Suche); die
+# Suche: eine Seite, oben die Strategie (freie Suche, Einzeltitel, Strukturwandel); die
 # frueheren Seiten sind ihre Teile (core/ui/suche/). Kandidaten folgen (BACKLOG.md, "Suche").
 _suche_pages = [
     st.Page("pages/suche.py", title=t("nav.suche"), icon=":material/manage_search:"),
@@ -166,15 +168,13 @@ pg = st.navigation({
     t("nav.group_pflege"): _pflege_pages,
     t("nav.group_performance"): _performance_pages,
     t("nav.group_suche"): _suche_pages,
-    # Einstellungen hinter Basis und Suche: Sprache, lokale und Cloud-Modelle (10.10.2026).
+    # Einstellungen zuletzt: was den Betrieb einstellt, nichts zum Lesen. Die Gruppe System ist
+    # darin aufgegangen (11.10.2026); der Scheduler entfaellt mit "Checks je Liste" (BACKLOG.md).
     t("nav.settings"): [
-        st.Page("pages/settings.py", title=t("nav.settings"), icon=":material/settings:"),
-    ],
-    t("nav.group_system"): [
-        st.Page("pages/usage_statistics.py", title=t("nav.statistics"),       icon=":material/bar_chart:"),
-        st.Page("pages/verdict_hindsight.py", title=t("nav.verdict_hindsight"), icon=":material/history_toggle_off:"),
-        st.Page("pages/skills.py",          title="Skills",                  icon=":material/psychology:"),
-        st.Page("pages/scheduler.py",       title="Scheduler",               icon=":material/schedule:"),
+        st.Page("pages/settings.py",         title=t("nav.settings"),   icon=":material/settings:"),
+        st.Page("pages/skills.py",           title="Skills",            icon=":material/psychology:"),
+        st.Page("pages/scheduler.py",        title="Scheduler",         icon=":material/schedule:"),
+        st.Page("pages/usage_statistics.py", title=t("nav.statistics"), icon=":material/bar_chart:"),
     ],
 })
 

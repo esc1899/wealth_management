@@ -65,15 +65,15 @@ Seit 10.10.2026 abends sind auch Positions- und Watchlist-Analyse ausgeblendet (
 ueber Titel und Kaestchen der Kacheln) und der ganze Cowork-Abschnitt; die Seite "Research
 anfordern" ist geloescht (Erik). Die Gruppe "Portfolio" entfaellt damit. Alle ausgeblendeten
 Seiten stehen in `app.py` in einer Liste `_ausgeblendet`. Seit 11.10.2026 gehoeren Portfolio
-Checker und Watchlist Checker dazu, die Gruppe "Assistent" entfaellt.
+Checker und Watchlist Checker dazu, die Gruppe "Assistent" entfaellt. Seit 11.10.2026 ist
+auch "System" aufgeloest: Urteils-Rueckblick unter Performance, Skills, Scheduler und
+Statistiken unter Einstellungen.
 
 Offen:
 - **Titelseite nach dem Durchgang** (Erik, 10./11.10.2026; die Seite selbst steht seit
   11.10.2026, `core/ui/titelseite.py`): Ueber den Urteilen, was sich seit dem Durchgang davor
   geaendert hat; der Knopf "Titel pruefen" auch im Depot, mit der Auswahl der Liste. Liegt,
   bis der Durchgang gebaut ist (unten, "Checks je Liste").
-- **Die uebrigen Seiten unten einzeln angehen**, jede fuer sich: in einen der vier Bereiche
-  oben ziehen, in die Kacheln aufgehen lassen oder ausblenden. Uebrig: System.
 - **Was die ausgeblendeten Check-Seiten noch konnten** (Storychecker, Fundamental, Konsens,
   seit 11.10.2026 aus dem Menue): je Einzelcheck einen Skill waehlen und im Storychecker und
   Fundamental Analyzer nachfragen (Chat). Die Titelseite prueft mit dem Skill aus dem
@@ -83,7 +83,7 @@ Offen:
   dem Lotsee-Plan). Dashboard: vorher klaeren, ob sein Kopf (Tagesbild, Allokation) auf die
   Depot-Kacheln wandert.
 
-Offen fuer Erik: ob Marktdaten nach System gehoert (heute auch zum Nachsehen einzelner Kurse
+Offen fuer Erik: ob Marktdaten unter Einstellungen gehoert (heute auch zum Nachsehen einzelner Kurse
 genutzt?).
 
 ## Nachrichten bei grossen Kursbewegungen (10.10.2026)
