@@ -150,6 +150,21 @@ Depot-Jobs; seit demselben Tag verfallen Volltexte (`core/storage/volltexte.py`)
 **Nach dem ersten Lauf (Erik):** die abgeschalteten Jobs je Check loeschen, wenn "Depot
 pruefen" traegt; dann auch die Seiten Portfolio Checker und Watchlist Checker (ausgeblendet).
 
+## Cloud-Modell je Liste statt je Check (11.10.2026)
+
+Seit der Pruefung je Liste (`core/pruefung.py`) laufen die Checks eines Titels zusammen; das
+Modell waehlt man aber noch je Agent (Einstellungen, Cloud LLM: elf Eintraege, darunter die
+fuenf Checks, die fuer Depot und Watchlist zugleich gelten). Erik (11.10.2026): je Liste ein
+Modell, alle Checks dieser Liste laufen damit -- Knopf und Job gleich.
+
+Was dabei zu klaeren ist:
+- Die Checks ziehen ihr Modell heute aus `model_public_<agent>` (`state_llm`,
+  `background_jobs._resolve_model_from_conn`, `scheduler._resolve_model`); kuenftig aus der
+  Liste, fuer die sie laufen. Uebernahme: der bisherige Eintrag des Storycheckers.
+- Was nicht zu einer Liste gehoert (News, Suche, Strukturwandel, Sektor-Rotation, Story-Entwurf,
+  Research-Chat), behaelt sein eigenes Modell.
+- Der Batch braucht eine echte `claude-`ID; "home" wird wie heute aufgeloest.
+
 ## Wertzuwachs "Kurs vs. Anteile" mit echten Daten pruefen (10.10.2026)
 
 Die Zerlegung auf der Dividenden-Seite ist am 10.10.2026 korrigiert (Bargeld/Festgeld ausser
