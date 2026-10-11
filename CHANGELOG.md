@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Volltexte verfallen, Urteile bleiben — 2026-10-11
+
+**Warum:** Die langen Texte der Checks sind irgendwann Schnee von gestern, die Entwicklung der
+Urteile nicht (Erik).
+
+**Änderungen:**
+- `core/storage/volltexte.py`: Je Titel und Check bleiben die Texte der zwei jüngsten Urteile;
+  älter werden die Nachrichten der Sitzung gelöscht und `analysis_text` geleert. Urteil, Satz
+  und Sitzung bleiben, Dialoge (mehr als eine Nachricht von Erik) nie gelöscht. Läuft
+  idempotent im Job `agenten`.
+- Die geplante „Titelseite nach dem Durchgang“ entfällt: Was sich geändert hat, zeigt das
+  Urteilsband unter dem Kurs.
+
 ### Checks je Liste, Schritt 2: ein Job je Liste — 2026-10-11
 
 **Warum:** Eingeplant liefen die Checks je Agent mit eigenem Takt; jedes Urteil hatte sein

@@ -96,6 +96,11 @@ def agenten(dienst, batch_api: bool) -> int:
     # auch ohne Batch, falls ein Lauf mittendrin den Strom verlor.
     for zeile in dienst.durchgaenge_nachziehen():
         print(zeile)
+    # Volltexte verfallen, Urteile bleiben (core/storage/volltexte.py): erst nach dem
+    # Nachziehen, damit ein eben fertiger Durchgang mitzaehlt.
+    verfallen = dienst.volltexte_verfallen()
+    if verfallen:
+        print(f"Volltexte: {verfallen} ältere Texte gelöscht, Urteile bleiben.")
     if gebremst:
         # Rot, obwohl nichts lief: Sonst wäre die Kachel nach dem dritten Fehlversuch
         # wieder grün, und der Job stünde still, ohne dass es jemand sieht.

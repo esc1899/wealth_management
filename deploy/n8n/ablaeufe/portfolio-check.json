@@ -542,6 +542,19 @@
       ],
       "notes": "sofort und live: Cloud-Checks parallel, Watchlist Checker zuletzt\nCode: core/background_jobs.py::run_durchgang",
       "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "81377aae-7799-57ea-a6ce-1bf6617969fd",
+      "name": "Volltexte verfallen",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4440,
+        0
+      ],
+      "notes": "je Titel und Check bleiben die zwei jüngsten Texte, Urteile immer; Dialoge nie\nCode: core/storage/volltexte.py::verfallen_lassen",
+      "notesInFlow": true
     }
   ],
   "connections": {
@@ -960,6 +973,17 @@
         [
           {
             "node": "Durchgang fertig",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Durchgang fertig": {
+      "main": [
+        [
+          {
+            "node": "Volltexte verfallen",
             "type": "main",
             "index": 0
           }

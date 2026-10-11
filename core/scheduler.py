@@ -838,6 +838,17 @@ class AgentSchedulerService:
         if cloud and len(fehler) == len(cloud):
             raise RuntimeError("; ".join(fehler))
 
+    def volltexte_verfallen(self) -> int:
+        """Volltexte aelter als die juengsten je Titel und Check loeschen, Urteile bleiben
+        (core/storage/volltexte.py). Idempotent; laeuft im Job ``agenten``."""
+        from core.storage.volltexte import verfallen_lassen
+
+        conn = self._open_conn()
+        try:
+            return verfallen_lassen(conn)
+        finally:
+            conn.close()
+
     def durchgaenge_nachziehen(self) -> list[str]:
         """Offene Durchgaenge fertig machen (scripts/job.py, nach dem Abholen der Batches)."""
         conn = self._open_conn()

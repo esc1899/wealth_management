@@ -70,9 +70,6 @@ auch "System" aufgeloest: Urteils-Rueckblick unter Performance, Skills, Schedule
 Statistiken unter Einstellungen.
 
 Offen:
-- **Titelseite nach dem Durchgang** (Erik, 10./11.10.2026; die Seite selbst steht seit
-  11.10.2026, `core/ui/titelseite.py`): Ueber den Urteilen, was sich seit dem Durchgang davor
-  geaendert hat. Schritt 3 von "Checks je Liste" (unten).
 - **Was die ausgeblendeten Check-Seiten noch konnten** (Storychecker, Fundamental, Konsens,
   seit 11.10.2026 aus dem Menue): je Einzelcheck einen Skill waehlen und im Storychecker und
   Fundamental Analyzer nachfragen (Chat). Die Titelseite prueft mit dem Skill aus dem
@@ -148,22 +145,10 @@ beim Aufraeumen ohnehin dran ist -- vorher lohnt es nicht, weil manche Seite ent
 Seit 11.10.2026 stehen Schritt 1 und 2: je Liste eine Auswahl mit Skill je Check
 (Einstellungen, `core/pruefung.py`), "Jetzt checken" je Titel, die Jobs "Depot pruefen" und
 "Watchlist pruefen" (aus) statt der Jobs je Check, der Portfolio Checker am Ende des
-Depot-Jobs. Offen, in dieser Reihenfolge (Erik, 11.10.2026):
+Depot-Jobs; seit demselben Tag verfallen Volltexte (`core/storage/volltexte.py`). Offen:
 
 **Nach dem ersten Lauf (Erik):** die abgeschalteten Jobs je Check loeschen, wenn "Depot
 pruefen" traegt; dann auch die Seiten Portfolio Checker und Watchlist Checker (ausgeblendet).
-
-**Schritt 3: Titelseite nach dem Durchgang** (oben, "Kacheln loesen die alten Ansichten ab").
-Aeltere Analysen ohne Durchgang werden je Titel und Tag zusammengefasst und stehen als
-"einzeln geprueft" unter den frueheren Pruefungen.
-
-**Schritt 4: Volltexte verfallen, Urteile bleiben** (Erik, 11.10.2026: die Texte sind
-irgendwann Schnee von gestern, die Entwicklung der Urteile nicht). Urteil und Satz in
-`position_analyses` bleiben fuer immer -- der Urteils-Rueckblick und das Band auf der
-Titelseite leben davon. Die Volltexte (letzte Antwort in den Sitzungen der Agenten) loescht ein
-idempotenter Job; Vorschlag: behalten fuer die letzten zwei Durchgaenge eines Titels, aelter
-weg. Nur Batch-Sitzungen der Checks, nie Dialoge (Fundamental Analyzer Chat). Was weg ist,
-liegt noch in der Sicherung.
 
 ## Wertzuwachs "Kurs vs. Anteile" mit echten Daten pruefen (10.10.2026)
 

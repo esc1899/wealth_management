@@ -6,8 +6,8 @@ schon gespeichert ist (Kurse, Urteile). Nichts wird geholt, kein Check wird gest
 
 Das Urteilsband unter dem Kurschart zeigt je Check, welches Urteil wann galt: Ein Urteil gilt
 von seinem Tag bis zum nächsten Urteil desselben Checks, das jüngste bis heute. Gelesen wird
-nur ``position_analyses`` (Urteil und Satz), nie die Volltexte — die dürfen später verfallen
-(BACKLOG.md, "Checks je Liste").
+nur ``position_analyses`` (Urteil und Satz), nie die Volltexte — die verfallen
+(``core/storage/volltexte.py``).
 """
 
 from __future__ import annotations
