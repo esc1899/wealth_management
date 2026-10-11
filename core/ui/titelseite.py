@@ -33,11 +33,15 @@ from core.ui.verdicts import VERDICT_CONFIGS, verdict_badge
 from core.ui.vorauswahl import vorauswahl
 
 #: Woher ältere Seiten die Position per ``st.switch_page`` mitgeben (Research-Antworten).
-SITZUNG = {"depot": "pd_preselect_position_id", "watchlist": "wla_preselect_pos_id"}
+SITZUNG = {"depot": "pd_preselect_position_id", "watchlist": "wla_preselect_pos_id",
+           "kandidaten": "kand_preselect_pos_id"}
 
+#: Ein Kandidat hat keinen Kurs und keine Nachrichten (die Jobs holen nur Depot und Watchlist);
+#: statt dessen die Entscheidung und woher er kommt -- mit dem Bericht des Laufs.
 ABSCHNITTE = {
     "depot": ("kurs", "urteile", "nachkaufen", "nachrichten", "recherche"),
     "watchlist": ("urteile", "kurs", "nachrichten", "recherche"),
+    "kandidaten": ("urteile", "entscheidung", "herkunft"),
 }
 
 CSS = """
@@ -237,7 +241,8 @@ def _veraltet(u, jetzt: datetime) -> bool:
 def jetzt_checken(art: str, position, jeweils: dict, key: str, klein: bool = False) -> None:
     """Der Knopf "Jetzt checken": ein Durchgang mit der Auswahl der Liste für diesen Titel
     (``core/background_jobs.py::run_durchgang``). Auf der Titelseite und auf der Kachel;
-    ``jeweils`` = je Check das jüngste Urteil oder None."""
+    ``jeweils`` = je Check das jüngste Urteil oder None. Bei Kandidaten heißt er "Genauer
+    prüfen" und zählt als Berührung (die 60 Tage bis "Ignoriert" beginnen neu)."""
     from config import config
     from core.background_jobs import run_durchgang
 
@@ -246,12 +251,18 @@ def jetzt_checken(art: str, position, jeweils: dict, key: str, klein: bool = Fal
         return
     jetzt = datetime.now(timezone.utc)
     veraltet = sum(_veraltet(jeweils.get(a), jetzt) for a in agenten)
-    label = (t("titelseite.checks_erneuern_alt").format(n=veraltet) if veraltet
-             else t("titelseite.checks_erneuern"))
+    if art == "kandidaten":
+        label = t("kandidaten.genauer_pruefen")
+    else:
+        label = (t("titelseite.checks_erneuern_alt").format(n=veraltet) if veraltet
+                 else t("titelseite.checks_erneuern"))
     if not ki_knopf(label, wo="cloud", key=key,
                     type="primary" if veraltet and not klein else "secondary",
                     width="stretch" if klein else "content"):
         return
+    if art == "kandidaten":
+        from state import get_kandidaten_repo
+        get_kandidaten_repo().beruehren(position.id)
 
     zustand = {"running": True, "done": False, "count": 0, "error": None}
     threading.Thread(target=run_durchgang, daemon=True, args=(
@@ -361,19 +372,75 @@ def _recherche(art: str, position) -> None:
 
 
 # ------------------------------------------------------------------
+# Nur Kandidaten: Entscheidung und Herkunft
+# ------------------------------------------------------------------
+
+def _entscheidung(position) -> None:
+    """Ja oder Nein; ist er schon verworfen, steht das da, mit dem Weg zurück."""
+    from core import kandidaten
+    from core.ui.suche.kandidaten import entscheiden
+    from state import get_kandidaten_repo
+
+    st.subheader(t("kandidaten.entscheidung"))
+    k = get_kandidaten_repo().get(position.id)
+    if k is not None and k.zustand == "verworfen":
+        st.markdown(t("kandidaten.ist_verworfen").format(datum=fmt_date(k.entschieden) if k.entschieden else "?"))
+        if st.button(t("kandidaten.wieder_aufnehmen"), key="ts-wieder"):
+            kandidaten.wieder_aufnehmen(get_kandidaten_repo(), position.id)
+            st.rerun()
+        return
+    st.markdown(t("kandidaten.entscheidung_satz"))
+    entscheiden(position.id, key="ts-entscheiden")
+
+
+def _herkunft(position) -> None:
+    """Woher der Kandidat kommt: der Lauf, der ihn fand, mit seinem Bericht; dazu die These."""
+    from core.ui.suche.kandidaten import bericht, herkunft
+    from state import get_kandidaten_repo
+
+    k = get_kandidaten_repo().get(position.id)
+    if k is None:
+        return
+    st.subheader(t("kandidaten.herkunft"))
+    st.markdown(herkunft(k))
+    if position.story:
+        llm_markdown(f"_{position.story}_")
+    b = bericht(k.strategie, k.lauf_id)
+    if b is None:
+        st.markdown(t("kandidaten.bericht_fehlt"))
+        return
+    wann, skill, anfrage, texte = b
+    zeile = " · ".join(x for x in (fmt_date(wann) if wann else None, skill, anfrage) if x)
+    with st.expander(t("kandidaten.bericht").format(lauf=zeile)):
+        for text in texte:
+            llm_markdown(text)
+        st.caption(t("common.ai_disclaimer"))
+
+
+# ------------------------------------------------------------------
 # Die Seite
 # ------------------------------------------------------------------
+
+def _position(art: str, pid: int):
+    """Die Position, wenn sie zur Art gehört: im Depot, auf der Watchlist oder offener bzw.
+    verworfener Kandidat."""
+    from state import get_kandidaten_repo, get_portfolio_service, get_positions_repo
+
+    if art == "kandidaten":
+        k = get_kandidaten_repo().get(pid)
+        p = get_positions_repo().get(pid) if k is not None and k.zustand != "uebernommen" else None
+        return p if p is not None and not (p.in_portfolio or p.in_watchlist) else None
+    dienst = get_portfolio_service()
+    alle = dienst.get_portfolio_positions() if art == "depot" else dienst.get_watchlist_positions()
+    return next((p for p in alle if p.id == pid), None)
+
 
 def seite(art: str) -> None:
     """Die Titelseite für ``art`` = "depot" oder "watchlist"; die Position kommt aus der
     Adresse (``?position=&check=``) oder aus der Sitzung."""
-    from state import get_portfolio_service
-
     st.markdown(kachel_ui.CSS + CSS, unsafe_allow_html=True)
     pid, offener_check = vorauswahl(SITZUNG[art])
-    dienst = get_portfolio_service()
-    alle = dienst.get_portfolio_positions() if art == "depot" else dienst.get_watchlist_positions()
-    position = next((p for p in alle if p.id == pid), None) if pid is not None else None
+    position = _position(art, pid) if pid is not None else None
 
     _zurueck(art)
     if position is None:
@@ -394,3 +461,7 @@ def seite(art: str) -> None:
             _nachrichten(position)
         elif abschnitt == "recherche":
             _recherche(art, position)
+        elif abschnitt == "entscheidung":
+            _entscheidung(position)
+        elif abschnitt == "herkunft":
+            _herkunft(position)

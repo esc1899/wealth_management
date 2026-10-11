@@ -346,24 +346,6 @@ class TestStrategyWorkflows:
         with pytest.raises(ValueError, match="Unknown strategy"):
             research_agent.start_session("AAPL", "Nonexistent Strategy")
 
-    def test_research_agent_adds_to_watchlist_with_strategy(self, research_agent, positions):
-        session = research_agent.start_session("AAPL", "Value Investing")
-        proposal = {
-            "ticker": "AAPL",
-            "name": "Apple Inc.",
-            "asset_class": "Aktie",
-            "notes": "Attraktiv",
-            "story": "",
-        }
-        research_agent.add_from_proposal(session.id, proposal)
-
-        wl = positions.get_watchlist()
-        assert len(wl) == 1
-        assert wl[0].strategy == "Value Investing"
-        assert wl[0].recommendation_source == "research_agent"
-        assert wl[0].in_portfolio is False
-
-
 # ------------------------------------------------------------------
 # Research session lifecycle
 # ------------------------------------------------------------------

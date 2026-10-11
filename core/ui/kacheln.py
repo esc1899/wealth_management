@@ -31,9 +31,11 @@ from core.ui.verdicts import VERDICT_CONFIGS
 #: Absolute Pfade: Streamlit loest einen Seitenpfad relativ zur Einstiegsdatei auf (app.py),
 #: ein absoluter bleibt absolut -- so findet ``st.page_link`` die Seite auch im Test.
 _SEITEN = Path(__file__).resolve().parents[2] / "pages"
-ANALYSE = {"depot": str(_SEITEN / "position_dashboard.py"), "watchlist": str(_SEITEN / "watchlist_analysis.py")}
-#: Zurück von der Titelseite auf die Kacheln.
-KACHELN = {"depot": str(_SEITEN / "kacheln_depot.py"), "watchlist": str(_SEITEN / "kacheln_watchlist.py")}
+ANALYSE = {"depot": str(_SEITEN / "position_dashboard.py"), "watchlist": str(_SEITEN / "watchlist_analysis.py"),
+           "kandidaten": str(_SEITEN / "kandidat.py")}
+#: Zurück von der Titelseite auf die Kacheln; die Kandidaten stehen auf der Suche.
+KACHELN = {"depot": str(_SEITEN / "kacheln_depot.py"), "watchlist": str(_SEITEN / "kacheln_watchlist.py"),
+           "kandidaten": str(_SEITEN / "suche.py")}
 
 _SPALTEN = 3
 _FARBE_SONST = "#5E6B7A"
@@ -188,25 +190,31 @@ def karte(k: Kachel, art: str, position=None) -> None:
             st.page_link(ziel(art), label=k.name, query_params={"position": k.position_id})
             st.markdown(unter_html(k), unsafe_allow_html=True)
         st.markdown(inhalt_html(k), unsafe_allow_html=True)
-        if k.urteile or k.nie:
-            # Untereinander und volle Breite: alle Kaestchen gleich gross, nie zwei in einer Reihe.
-            with st.container(key=f"wk-urteile-{k.position_id}"):
-                for u in urteile_sortiert(k):
-                    st.page_link(
-                        ziel(art, u.agent), label=urteil_label(u), icon=_verdict_eintrag(u)[0],
-                        query_params={"position": k.position_id, "check": u.agent}, width="stretch",
-                    )
-                # Blindzeit ist eine Aussage: ein gewaehlter Check, der fuer den Titel nie lief.
-                for agent in k.nie:
-                    st.page_link(
-                        ziel(art, agent), label=t("kacheln.check_nie").format(check=_agent(agent)),
-                        icon="⚪", query_params={"position": k.position_id, "check": agent},
-                        width="stretch",
-                    )
+        kaestchen(k, art)
         if position is not None:
             from core.ui.titelseite import jetzt_checken
             jetzt_checken(art, position, {u.agent: u for u in k.urteile},
                           key=f"wk-checken-{k.position_id}", klein=True)
+
+
+def kaestchen(k: Kachel, art: str) -> None:
+    """Je gewaehlter Check ein Kaestchen, das zu genau diesem Check springt."""
+    if not (k.urteile or k.nie):
+        return
+    # Untereinander und volle Breite: alle Kaestchen gleich gross, nie zwei in einer Reihe.
+    with st.container(key=f"wk-urteile-{k.position_id}"):
+        for u in urteile_sortiert(k):
+            st.page_link(
+                ziel(art, u.agent), label=urteil_label(u), icon=_verdict_eintrag(u)[0],
+                query_params={"position": k.position_id, "check": u.agent}, width="stretch",
+            )
+        # Blindzeit ist eine Aussage: ein gewaehlter Check, der fuer den Titel nie lief.
+        for agent in k.nie:
+            st.page_link(
+                ziel(art, agent), label=t("kacheln.check_nie").format(check=_agent(agent)),
+                icon="⚪", query_params={"position": k.position_id, "check": agent},
+                width="stretch",
+            )
 
 
 def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:

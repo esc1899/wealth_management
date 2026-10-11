@@ -6,7 +6,9 @@ Eine Prüfung eines Titels ist ein **Durchgang**: alle gewählten Checks, ein Da
 die Titelseite zeigen genau diese Checks, auch die, die für einen Titel nie liefen.
 
 Möglich ist je Liste eine feste Reihe in fester Reihenfolge. Devil's Advocate gehört nur auf
-die Watchlist (Erik, 11.10.2026): Er sucht Gründe, einen Titel *nicht* zu kaufen.
+die Watchlist (Erik, 11.10.2026): Er sucht Gründe, einen Titel *nicht* zu kaufen. Die dritte
+Liste sind die Kandidaten der Suche (``core/kandidaten.py``): dieselben Checks wie die
+Watchlist, eigene Auswahl, nur per Knopf "Genauer prüfen" -- kein Job.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ MOEGLICH: dict[str, tuple[str, ...]] = {
     "watchlist": ("watchlist_checker", "devils_advocate", "fundamental_analyzer",
                   "capital_allocator", "consensus_gap", "storychecker"),
 }
+MOEGLICH["kandidaten"] = MOEGLICH["watchlist"]
 
 #: Läuft lokal und liest die Urteile der anderen -- darum im Durchgang zuletzt.
 ZULETZT = ("watchlist_checker",)
@@ -107,9 +110,12 @@ _BISHER = {"depot": "storychecker", "watchlist": "devils_advocate", "research": 
 
 
 def modell(app_cfg, bereich: str) -> str:
-    """Das Cloud-Modell des Bereichs; "" = Standard der App."""
+    """Das Cloud-Modell des Bereichs; "" = Standard der App. Kandidaten prüfen mit dem Modell
+    der Watchlist -- es sind deren Checks, und wer übernimmt, soll dasselbe Urteil sehen."""
     if app_cfg is None:
         return ""
+    if bereich == "kandidaten":
+        bereich = "watchlist"
     return (app_cfg.get(f"model_bereich_{bereich}")
             or app_cfg.get(f"model_public_{_BISHER[bereich]}") or "")
 

@@ -26,6 +26,7 @@ from core.storage.cowork import CoworkRepository
 from core.storage.monthly_digest import MonthlyDigestRepository
 from core.storage.yearly_digest import YearlyDigestRepository
 from core.storage.research_queue import ResearchQueueRepository
+from core.storage.kandidaten import KandidatenRepository
 
 
 @st.cache_resource
@@ -124,6 +125,11 @@ def get_scheduled_job_runs_repo() -> ScheduledJobRunsRepository:
 @st.cache_resource
 def get_structural_scans_repo() -> StructuralScansRepository:
     return StructuralScansRepository(get_db_connection())
+
+
+@st.cache_resource
+def get_kandidaten_repo() -> KandidatenRepository:
+    return KandidatenRepository(get_db_connection())
 
 
 @st.cache_resource

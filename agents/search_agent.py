@@ -13,12 +13,10 @@ from __future__ import annotations
 import logging
 
 
-from datetime import date
-from typing import Optional
+from typing import Optional, Sequence
 
-from core.asset_class_config import get_asset_class_registry
 from core.llm.claude import ClaudeProvider, ClaudeResponse, ClaudeToolCall
-from core.storage.models import Position, SearchSession
+from core.storage.models import SearchSession
 from core.storage.positions import PositionsRepository
 from core.storage.search import SearchRepository
 from agents.agent_language import current_date_context
@@ -127,8 +125,11 @@ class SearchAgent:
             skill_prompt=skill_prompt,
         )
 
-    async def chat(self, session_id: int, user_message: str, enable_thinking: bool = False) -> tuple[str, list[dict]]:
-        """Send a user message in an existing session and return the assistant reply + proposals."""
+    async def chat(self, session_id: int, user_message: str, enable_thinking: bool = False,
+                   bekannte_ticker: Sequence[str] = ()) -> tuple[str, list[dict]]:
+        """Send a user message in an existing session and return the assistant reply + proposals.
+        ``bekannte_ticker``: not to be proposed again (core/kandidaten.py -- never the portfolio)."""
+        from core.kandidaten import ausschluss
         session = self._search.get_session(session_id)
         if session is None:
             raise ValueError(f"Session {session_id} not found")
@@ -136,7 +137,8 @@ class SearchAgent:
         self._session_proposals[session_id] = []
         self._current_session_id = session_id
 
-        system = current_date_context() + BASE_SYSTEM_PROMPT + "\n\n## Screening Strategy\n" + session.skill_prompt
+        system = (current_date_context() + BASE_SYSTEM_PROMPT + "\n\n## Screening Strategy\n"
+                  + session.skill_prompt + ausschluss(list(bekannte_ticker)))
 
         api_messages = self._build_api_messages(session_id)
         api_messages.append({"role": "user", "content": user_message})
@@ -216,42 +218,3 @@ class SearchAgent:
         session_id = self._current_session_id
         self._session_proposals[session_id].append(proposal)
         return f"Added '{proposal['name']}' ({proposal['ticker']}) to proposal list for review."
-
-    def add_from_proposal(self, session_id: int, proposal: dict) -> Position:
-        """Write a proposal to the watchlist after user confirmation."""
-        ticker = proposal.get("ticker", "")
-        name = proposal.get("name", ticker)
-        asset_class = proposal.get("asset_class", "Aktie")
-        notes = proposal.get("notes", "")
-        story = proposal.get("story", "")
-
-        registry = get_asset_class_registry()
-        try:
-            cfg = registry.require(asset_class)
-        except Exception:
-            cfg = registry.require("Aktie")
-
-        position = Position(
-            ticker=ticker,
-            name=name,
-            asset_class=asset_class,
-            investment_type=cfg.investment_type,
-            unit=cfg.default_unit,
-            notes=notes,
-            story=story or None,
-            added_date=date.today(),
-            in_portfolio=False,
-            in_watchlist=True,
-            recommendation_source="search_agent",
-        )
-        saved = self._positions.add(position)
-
-        if story and saved.id:
-            try:
-                from state import get_storychecker_agent
-                storychecker = get_storychecker_agent()
-                storychecker.start_session(position=saved)
-            except Exception as e:
-                logger.warning(f"Could not auto-validate story: {e}")
-
-        return saved

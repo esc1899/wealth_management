@@ -168,23 +168,6 @@ class TestProposeForWatchlistTool:
         assert proposals[0]["ticker"] == "NESN.SW"
         assert proposals[0]["name"] == "Nestlé"
 
-    @pytest.mark.asyncio
-    async def test_add_from_proposal_writes_to_watchlist(self, agent, mock_positions_repo):
-        proposal = {
-            "ticker": "NESN.SW",
-            "name": "Nestlé",
-            "asset_class": "Aktie",
-            "notes": "High yield",
-            "story": "Strong dividend history"
-        }
-        agent.add_from_proposal(1, proposal)
-        mock_positions_repo.add.assert_called_once()
-        position = mock_positions_repo.add.call_args[0][0]
-        assert position.ticker == "NESN.SW"
-        assert position.recommendation_source == "search_agent"
-        assert position.in_watchlist is True
-
-
 # ------------------------------------------------------------------
 # Session management delegation
 # ------------------------------------------------------------------

@@ -743,6 +743,21 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     if "durchgang_id" not in {row[1] for row in conn.execute("PRAGMA table_info(position_analyses)")}:
         conn.execute("ALTER TABLE position_analyses ADD COLUMN durchgang_id INTEGER")
 
+    # Kandidaten der Suche (11.10.2026, core/storage/kandidaten.py): eine Position auf keiner
+    # Liste plus diese Zeile. Ein Nein bleibt stehen, darum nie geloescht.
+    conn.execute("""CREATE TABLE IF NOT EXISTS kandidaten (
+        position_id INTEGER PRIMARY KEY,
+        zustand     TEXT NOT NULL DEFAULT 'offen',
+        strategie   TEXT NOT NULL,
+        skill       TEXT,
+        lauf_id     INTEGER,
+        funde       INTEGER NOT NULL DEFAULT 1,
+        gefunden    TEXT NOT NULL,
+        beruehrt    TEXT NOT NULL,
+        entschieden TEXT
+    )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_kandidaten_zustand ON kandidaten(zustand)")
+
     conn.commit()
 
 

@@ -487,10 +487,8 @@ class AgentSchedulerService:
 
     async def _run_structural_scan_job(self, job, conn, log_fn=None) -> None:
         from agents.structural_change_agent import StructuralChangeAgent
-        from agents.storychecker_agent import StorycheckerAgent
-        from core.storage.analyses import PositionAnalysesRepository
-        from core.storage.skills import SkillsRepository
-        from core.storage.storychecker import StorycheckerRepository
+        from core import kandidaten
+        from core.storage.kandidaten import KandidatenRepository
         from core.storage.structural_scans import StructuralScansRepository
         _log = log_fn or logger.info
 
@@ -507,28 +505,22 @@ class AgentSchedulerService:
             _log(f"Batch submitted: {batch_id}")
             return
 
+        # Die Vorschlaege werden Kandidaten der Suche (core/kandidaten.py), wie beim Scan von
+        # Hand; geprueft wird erst per "Genauer pruefen". Die bekannten Ticker ohne das Depot.
+        kandidaten_repo = KandidatenRepository(conn)
         agent = StructuralChangeAgent(positions_repo=positions_repo, llm=llm)
-        _, _, new_candidates = await agent.start_scan(
+        run, _, vorschlaege = await agent.start_scan(
             skill_name=job.skill_name,
             skill_prompt=job.skill_prompt,
             user_focus=None,
             repo=scans_repo,
             language="de",
+            bekannte_ticker=kandidaten.bekannte_ticker(positions_repo, kandidaten_repo),
         )
-        _log(f"Strukturscan abgeschlossen — {len(new_candidates)} neue Kandidaten")
-
-        if new_candidates:
-            _log(f"Story-Checks für {len(new_candidates)} Kandidaten")
-            sc_llm = self._make_scheduled_llm("storychecker", model, conn)
-            storychecker = StorycheckerAgent(
-                positions_repo=positions_repo,
-                storychecker_repo=StorycheckerRepository(conn),
-                analyses_repo=PositionAnalysesRepository(conn),
-                llm=sc_llm,
-                skills_repo=SkillsRepository(conn),
-            )
-            await storychecker.batch_check_all(positions=new_candidates, language="de")
-            _log("Story-Checks abgeschlossen")
+        a = kandidaten.aufnehmen(positions_repo, kandidaten_repo, vorschlaege, "strukturwandel",
+                                 job.skill_name, run.id)
+        _log(f"Strukturscan abgeschlossen — {a.neu} neue Kandidaten, {a.wieder} schon offen, "
+             f"{a.verworfen} früher verworfen, {a.bekannt} schon auf einer Liste")
 
     async def _run_sector_rotation_job(self, job, conn, log_fn=None) -> None:
         from agents.sector_rotation_agent import SectorRotationAgent

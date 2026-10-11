@@ -82,38 +82,6 @@ Offen:
 Offen fuer Erik: ob Marktdaten unter Einstellungen gehoert (heute auch zum Nachsehen einzelner Kurse
 genutzt?).
 
-## Suche: Kandidaten und gemerktes Nein (11.10.2026)
-
-Seit 11.10.2026 ist die Suche eine Seite (`pages/suche.py`, Fassung A des Entwurfs): oben die
-Strategie (freie Suche, Einzeltitel, Strukturwandel), ein Suchfeld mit Skill, ein Banner mit
-Link auf die Skills, darunter der letzte Lauf mit seinen Vorschlaegen als Ankreuzliste. Eine Suche ist ein Weg zu neuen Titeln, wie
-die Vorschlagsseiten der Serien.
-
-Entschieden (Erik, 11.10.2026), zu bauen:
-- **Zwei Stufen.** Ein Lauf liefert Kandidaten als kleine Kacheln wie die Watchlist, mit
-  Link auf ihre Titelseite. "Genauer pruefen" laesst die Checks der Watchlist laufen, je
-  Kandidat per Knopf (Cloud, Websuche kostet). Dann "Auf die Watchlist" oder "Nicht
-  interessant".
-- **Ein Nein wird gemerkt**, wie abgebrochene Serien: mit Datum, Strategie und These, nie
-  geloescht, in einer Liste "Verworfen" mit "wieder aufnehmen". Die Strategien bekommen die
-  verworfenen und bekannten Ticker mit, damit sie sie nicht wieder vorschlagen.
-- **Technisch** ist ein Kandidat eine Position auf keiner der beiden Listen, mit Zustand
-  (neu, verworfen); so funktionieren Checks, Urteilsband und Titelseite ohne Umbau -- sie
-  haengen an der Positions-ID. Heute legen Search und Scanner die Auswahl direkt als
-  Watchlist-Position an (`add_from_proposal`).
-- **Eine stehende Liste, kein Lauf** (Erik, 11.10.2026). Ein Lauf legt seine Kandidaten in
-  die Liste "Offen"; unentschiedene bleiben stehen, nichts verfaellt oder wird still zum Nein.
-  Findet ein spaeterer Lauf denselben Titel, waechst seine Herkunft ("2x gefunden"), kein
-  zweiter Kandidat; offene gelten als bekannt und gehen mit den Tickern an die Strategien.
-  Nach 60 Tagen ohne Beruehrung rueckt ein Kandidat in einen eingeklappten Teil "Ignoriert".
-- **Unten nur "Verworfen" und "Ignoriert".** Fruehere Suchen und den Bericht des Laufs
-  braucht die Seite dann nicht mehr; jede Kachel verlinkt auf den Lauf, aus dem sie kommt.
-- **Einzeltitel, Stufe 2:** Seit 11.10.2026 bewertet die Suche einen Einzeltitel (Stufe 1)
-  und legt ihn auf Wunsch direkt auf die Watchlist; mit den Kandidaten wird er wie jeder
-  andere ein Kandidat mit "Genauer pruefen".
-- **Reihenfolge:** Kandidaten sind eine dritte Liste mit eigener Auswahl an Checks; darum
-  nach "Checks je Liste".
-
 ## Uebrige KI-Knoepfe auf den Stern umstellen (11.10.2026)
 
 Seit 11.10.2026 zeigt `core/ui/ki.py::ki_knopf` mit der Farbe des Sterns, ob ein Knopf lokal

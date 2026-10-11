@@ -3,8 +3,9 @@ Suche — eine Seite für alle Wege zu neuen Titeln (11.10.2026, BACKLOG.md "Suc
 
 Oben die Strategie (freie Suche, Einzeltitel, Strukturwandel), darunter ein Suchfeld mit dem
 Skill und dem Stern, ein Banner sagt, womit gesucht wird, und verweist auf die Skills. Darunter
-der letzte Lauf der Strategie. Jeder Teil (core/ui/suche/) kennt ``modell``, ``starten`` und
-``lauf``; das Suchfeld gehört der Seite.
+die Kandidaten, eine stehende Liste über alle Strategien (core/ui/suche/kandidaten.py): Ein Lauf
+legt seine Vorschläge dort ab, ein Satz sagt, was er gebracht hat. Jeder Teil (core/ui/suche/)
+kennt ``modell``, ``starten`` und ``bericht``; das Suchfeld gehört der Seite.
 """
 
 from pathlib import Path
@@ -14,7 +15,7 @@ import streamlit as st
 from core.constants import supports_effort
 from core.i18n import t
 from core.ui.ki import ki_knopf
-from core.ui.suche import einzeltitel, frei, strukturwandel
+from core.ui.suche import einzeltitel, frei, gemeinsam, kandidaten, strukturwandel
 from core.ui.verdicts import cloud_notice
 from state import get_skills_repo
 
@@ -112,5 +113,11 @@ if los:
     else:
         teil.starten(skill, anfrage, eigene, denken)
 
+# Ein Scan läuft im Hintergrund weiter, auch wenn oben eine andere Strategie gewählt ist.
+strukturwandel.nachziehen()
+if hasattr(teil, "hinweis"):
+    teil.hinweis()
+gemeinsam.ergebnis(kandidaten.bericht)
+
 st.divider()
-teil.lauf()
+kandidaten.liste()

@@ -230,6 +230,15 @@ Ein Cloud-Modell je Bereich (Depot, Watchlist, Research; `core/pruefung.py::BERE
 `modell`/`modell_setzen`): Die Einstellungen schreiben die Einträge je Agent mit; im Durchgang
 reicht der Knopf `job["modell"]`, der Job `ScheduledJob.model` das Modell der Liste durch.
 
+Kandidaten der Suche als dritte Liste (`core/kandidaten.py`, `core/storage/kandidaten.py`):
+eine Position mit `in_portfolio = in_watchlist = 0` plus eine Zeile in `kandidaten` (Zustand
+offen/verworfen/uebernommen, Strategie, Lauf, Funde, Berührung). So tragen Durchgang,
+Urteilsband und Titelseite ohne Umbau; eine Position ohne diese Zeile ist kein Kandidat.
+`MOEGLICH["kandidaten"]` sind die Watchlist-Checks mit eigener Auswahl, Modell der Watchlist,
+nur per Knopf. "Ignoriert" wird beim Lesen gerechnet (60 Tage ohne Berührung), nie gespeichert.
+Die bekannten Ticker für die Strategien (`bekannte_ticker`) lassen das Depot aus -- sie gehen
+in die Cloud.
+
 Starke Kursbewegung (`core/bewegung.py`): Schwelle aus `app_config` (`bewegung_prozent`), von
 Kachel und Job `kurse` gelesen; der Job sucht live höchstens 3 Titel je Tag
 (`AgentSchedulerService.bewegungen_nachrichten`), gespeichert als News-Lauf „Bewegung“, den

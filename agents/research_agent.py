@@ -14,11 +14,10 @@ import logging
 
 
 import json
-from datetime import date
 from typing import Optional
 
 from core.llm.claude import ClaudeProvider, ClaudeResponse, ClaudeToolCall
-from core.storage.models import Position, ResearchSession
+from core.storage.models import ResearchSession
 from core.storage.positions import PositionsRepository
 from core.storage.research import ResearchRepository
 from core.strategy_config import StrategyConfig, StrategyRegistry
@@ -271,40 +270,3 @@ class ResearchAgent:
         session_id = self._current_session_id
         self._session_proposals[session_id].append(proposal)
         return f"Added '{proposal['name']}' ({proposal['ticker']}) to proposal list for review."
-
-    def add_from_proposal(self, session_id: int, proposal: dict) -> Position:
-        """Write a proposal to the watchlist after user confirmation."""
-        session = self._research.get_session(session_id)
-        ticker = proposal.get("ticker", "")
-        name = proposal.get("name", ticker)
-        asset_class = proposal.get("asset_class", "Aktie")
-        notes = proposal.get("notes", "")
-        story = proposal.get("story", "")
-        investment_type = "Wertpapiere"
-
-        position = Position(
-            ticker=ticker,
-            name=name,
-            asset_class=asset_class,
-            investment_type=investment_type,
-            unit="Stück",
-            added_date=date.today(),
-            in_portfolio=False,
-            in_watchlist=True,
-            recommendation_source="research_agent",
-            strategy=session.strategy_name if session else None,
-            notes=notes,
-            story=story or None,
-        )
-        saved = self._positions.add(position)
-
-        if story and saved.id:
-            try:
-                from state import get_storychecker_agent
-                storychecker = get_storychecker_agent()
-                storychecker.start_session(position=saved)
-            except Exception as e:
-                logger = logging.getLogger(__name__)
-                logger.warning(f"Could not auto-validate story: {e}")
-
-        return saved

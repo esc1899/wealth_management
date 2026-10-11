@@ -131,7 +131,8 @@ _performance_pages = [
     st.Page("pages/verdict_hindsight.py", title=t("nav.verdict_hindsight"), icon=":material/history_toggle_off:"),
 ]
 # Suche: eine Seite, oben die Strategie (freie Suche, Einzeltitel, Strukturwandel); die
-# frueheren Seiten sind ihre Teile (core/ui/suche/). Kandidaten folgen (BACKLOG.md, "Suche").
+# frueheren Seiten sind ihre Teile (core/ui/suche/); darunter die Kandidaten, deren Titelseite
+# (pages/kandidat.py) nur ueber ihre Kachel erreichbar ist.
 _suche_pages = [
     st.Page("pages/suche.py", title=t("nav.suche"), icon=":material/manage_search:"),
 ]
@@ -149,6 +150,7 @@ _ausgeblendet = [
     st.Page("pages/marktdaten.py",         title=t("nav.market_data"), icon=":material/trending_up:", visibility=_AUS),
     st.Page("pages/position_dashboard.py", title="Positionsanalyse",   icon=":material/person_search:", visibility=_AUS),
     st.Page("pages/watchlist_analysis.py", title="Watchlist-Analyse",  icon=":material/search:", visibility=_AUS),
+    st.Page("pages/kandidat.py",           title="Kandidat",           icon=":material/travel_explore:", visibility=_AUS),
     st.Page("pages/cowork_inbox.py",       title=t("nav.cowork_inbox"),     icon=":material/inbox:", visibility=_AUS),
     st.Page("pages/research_answers.py",   title=t("nav.research_answers"), icon=":material/question_answer:", visibility=_AUS),
     st.Page("pages/cowork_setup.py",       title="Cowork Setup",            icon=":material/settings_suggest:", visibility=_AUS),

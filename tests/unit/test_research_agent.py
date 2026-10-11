@@ -214,37 +214,6 @@ class TestProposeForWatchlistTool:
         assert proposals[0]["name"] == "Apple Inc."
 
     @pytest.mark.asyncio
-    async def test_add_from_proposal_writes_to_watchlist(self, agent, mock_positions_repo):
-        proposal = {
-            "ticker": "AAPL",
-            "name": "Apple Inc.",
-            "asset_class": "Aktie",
-            "notes": "Günstig bewertet",
-            "story": "Strong growth",
-        }
-        agent.add_from_proposal(1, proposal)
-        mock_positions_repo.add.assert_called_once()
-        position = mock_positions_repo.add.call_args[0][0]
-        assert position.ticker == "AAPL"
-        assert position.in_watchlist is True
-        assert position.recommendation_source == "research_agent"
-
-    @pytest.mark.asyncio
-    async def test_watchlist_entry_has_correct_source(self, agent, mock_positions_repo):
-        proposal = {
-            "ticker": "AAPL",
-            "name": "Apple",
-            "asset_class": "Aktie",
-            "notes": "",
-            "story": "",
-        }
-        agent.add_from_proposal(1, proposal)
-        position = mock_positions_repo.add.call_args[0][0]
-        assert position.recommendation_source == "research_agent"
-        assert position.strategy == "Value Investing"
-        assert position.in_portfolio is False
-
-    @pytest.mark.asyncio
     async def test_llm_called_twice_for_tool_use(self, agent, mock_llm):
         tool_call = ClaudeToolCall(id="t1", name="propose_for_watchlist",
                                    input={"ticker": "AAPL", "name": "Apple", "asset_class": "Aktie"})

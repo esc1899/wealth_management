@@ -8,6 +8,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Suche: Kandidaten statt Ankreuzliste — 2026-10-11
+
+**Warum:** Bisher legte die Suche angekreuzte Vorschläge direkt auf die Watchlist und startete
+dabei still einen Story-Check; was man nicht ankreuzte, war weg und kam beim nächsten Lauf
+wieder. Entschieden (Erik, 11.10.2026): zwei Stufen, eine stehende Liste, ein gemerktes Nein.
+
+**Änderungen:**
+- Ein Lauf (freie Suche, Einzeltitel, Strukturwandel -- auch der eingeplante Scan) legt seine
+  Vorschläge als **Kandidaten** ab: eine Position auf keiner Liste plus eine Zeile in der neuen
+  Tabelle `kandidaten` (`core/kandidaten.py`, `core/storage/kandidaten.py`). Derselbe Titel noch
+  einmal gefunden zählt hoch („2× gefunden“), Depot- und Watchlist-Titel werden keine Kandidaten.
+  **DB-Schema-Änderung** (neue Tabelle): Streamlit neu starten.
+- Seite Suche: unter dem Suchfeld ein Satz, was der Lauf gebracht hat, darunter „Kandidaten“ als
+  Kacheln mit „Genauer prüfen“ (ein Durchgang mit eigener Auswahl, Einstellungen → Prüfung je
+  Liste, Modell der Watchlist), „Auf die Watchlist“ und „Nicht interessant“. Eingeklappt
+  „Ignoriert“ (60 Tage unberührt) und „Verworfen“ (nie gelöscht), je mit „Wieder aufnehmen“.
+- Titelseite eines Kandidaten (`pages/kandidat.py`, nicht im Menü): Urteile, Entscheidung,
+  Herkunft mit These und Bericht des Laufs. Die Ankreuzliste, der Bericht unter der Suche und
+  die Rückfrage an einen Lauf entfallen; hat ein Lauf nichts vorgeschlagen, steht sein Bericht
+  unter dem Satz.
+- Freie Suche und Strukturwandel bekommen die bekannten Ticker mit (Watchlist, offene und
+  verworfene Kandidaten), damit sie sie nicht wieder vorschlagen -- **nie die des Depots**,
+  auch nicht, wenn ein Titel zugleich auf der Watchlist steht: Die Strategien rechnen in der
+  Cloud.
+- `add_from_proposal` der drei Agenten ist weg, mit ihm der automatische Story-Check beim
+  Übernehmen; geprüft wird per „Genauer prüfen“. Der eingeplante Strukturwandel-Scan ließ den
+  Storychecker auf die rohen Vorschläge los -- auch das ist ersetzt.
+
 ### Websuche: das Limit ist kein Ausfall — 2026-10-11
 
 **Warum:** Der zweite Test bei Schneider Electric brachte wieder „Websuche nicht verfügbar“. Das
