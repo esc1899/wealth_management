@@ -6,8 +6,8 @@
 graph TD
     subgraph UI["Streamlit UI"]
         PG1["Dashboard / Positionen / Marktdaten"]
-        PG2["Portfolio Chat / Portfolio Checker / Titelseite (Depot)"]
-        PG3["Storychecker / Watchlist Checker / Titelseite (Watchlist)"]
+        PG2["Portfolio-Story mit Story-Check / Titelseite (Depot)"]
+        PG3["Storychecker / Titelseite (Watchlist)"]
         PG4["Consensus Gap / Fundamental Analyzer / Capital Allocator"]
         PG5["Research Chat / News / Search / Sector Rotation"]
         PG6["Research Inbox / Research Answers (ausgeblendet)"]

@@ -1,20 +1,32 @@
-"""Portfolio-Story — das Narrativ des Depots definieren und pflegen (Bereich Pflege).
+"""Portfolio-Story — das Narrativ des Depots definieren, pflegen und das Depot daran messen.
 
 Herausgelöst aus dem Portfolio Checker (10.10.2026): Die Story ist Pflege wie die Positionen
-und braucht kein Sprachmodell. Der Portfolio Checker liest sie von hier. Der KI-Entwurf ist
-ein Extra; ohne erreichbares Ollama ist er ausgegraut (core/ui/lokales_modell.py).
+und braucht kein Sprachmodell. Seit 11.10.2026 steht auch der Check gegen die Story hier,
+der Portfolio Checker ist ausgeblendet. KI-Entwurf und Check sind Extras; ohne erreichbares
+Ollama sind sie ausgegraut (core/ui/lokales_modell.py).
 """
 
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 
 import streamlit as st
 
-from core.i18n import t
-from core.storage.models import PortfolioStory
+from core.i18n import fmt_dt, t
+from core.portfolio_snapshot import build_portfolio_snapshot
+from core.storage.models import PortfolioStory, PortfolioStoryAnalysis
 from core.ui.lokales_modell import hinweis_einrichten, lokales_modell_bereit
-from state import get_portfolio_service, get_portfolio_story_agent, get_portfolio_story_repo
+from core.ui.markdown import llm_markdown
+from state import (
+    get_analysis_service,
+    get_market_agent,
+    get_portfolio_service,
+    get_portfolio_story_agent,
+    get_portfolio_story_repo,
+)
+
+_ICON = {"intact": "🟢", "gemischt": "🟡", "gefaehrdet": "🔴"}
 
 st.set_page_config(page_title="Portfolio-Story", page_icon="📖", layout="wide")
 st.title(t("portfolio_story.pflege_title"))
@@ -108,3 +120,84 @@ with st.form("portfolio_story_form", clear_on_submit=False):
 
 if "_ps_draft" in st.session_state:
     st.info(f"{t('portfolio_story.ai_draft_label')}\n\n{st.session_state['_ps_draft']}")
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Der Check gegen die Story (lokal): misst das Depot und die Urteile der Storychecks an der
+# Story. Nur auf Knopfdruck, nie beim Oeffnen der Seite; das letzte Ergebnis steht darunter.
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _story_check(story: PortfolioStory) -> None:
+    """Ein Lauf: Snapshot mit Werten (das Modell fragt nach Gewichten und Dividenden, ohne Zahlen
+    erfaende es sie) und die Storychecker-Urteile je Position, Ergebnis in die Datenbank."""
+    positionen = get_portfolio_service().get_portfolio_positions()
+    market_agent = get_market_agent()
+    bewertungen = market_agent.get_portfolio_valuation() if market_agent else []
+    snapshot = (build_portfolio_snapshot(positionen, bewertungen) if positionen
+                else "## Portfolio\n" + t("portfolio_story.empty_portfolio") + "\n")
+
+    ids = [p.id for p in positionen if p.id]
+    urteile = get_analysis_service().get_all_verdicts(ids).get("storychecker", {}) if ids else {}
+    zeilen = []
+    for p in positionen:
+        v = urteile.get(p.id) if p.id else None
+        if v:
+            zeilen.append(f"- {p.name} ({p.ticker}): {_ICON.get(v.verdict, '⚪')} {v.summary or v.verdict}")
+        elif p.story and p.ticker:
+            zeilen.append(f"- {p.name} ({p.ticker}): {t('portfolio_story.verdict_pending')}")
+
+    with st.spinner(t("portfolio_story.analyze_spinner")):
+        ergebnis = asyncio.run(get_portfolio_story_agent().analyze_story_and_performance(
+            story=story,
+            portfolio_snapshot=snapshot,
+            position_verdicts="\n".join(zeilen) or t("portfolio_story.no_verdicts"),
+        ))
+    repo.save_analysis(PortfolioStoryAnalysis(
+        verdict=ergebnis.verdict,
+        summary=ergebnis.summary,
+        perf_verdict=ergebnis.perf_verdict,
+        perf_summary=ergebnis.perf_summary,
+        stability_verdict=None,
+        stability_summary=None,
+        full_text=ergebnis.full_text,
+        created_at=datetime.now(timezone.utc),
+    ))
+
+
+st.divider()
+st.subheader(t("portfolio_story.check_title"))
+st.caption(t("portfolio_story.check_subtitle"))
+
+if st.button(t("portfolio_story.check_button"), disabled=not ki_bereit, key="ps_check"):
+    if not current_story or not current_story.story:
+        st.error(t("portfolio_story.no_story_error"))
+    else:
+        _story_check(current_story)
+        st.rerun()
+if not ki_bereit:
+    hinweis_einrichten()
+
+letzte = repo.get_latest_analysis()
+if letzte is None:
+    st.info(t("portfolio_story.check_nie"))
+else:
+    if letzte.created_at:
+        zeit = letzte.created_at
+        if zeit.tzinfo:
+            zeit = zeit.astimezone()
+        st.caption(t("portfolio_story.check_vom").format(ts=fmt_dt(zeit)))
+    links, rechts = st.columns(2)
+    with links:
+        st.metric(f"{_ICON.get(letzte.verdict, '⚪')} {t('portfolio_story.story_verdict_label')}",
+                  letzte.verdict.upper())
+        if letzte.summary:
+            st.info(letzte.summary)
+    with rechts:
+        st.metric(f"{_ICON.get(letzte.perf_verdict, '⚪')} {t('portfolio_story.positions_verdict_label')}",
+                  (letzte.perf_verdict or "—").upper())
+        if letzte.perf_summary:
+            st.info(letzte.perf_summary)
+    if letzte.full_text:
+        with st.expander(t("portfolio_story.full_analysis_label")):
+            llm_markdown(letzte.full_text)

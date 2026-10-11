@@ -64,7 +64,8 @@ Seit 10.10.2026 folgen darunter "Pflege" (Positionen, Portfolio-Story) und "Perf
 Seit 10.10.2026 abends sind auch Positions- und Watchlist-Analyse ausgeblendet (erreichbar nur
 ueber Titel und Kaestchen der Kacheln) und der ganze Cowork-Abschnitt; die Seite "Research
 anfordern" ist geloescht (Erik). Die Gruppe "Portfolio" entfaellt damit. Alle ausgeblendeten
-Seiten stehen in `app.py` in einer Liste `_ausgeblendet`.
+Seiten stehen in `app.py` in einer Liste `_ausgeblendet`. Seit 11.10.2026 gehoeren Portfolio
+Checker und Watchlist Checker dazu, die Gruppe "Assistent" entfaellt.
 
 Offen:
 - **Titelseite nach dem Durchgang** (Erik, 10./11.10.2026; die Seite selbst steht seit
@@ -72,8 +73,12 @@ Offen:
   geaendert hat; der Knopf "Titel pruefen" auch im Depot, mit der Auswahl der Liste. Liegt,
   bis der Durchgang gebaut ist (unten, "Checks je Liste").
 - **Die uebrigen Seiten unten einzeln angehen**, jede fuer sich: in einen der vier Bereiche
-  oben ziehen, in die Kacheln aufgehen lassen oder ausblenden. Uebrig: Assistent (Portfolio
-  Checker, Watchlist Checker), Research, Strategie, System.
+  oben ziehen, in die Kacheln aufgehen lassen oder ausblenden. Uebrig: Research, Strategie,
+  System.
+- **Portfolio-Gegenanalyse** (`portfolio_story.py`, lokal) steht seit 11.10.2026 nur noch auf
+  der ausgeblendeten Seite Portfolio Checker; der Story-Check ist nach Pflege ->
+  Portfolio-Story gezogen. Erik entscheidet: mit dorthin, Depot-Check der Auswahl (unten,
+  "Checks je Liste") oder weg.
 - **News Digest und Investment Search** sind dem Namen nach auch Dialoge (`news_chat.py`,
   `search_chat.py`), liefern aber Ergebnisse: den Digest, den die Positionsanalyse liest, und
   Kandidaten fuer die Watchlist. Darum noch sichtbar -- Erik entscheidet.

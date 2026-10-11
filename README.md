@@ -35,9 +35,9 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 
 ### Local Assistants (private, Ollama)
 - **Portfolio Chat** — natural language CRUD interface for your positions; data never leaves your machine
-- **Portfolio Story** — analyzes portfolio narrative alignment and position support; validates whether holdings match your investment thesis
-- **Watchlist Checker** — evaluates which watchlist positions fit into current portfolio structure and strategy, with optional configurable analysis skills
-- **Portfolio Robustness** — portfolio-level stress assessment across scenarios (local, full portfolio visibility)
+- **Portfolio Story** — on the upkeep page next to the story itself: measures the portfolio and the story-check verdicts against your narrative; greyed out without a reachable Ollama
+- **Watchlist Checker** — evaluates which watchlist positions fit into current portfolio structure and strategy; its page is hidden and reached via its box on the watchlist tiles
+- **Portfolio Robustness** — portfolio-level stress assessment across scenarios (local, full portfolio visibility); for now only on the hidden Portfolio Checker page
 - **Tax Loss Harvesting Assistant** — identifies loss positions, computes tax impact, suggests watchlist replacements, warns about wash-sale windows
 
 ### Research (cloud, Claude API + web search)

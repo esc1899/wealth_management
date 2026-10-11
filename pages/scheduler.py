@@ -115,12 +115,12 @@ _SKILL_CAPABLE_AGENTS = {
 }
 
 # Die Jobs in Rahmen (2026-10-06): Was ueber das Portfolio laeuft, ist der
-# Portfolio-Check -- die Watchlist prueft der Watchlist Checker auf Knopfdruck.
+# Portfolio-Check -- die Watchlist prueft die Titelseite eines Titels auf Knopfdruck.
 _PORTFOLIO_CHECK = {"news", "consensus_gap", "storychecker", "fundamental_analyzer", "sector_rotation"}
 _MARKT = {"structural_scan", "search_agent"}
 _GRUPPEN = [
     ("Portfolio-Check",
-     "Läuft eingeplant über dein Portfolio. Die Watchlist prüfst du auf Knopfdruck im Watchlist Checker.",
+     "Läuft eingeplant über dein Portfolio. Die Watchlist prüfst du auf Knopfdruck, je Titel auf seiner Seite.",
      _PORTFOLIO_CHECK),
     ("Markt", "Läuft eingeplant, ohne deine Positionen.", _MARKT),
     ("System", "Legt die App selbst an; rechnet nur, ohne Sprachmodell.", _SYSTEM_AGENT_NAMES),

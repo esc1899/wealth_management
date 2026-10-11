@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Story-Check unter Portfolio-Story, Gruppe Assistent aufgelöst — 2026-10-11
+
+**Warum:** Vom Portfolio Checker war nur noch der Check gegen die Story übrig, und der gehört
+neben die Story selbst; der Watchlist Checker ist durch Kacheln und Titelseite ersetzt (Erik).
+
+**Änderungen:**
+- Pflege → Portfolio-Story misst das Depot an der Story („Depot an der Story messen“, lokal):
+  derselbe Lauf wie bisher, das letzte Ergebnis darunter, „noch nie gemessen“ ohne Lauf. Ohne
+  erreichbares Ollama ist der Knopf grau, mit dem Hinweis zum Einrichten.
+- Portfolio Checker und Watchlist Checker sind ausgeblendet, nicht gelöscht. Der Portfolio
+  Checker hält noch die Portfolio-Gegenanalyse; der Watchlist Checker bleibt das Ziel seines
+  Kästchens auf den Watchlist-Kacheln. Die Gruppe „Assistent“ entfällt.
+
 ### Titelseite statt Positions- und Watchlist-Analyse — 2026-10-11
 
 **Warum:** Man kommt nur noch über die Kacheln auf einen Titel; die alten Seiten hatten eine

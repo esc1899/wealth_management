@@ -1011,7 +1011,12 @@ wealth_history:
 
 portfolio_story:
   pflege_title: "📖 Portfolio-Story"
-  pflege_subtitle: "Wofür das Depot da ist: Narrativ, Ziel-Jahr, Liquiditätsbedarf, Priorität. Der Portfolio Checker misst das Depot daran."
+  pflege_subtitle: "Wofür das Depot da ist: Narrativ, Ziel-Jahr, Liquiditätsbedarf, Priorität. Darunter misst das lokale Sprachmodell das Depot daran."
+  check_title: "Passt das Depot zur Story?"
+  check_subtitle: "Das lokale Sprachmodell liest Story, Depot und die Urteile der Storychecks und sagt, ob beides noch zusammengeht. Es läuft nur auf Knopfdruck."
+  check_button: "🔍 Depot an der Story messen"
+  check_nie: "Das Depot wurde noch nie an der Story gemessen."
+  check_vom: "Gemessen am {ts}"
   no_story_link: "Noch keine Portfolio-Story. Festhalten unter Pflege → Portfolio-Story; danach misst der Checker das Depot daran."
   cash_rule_title: "💰 Bargeldregel"
   cash_rule_total: "Gesamtportfolio"

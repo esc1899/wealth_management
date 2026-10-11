@@ -35,7 +35,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
-from core.health import Severity, is_local_url, run_static_checks  # noqa: E402
+from core.health import Severity, run_static_checks  # noqa: E402
 from core.i18n import t, set_language, current_language, SUPPORTED_LANGUAGES  # noqa: E402
 
 # Fail fast if required config is missing
@@ -102,12 +102,6 @@ if config.SHOW_LEGAL_NOTICE and not st.session_state.get("legal_accepted"):
     _legal_dialog()
     st.stop()
 
-_is_local = is_local_url(config.OLLAMA_HOST)
-_assistant_group = (
-    t("nav.group_assistant") if _is_local
-    else t("nav.group_assistant_remote")
-)
-
 # Neu oben: die Kacheln, Depot ist die Startseite. Darunter steht der Rest wie bisher und wird
 # nach und nach abgeloest (BACKLOG.md, "Kacheln loesen die alten Ansichten ab").
 _neu_pages = [
@@ -135,6 +129,10 @@ _performance_pages = [
 # Ausgeblendet, aber registriert. Positions- und Watchlist-Analyse erreicht man ueber Titel und
 # Kaestchen der Kacheln, nicht mehr ueber das Menue; Cowork ganz (10.10.2026). Sie haengen an
 # der ersten Gruppe, damit keine Gruppe ohne sichtbare Seite eine leere Ueberschrift zeigt.
+# Die Gruppe Assistent ist aufgeloest (11.10.2026): Der Check gegen die Story steht unter
+# Pflege -> Portfolio-Story, der Portfolio Checker haelt nur noch die Gegenanalyse. Der Watchlist
+# Checker bleibt registriert, weil sein Kaestchen auf den Watchlist-Kacheln dorthin springt
+# -- die Titelseite kennt den lokalen Passungs-Check (noch) nicht.
 _ausgeblendet = [
     st.Page("pages/dashboard.py",          title=t("nav.dashboard"),   icon=":material/dashboard:", visibility=_AUS),
     st.Page("pages/marktdaten.py",         title=t("nav.market_data"), icon=":material/trending_up:", visibility=_AUS),
@@ -143,19 +141,10 @@ _ausgeblendet = [
     st.Page("pages/cowork_inbox.py",       title=t("nav.cowork_inbox"),     icon=":material/inbox:", visibility=_AUS),
     st.Page("pages/research_answers.py",   title=t("nav.research_answers"), icon=":material/question_answer:", visibility=_AUS),
     st.Page("pages/cowork_setup.py",       title="Cowork Setup",            icon=":material/settings_suggest:", visibility=_AUS),
-]
-
-# Der Rest wie bisher, bis er einzeln angegangen ist. Der Watchlist Checker ist immer
-# registriert -- die Watchlist-Kacheln springen dorthin --, ohne lokales Ollama aber
-# ausgeblendet wie bisher.
-_nur_lokal = "visible" if _is_local else _AUS
-
-# Assistant pages
-_assistant_pages = [
-    st.Page("pages/portfolio_chat.py",    title=t("nav.portfolio_chat"), icon=":material/chat:", visibility=_AUS),
-    st.Page("pages/portfolio_story.py",   title="Portfolio Checker",     icon=":material/fact_check:"),
-    st.Page("pages/watchlist_checker.py", title="Watchlist Checker",     icon=":material/check_circle:", visibility=_nur_lokal),
-    st.Page("pages/rebalance_chat.py",    title=t("nav.rebalance_chat"), icon=":material/balance:", visibility=_AUS),
+    st.Page("pages/portfolio_chat.py",     title=t("nav.portfolio_chat"),   icon=":material/chat:", visibility=_AUS),
+    st.Page("pages/portfolio_story.py",    title="Portfolio Checker",       icon=":material/fact_check:", visibility=_AUS),
+    st.Page("pages/watchlist_checker.py",  title="Watchlist Checker",       icon=":material/check_circle:", visibility=_AUS),
+    st.Page("pages/rebalance_chat.py",     title=t("nav.rebalance_chat"),   icon=":material/balance:", visibility=_AUS),
 ]
 
 pg = st.navigation({
@@ -166,7 +155,6 @@ pg = st.navigation({
     t("nav.settings"): [
         st.Page("pages/settings.py", title=t("nav.settings"), icon=":material/settings:"),
     ],
-    _assistant_group: _assistant_pages,
     t("nav.group_research"): [
         st.Page("pages/research_chat.py",        title=t("nav.research_chat"),    icon=":material/search:", visibility=_AUS),
         st.Page("pages/news_chat.py",            title=t("nav.news_chat"),        icon=":material/newspaper:"),

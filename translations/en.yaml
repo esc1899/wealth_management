@@ -1013,7 +1013,12 @@ wealth_history:
 
 portfolio_story:
   pflege_title: "📖 Portfolio Story"
-  pflege_subtitle: "What the portfolio is for: narrative, target year, liquidity need, priority. The Portfolio Checker measures the portfolio against it."
+  pflege_subtitle: "What the portfolio is for: narrative, target year, liquidity need, priority. Below, the local model measures the portfolio against it."
+  check_title: "Does the portfolio fit the story?"
+  check_subtitle: "The local model reads the story, the portfolio and the story-check verdicts and says whether they still fit together. It runs only on demand."
+  check_button: "🔍 Measure portfolio against story"
+  check_nie: "The portfolio has never been measured against the story."
+  check_vom: "Measured on {ts}"
   no_story_link: "No portfolio story yet. Write it down under Upkeep → Portfolio Story; the checker then measures the portfolio against it."
   cash_rule_title: "💰 Cash Rule"
   cash_rule_total: "Total Portfolio"

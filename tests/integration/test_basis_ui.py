@@ -45,6 +45,26 @@ def test_mit_ollama_ist_der_entwurf_frei(ollama):
     assert not any("Ollama installieren" in c.value for c in at.caption)
 
 
+def _check_knopf(at):
+    return next(b for b in at.button if b.key == "ps_check")
+
+
+@pytest.mark.parametrize("erreichbar", [False, True])
+def test_story_check_ist_grau_ohne_ollama(ollama, erreichbar):
+    ollama(erreichbar)
+    at = AppTest.from_file(PAGES / "portfolio_narrativ.py", default_timeout=30)
+    at.run()
+    assert not at.exception, at.exception
+    assert _check_knopf(at).disabled is not erreichbar
+
+
+def test_story_check_ohne_lauf_sagt_nie_gemessen(ollama):
+    ollama(False)
+    at = AppTest.from_file(PAGES / "portfolio_narrativ.py", default_timeout=30)
+    at.run()
+    assert any("noch nie" in i.value for i in at.info)
+
+
 def test_bereit_folgt_der_pruefung(ollama):
     ollama(True)
     assert lokales_modell.lokales_modell_bereit()
