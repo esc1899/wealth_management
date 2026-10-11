@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Menü: Abschnitt Suche statt Research und Strategie — 2026-10-11
+
+**Warum:** Was neue Titel findet, gehört zusammen, egal welches Modell rechnet (Erik).
+
+**Änderungen:**
+- „Suche“ unter Performance: Investment Search, Strukturwandel-Scanner, Sektorrotation.
+- Tax Loss Harvesting nach Performance; News Digest ausgeblendet (Job und Titelseite).
+- Die Gruppen „Research“ und „Strategie“ entfallen.
+
 ### Gegenanalyse unter Portfolio-Story, Check-Seiten ausgeblendet — 2026-10-11
 
 **Warum:** Was die Depot-Checks sagen, steht auf Kacheln und Titelseite; eigene Seiten dafür

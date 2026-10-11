@@ -79,6 +79,7 @@ nav:
   group_assistant_remote: "Assistant ⚠️"
   group_research: "Research ☁️"
   group_claude_strategy: "Strategy"
+  group_suche: "Search"
   structural_scan: "Structural Change Scanner"
   consensus_gap: "Consensus Gap"
   fundamental: "Fundamental Value"

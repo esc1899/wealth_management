@@ -73,22 +73,18 @@ Offen:
   geaendert hat; der Knopf "Titel pruefen" auch im Depot, mit der Auswahl der Liste. Liegt,
   bis der Durchgang gebaut ist (unten, "Checks je Liste").
 - **Die uebrigen Seiten unten einzeln angehen**, jede fuer sich: in einen der vier Bereiche
-  oben ziehen, in die Kacheln aufgehen lassen oder ausblenden. Uebrig: Research, Strategie,
-  System.
+  oben ziehen, in die Kacheln aufgehen lassen oder ausblenden. Uebrig: System.
 - **Was die ausgeblendeten Check-Seiten noch konnten** (Storychecker, Fundamental, Konsens,
   seit 11.10.2026 aus dem Menue): je Einzelcheck einen Skill waehlen und im Storychecker und
   Fundamental Analyzer nachfragen (Chat). Die Titelseite prueft mit dem Skill aus dem
   Scheduler und kennt keine Nachfrage. Faellt es Erik nicht auf, entfaellt beides mit dem
   Loeschen; sonst gehoert es zum Durchgang (unten, "Checks je Liste").
-- **News Digest und Investment Search** sind dem Namen nach auch Dialoge (`news_chat.py`,
-  `search_chat.py`), liefern aber Ergebnisse: den Digest, den die Positionsanalyse liest, und
-  Kandidaten fuer die Watchlist. Darum noch sichtbar -- Erik entscheidet.
 - **Ausgeblendetes loeschen**, wenn es zwei Wochen keiner vermisst hat (das "gut genug" aus
   dem Lotsee-Plan). Dashboard: vorher klaeren, ob sein Kopf (Tagesbild, Allokation) auf die
   Depot-Kacheln wandert.
 
 Offen fuer Erik: ob Marktdaten nach System gehoert (heute auch zum Nachsehen einzelner Kurse
-genutzt?); ob "Neue Titel finden" ein eigener Bereich wird.
+genutzt?).
 
 ## Nachrichten bei grossen Kursbewegungen (10.10.2026)
 
@@ -109,23 +105,22 @@ Was dabei zu klaeren ist:
 Liegt, weil sich erst zeigen soll, ob die Kacheln tragen (zusaetzlicher Menueeintrag seit
 10.10.2026).
 
-## Suche: Strategien, Kandidaten, Entscheidung (11.10.2026)
+## Suche: eine Seite, Strategien, Kandidaten, gemerktes Nein (11.10.2026)
 
-Research und Strategie werden ein Abschnitt **Suche** unter Performance (Erik, 11.10.2026).
-Was eine Suche ist: ein Weg zu neuen Titeln, wie die Vorschlagsseiten der Serien ("drei Wege
-zu etwas Neuem"). Gedanken von Erik: verschiedene Strategien wie heute; die gezielte Suche
-nach einer Anlage ist auch eine; Ergebnisse kommen nur nach Auswahl auf die Watchlist.
+Seit 11.10.2026 steht im Menue ein Abschnitt **Suche** unter Performance: Investment Search,
+Strukturwandel-Scanner, Sektorrotation, je noch mit eigener Seite; Tax Loss Harvesting ist
+nach Performance gezogen, der News Digest ausgeblendet (er laeuft als Job, die Titelseite
+liest ihn). Eine Suche ist ein Weg zu neuen Titeln, wie die Vorschlagsseiten der Serien.
 
-Vorschlag, wartet auf Erik:
-- **Je Strategie eine Seite** unter Suche: Strukturwandel (Scanner), Investment Search
-  (freie Suche, auch nach einer bestimmten Anlage), spaeter die Research-Inbox als "fremder
-  Tipp". Was keine Titel vorschlaegt, gehoert nicht dorthin: Tax Loss Harvesting (verkauft,
-  lokal) unter Performance; News Digest in Job und Titelseite (sie liest ihn schon);
-  Sektorrotation misst das Depot gegen die Sektorstroeme -- Performance oder Suche?
+Entschieden (Erik, 11.10.2026), zu bauen:
+- **Eine Seite Suche, oben die Strategieauswahl.** Ein Banner zeigt, mit welcher Strategie
+  gesucht wird, daneben ein Link "Strategie einstellen" (heute die Skills unter System).
+  Strategien wie heute: Strukturwandel, Sektorrotation, freie Suche -- auch nach einer
+  bestimmten Anlage. Die drei Seiten gehen darin auf.
 - **Zwei Stufen.** Ein Lauf liefert Kandidaten als kleine Kacheln wie die Watchlist, mit
-  Link auf ihre Titelseite. "Genauer pruefen" laesst die Checks der Watchlist laufen
-  (Cloud, kostet je Kandidat Websuche -- darum per Knopf, nicht fuer alle). Dann "Auf die
-  Watchlist" oder "Nicht interessant".
+  Link auf ihre Titelseite. "Genauer pruefen" laesst die Checks der Watchlist laufen, je
+  Kandidat per Knopf (Cloud, Websuche kostet). Dann "Auf die Watchlist" oder "Nicht
+  interessant".
 - **Ein Nein wird gemerkt**, wie abgebrochene Serien: mit Datum, Strategie und These, nie
   geloescht, in einer Liste "Verworfen" mit "wieder aufnehmen". Die Strategien bekommen die
   verworfenen und bekannten Ticker mit, damit sie sie nicht wieder vorschlagen.
@@ -134,7 +129,7 @@ Vorschlag, wartet auf Erik:
   haengen an der Positions-ID. Heute legen Search und Scanner die Auswahl direkt als
   Watchlist-Position an (`add_from_proposal`).
 - **Reihenfolge:** Kandidaten sind eine dritte Liste mit eigener Auswahl an Checks; darum
-  nach "Checks je Liste". Das Umhaengen der Seiten in den Abschnitt Suche geht vorher.
+  nach "Checks je Liste".
 
 ## Uebrige KI-Knoepfe auf den Stern umstellen (11.10.2026)
 

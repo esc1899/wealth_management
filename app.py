@@ -124,6 +124,14 @@ _performance_pages = [
     st.Page("pages/analyse.py",           title=t("nav.analysis"),          icon=":material/bar_chart:"),
     st.Page("pages/dividend_calendar.py", title=t("nav.dividend_calendar"), icon=":material/payments:"),
     st.Page("pages/wealth_history.py",    title=t("nav.wealth_history"),    icon=":material/show_chart:"),
+    st.Page("pages/tax_loss_harvesting.py", title=t("nav.tax_loss_harvesting"), icon=":material/trending_down:"),
+]
+# Suche: die Wege zu neuen Titeln (11.10.2026, aus Research und Strategie). Spaeter eine Seite mit
+# Strategieauswahl und Kandidaten (BACKLOG.md, "Suche").
+_suche_pages = [
+    st.Page("pages/search_chat.py",     title=t("nav.search_chat"),     icon=":material/manage_search:"),
+    st.Page("pages/structural_scan.py", title=t("nav.structural_scan"), icon=":material/radar:"),
+    st.Page("pages/sector_rotation.py", title=t("nav.sector_rotation"), icon=":material/rotate_right:"),
 ]
 
 # Ausgeblendet, aber registriert. Positions- und Watchlist-Analyse erreicht man ueber Titel und
@@ -149,25 +157,18 @@ _ausgeblendet = [
     st.Page("pages/storychecker.py",         title=t("nav.storychecker"),   icon=":material/fact_check:", visibility=_AUS),
     st.Page("pages/fundamental_analyzer.py", title="Fundamental Analyzer", icon=":material/calculate:", visibility=_AUS),
     st.Page("pages/consensus_gap.py",        title=t("nav.consensus_gap"), icon=":material/target:", visibility=_AUS),
+    st.Page("pages/research_chat.py",        title=t("nav.research_chat"), icon=":material/search:", visibility=_AUS),
+    st.Page("pages/news_chat.py",            title=t("nav.news_chat"),     icon=":material/newspaper:", visibility=_AUS),
 ]
 
 pg = st.navigation({
     t("kacheln.nav_gruppe"): _neu_pages + _ausgeblendet,
     t("nav.group_pflege"): _pflege_pages,
     t("nav.group_performance"): _performance_pages,
-    # Einstellungen gleich hinter der Basis: Sprache, lokale und Cloud-Modelle (10.10.2026).
+    t("nav.group_suche"): _suche_pages,
+    # Einstellungen hinter Basis und Suche: Sprache, lokale und Cloud-Modelle (10.10.2026).
     t("nav.settings"): [
         st.Page("pages/settings.py", title=t("nav.settings"), icon=":material/settings:"),
-    ],
-    t("nav.group_research"): [
-        st.Page("pages/research_chat.py",        title=t("nav.research_chat"),    icon=":material/search:", visibility=_AUS),
-        st.Page("pages/news_chat.py",            title=t("nav.news_chat"),        icon=":material/newspaper:"),
-        st.Page("pages/search_chat.py",          title=t("nav.search_chat"),      icon=":material/manage_search:"),
-    ],
-    t("nav.group_claude_strategy"): [
-        st.Page("pages/tax_loss_harvesting.py", title=t("nav.tax_loss_harvesting"), icon=":material/trending_down:"),
-        st.Page("pages/structural_scan.py",     title=t("nav.structural_scan"),     icon=":material/radar:"),
-        st.Page("pages/sector_rotation.py",     title=t("nav.sector_rotation"),     icon=":material/rotate_right:"),
     ],
     t("nav.group_system"): [
         st.Page("pages/usage_statistics.py", title=t("nav.statistics"),       icon=":material/bar_chart:"),
