@@ -459,3 +459,15 @@ def test_job_reicht_modell_der_liste_weiter(dienst):
     job = ScheduledJob(agent_name="pruefung_depot", skill_name="", skill_prompt="", frequency="monthly")
     asyncio.run(d._run_pruefung_job(job, c, lambda _: None, "depot"))
     assert modelle == ["claude-opus-5-5"]
+
+
+def test_ein_lokales_modell_fuer_alle(conn):
+    from core.pruefung import LOKALE_AGENTEN, lokales_modell, lokales_modell_setzen
+
+    cfg = AppConfigRepository(conn)
+    assert lokales_modell(cfg, "qwen3:8b") == "qwen3:8b"
+    cfg.set("model_ollama_portfolio_story", "gemma3:12b")
+    assert lokales_modell(cfg, "qwen3:8b") == "gemma3:12b"       # bisher der Portfolio Checker
+    lokales_modell_setzen(cfg, "qwen3:14b")
+    assert lokales_modell(cfg) == "qwen3:14b"
+    assert all(cfg.get(f"model_ollama_{a}") == "qwen3:14b" for a in LOKALE_AGENTEN)

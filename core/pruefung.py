@@ -122,6 +122,28 @@ def modell_setzen(app_cfg, bereich: str, wert: str) -> None:
         app_cfg.set(f"model_public_{agent}", wert)
 
 
+#: Die lokalen Agenten (Ollama). Seit 11.10.2026 ein Modell für alle -- lokal sieht jeder alles,
+#: eine Datengrenze zwischen ihnen gibt es nicht, und ein zweites Modell verdrängte das erste
+#: aus dem geteilten Speicher.
+LOKALE_AGENTEN = ("portfolio", "portfolio_story", "watchlist_checker", "portfolio_comment",
+                  "portfolio_robustness", "rebalance", "dividend_calendar", "tax_loss_harvesting",
+                  "skill_generator")
+
+
+def lokales_modell(app_cfg, standard: str = "") -> str:
+    """Das eine lokale Modell; ohne Eintrag das des Portfolio Checkers, sonst ``standard``."""
+    if app_cfg is None:
+        return standard
+    return app_cfg.get("model_ollama") or app_cfg.get("model_ollama_portfolio_story") or standard
+
+
+def lokales_modell_setzen(app_cfg, wert: str) -> None:
+    """Speichert das lokale Modell und schreibt es in die Einträge aller lokalen Agenten."""
+    app_cfg.set("model_ollama", wert)
+    for agent in LOKALE_AGENTEN:
+        app_cfg.set(f"model_ollama_{agent}", wert)
+
+
 # ------------------------------------------------------------------
 # Die eingeplanten Jobs: einer je Liste statt einer je Check
 # ------------------------------------------------------------------

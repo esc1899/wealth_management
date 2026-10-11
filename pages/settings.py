@@ -311,8 +311,8 @@ with tab_lokal:
         return model
 
 
-    def _ollama_sel(agent_key: str, label: str) -> str:
-        saved = app_config.get(f"model_ollama_{agent_key}") or app_config.get("model_ollama") or config.OLLAMA_MODEL
+    def _ollama_sel(agent_key: str, label: str, saved: str = "") -> str:
+        saved = saved or app_config.get(f"model_ollama_{agent_key}") or app_config.get("model_ollama") or config.OLLAMA_MODEL
         options = ([_house.HOME] if _HOUSE_LOCAL else []) + _ollama_models
         options = _with_saved(options, saved)
         idx = options.index(saved) if saved in options else 0
@@ -350,41 +350,16 @@ with tab_lokal:
                             format_func=lambda m: _model_label(m, _HOUSE_CLOUD),
                             key=f"_model_public_{agent_key}")
 
+    # Ein lokales Modell fuer alle (11.10.2026), wie die Bereiche bei der Cloud.
+    from core.pruefung import lokales_modell, lokales_modell_setzen
+
     st.markdown(f"**{t('settings.ollama_agents_header')}** 🔒")
-    col_o1, col_o2, col_o3 = st.columns(3)
-    with col_o1:
-        sel_portfolio = _ollama_sel("portfolio", t("settings.agent_portfolio_chat"))
-    with col_o2:
-        sel_portfolio_story = _ollama_sel("portfolio_story", "Portfolio Story")
-    with col_o3:
-        sel_watchlist_checker = _ollama_sel("watchlist_checker", "Watchlist Checker")
-
-    col_o4, col_o5, col_o6 = st.columns([1, 1, 1])
-    with col_o4:
-        sel_portfolio_comment = _ollama_sel("portfolio_comment", "💬 KI-Kommentare")
-    with col_o5:
-        sel_portfolio_robustness = _ollama_sel("portfolio_robustness", "🐻 Portfolio Robustness")
-    with col_o6:
-        sel_rebalance = _ollama_sel("rebalance", f"⚖️ {t('nav.rebalance_chat')}")
-
-    col_o7, col_o8, col_o9 = st.columns([1, 1, 1])
-    with col_o7:
-        sel_dividend_calendar = _ollama_sel("dividend_calendar", "💰 Dividendenkalender")
-    with col_o8:
-        sel_tax_loss = _ollama_sel("tax_loss_harvesting", "🧾 Tax-Loss-Harvesting")
-    with col_o9:
-        sel_skill_generator = _ollama_sel("skill_generator", "🧩 Skill-Generator")
+    st.caption(t("settings.lokal_satz"))
+    sel_lokal = _ollama_sel("alle", t("settings.lokal_label"),
+                            saved=lokales_modell(app_config, config.OLLAMA_MODEL))
 
     if st.button(t("settings.save_models_button"), key="_save_models_lokal_btn", width="content"):
-        app_config.set("model_ollama_portfolio", sel_portfolio)
-        app_config.set("model_ollama_portfolio_story", sel_portfolio_story)
-        app_config.set("model_ollama_watchlist_checker", sel_watchlist_checker)
-        app_config.set("model_ollama_portfolio_comment", sel_portfolio_comment)
-        app_config.set("model_ollama_portfolio_robustness", sel_portfolio_robustness)
-        app_config.set("model_ollama_rebalance", sel_rebalance)
-        app_config.set("model_ollama_dividend_calendar", sel_dividend_calendar)
-        app_config.set("model_ollama_tax_loss_harvesting", sel_tax_loss)
-        app_config.set("model_ollama_skill_generator", sel_skill_generator)
+        lokales_modell_setzen(app_config, sel_lokal)
         st.cache_resource.clear()
         st.success(t("settings.models_saved"))
 

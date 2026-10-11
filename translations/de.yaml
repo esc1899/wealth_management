@@ -382,6 +382,8 @@ settings:
   pruefung_speichern: "Auswahl speichern"
   pruefung_skill: "Skill {check}"
   pruefung_skill_standard: "Standard"
+  lokal_label: "Lokales Modell"
+  lokal_satz: "Ein Modell für alles, was auf diesem Rechner rechnet: Portfolio Checker, Watchlist Checker, Portfolio-Chat, Kommentare, Gegenanalyse, Rebalancing, Dividenden, Tax-Loss, Skill-Generator."
   bereiche_satz: "Ein Modell je Bereich. Depot und Watchlist rechnen ihre Checks damit, per Knopf und im Job; Research darf das stärkste sein."
   bereich_depot: "Depot"
   bereich_depot_wer: "Checks im Depot, News Digest, Sektor-Rotation, Story-Entwurf"

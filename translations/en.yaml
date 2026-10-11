@@ -382,6 +382,8 @@ settings:
   pruefung_speichern: "Save selection"
   pruefung_skill: "Skill {check}"
   pruefung_skill_standard: "Default"
+  lokal_label: "Local model"
+  lokal_satz: "One model for everything that runs on this machine: Portfolio Checker, Watchlist Checker, portfolio chat, comments, counter-analysis, rebalancing, dividends, tax loss, skill generator."
   bereiche_satz: "One model per area. Portfolio and watchlist run their checks with it, by button and in the job; research may be the strongest."
   bereich_depot: "Portfolio"
   bereich_depot_wer: "Portfolio checks, news digest, sector rotation, story draft"

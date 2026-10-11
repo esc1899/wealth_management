@@ -22,6 +22,9 @@ Modell fürs Depot, eins für die Watchlist, eins für Research -- dort darf es 
   der in beiden Listen vorkommt, bekommt im Durchgang (Knopf und Job) das Modell seiner Liste.
 - Ohne gespeichertes Bereichsmodell gilt der bisherige Eintrag (Depot: Storychecker,
   Watchlist: Devil's Advocate, Research: Research-Chat).
+- Lokale LLM: ein Modell für alle neun lokalen Agenten statt eines je Agent
+  (`core/pruefung.py::lokales_modell`); lokal gibt es keine Datengrenze, und ein zweites Modell
+  verdrängte das erste aus dem geteilten Ollama.
 
 ### Gescheiterte Websuche: kein Urteil ohne Beleg — 2026-10-11
 
