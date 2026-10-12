@@ -82,6 +82,14 @@ Offen:
 Offen fuer Erik: ob Marktdaten unter Einstellungen gehoert (heute auch zum Nachsehen einzelner Kurse
 genutzt?).
 
+## Abrundung: einzelne Seiten aufraeumen und vereinfachen (12.10.2026)
+
+Menue und Grundlagen des Umbaus tragen (Erik, 12.10.2026); auf einzelnen Seiten ist noch
+aufzuraeumen und zu vereinfachen. Aufgefallen ist Erik unter anderem die Modellpflege, dazu
+aehnliche Verbesserungspunkte -- die Liste je Seite entsteht zu Beginn mit Erik. Liegt hinter
+der Lotsee-Optik (Fahrplan des Hauses), damit die Seiten gleich in der neuen Optik aufgeraeumt
+werden. Hierher gehoeren dann auch die uebrigen KI-Knoepfe (Abschnitt unten).
+
 ## Uebrige KI-Knoepfe auf den Stern umstellen (11.10.2026)
 
 Seit 11.10.2026 zeigt `core/ui/ki.py::ki_knopf` mit der Farbe des Sterns, ob ein Knopf lokal
