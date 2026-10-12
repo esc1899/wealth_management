@@ -33,9 +33,6 @@ from state import (
     get_watchlist_checker_agent,
     get_portfolio_story_repo,
     get_agent_runs_repo,
-    get_portfolio_comment_model,
-    get_portfolio_comment_service,
-    get_app_config_repo,
     get_storychecker_repo,
     get_skills_repo,
     get_watchlist_checker_repo,
@@ -477,18 +474,6 @@ if st.session_state.get("_watchlist_check_result"):
                     st.caption(fit.summary)
                 with col2:
                     st.metric("Fit", fit.verdict.replace("_", " ").title())
-
-    # KI-Kommentar (on-demand)
-    from core.ui.ai_comment import render_ai_comment
-
-    full_text = result.full_text if hasattr(result, 'full_text') else ""
-    render_ai_comment(
-        state_key="_watchlist",
-        ctx=f"Watchlist-Check Ergebnis:\n{full_text}",
-        style_id=get_app_config_repo().get("comment_style") or "humorvoll",
-        comment_service=get_portfolio_comment_service(get_portfolio_comment_model()),
-        section_title=t("watchlist_checker.ai_comment_section"),
-    )
 
     st.divider()
     with st.expander(t("watchlist_checker.full_analysis_label")):

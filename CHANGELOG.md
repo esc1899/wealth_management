@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Abrundung 1: KI-Kommentar, tote Seiten und Ampel entfallen — 2026-10-12
+
+**Warum:** Erste Runde der Abrundung (BACKLOG.md). Der KI-Kommentar in einem waehlbaren Stil
+stand nur noch auf Portfolio Checker und Watchlist Checker, beide ausgeblendet; Erik braucht ihn
+nicht. Zwei Seiten waren in keinem Menue registriert und nirgends verlinkt. Die Ampel der
+Seitenleiste pruefte nur die Konfiguration und meldete trotzdem "System OK".
+
+**Änderungen:**
+- Entfallen: `core/ui/ai_comment.py`, `core/services/portfolio_comment_service.py`, die Getter
+  `get_portfolio_comment_*`, der Abschnitt "KI-Kommentarstil" in den Einstellungen und der
+  Schluessel `comment_style` (bleibt in alten Datenbanken ungelesen liegen).
+- Entfallen: `pages/wealth_assistant.py` (Snapshots legen Scheduler und Vermoegenshistorie an)
+  und `pages/capital_allocator.py` (der Check laeuft ueber Kacheln und Titelseite).
+- Seitenleiste: keine Ampel und keine Sprachwahl mehr -- beides steht in den Einstellungen;
+  die Warnung bei gescheiterten Jobs bleibt.
+
 ### Lotsee-Optik "Richtfeuer" statt Bank-Optik — 2026-10-12
 
 **Warum:** Wealth ist ein Kandidat fuer Lotsee, und die Optik der Familie soll an einer echten

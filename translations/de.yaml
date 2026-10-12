@@ -1,10 +1,3 @@
-ai_comment:
-  generate: "KI-Kommentar generieren"
-  regenerate: "🔄 KI-Kommentar neu generieren"
-  spinner: "Kommentar wird generiert…"
-  stale: "ℹ️ Das Ergebnis hat sich geändert — Kommentar ist evtl. veraltet, neu generieren."
-  failed: "KI-Kommentar fehlgeschlagen."
-
 common:
   save: "Speichern"
   delete: "Löschen"
@@ -69,7 +62,6 @@ nav:
   analysis: "Analyse"
   portfolio_chat: "Portfolio Chat"
   rebalance_chat: "Investieren / Rebalancieren"
-  wealth_assistant: "Vermögens-Assistent"
   research_chat: "Research Chat"
   news_chat: "News Digest"
   search_chat: "Investment Search"
@@ -98,7 +90,6 @@ nav:
 dividend_calendar:
   title: "Dividenden"
   subtitle: "Jahresprognose & Verteilung"
-  ai_comment_section: "💬 KI-Kommentar"
   total_annual: "Jährliche Dividende"
   monthly_avg: "Monatlicher Ø"
   coverage: "Abdeckung"
@@ -202,23 +193,6 @@ dashboard:
   show_breakdown: "Nach Asset-Klasse anzeigen"
   no_snapshots: "Noch keine Vermögenshistorie vorhanden. Snapshots werden über den Vermögens-Assistenten erstellt."
 
-wealth_assistant:
-  title: "Vermögens-Assistent"
-  latest_snapshot: "Letzter Snapshot"
-  coverage: "Datenvollständigkeit"
-  is_manual: "Korrigiert"
-  prepare: "Vorbereiten"
-  prepare_help: "Marktdaten aktualisieren, veraltete Positionen prüfen"
-  take_snapshot: "Snapshot aufnehmen"
-  take_snapshot_help: "Vermögensstand speichern"
-  prepare_success: "Vorbereitung abgeschlossen. ✓"
-  snapshot_success: "Snapshot erstellt! ✓"
-  preview_title: "📊 Snapshot-Vorschau"
-  stale_positions: "Veraltete Positionen"
-  overwrite_title: "Snapshot überschreiben?"
-  overwrite_message: "Snapshot für heute existiert bereits. Neu berechnen und überschreiben?"
-  overwrite_confirm: "Überschreiben"
-  overwrite_cancel: "Abbrechen"
 
 portfolio_chat:
   title: "Portfolio Chat"
@@ -810,9 +784,6 @@ health:
   title: "System-Status"
   all_ok: "Alle Checks bestanden"
   check_connectivity: "Ollama-Verbindung prüfen"
-  sidebar_status_ok: "System OK"
-  sidebar_status_warning: "Setup-Hinweise vorhanden — Details in den Einstellungen"
-  sidebar_status_error: "Setup-Problem erkannt — Details in den Einstellungen"
   sidebar_scheduler_failed: "Scheduler: {n} Job(s) fehlgeschlagen"
   sidebar_scheduler_link: "Zur Ausführungshistorie"
   checks:
@@ -1092,8 +1063,6 @@ portfolio_story:
   check_pending_label: "Story-Check ausstehend"
   last_analysis_label: "**Letzte gespeicherte Analyse:**"
   no_analysis: "Noch keine Analyse vorhanden. Klick auf 'Portfolio Story-Check ausführen' um zu starten."
-  ai_comment_section: "💬 KI-Kommentar"
-  ai_comment_spinner: "Generiere KI-Kommentar..."
 
 watchlist_checker:
   title: "📋 Watchlist Checker"
@@ -1146,9 +1115,6 @@ watchlist_checker:
   position_details_header: "**Position-Details**"
   position_details_label: "📋 Position-Details"
   not_analyzed: "⚪ Noch nicht analysiert"
-  ai_comment_spinner: "Generiere Kommentar..."
-  ai_comment_unavailable: "⚠️ KI-Kommentar nicht verfügbar — Ollama prüfen (Einstellungen > Verbindungstest)."
-  ai_comment_section: "3️⃣ KI-Kommentar"
   full_analysis_label: "📋 Vollständige Analyse & Metadaten"
   full_llm_label: "**Vollständige LLM-Analyse**"
   metadata_label: "**Agent Metadata**"

@@ -19,7 +19,7 @@ st.set_page_config(page_title="Einstellungen", page_icon="⚙️", layout="wide"
 st.title(t("settings.title"))
 
 # Drei Bereiche (10.10.2026): Generell (Sprache zuerst, Systemzustand, Backup), Lokale LLM
-# (Ollama: Modelle je Agent, Kommentarstil) und Cloud LLM (Modelle je Agent, Preise). Jeder
+# (Ollama: das eine lokale Modell) und Cloud LLM (Modelle je Agent, Preise). Jeder
 # Bereich speichert nur seine eigenen Einstellungen.
 tab_generell, tab_lokal, tab_cloud = st.tabs([
     t("settings.tab_generell"), t("settings.tab_lokal"), t("settings.tab_cloud"),
@@ -370,35 +370,6 @@ with tab_lokal:
         st.cache_resource.clear()
         st.success(t("settings.models_saved"))
 
-    st.divider()
-
-    # ------------------------------------------------------------------
-    # Section: KI-Kommentarstil
-    # ------------------------------------------------------------------
-
-    st.subheader("💬 KI-Kommentarstil")
-    st.caption("Wird für KI-Kommentare verwendet (Portfolio Story, erweiterbar auf weitere Seiten)")
-
-    from core.services.portfolio_comment_service import get_style_options
-
-    _styles = get_style_options()
-    _style_ids = [s["id"] for s in _styles]
-    _style_labels = [f"{s['emoji']} {s['name']}" for s in _styles]
-    _saved_style = app_config.get("comment_style") or _style_ids[0]
-    _style_idx = _style_ids.index(_saved_style) if _saved_style in _style_ids else 0
-    _sel_label = st.selectbox(
-        "Kommentarstil",
-        _style_labels,
-        index=_style_idx,
-        key="_settings_comment_style",
-    )
-    _sel_id = _style_ids[_style_labels.index(_sel_label)]
-    _sel_style = _styles[_style_ids.index(_sel_id)]
-    st.caption(f"_{_sel_style['instruction']}_")
-
-    if st.button("💾 Stil speichern", key="_save_comment_style_btn"):
-        app_config.set("comment_style", _sel_id)
-        st.success("Kommentarstil gespeichert!")
 
 with tab_cloud:
     _providers = []

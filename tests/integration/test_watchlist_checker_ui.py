@@ -121,12 +121,6 @@ class TestPageLoadability:
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 
-    def test_wealth_assistant_page_loads(self):
-        """Wealth Assistant page should load without exceptions."""
-        at = AppTest.from_file(PAGES / "wealth_assistant.py")
-        at.run()
-        assert not at.exception, f"Page threw exception: {at.exception}"
-
     def test_analyse_page_loads(self):
         """Analysis (Performance) page should load without exceptions."""
         at = AppTest.from_file(PAGES / "analyse.py")
@@ -179,12 +173,6 @@ class TestPageLoadability:
     def test_cowork_setup_loads(self):
         """Cowork Setup page should load without exceptions."""
         at = AppTest.from_file(PAGES / "cowork_setup.py")
-        at.run()
-        assert not at.exception, f"Page threw exception: {at.exception}"
-
-    def test_capital_allocator_page_loads(self):
-        """Capital Allocator page should load without exceptions."""
-        at = AppTest.from_file(PAGES / "capital_allocator.py")
         at.run()
         assert not at.exception, f"Page threw exception: {at.exception}"
 

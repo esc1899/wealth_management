@@ -29,29 +29,11 @@ def get_position_story_service():
     )
 
 
-def get_portfolio_comment_model() -> str:
-    """Resolve the currently configured model for portfolio comments."""
-    return _get_agent_model("portfolio_comment", "ollama", _DEFAULT_OLLAMA_MODEL)
-
-
 def get_skill_generator_llm():
     """Lokales Modell fuer den Prompt-Generator der Skills-Seite -- je Aufruf
     gebaut, damit eine neue Auswahl in den Einstellungen sofort gilt."""
     model = _get_agent_model("skill_generator", "ollama", _DEFAULT_OLLAMA_MODEL)
     return _make_ollama_provider(model, "skill_generator")
-
-
-@st.cache_resource
-def get_portfolio_comment_service(model: str = ""):
-    """Service for generating stylized financial commentary.
-
-    model is passed explicitly so @st.cache_resource creates a new instance
-    when the model changes (cache key includes model).
-    """
-    from core.services.portfolio_comment_service import PortfolioCommentService
-    return PortfolioCommentService(
-        provider_factory=lambda: _make_ollama_provider(model or _DEFAULT_OLLAMA_MODEL, "portfolio_comment"),
-    )
 
 
 @st.cache_resource

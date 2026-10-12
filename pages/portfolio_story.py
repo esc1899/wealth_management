@@ -19,10 +19,7 @@ from core.ui.markdown import llm_markdown
 from core.portfolio_snapshot import build_portfolio_snapshot
 from state import (
     get_analysis_service,
-    get_app_config_repo,
     get_market_agent,
-    get_portfolio_comment_model,
-    get_portfolio_comment_service,
     get_portfolio_robustness_agent,
     get_portfolio_robustness_repo,
     get_portfolio_service,
@@ -327,23 +324,3 @@ with st.container(border=True):
     else:
         st.info(t("portfolio_robustness.no_analysis"))
 
-# ──────────────────────────────────────────────────────────────────────
-# Section 6: KI-Kommentar
-# ──────────────────────────────────────────────────────────────────────
-
-_ps_full_text = None
-if "_ps_result" in st.session_state:
-    _ps_full_text = st.session_state["_ps_result"].full_text
-elif latest_analysis and latest_analysis.full_text:
-    _ps_full_text = latest_analysis.full_text
-
-if _ps_full_text:
-    from core.ui.ai_comment import render_ai_comment
-
-    render_ai_comment(
-        state_key="_ps",
-        ctx=f"Portfolio Story-Check Ergebnis:\n{_ps_full_text}",
-        style_id=get_app_config_repo().get("comment_style") or "humorvoll",
-        comment_service=get_portfolio_comment_service(get_portfolio_comment_model()),
-        section_title=t("portfolio_story.ai_comment_section"),
-    )

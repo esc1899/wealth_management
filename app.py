@@ -28,8 +28,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
-from core.health import Severity, run_static_checks  # noqa: E402
-from core.i18n import t, set_language, current_language, SUPPORTED_LANGUAGES  # noqa: E402
+from core.i18n import t  # noqa: E402
 
 # Fail fast if required config is missing
 _config_errors = config.validate()
@@ -173,11 +172,8 @@ pg = st.navigation({
     ],
 })
 
-# Sidebar: always-visible system status indicator ("Ampel")
-_health_checks = run_static_checks(config)
-_has_errors   = any(c.severity == Severity.ERROR   for c in _health_checks)
-_has_warnings = any(c.severity == Severity.WARNING for c in _health_checks)
-
+# Seitenleiste: keine Ampel mehr (12.10.2026) -- sie pruefte nur die Konfiguration und meldete
+# trotzdem "alles ok"; der Zustand steht in den Einstellungen. Die Sprache waehlt man dort.
 with st.sidebar:
     # Logout button (top right)
     if config.APP_PASSWORD and st.session_state.get("authenticated"):
@@ -185,13 +181,6 @@ with st.sidebar:
             st.session_state.clear()
             st.rerun()
         st.divider()
-    if _has_errors:
-        st.error(t("health.sidebar_status_error"), icon=":material/error:")
-    elif _has_warnings:
-        st.warning(t("health.sidebar_status_warning"), icon=":material/warning:")
-    else:
-        st.success(t("health.sidebar_status_ok"), icon=":material/check_circle:")
-
     # Scheduler runtime status: only visible when the latest run of an enabled
     # job failed — recovered jobs (green after red) clear the warning immediately.
     try:
@@ -205,22 +194,6 @@ with st.sidebar:
         )
         st.page_link("pages/scheduler.py", label=t("health.sidebar_scheduler_link"))
 
-# Language switcher in sidebar
-with st.sidebar:
-    lang_options = list(SUPPORTED_LANGUAGES.keys())
-    current = current_language()
-    selected_idx = lang_options.index(current) if current in lang_options else 0
-    selected = st.selectbox(
-        "🌐",
-        options=lang_options,
-        format_func=lambda x: SUPPORTED_LANGUAGES[x],
-        index=selected_idx,
-        key="lang_selector",
-        label_visibility="collapsed",
-    )
-    if selected != current:
-        set_language(selected)
-        st.rerun()
 pg.run()
 
 if config.SHOW_LEGAL_NOTICE:

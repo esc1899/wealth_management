@@ -72,8 +72,6 @@ from state_agents import (
 # Services
 from state_services import (
     get_position_story_service,
-    get_portfolio_comment_model,
-    get_portfolio_comment_service,
     get_analysis_service,
     get_portfolio_service,
     get_skill_generator_llm,
@@ -132,8 +130,6 @@ __all__ = [
     "get_cowork_watcher",
     "get_sector_rotation_agent",
     "get_position_story_service",
-    "get_portfolio_comment_model",
-    "get_portfolio_comment_service",
     "get_analysis_service",
     "get_portfolio_service",
     "get_skill_generator_llm",

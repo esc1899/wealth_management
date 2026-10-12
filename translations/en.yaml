@@ -1,10 +1,3 @@
-ai_comment:
-  generate: "Generate AI comment"
-  regenerate: "🔄 Regenerate AI comment"
-  spinner: "Generating comment…"
-  stale: "ℹ️ The result changed — the comment may be outdated, regenerate it."
-  failed: "AI comment failed."
-
 common:
   save: "Save"
   delete: "Delete"
@@ -69,7 +62,6 @@ nav:
   analysis: "Analysis"
   portfolio_chat: "Portfolio Chat"
   rebalance_chat: "Invest / Rebalance"
-  wealth_assistant: "Wealth Assistant"
   research_chat: "Research Chat"
   news_chat: "News Digest"
   search_chat: "Investment Search"
@@ -98,7 +90,6 @@ nav:
 dividend_calendar:
   title: "Dividends"
   subtitle: "Annual Forecast & Distribution"
-  ai_comment_section: "💬 AI Comment"
   total_annual: "Annual Dividend"
   monthly_avg: "Monthly Average"
   coverage: "Coverage"
@@ -203,23 +194,6 @@ dashboard:
   show_breakdown: "Show by Asset Class"
   no_snapshots: "No wealth history yet. Snapshots are created via the Wealth Assistant."
 
-wealth_assistant:
-  title: "Wealth Assistant"
-  latest_snapshot: "Latest Snapshot"
-  coverage: "Data Completeness"
-  is_manual: "Corrected"
-  prepare: "Prepare"
-  prepare_help: "Refresh market data, check stale valuations"
-  take_snapshot: "Take Snapshot"
-  take_snapshot_help: "Save wealth state"
-  prepare_success: "Preparation complete. ✓"
-  snapshot_success: "Snapshot created! ✓"
-  preview_title: "📊 Snapshot Preview"
-  stale_positions: "Stale Positions"
-  overwrite_title: "Overwrite Snapshot?"
-  overwrite_message: "Snapshot for today already exists. Recalculate and overwrite?"
-  overwrite_confirm: "Overwrite"
-  overwrite_cancel: "Cancel"
 
 portfolio_chat:
   title: "Portfolio Chat"
@@ -812,9 +786,6 @@ health:
   title: "System Status"
   all_ok: "All checks passed"
   check_connectivity: "Check Ollama connectivity"
-  sidebar_status_ok: "System OK"
-  sidebar_status_warning: "Setup notices — see Settings for details"
-  sidebar_status_error: "Setup issue detected — see Settings for details"
   sidebar_scheduler_failed: "Scheduler: {n} job(s) failed"
   sidebar_scheduler_link: "View run history"
   checks:
@@ -1094,8 +1065,6 @@ portfolio_story:
   check_pending_label: "Story check pending"
   last_analysis_label: "**Last Saved Analysis:**"
   no_analysis: "No analysis yet. Click 'Run Portfolio Story Check' to start."
-  ai_comment_section: "💬 AI Comment"
-  ai_comment_spinner: "Generating AI comment..."
 
 watchlist_checker:
   title: "📋 Watchlist Checker"
@@ -1148,9 +1117,6 @@ watchlist_checker:
   position_details_header: "**Position Details**"
   position_details_label: "📋 Position Details"
   not_analyzed: "⚪ Not yet analyzed"
-  ai_comment_spinner: "Generating comment..."
-  ai_comment_unavailable: "⚠️ AI comment unavailable — check Ollama (Settings > Connection Test)."
-  ai_comment_section: "3️⃣ AI Comment"
   full_analysis_label: "📋 Full Analysis & Metadata"
   full_llm_label: "**Full LLM Analysis**"
   metadata_label: "**Agent Metadata**"

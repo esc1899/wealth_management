@@ -131,7 +131,7 @@ def modell_setzen(app_cfg, bereich: str, wert: str) -> None:
 #: Die lokalen Agenten (Ollama). Seit 11.10.2026 ein Modell für alle -- lokal sieht jeder alles,
 #: eine Datengrenze zwischen ihnen gibt es nicht, und ein zweites Modell verdrängte das erste
 #: aus dem geteilten Speicher.
-LOKALE_AGENTEN = ("portfolio", "portfolio_story", "watchlist_checker", "portfolio_comment",
+LOKALE_AGENTEN = ("portfolio", "portfolio_story", "watchlist_checker",
                   "portfolio_robustness", "rebalance", "dividend_calendar", "tax_loss_harvesting",
                   "skill_generator")
 
