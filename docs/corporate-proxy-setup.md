@@ -1,7 +1,7 @@
 # Running Behind a Corporate LLM Proxy
 
 This guide is for participants who run the app inside a **corporate environment** where
-there is **no direct internet access** to `api.anthropic.com`, OpenRouter, or DeepSeek.
+there is **no direct internet access** to `api.anthropic.com` or OpenRouter.
 Instead, the cloud agents talk to an **internal LLM proxy** that speaks the Anthropic API
 format (e.g. an in-house gateway, often reachable at something like
 `http://localhost:6655`).
@@ -57,7 +57,7 @@ ANTHROPIC_API_KEY=<your-proxy-token>                 # the proxy token (sent as 
 TAVILY_API_KEY=<your-tavily-key>
 
 # Leave the other cloud providers OFF — they are blocked in the corporate network:
-# (do NOT set OPENAI_BASE_URL / OPENAI_API_KEY / DEEPSEEK_API_KEY)
+# (do NOT set OPENAI_BASE_URL / OPENAI_API_KEY)
 ```
 
 That's it. Notes on **why** this is enough:
@@ -155,7 +155,7 @@ Then open **Settings → System Status** in the app, and pick a model per cloud 
 | `Search failed: …` inside an agent's search results | Tavily key is set but `api.tavily.com` isn't reachable from the corporate network. | Ask IT to allow `api.tavily.com`, or run agents that don't need web search. The agent still completes. |
 | `model not found` / 404 on a specific model ID | The proxy serves different model IDs than the defaults. | Find the accepted IDs (`./app.sh ping`) and set `CLAUDE_MODELS=<comma-separated IDs>` (+ optional `LLM_DEFAULT_MODEL`) in `.env`. |
 | App calls don't reach the proxy at all (its request count stays flat) | `LLM_BASE_URL`/`ANTHROPIC_BASE_URL` is empty or misspelled in the loaded env. | Run verify step (a). Variable names are case-sensitive — `ANTHROPIC_BASE_URL`, not lowercase. |
-| Cloud-model dropdown shows OpenRouter/DeepSeek models you can't use | Those providers' models are configured/seeded but blocked in your network. | Don't set `OPENAI_*` / `DEEPSEEK_*`. The dropdown only offers models of configured providers. |
+| Cloud-model dropdown shows OpenRouter models you can't use | OpenRouter is configured but blocked in your network. | Don't set `OPENAI_*`. The dropdown only offers models of configured providers. |
 
 The proxy has **no `/v1/models` listing endpoint** in the reference setup, so the app can't
 auto-discover models and falls back to the IDs in `CLAUDE_MODELS` (defaults:

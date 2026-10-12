@@ -601,20 +601,19 @@ No positions, no names, no prompt text — and the log is a file on this
 machine, in the same house as the app.
 
 **Two prices, one call.** The booking carries the **list price**, priced
-from the same model registry the statistics page uses. When the cost sync
+from the same list the statistics page uses (`core/preise.py`); a model
+without a price is booked with `cost_usd` null ("offen"), never 0. When the cost sync
 later learns what OpenRouter actually billed (`/generation`),
 `update_actual_cost()` books the **difference** as a separate metric
 (`llm_call_cost`). The household sum settles on the billed amount without
 the call ever being counted twice, and a second sync of the same row
-books nothing.
+books nothing. A call booked "offen" is corrected by the whole bill; that
+is why the job `kosten` syncs first and fetches list prices second.
 
-**Pricing normalisation.** The registry holds Haiku under its dated id
-while the API also accepts the dateless alias; `_estimate()` falls back
-to the base id (the rule `core.llm.router` already applies to the model
-picker), so a call is not silently booked at 0 just because it used the
-other form. Note this fallback is **not** applied to the statistics page:
-a historic row under an id the registry does not hold still shows 0
-there.
+**Pricing normalisation.** The catalog holds Haiku under its dated id
+while the API also accepts the dateless alias; `preise.preis()` falls
+back to the base id (the rule `core.llm.router` already applies to the
+model picker), for bookings and the statistics page alike.
 
 **Two rules inherited from ops-core**, both enforced by tests: a call
 must never fail because the log is unwritable (every error swallowed,
@@ -688,13 +687,20 @@ nothing, the configured list stands (no empty dropdown). A saved model that is n
 stays visible and selected — silently falling back to option 0 would show one model while the
 agent keeps running another.
 
-### Model Prices and the `claude_legacy` Provider
+### Model Prices (`core/preise.py`)
 
-`compute_cost()` looks prices up in the registry only (`app_config.model_prices`, seeded from
-`core/storage/app_config.py` defaults — stored values win over defaults). Removing a retired model
-ID would therefore silently re-cost its historical `llm_usage` rows at $0. Retired Claude models
-keep their price of the day under the provider `claude_legacy`, which is **not** in
-`PUBLIC_PROVIDERS`: out of the model selection, still in the cost calculation.
+Prices are read, never maintained in the app (since 2026-10-12; before, a hand-edited registry
+in `app_config.model_prices`). Claude prices come from the household catalog
+(`~/.ops-core/katalog.toml`, written by the Maschinenraum), which never forgets a price, so
+historical `llm_usage` rows keep theirs. OpenRouter list prices are fetched once a day by the job
+`kosten` from `/models` and kept in `app_config.preise_openrouter` (old prices stay); the billed
+amount from `/generation` replaces them per call anyway. Local models cost nothing. The provider
+follows from the id: `claude-…` Anthropic, `vendor/model` OpenRouter, everything else Ollama
+(old `deepseek-…` rows from the direct DeepSeek API, removed 2026-10-12, keep their own label
+and have no price). A model without a price is "offen", never 0. Ollama runs without thinking
+and with the household context (`OLLAMA_NUM_CTX`), no per-model parameters. Settings > Preise
+shows the list read-only. For Lotsee this does not carry over: an app on the device has no
+household catalog and needs its own price source.
 
 ### Web Search
 

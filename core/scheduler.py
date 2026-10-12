@@ -214,6 +214,30 @@ class AgentSchedulerService:
         finally:
             conn.close()
 
+    def preise_holen(self) -> Optional[int]:
+        """Listenpreise der OpenRouter-Modelle, einmal am Tag (core/preise.py): der
+        konfigurierten und aller je gerufenen. ``None`` heisst: heute schon geholt oder
+        kein OpenRouter."""
+        if not self._openai_base_url:
+            return None
+        from core import preise
+        from core.llm.openrouter_costs import fetch_model_prices
+        from core.storage.app_config import AppConfigRepository
+
+        conn = self._open_conn()
+        try:
+            app_cfg = AppConfigRepository(conn)
+            if not preise.openrouter_faellig(app_cfg):
+                return None
+            modelle = {m for m in [*config.OPENAI_MODELS, *UsageRepository(conn).models()]
+                       if preise.anbieter(m) == preise.OPENROUTER}
+            neu = fetch_model_prices(self._openai_base_url, sorted(modelle))
+            if not neu and modelle:
+                return 0       # Abruf gescheitert: morgen nicht abwarten, naechste Stunde neu
+            return preise.openrouter_ablegen(app_cfg, neu)
+        finally:
+            conn.close()
+
     def wartet(self) -> dict:
         """Worauf noch gewartet wird -- der Messwert `wartet` fuer die
         ops-core-Kachel (Vertrag docs/haus/vertraege/wartet.ndjson in heimnetzwerk)."""
@@ -417,11 +441,7 @@ class AgentSchedulerService:
         return self._default_claude_model or ""
 
     def _make_scheduled_llm(self, agent_name: str, model: str, conn):
-        """Create a provider for a scheduled job — routing delegated to core.llm.router.
-
-        The scheduler has no DeepSeek-direct credentials, so deepseek-* models fall
-        through to the OpenAI-compatible (OpenRouter) path.
-        """
+        """Create a provider for a scheduled job — routing delegated to core.llm.router."""
         from core.llm.claude import ClaudeProvider
         from core.llm.openai_compatible import OpenAICompatibleProvider
         from core.llm.router import (resolve_house_model, resolve_provider_kind,
@@ -434,7 +454,6 @@ class AgentSchedulerService:
         kind = resolve_provider_kind(
             model,
             has_anthropic=bool(self._anthropic_key),
-            has_deepseek=False,
             has_openai_base=bool(self._openai_base_url),
         )
         if kind == "openai":
@@ -976,10 +995,8 @@ class AgentSchedulerService:
         model = (app_cfg.get(f"model_ollama_{agent_key}") or app_cfg.get("model_ollama")
                  or config.OLLAMA_MODEL)
         model = resolve_house_model(model, local=True, fallback=config.OLLAMA_MODEL)
-        params = app_cfg.get_ollama_params(model)
         provider = OllamaProvider(host=config.OLLAMA_HOST, model=model, timeout=timeout,
-                                  think=params["think"],
-                                  num_ctx=params["num_ctx"] or config.OLLAMA_NUM_CTX)
+                                  think=False, num_ctx=config.OLLAMA_NUM_CTX)
         usage_repo = UsageRepository(conn)
         provider.on_usage = lambda i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None: usage_repo.record(
             agent_name, model, i, o, skill=skill, source="scheduled", duration_ms=dur, position_count=pos)

@@ -98,55 +98,33 @@ def resolve_provider_kind(
     model: str,
     *,
     has_anthropic: bool,
-    has_deepseek: bool,
     has_openai_base: bool,
 ) -> str:
-    """Decide which provider to use for a model. Returns 'claude' | 'deepseek' | 'openai'.
+    """Decide which provider to use for a model. Returns 'claude' | 'openai'.
 
     This is THE routing rule — every call site delegates here so it cannot drift.
-    A call site that lacks credentials for a kind passes the matching ``has_*=False``
-    (e.g. the scheduler has no DeepSeek-direct keys), and the model falls through.
+    DeepSeek direkt gibt es seit 12.10.2026 nicht mehr: DeepSeek kommt ueber OpenRouter.
     """
     if model.startswith("claude-") and has_anthropic:
         return "claude"
-    if model.startswith("deepseek-") and has_deepseek:
-        return "deepseek"
     if has_openai_base:
         return "openai"
     return "claude"
-
-
-# Maps a registry entry's ``provider`` to the credential flag that activates it.
-_REGISTRY_PROVIDER_FLAG = {"claude": "anthropic", "openrouter": "openrouter", "deepseek": "deepseek"}
 
 
 def available_public_models(
     *,
     claude_models: list[str],
     openrouter_models: list[str],
-    deepseek_models: list[str],
-    registry: dict[str, str],
     has_anthropic: bool,
     has_openrouter: bool,
-    has_deepseek: bool,
 ) -> list[str]:
-    """Ordered, deduplicated cloud-model list for the settings dropdown.
-
-    Only models whose provider is actually configured are offered. Without this
-    filter ``config.DEEPSEEK_MODELS`` (which has a non-empty default) leaks into the
-    list even with no DeepSeek key; picking such a model routes it to the Anthropic
-    proxy as a "claude" call → 404. ``registry`` maps model_id → provider.
-    """
-    active = {"anthropic": has_anthropic, "openrouter": has_openrouter, "deepseek": has_deepseek}
+    """Ordered, deduplicated cloud-model list for the settings dropdown: OpenRouter, then
+    Claude -- only providers that are actually configured, else a pick routes to the
+    wrong endpoint and 404s."""
     ordered: list[str] = []
-    if has_deepseek:
-        ordered += deepseek_models
     if has_openrouter:
         ordered += openrouter_models
     if has_anthropic:
         ordered += claude_models
-    ordered += [
-        mid for mid, prov in registry.items()
-        if active.get(_REGISTRY_PROVIDER_FLAG.get(prov, ""), False)
-    ]
     return list(dict.fromkeys(ordered))

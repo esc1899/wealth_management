@@ -36,7 +36,7 @@ def _get_claude_model_list() -> list[str]:
 
 _CLAUDE_MODELS = _get_claude_model_list()
 # Show all configured providers — same combined list as Settings page
-_ALL_PUBLIC_MODELS = list(dict.fromkeys(config.DEEPSEEK_MODELS + config.OPENAI_MODELS + _CLAUDE_MODELS))
+_ALL_PUBLIC_MODELS = list(dict.fromkeys(config.OPENAI_MODELS + _CLAUDE_MODELS))
 _AVAILABLE_MODELS = _ALL_PUBLIC_MODELS or _CLAUDE_MODELS
 
 # ------------------------------------------------------------------

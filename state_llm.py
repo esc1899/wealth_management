@@ -49,28 +49,6 @@ def _make_openai_provider(model: str, agent_name: str, tavily_search_depth: str 
     return provider
 
 
-def _make_deepseek_provider(model: str, agent_name: str) -> "OpenAICompatibleProvider":
-    """Create a DeepSeek direct API provider (cheaper than OpenRouter middlemen)."""
-    from core.llm.openai_compatible import OpenAICompatibleProvider
-    provider = OpenAICompatibleProvider(
-        api_key=config.DEEPSEEK_API_KEY,
-        model=model,
-        base_url=config.DEEPSEEK_BASE_URL,
-    )
-
-    def _on_usage(i, o, skill=None, dur=None, pos=None, cache_read=None, cache_write=None, web_search=None):
-        get_usage_repo().record(
-            agent_name, model, i, o,
-            skill=skill, duration_ms=dur, position_count=pos,
-            cache_read_tokens=cache_read, cache_write_tokens=cache_write,
-            web_search_requests=web_search,
-            generation_id=provider.last_generation_id,
-        )
-
-    provider.on_usage = _on_usage
-    return provider
-
-
 def _make_public_provider(model: str, agent_name: str, enable_thinking: bool = False) -> LLMProvider:
     """Route to the right provider for a model (see core.llm.router for the rule)."""
     depth = tavily_search_depth(agent_name)
@@ -83,13 +61,10 @@ def _make_public_provider(model: str, agent_name: str, enable_thinking: bool = F
     kind = resolve_provider_kind(
         model,
         has_anthropic=bool(config.LLM_API_KEY),
-        has_deepseek=bool(config.DEEPSEEK_API_KEY),
         has_openai_base=bool(config.OPENAI_BASE_URL),
     )
     if kind == "claude":
         return _make_claude_provider(model, agent_name, enable_thinking=enable_thinking, tavily_search_depth=depth)
-    if kind == "deepseek":
-        return _make_deepseek_provider(model, agent_name)
     return _make_openai_provider(model, agent_name, tavily_search_depth=depth)
 
 
@@ -114,14 +89,13 @@ def _get_public_agent_model(agent_key: str, default: str) -> str:
 
 
 def get_ollama_runtime_kwargs(model: str, *, num_ctx_floor: int = 0) -> dict:
-    """Per-model Ollama kwargs (think / num_ctx) from the model registry.
+    """Ollama-Parameter: ohne Denken, Kontext wie im ganzen Haus (``config.OLLAMA_NUM_CTX``).
 
-    Falls back to ``config.OLLAMA_NUM_CTX`` when the registry has no override, and
-    never drops below ``num_ctx_floor`` (used by context-hungry agents like rebalance).
+    Seit 12.10.2026 nicht mehr je Modell einstellbar -- es gibt ein lokales Modell fuer
+    alle, und ein abweichender Kontext laedt das geteilte Modell neu. ``num_ctx_floor``
+    bleibt fuer Agenten, die mehr brauchen (Rebalance).
     """
-    params = get_app_config_repo().get_ollama_params(model)
-    num_ctx = params["num_ctx"] or config.OLLAMA_NUM_CTX
-    return {"think": params["think"], "num_ctx": max(num_ctx, num_ctx_floor)}
+    return {"think": False, "num_ctx": max(config.OLLAMA_NUM_CTX, num_ctx_floor)}
 
 
 def _make_ollama_provider(model: str, agent_name: str, timeout: float = 120.0, num_ctx_floor: int = 0) -> OllamaProvider:

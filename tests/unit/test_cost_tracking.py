@@ -1,7 +1,6 @@
 """
 Unit tests for cost tracking:
 - UsageRepository: record(skill), reset(), avg_cost_per_call()
-- AppConfigRepository: get_model_prices / set_model_prices
 - LLMProvider: skill_context attribute, 3-arg on_usage callback
 - compute_cost helper
 """
@@ -13,7 +12,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from core.storage.app_config import AppConfigRepository
 from core.storage.base import init_db, migrate_db
 from core.storage.usage import UsageRepository, compute_cost
 
@@ -35,11 +33,6 @@ def conn():
 @pytest.fixture
 def usage_repo(conn):
     return UsageRepository(conn)
-
-
-@pytest.fixture
-def config_repo(conn):
-    return AppConfigRepository(conn)
 
 
 _PRICES = {
@@ -178,33 +171,6 @@ def test_avg_cost_after_reset(usage_repo):
     usage_repo.reset()
     avg = usage_repo.avg_cost_per_call("news_digest", "claude-haiku-4-5-20251001", None, _PRICES)
     assert avg == 0.0
-
-
-# ---------------------------------------------------------------------------
-# AppConfigRepository: model prices
-# ---------------------------------------------------------------------------
-
-def test_get_model_prices_seeds_defaults(config_repo):
-    prices = config_repo.get_model_prices()
-    assert "claude-haiku-4-5-20251001" in prices
-    assert prices["claude-haiku-4-5-20251001"]["input"] == pytest.approx(1.00)
-    assert prices["claude-haiku-4-5-20251001"]["output"] == pytest.approx(5.00)
-
-
-def test_set_model_prices(config_repo):
-    config_repo.set_model_prices({"my-model": {"input": 1.0, "output": 5.0}})
-    prices = config_repo.get_model_prices()
-    # Defaults are merged back in
-    assert "claude-haiku-4-5-20251001" in prices
-    assert "my-model" in prices
-    assert prices["my-model"]["input"] == 1.0
-
-
-def test_model_prices_override(config_repo):
-    config_repo.set_model_prices({"claude-haiku-4-5-20251001": {"input": 9.99, "output": 9.99}})
-    prices = config_repo.get_model_prices()
-    # Stored value overrides default
-    assert prices["claude-haiku-4-5-20251001"]["input"] == pytest.approx(9.99)
 
 
 # ---------------------------------------------------------------------------

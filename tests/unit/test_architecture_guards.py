@@ -242,29 +242,27 @@ def test_local_agent_llm_is_not_cloud(agent_cls):
 # --- Guard 4: routing rule -------------------------------------------------------
 
 @pytest.mark.parametrize(
-    "model,has_anthropic,has_deepseek,has_openai_base,expected",
+    "model,has_anthropic,has_openai_base,expected",
     [
         # Claude models route to Claude when the key is present.
-        ("claude-opus-4-8", True, False, False, "claude"),
-        ("claude-haiku-4-5-20251001", True, True, True, "claude"),
-        # DeepSeek-direct only when no Claude match and DeepSeek key present.
-        ("deepseek-chat", False, True, False, "deepseek"),
-        # OpenAI-compatible (OpenRouter) catches everything else with a base url.
-        ("mistralai/mistral-large-2512", False, False, True, "openai"),
-        ("deepseek-chat", False, False, True, "openai"),
+        ("claude-opus-4-8", True, False, "claude"),
+        ("claude-haiku-4-5-20251001", True, True, "claude"),
+        # OpenAI-compatible (OpenRouter) catches everything else with a base url --
+        # DeepSeek included, there is no direct DeepSeek since 2026-10-12.
+        ("mistralai/mistral-large-2512", False, True, "openai"),
+        ("deepseek-chat", True, True, "openai"),
         # Fallback to Claude when no credentials match the model.
-        ("claude-opus-4-8", False, False, False, "claude"),
-        ("some-unknown-model", False, False, False, "claude"),
+        ("claude-opus-4-8", False, False, "claude"),
+        ("some-unknown-model", False, False, "claude"),
     ],
 )
 def test_resolve_provider_kind_matches_documented_table(
-    model, has_anthropic, has_deepseek, has_openai_base, expected
+    model, has_anthropic, has_openai_base, expected
 ):
     assert (
         resolve_provider_kind(
             model,
             has_anthropic=has_anthropic,
-            has_deepseek=has_deepseek,
             has_openai_base=has_openai_base,
         )
         == expected

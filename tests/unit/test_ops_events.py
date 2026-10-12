@@ -36,6 +36,9 @@ def conn():
         CREATE TABLE app_config (key TEXT PRIMARY KEY, value TEXT);
         """
     )
+    # Die Listenpreise, die der Job kosten von OpenRouter holt (core/preise.py).
+    AppConfigRepository(c).set_json("preise_openrouter",
+                                     {"deepseek/deepseek-chat": {"input": 0.26, "output": 1.03}})
     return c
 
 
@@ -44,7 +47,13 @@ def runs(tmp_path, monkeypatch):
     """Ein eigenes ops-core-Zuhause je Test."""
     home = tmp_path / "ops-core"
     home.mkdir()
+    # Der Katalog des Hauses fuehrt Haiku datiert -- wie der echte.
+    (home / "katalog.toml").write_text(
+        '[claude]\naktuell = ["claude-haiku-4-5-20251001"]\n\n'
+        '[claude.preise."claude-haiku-4-5-20251001"]\neingabe = 1\nausgabe = 5\n',
+        encoding="utf-8")
     monkeypatch.setenv("OPS_CORE_HOME", str(home))
+    monkeypatch.delenv("OPS_CORE_KATALOG", raising=False)
     monkeypatch.delenv("OPS_RUN_ID", raising=False)
     monkeypatch.delenv("OPS_JOB", raising=False)
     return home / "runs"
@@ -59,7 +68,7 @@ def _lines(runs: Path) -> list[dict]:
 
 class TestBooking:
     def test_a_claude_call_is_booked_with_its_list_price(self, conn, runs):
-        """Mit dem datumslosen Alias -- die Registry führt Haiku datiert, und
+        """Mit dem datumslosen Alias -- der Katalog führt Haiku datiert, und
         beides ist dasselbe Modell (wie in core.llm.router)."""
         UsageRepository(conn).record(
             "news_digest", "claude-haiku-4-5", 1000, 200, skill="News",
@@ -123,12 +132,19 @@ class TestBooking:
         datiert, alias = [e["payload"]["cost_usd"] for e in _lines(runs)]
         assert datiert == alias == pytest.approx(0.002)
 
-    def test_an_unknown_model_is_booked_at_zero_like_the_statistics_show_it(
-            self, conn, runs):
-        UsageRepository(conn).record("research", "brandneues-modell", 10, 10)
+    def test_a_model_without_price_is_booked_open_not_at_zero(self, conn, runs):
+        """Hausregel: Ein Modell ohne Preis kostet "offen", nie 0 (core/preise.py)."""
+        UsageRepository(conn).record("research", "acme/brandneu", 10, 10)
         (event,) = _lines(runs)
-        assert event["payload"]["cost_usd"] == 0
+        assert event["payload"]["cost_usd"] is None
         assert event["payload"]["provider"] == "openrouter"   # aus der Modell-ID
+
+    def test_an_open_booking_is_corrected_by_the_whole_bill(self, conn, runs):
+        repo = UsageRepository(conn)
+        repo.record("research", "acme/brandneu", 10, 10, generation_id="gen-9")
+        row_id = conn.execute("SELECT id FROM llm_usage").fetchone()[0]
+        repo.update_actual_cost(row_id, 0.04)
+        assert _lines(runs)[1]["payload"]["cost_usd"] == pytest.approx(0.04)
 
 
 class TestCostCorrection:

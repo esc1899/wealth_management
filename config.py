@@ -42,10 +42,6 @@ class Config:
     # OpenRouter provider routing — comma-separated preferred providers, e.g. "NovitaAI,SiliconFlow"
     OPENAI_PROVIDER: list = [p.strip() for p in os.getenv("OPENAI_PROVIDER", "").split(",") if p.strip()]
 
-    # DeepSeek direct API (cheaper than OpenRouter middlemen)
-    DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY", "")
-    DEEPSEEK_BASE_URL: str = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-    DEEPSEEK_MODELS: list = [m.strip() for m in os.getenv("DEEPSEEK_MODELS", "deepseek-chat,deepseek-reasoner").split(",") if m.strip()]
 
     # Tavily Search (optional — replaces Anthropic's built-in web_search when set)
     TAVILY_API_KEY: str = get_secret("TAVILY_API_KEY", "")

@@ -3,7 +3,7 @@
 
     python scripts/job.py agenten   # die fälligen Jobs der Seite "Scheduler"
     python scripts/job.py kurse     # der Tagesabruf: Kurse mit Historie, danach die Snapshots
-    python scripts/job.py kosten    # echte Kosten der OpenRouter-Aufrufe nachtragen
+    python scripts/job.py kosten    # echte Kosten der OpenRouter-Aufrufe nachtragen, Listenpreise holen
 
 ops-core ruft sie über `ops run wealth_management <job>` auf, Zeitplan in
 `~/.ops-core/jobs.toml`: `agenten` stündlich und beim Login, `kurse` beim Login und
@@ -129,9 +129,15 @@ def kurse(markt, fetch_hour: int, dienst=None) -> int:
 
 
 def kosten(dienst) -> int:
+    # Erst abgleichen, dann Preise holen: Ein Aufruf, der ohne Preis "offen" gebucht wurde,
+    # bekommt so seinen ganzen Betrag nachgebucht, nicht nur den Abstand zu einem Preis,
+    # den es beim Buchen noch nicht gab.
     nachgetragen, offen = dienst.kosten_abgleichen()
     print(f"OpenRouter: {nachgetragen} von {offen} offenen Aufrufen nachgetragen."
           if offen else "OpenRouter: nichts offen.")
+    geholt = dienst.preise_holen()
+    if geholt is not None:
+        print(f"OpenRouter: Listenpreise für {geholt} Modelle geholt.")
     return 0
 
 

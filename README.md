@@ -61,15 +61,13 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 ### System
 - **Skills Management** — dedicated page (System → Skills) with CRUD for reusable prompt templates; AI-assisted generation
 - **Skills Integration** — optional user-selectable skills for WatchlistChecker, PortfolioStory, and other agents
-- **Per-agent Model Selection** — choose Ollama and Claude models individually at runtime
+- **Model Selection** — one cloud model per area (Depot, Watchlist, Research), one local model for everything on the machine; prices read-only from the household catalog and OpenRouter
 - **Scheduled Tasks** — run cloud agents automatically on a schedule (daily / weekly / monthly / yearly); dedicated Scheduler page with per-job run history
 - **Batch API** — scheduled jobs (all eight cloud agents) go out as Anthropic batches at half price when the household switch is on (Maschinenraum, "Eingeplante Läufe als Batch" → `batch = true` under `[claude]` in `~/.ops-core/modelle.toml`). "Run now" stays live. The job `agenten` collects results hourly and reports what it still waits for to the ops-core tile. Background and decisions: heimnetzwerk `docs/haus/integrationen.md`, profile "Claude".
 - **Cost & Token Tracking** — per-agent/skill/model token counts and USD costs; split by manual vs. scheduled runs; daily trend chart; non-destructive per-row reset
-- **Cost Alerts** — configurable daily and monthly USD spending limits; warnings in sidebar and Statistics page
-- **Monthly Cost Forecast** — projects scheduled-job costs forward based on actual average tokens per call
 - **Recommendation & Story** — investment thesis per position
 - **Demo Mode** — pre-seeded database with 20 realistic positions + sample analyses for testing
-- **Bilingual UI** — German / English, switchable per session
+- **Bilingual UI** — German / English, switchable in Settings
 - **System Status** — health checks for Ollama connectivity, privacy mode, and demo mode
 
 ## What You Can Learn Here
@@ -119,7 +117,7 @@ The Statistics page gives an indication of what each agent call costs in USD, br
 - Python 3.9+, Streamlit
 - SQLite (encrypted via cryptography/Fernet)
 - Ollama (local LLM, e.g. qwen3:8b)
-- Anthropic Claude API (optional, for Research/News/Search — OpenRouter and OpenAI-compatible providers also supported)
+- Anthropic Claude API (optional, for Research/News/Search — OpenRouter also supported)
 - yfinance for market data, optional Tavily web search
 - APScheduler for automated price fetching and scheduled agent runs
 - watchdog file watcher for the Research Inbox ingest pipeline
@@ -162,9 +160,9 @@ Copy `.env.example` to `.env` and fill in your values.
 | `LLM_BASE_URL` | Optional | Custom endpoint for LLM (e.g. OpenRouter, or a corporate proxy). Default: empty = Anthropic direkt. Falls back to `ANTHROPIC_BASE_URL` if unset |
 | `ANTHROPIC_BASE_URL` | Optional | SDK-standard base URL — used when `LLM_BASE_URL` is empty. Point it at a corporate Anthropic-compatible proxy (incl. vendor path). See [corporate proxy setup](docs/corporate-proxy-setup.md) |
 | `LLM_DEFAULT_MODEL` | Optional | Model override for public (cloud) agents. Default: empty = claude-haiku-4-5-20251001 |
-| `OPENAI_API_KEY` | Optional* | API key for OpenAI-compatible provider (Perplexity Sonar, Groq, Together, etc.) |
-| `OPENAI_BASE_URL` | Optional | Endpoint URL for OpenAI-compatible provider (e.g. https://api.perplexity.ai) |
-| `OPENAI_MODELS` | Optional | Komma-separated list of models for Settings dropdown (e.g. `sonar,sonar-pro`) |
+| `OPENAI_API_KEY` | Optional* | OpenRouter API key |
+| `OPENAI_BASE_URL` | Optional | OpenRouter endpoint (`https://openrouter.ai/api/v1`) |
+| `OPENAI_MODELS` | Optional | Comma-separated OpenRouter models for the Settings dropdown (e.g. `deepseek/deepseek-v4-pro,mistralai/mistral-medium-3-5`) |
 | `OLLAMA_HOST` | Optional | Default: `http://localhost:11434` |
 | `OLLAMA_MODEL` | Optional | Default model for Portfolio Chat and Portfolio Story (overridable in Settings UI) |
 | `TAVILY_API_KEY` | Optional | Tavily search — replaces Anthropic's built-in web_search when set. Free tier: 1000 searches/month |
@@ -184,20 +182,21 @@ Copy `.env.example` to `.env` and fill in your values.
 
 *`LLM_API_KEY` is required for Research Chat, News Digest, Investment Search, Story Checker, Fundamental Analyzer, Structural Change Scanner, Consensus Gap Analysis — unless `OPENAI_BASE_URL` is configured, in which case `OPENAI_API_KEY` is used instead.
 
-**Note on model choice:** Claude Sonnet (or better) is required for agents that use `web_search` (Structural Change Scanner, Consensus Gap Analysis, Fundamental Analyzer, Capital Allocator, Devil's Advocate, Sector Rotation). Claude Haiku works for Research Chat, News Digest, and Story Checker. Models are selectable per agent in Settings.
+**Note on model choice:** Claude Sonnet (or better) is required for agents that use `web_search` (Structural Change Scanner, Consensus Gap Analysis, Fundamental Analyzer, Capital Allocator, Devil's Advocate, Sector Rotation). Claude Haiku works for Research Chat, News Digest, and Story Checker. Settings > Prüfung picks one cloud model per area (Depot, Watchlist, Research) and one local model for everything on the machine; Settings > Preise shows the prices read-only (Claude from the household catalog, OpenRouter fetched daily).
 
-### Provider Switch
+### Providers: Claude and OpenRouter
 
-By default, cloud agents use Anthropic Claude. To switch all cloud agents to an OpenAI-compatible provider (Perplexity Sonar, Groq, Together, etc.), set:
+Cloud agents use Anthropic Claude (`claude-…` models) or OpenRouter (`vendor/model` ids, e.g.
+DeepSeek or Mistral). For OpenRouter set:
 
 ```env
-OPENAI_API_KEY=pplx-...
-OPENAI_BASE_URL=https://api.perplexity.ai
-OPENAI_MODELS=sonar,sonar-pro,sonar-reasoning
-LLM_DEFAULT_MODEL=sonar
+OPENAI_API_KEY=sk-or-...
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+OPENAI_MODELS=deepseek/deepseek-v4-pro,mistralai/mistral-medium-3-5
 ```
 
-The Settings page will automatically show "OpenAI-compatible 🌐" instead of "Claude ☁️". Cloud agents route through the OpenAI provider; local agents (Ollama) are unaffected. This requires no code changes — configuration only.
+The provider follows from the model id; local agents (Ollama) are unaffected. There is no
+direct DeepSeek API any more (since 2026-10-12) — DeepSeek runs through OpenRouter.
 
 ### Corporate LLM Proxy (no direct internet)
 

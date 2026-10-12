@@ -8,6 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Abrundung 2: Preise aus Quellen, Einstellungen nach Bedeutung, kein DeepSeek direkt — 2026-10-12
+
+**Warum:** Die Modell-Registry liess Preis, Anbieter und Ollama-Parameter je Modell von Hand
+pflegen, obwohl nichts davon eine Eingabe braucht: Claude-Preise kamen schon aus dem Katalog
+des Hauses (und ueberschrieben jede Eingabe), OpenRouter rechnet ohnehin echt ab, lokal kostet
+nichts, und seit einem lokalen Modell fuer alle gilt der Kontext des Hauses. Eine eigene
+Preistabelle baute zudem das Loch nach, vor dem die Hausregel warnt. Die Einstellungen waren nach
+Technik geschnitten (Lokal/Cloud) statt nach Bedeutung. DeepSeek direkt braucht Erik nicht mehr,
+DeepSeek kommt ueber OpenRouter.
+
+**Änderungen:**
+- `core/preise.py`: Preisliste nur gelesen -- Claude aus `katalog.toml`, OpenRouter aus
+  `app_config.preise_openrouter`, lokal 0; Anbieter aus der ID. Ein Modell ohne Preis ist
+  "offen": gebucht mit `cost_usd` null, nie 0; die Korrektur bucht dann den ganzen Betrag.
+- Job `kosten`: gleicht ab und holt danach einmal am Tag die Listenpreise der benutzten
+  OpenRouter-Modelle aus `/models` (`fetch_model_prices`).
+- `AppConfigRepository`: Registry, Liste geloeschter Modelle, `claude_legacy`, `provider_for`
+  und `get_ollama_params` entfallen; Ollama laeuft ohne Denken mit `OLLAMA_NUM_CTX`.
+- Einstellungen: Tabs Pruefung (Checks je Liste, lokales Modell, Modell je Bereich, ein Knopf
+  fuer alle Modelle), System (Sprache, Zustand, Backup), Preise (nur lesen, "offen" sichtbar).
+- DeepSeek direkt entfaellt (`DEEPSEEK_*`, `_make_deepseek_provider`, Routing); alte Aufrufe
+  `deepseek-…` behalten ihren Anbieter in der Statistik, ohne Preis. `DEEPSEEK_API_KEY` kann aus
+  der `.env` (meldet `check_secrets`).
+
 ### Abrundung 1: KI-Kommentar, tote Seiten und Ampel entfallen — 2026-10-12
 
 **Warum:** Erste Runde der Abrundung (BACKLOG.md). Der KI-Kommentar in einem waehlbaren Stil

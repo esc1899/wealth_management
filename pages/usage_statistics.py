@@ -11,6 +11,7 @@ import streamlit as st
 from config import config
 from core.i18n import t
 from core.llm.openrouter_costs import fetch_account_usage, fetch_and_store_costs
+from core import preise
 from core.storage.usage import compute_cost
 from state import get_app_config_repo, get_usage_repo
 
@@ -20,23 +21,22 @@ st.caption(t("statistics.subtitle"))
 
 repo = get_usage_repo()
 config_repo = get_app_config_repo()
-# Registry is a superset of the price table (adds `provider`); usable directly for
-# cost estimation (compute_cost reads only input/output) and provider grouping.
-model_registry = config_repo.get_model_registry()
-model_prices = model_registry
+# Preise und Anbieter aus core/preise.py (12.10.2026): Katalog des Hauses, OpenRouter-Liste,
+# lokal kostenlos. Ein Modell ohne Preis zaehlt hier 0 -- die Seite Einstellungen > Preise
+# zeigt es als "offen".
+_preisliste = preise.preisliste(config_repo)
 
 # Provider display names (brand names — language-neutral).
 _PROVIDER_LABELS = {
     "claude": "Anthropic",
-    "claude_legacy": "Anthropic (abgelöst)",
     "openrouter": "OpenRouter",
-    "deepseek": "DeepSeek",
+    "deepseek": "DeepSeek (direkt, bis 12.10.2026)",
     "ollama": "Ollama",
 }
 
 
 def _provider_for(model: str) -> str:
-    return config_repo.provider_for(model)
+    return preise.anbieter(model)
 
 _OR_ACTIVE = bool(config.OPENAI_BASE_URL and config.OPENAI_API_KEY)
 
@@ -86,7 +86,7 @@ def _row_cost(r: dict) -> float:
         r["input_tokens"],
         r["output_tokens"],
         r["model"],
-        model_prices,
+        {r["model"]: preise.preis(r["model"], _preisliste) or {}},
         r.get("cache_read_tokens"),
         r.get("cache_write_tokens"),
         r.get("web_search_requests"),
@@ -125,7 +125,7 @@ m2.metric(t("statistics.this_month"), f"${this_month_cost:.4f}", delta=f"{this_m
 m3.metric(t("statistics.last_month"), f"${last_month_cost:.4f}", delta=f"{last_month_calls} Calls", delta_color="off")
 
 # Per-provider breakdown of the cost (this month) — makes explicit that the total
-# spans Anthropic + OpenRouter + DeepSeek + Ollama, not just one provider.
+# spans Anthropic + OpenRouter + Ollama, not just one provider.
 _provider_month: dict[str, float] = {}
 for r in this_month_rows:
     p = _provider_for(r["model"])

@@ -52,33 +52,19 @@ class UsageRepository:
 
     def _estimate(self, model: str, input_tokens, output_tokens,
                   cache_read_tokens=None, cache_write_tokens=None,
-                  web_search_requests=None, source: str = "") -> tuple[str, float]:
-        """(provider, list price) for a call, from the model registry.
-
-        The registry is the same one the statistics page prices with, read
-        through the same connection; a model that is not in it at all has no
-        price and costs 0 — the same silent 0 the statistics show, not an
-        invented number.
-
-        One normalisation on top, because the household sum would otherwise be
-        wrong for a whole provider: the registry holds Haiku under its dated id
-        (``claude-haiku-4-5-20251001``) while the API also accepts the dateless
-        alias. Both are the same model — the same rule ``core.llm.router``
-        already applies to the model picker — so a call priced under one id is
-        priced under the other.
-        """
-        from core.llm.router import _base_model_id
+                  web_search_requests=None, source: str = "") -> tuple[str, Optional[float]]:
+        """(Anbieter, Listenpreis) eines Aufrufs, aus ``core.preise`` -- derselben Liste,
+        mit der die Statistik rechnet. Ein Modell ohne Preis kostet ``None`` ("offen"),
+        nie 0: Die Hausbuchhaltung soll die Luecke sehen, nicht eine falsche Summe."""
+        from core import preise
         from core.storage.app_config import AppConfigRepository
 
-        registry = AppConfigRepository(self._conn).get_model_registry()
-        key = model
-        if key not in registry:
-            base = _base_model_id(model)
-            key = next((m for m in registry if _base_model_id(m) == base), model)
-        provider = (registry.get(key) or {}).get("provider") or \
-            AppConfigRepository._infer_provider(model)
-        return provider, compute_cost(
-            input_tokens or 0, output_tokens or 0, key, registry,
+        anbieter = preise.anbieter(model)
+        preis = preise.preis(model, preise.preisliste(AppConfigRepository(self._conn)))
+        if preis is None:
+            return anbieter, None
+        return anbieter, compute_cost(
+            input_tokens or 0, output_tokens or 0, model, {model: preis},
             cache_read_tokens, cache_write_tokens, web_search_requests,
             batch=(source == "batch"))
 
@@ -127,7 +113,8 @@ class UsageRepository:
                 row["model"], row["input_tokens"], row["output_tokens"],
                 row["cache_read_tokens"], row["cache_write_tokens"],
                 row["web_search_requests"], row["source"])
-            delta = float(cost_usd) - estimate
+            # Ohne Preis war "offen" gebucht, also nichts: dann zaehlt der ganze Betrag.
+            delta = float(cost_usd) - (estimate or 0.0)
             if abs(delta) < 1e-9:
                 return
             ops_events.book_llm_cost_correction(
@@ -137,6 +124,10 @@ class UsageRepository:
         except Exception as exc:  # noqa: BLE001
             print(f"wealth_management: cost correction not booked "
                   f"({type(exc).__name__}: {exc})", file=sys.stderr, flush=True)
+
+    def models(self) -> list[str]:
+        """Jedes Modell, das je gerufen wurde -- fuer den Abruf der Listenpreise."""
+        return [r[0] for r in self._conn.execute("SELECT DISTINCT model FROM llm_usage")]
 
     def get_uncosted_openrouter_records(self, limit: int = 200) -> list[dict]:
         """Records that have a generation_id but no actual_cost_usd yet."""

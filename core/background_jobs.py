@@ -69,14 +69,10 @@ def _make_bg_llm(model: str, agent_name: str, usage_repo: UsageRepository):
     kind = resolve_provider_kind(
         model,
         has_anthropic=bool(config.LLM_API_KEY),
-        has_deepseek=bool(config.DEEPSEEK_API_KEY),
         has_openai_base=bool(config.OPENAI_BASE_URL),
     )
     if kind == "claude":
         llm = ClaudeProvider(api_key=config.LLM_API_KEY, model=model, base_url=config.LLM_BASE_URL)
-    elif kind == "deepseek":
-        from core.llm.openai_compatible import OpenAICompatibleProvider
-        llm = OpenAICompatibleProvider(api_key=config.DEEPSEEK_API_KEY, model=model, base_url=config.DEEPSEEK_BASE_URL)
     else:
         from core.llm.openai_compatible import OpenAICompatibleProvider
         llm = OpenAICompatibleProvider(

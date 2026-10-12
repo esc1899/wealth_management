@@ -54,3 +54,30 @@ def fetch_and_store_costs(api_key: str, base_url: str, records: list[dict], repo
             repo.update_actual_cost(rec["id"], cost)
             updated += 1
     return updated
+
+
+def fetch_model_prices(base_url: str, model_ids: list[str]) -> dict:
+    """Listenpreise dieser Modelle aus ``/models``, in US-Dollar je Million Token
+    (OpenRouter nennt sie je Token, als Text). Ein Modell ohne Preis fehlt im Ergebnis;
+    ein Fehler gibt ``{}`` -- der Preis bleibt dann "offen", bis der Abruf klappt."""
+    wanted = set(model_ids)
+    if not wanted:
+        return {}
+    try:
+        resp = requests.get(f"{base_url.rstrip('/')}/models", timeout=_TIMEOUT * 3)
+        resp.raise_for_status()
+        models = resp.json().get("data", [])
+    except Exception as exc:
+        _logger.warning("OpenRouter price fetch failed: %s", exc)
+        return {}
+    prices = {}
+    for m in models:
+        if m.get("id") not in wanted:
+            continue
+        pricing = m.get("pricing") or {}
+        try:
+            prices[m["id"]] = {"input": float(pricing["prompt"]) * 1e6,
+                               "output": float(pricing["completion"]) * 1e6}
+        except (KeyError, TypeError, ValueError):
+            continue
+    return prices
