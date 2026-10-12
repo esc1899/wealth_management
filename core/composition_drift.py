@@ -122,6 +122,67 @@ def portfolio_income_series(snapshots) -> List[dict]:
     return series
 
 
+def _zerlegungsschritte(snapshots, classes=None):
+    """Die Zerlegung Schritt fuer Schritt: je Folge-Snapshot und Titel ein Beitrag.
+
+    Liefert (erstes_datum, [(date, [(ticker, price_effect, quantity_effect, q0, q1), ...]), ...],
+    {ticker: (name, asset_class)}) -- je Folge-Snapshot seine Schritte -- oder None bei weniger
+    als zwei Snapshots mit Holdings. Die Rechnung erklaert ``value_decomposition_series``; beide
+    Sichten lesen aus dieser einen Schleife, damit die Summe je Titel genau die Kurve ergibt.
+    """
+    holding_snaps = [s for s in snapshots if getattr(s, "holdings", None)]
+    if len(holding_snaps) < 2:
+        return None
+
+    titel: Dict[str, Tuple[str, str]] = {}
+
+    def _by_ticker(snap) -> Tuple[Dict[str, Tuple[float, float]], set]:
+        """({ticker: (quantity, value)} for complete lots, {tickers present at all})."""
+        werte: Dict[str, Tuple[float, float]] = {}
+        unvollstaendig: set = set()
+        da: set = set()
+        for h in snap.holdings or []:
+            ticker = h.get("ticker")
+            if not ticker or (classes is not None and h.get("asset_class") not in classes):
+                continue
+            da.add(ticker)
+            titel[ticker] = (h.get("name") or ticker, h.get("asset_class") or "")
+            q = h.get("quantity")
+            v = h.get("value_eur")
+            if v is None and q is not None and h.get("price_eur") is not None:
+                v = q * h["price_eur"]
+            if q is None or v is None or q <= 0:
+                unvollstaendig.add(ticker)
+                continue
+            q_alt, v_alt = werte.get(ticker, (0.0, 0.0))
+            werte[ticker] = (q_alt + q, v_alt + v)
+        # Fehlt einer Tranche der Wert, ist der Titel als Ganzes eine Datenluecke.
+        for ticker in unvollstaendig:
+            werte.pop(ticker, None)
+        return werte, da
+
+    je_snapshot: List[tuple] = []
+    ref, _ = _by_ticker(holding_snaps[0])   # letzte vollstaendige Werte je Titel
+    for snap in holding_snaps[1:]:
+        cur, da = _by_ticker(snap)
+        schritte: List[tuple] = []
+        for ticker, (q1, v1) in cur.items():
+            p1 = v1 / q1
+            alt = ref.get(ticker)
+            if alt is None:                         # neue Position: voller Wert ist Zukauf
+                schritte.append((ticker, 0.0, v1, 0.0, q1))
+                continue
+            q0, v0 = alt
+            p0 = v0 / q0
+            schritte.append((ticker, q0 * (p1 - p0), (q1 - q0) * p1, q0, q1))
+        for ticker in [t for t in ref if t not in da]:
+            q0, v0 = ref.pop(ticker)                # verkauft: zum letzten Wert abgehen
+            schritte.append((ticker, 0.0, -v0, q0, 0.0))
+        ref.update(cur)                             # Datenluecken behalten ihre alte Referenz
+        je_snapshot.append((snap.date, schritte))
+    return holding_snaps[0].date, je_snapshot, titel
+
+
 def value_decomposition_series(snapshots, classes=None) -> List[dict]:
     """Decompose cumulative portfolio value growth into price vs. share-accumulation effects.
 
@@ -146,64 +207,61 @@ def value_decomposition_series(snapshots, classes=None) -> List[dict]:
     Honest limit: quantity_effect captures EVERY share increase (purchases incl. reinvested
     dividends) — the snapshots cannot separate reinvested dividends from fresh capital.
     """
-    holding_snaps = [s for s in snapshots if getattr(s, "holdings", None)]
-    if len(holding_snaps) < 2:
+    zerlegt = _zerlegungsschritte(snapshots, classes)
+    if zerlegt is None:
         return []
-
-    def _by_ticker(snap) -> Tuple[Dict[str, Tuple[float, float]], set]:
-        """({ticker: (quantity, value)} for complete lots, {tickers present at all})."""
-        werte: Dict[str, Tuple[float, float]] = {}
-        unvollstaendig: set = set()
-        da: set = set()
-        for h in snap.holdings or []:
-            ticker = h.get("ticker")
-            if not ticker or (classes is not None and h.get("asset_class") not in classes):
-                continue
-            da.add(ticker)
-            q = h.get("quantity")
-            v = h.get("value_eur")
-            if v is None and q is not None and h.get("price_eur") is not None:
-                v = q * h["price_eur"]
-            if q is None or v is None or q <= 0:
-                unvollstaendig.add(ticker)
-                continue
-            q_alt, v_alt = werte.get(ticker, (0.0, 0.0))
-            werte[ticker] = (q_alt + q, v_alt + v)
-        # Fehlt einer Tranche der Wert, ist der Titel als Ganzes eine Datenluecke.
-        for ticker in unvollstaendig:
-            werte.pop(ticker, None)
-        return werte, da
+    erstes_datum, je_snapshot, _ = zerlegt
 
     cum_price = 0.0
     cum_qty = 0.0
     series: List[dict] = [{
-        "date": holding_snaps[0].date,
+        "date": erstes_datum,
         "cum_price_effect": 0.0,
         "cum_quantity_effect": 0.0,
     }]
-
-    ref, _ = _by_ticker(holding_snaps[0])   # letzte vollstaendige Werte je Titel
-    for snap in holding_snaps[1:]:
-        cur, da = _by_ticker(snap)
-        for ticker, (q1, v1) in cur.items():
-            p1 = v1 / q1
-            alt = ref.get(ticker)
-            if alt is None:
-                cum_qty += v1                       # neue Position: voller Wert ist Zukauf
-                continue
-            q0, v0 = alt
-            p0 = v0 / q0
-            cum_qty += (q1 - q0) * p1
-            cum_price += q0 * (p1 - p0)
-        for ticker in [t for t in ref if t not in da]:
-            cum_qty -= ref.pop(ticker)[1]           # verkauft: zum letzten Wert abgehen
-        ref.update(cur)                             # Datenluecken behalten ihre alte Referenz
+    for date, schritte in je_snapshot:
+        for _ticker, kurs, anteile, _q0, _q1 in schritte:
+            cum_price += kurs
+            cum_qty += anteile
         series.append({
-            "date": snap.date,
+            "date": date,
             "cum_price_effect": cum_price,
             "cum_quantity_effect": cum_qty,
         })
     return series
+
+
+def value_decomposition_by_ticker(snapshots, classes=None) -> List[dict]:
+    """Dieselbe Zerlegung je Titel -- woher der Anteilszuwachs der Kurve kommt.
+
+    Je Titel: {ticker, name, asset_class, price_effect, quantity_effect, groesster_schritt},
+    wobei ``groesster_schritt`` der eine Snapshot-Schritt mit dem betragsmaessig groessten
+    Anteilszuwachs ist ({date, q0, q1, quantity_effect}; q0 = 0 heisst neu, q1 = 0 verkauft).
+    Ein Rechenfehler zeigt sich meist als ein solcher Sprung, nicht als Drift. Sortiert nach
+    dem Betrag des Anteilszuwachses; die Summen ueber alle Titel sind der letzte Punkt von
+    ``value_decomposition_series``. [] bei weniger als zwei Snapshots mit Holdings.
+    """
+    zerlegt = _zerlegungsschritte(snapshots, classes)
+    if zerlegt is None:
+        return []
+    _erstes_datum, je_snapshot, titel = zerlegt
+
+    je_titel: Dict[str, dict] = {}
+    for date, schritte in je_snapshot:
+        for ticker, kurs, anteile, q0, q1 in schritte:
+            name, klasse = titel.get(ticker, (ticker, ""))
+            zeile = je_titel.setdefault(ticker, {
+                "ticker": ticker, "name": name, "asset_class": klasse,
+                "price_effect": 0.0, "quantity_effect": 0.0, "groesster_schritt": None,
+            })
+            zeile["price_effect"] += kurs
+            zeile["quantity_effect"] += anteile
+            bisher = zeile["groesster_schritt"]
+            if anteile and (bisher is None or abs(anteile) > abs(bisher["quantity_effect"])):
+                zeile["groesster_schritt"] = {
+                    "date": date, "q0": q0, "q1": q1, "quantity_effect": anteile,
+                }
+    return sorted(je_titel.values(), key=lambda z: abs(z["quantity_effect"]), reverse=True)
 
 
 def sold_positions_summary(snapshots) -> List[dict]:

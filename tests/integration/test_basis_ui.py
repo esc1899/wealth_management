@@ -93,3 +93,32 @@ def test_ki_knoepfe_sagen_wo_das_modell_rechnet(ollama):
     at.run()
     assert "Lokales Sprachmodell" in _check_knopf(at).help
     assert "Lokales Sprachmodell" in _ki_knopf(at).help
+
+
+def test_dividenden_klapper_anteilszuwachs_je_titel(monkeypatch):
+    """Der Klapper unter "Kurs vs. Anteile" wird gezeichnet: Satz vorweg, Tabelle dahinter."""
+    import core.composition_drift as cd
+    import core.dividend_calendar as dk
+    beitrag = dk.DividendContribution("A", "Alpha", "Aktie", 12.0, 1.0)
+    monkeypatch.setattr(dk, "compute_monthly_cashflow_forecast", lambda v, months_ahead=12: [
+        dk.MonthlyForecast("2026-11", 1.0, [beitrag])])
+    monkeypatch.setattr(cd, "portfolio_income_series", lambda s: [
+        {"date": "2026-01-01", "total_annual_dividend_eur": 1.0}])
+    monkeypatch.setattr(cd, "value_decomposition_series", lambda s, classes=None: [
+        {"date": "2026-01-01", "cum_price_effect": 0.0, "cum_quantity_effect": 0.0},
+        {"date": "2026-02-01", "cum_price_effect": 10.0, "cum_quantity_effect": 50.0}])
+    monkeypatch.setattr(cd, "value_decomposition_by_ticker", lambda s, classes=None: [
+        {"ticker": "XEON", "name": "Geldmarkt", "asset_class": "ETF", "price_effect": 1.0,
+         "quantity_effect": 60.0, "groesster_schritt": {"date": "2026-02-01", "q0": 0.0,
+                                                          "q1": 2.0, "quantity_effect": 60.0}},
+        {"ticker": "A", "name": "Alpha", "asset_class": "Aktie", "price_effect": 9.0,
+         "quantity_effect": -10.0, "groesster_schritt": None},
+    ])
+    at = AppTest.from_file(PAGES / "dividend_calendar.py", default_timeout=30)
+    at.run()
+    assert not at.exception, at.exception
+    klapper = next(e for e in at.expander if e.label == "Woher kommt der Anteilszuwachs?")
+    assert "Geldmarkt (ETF)" in klapper.markdown[0].value
+    tabelle = klapper.dataframe[0].value
+    assert list(tabelle["Titel"]) == ["Geldmarkt (XEON)", "Alpha (A)"]
+    assert tabelle["Größter Sprung"][0] == "01.02.2026: neu → 2 (+60 €)"

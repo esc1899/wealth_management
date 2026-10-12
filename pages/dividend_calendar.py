@@ -23,6 +23,7 @@ from core.composition_drift import (
     share_count_series,
     portfolio_income_series,
     value_decomposition_series,
+    value_decomposition_by_ticker,
 )
 from core.asset_class_config import get_asset_class_registry
 from core.i18n import t
@@ -236,9 +237,9 @@ st.subheader(t("dividend_calendar.accumulation_section"))
 _share_hist = share_count_series(_snapshots)
 _income_ts = portfolio_income_series(_snapshots)
 # Nur Klassen mit Marktpreis: Eine Einzahlung aufs Tagesgeld ist kein Anteilszuwachs.
-_decomp = value_decomposition_series(
-    _snapshots, classes=set(get_asset_class_registry().auto_fetch_names())
-)
+_decomp_classes = set(get_asset_class_registry().auto_fetch_names())
+_decomp = value_decomposition_series(_snapshots, classes=_decomp_classes)
+_decomp_rows = value_decomposition_by_ticker(_snapshots, classes=_decomp_classes)
 
 if not _share_hist and not _income_ts:
     st.info(t("dividend_calendar.history_building"))
@@ -331,6 +332,44 @@ else:
             template="plotly_white",
         )
         st.plotly_chart(_fig_dec)
+
+        if _decomp_rows:
+            def _euro(x: float) -> str:
+                return f"{x:+,.0f} €".replace(",", ".")
+
+            def _sprung(z: dict) -> str:
+                s_ = z["groesster_schritt"]
+                if s_ is None:
+                    return "—"
+                vorher = t("dividend_calendar.decomp_new") if s_["q0"] == 0 else f"{s_['q0']:,.4g}"
+                nachher = t("dividend_calendar.decomp_sold") if s_["q1"] == 0 else f"{s_['q1']:,.4g}"
+                datum = "{2}.{1}.{0}".format(*str(s_["date"])[:10].split("-"))
+                return f"{datum}: {vorher} → {nachher} ({_euro(s_['quantity_effect'])})"
+
+            with st.expander(t("dividend_calendar.decomp_by_ticker"), expanded=False):
+                _top = _decomp_rows[0]
+                _summe = sum(z["quantity_effect"] for z in _decomp_rows)
+                st.markdown(t("dividend_calendar.decomp_by_ticker_lead").format(
+                    name=_top["name"], klasse=_top["asset_class"] or "—",
+                    betrag=_euro(_top["quantity_effect"]),
+                    anteil=f"{_top['quantity_effect'] / _summe:.0%}" if _summe else "—",
+                    summe=_euro(_summe),
+                ))
+                st.caption(t("dividend_calendar.decomp_by_ticker_help"))
+                st.dataframe(
+                    [{
+                        t("dividend_calendar.decomp_col_title"): f"{z['name']} ({z['ticker']})",
+                        t("dividend_calendar.decomp_col_class"): z["asset_class"],
+                        t("dividend_calendar.decomp_quantity"): round(z["quantity_effect"]),
+                        t("dividend_calendar.decomp_price"): round(z["price_effect"]),
+                        t("dividend_calendar.decomp_col_jump"): _sprung(z),
+                    } for z in _decomp_rows],
+                    width="stretch", hide_index=True,
+                    column_config={
+                        t("dividend_calendar.decomp_quantity"): st.column_config.NumberColumn(format="%+d €"),
+                        t("dividend_calendar.decomp_price"): st.column_config.NumberColumn(format="%+d €"),
+                    },
+                )
 
 st.divider()
 

@@ -12,6 +12,7 @@ from core.composition_drift import (
     share_count_series,
     portfolio_income_series,
     value_decomposition_series,
+    value_decomposition_by_ticker,
 )
 
 
@@ -339,3 +340,62 @@ class TestValueDecomposition:
     def test_fewer_than_two_holdings_snapshots(self):
         assert value_decomposition_series([_snap("2026-01-01", holdings=[_hp("A", 1.0, 10.0)])]) == []
         assert value_decomposition_series([]) == []
+
+
+class TestValueDecompositionByTicker:
+    def _gemischt(self):
+        # Kursbewegung, Zukauf, neue Position, Verkauf und eine Datenluecke in einer Reihe.
+        return [
+            _snap("2026-01-01", holdings=[_hp("A", 10.0, 100.0), _hp("B", 5.0, 20.0)]),
+            _snap("2026-02-01", holdings=[_hp("A", 12.0, 110.0), _hp("B", 5.0, None)]),
+            _snap("2026-03-01", holdings=[_hp("A", 12.0, 105.0), _hp("B", 5.0, 22.0),
+                                          _hp("C", 3.0, 50.0)]),
+            _snap("2026-04-01", holdings=[_hp("A", 12.0, 108.0), _hp("C", 3.0, 55.0)]),
+        ]
+
+    def test_sums_equal_series(self):
+        # Die Tabelle erklaert die Kurve: ihre Summen sind der letzte Punkt der Reihe.
+        snaps = self._gemischt()
+        zeilen = value_decomposition_by_ticker(snaps)
+        last = value_decomposition_series(snaps)[-1]
+        assert sum(z["quantity_effect"] for z in zeilen) == pytest.approx(last["cum_quantity_effect"])
+        assert sum(z["price_effect"] for z in zeilen) == pytest.approx(last["cum_price_effect"])
+
+    def test_per_ticker_values_and_order(self):
+        zeilen = {z["ticker"]: z for z in value_decomposition_by_ticker(self._gemischt())}
+        assert zeilen["A"]["quantity_effect"] == pytest.approx(2.0 * 110.0)
+        assert zeilen["A"]["price_effect"] == pytest.approx(10 * 10.0 + 12 * -5.0 + 12 * 3.0)
+        assert zeilen["B"]["quantity_effect"] == pytest.approx(-110.0)   # verkauft zu 5 * 22
+        assert zeilen["B"]["price_effect"] == pytest.approx(10.0)        # Luecke ueberbrueckt
+        assert zeilen["C"]["quantity_effect"] == pytest.approx(150.0)
+        reihenfolge = [z["ticker"] for z in value_decomposition_by_ticker(self._gemischt())]
+        assert reihenfolge == ["A", "C", "B"]   # nach Betrag: 220, 150, 110
+
+    def test_largest_step_marks_new_and_sold(self):
+        zeilen = {z["ticker"]: z for z in value_decomposition_by_ticker(self._gemischt())}
+        assert zeilen["C"]["groesster_schritt"] == {
+            "date": "2026-03-01", "q0": 0.0, "q1": 3.0, "quantity_effect": pytest.approx(150.0)}
+        assert zeilen["B"]["groesster_schritt"]["q1"] == 0.0
+        assert zeilen["B"]["groesster_schritt"]["date"] == "2026-04-01"
+
+    def test_price_only_has_no_step(self):
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("A", 1.0, 10.0)]),
+            _snap("2026-02-01", holdings=[_hp("A", 1.0, 12.0)]),
+        ]
+        (zeile,) = value_decomposition_by_ticker(snaps)
+        assert zeile["groesster_schritt"] is None
+        assert zeile["price_effect"] == pytest.approx(2.0)
+
+    def test_name_class_and_filter(self):
+        aktie = {**_hp("A", 1.0, 10.0), "asset_class": "Aktie", "name": "Alpha AG"}
+        cash = {"ticker": "Tagesgeld", "quantity": 100.0, "price_eur": 1.0, "asset_class": "Bargeld"}
+        snaps = [
+            _snap("2026-01-01", holdings=[aktie, cash]),
+            _snap("2026-02-01", holdings=[{**aktie, "quantity": 2.0}, {**cash, "quantity": 500.0}]),
+        ]
+        zeilen = value_decomposition_by_ticker(snaps, classes={"Aktie"})
+        assert [(z["ticker"], z["name"], z["asset_class"]) for z in zeilen] == [("A", "Alpha AG", "Aktie")]
+
+    def test_fewer_than_two_holdings_snapshots(self):
+        assert value_decomposition_by_ticker([_snap("2026-01-01", holdings=[_hp("A", 1.0, 10.0)])]) == []

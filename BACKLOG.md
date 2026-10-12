@@ -97,6 +97,5 @@ Rechnung, Gramm-Positionen, Datenluecken, Tranchen, Verkaeufe; siehe CHANGELOG).
 Eindruck danach: noch nicht ganz korrekt. Er sieht sich die Anlagearten seiner Positionen an,
 vor allem, wie Tagesgeld (Fonds mit Ticker oder Bargeld) eingeordnet ist.
 
-Moeglicher naechster Schritt, falls es hilft: ein Klapper "Woher kommt der Anteilszuwachs?"
-mit dem Beitrag je Titel und seiner Anlageklasse, sortiert nach Groesse -- so zeigt die Seite
-selbst, welche Position die Kurve treibt. Liegt, bis Erik die Anlagearten durchgesehen hat.
+Seit 12.10.2026 zeigt der Klapper "Woher kommt der Anteilszuwachs?" den Beitrag je Titel mit
+Anlageklasse und groesstem Sprung. Liegt, bis Erik dort nachgesehen hat, welche Zeile nicht passt.

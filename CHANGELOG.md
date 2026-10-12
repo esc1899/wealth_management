@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Wertzuwachs „Kurs vs. Anteile“ je Titel — 2026-10-12
+
+**Warum:** Nach der Korrektur vom 10.10. wirkte die Kurve noch nicht ganz richtig. Statt in den
+Daten zu suchen, zeigt die Seite jetzt selbst, welche Position den Anteilszuwachs treibt — ein
+Rechenfehler zeigt sich meist als einzelner unplausibler Sprung.
+
+**Änderungen:**
+- Klapper „Woher kommt der Anteilszuwachs?“ unter der Kurve: je Titel Anlageklasse,
+  Anteilszuwachs, Kurs und der größte Sprung (Datum, Stück vorher → nachher, „neu“/„verkauft“),
+  sortiert nach Betrag; vorweg ein Satz, wer am meisten beiträgt.
+- `value_decomposition_by_ticker` liest aus derselben Schleife wie `value_decomposition_series`
+  (`_zerlegungsschritte`); die Spalten ergeben zusammen genau den letzten Punkt der Kurve.
+
 ### Einstieg: der Tag oben auf dem Depot, Analyse-Kopf kompakt — 2026-10-12
 
 **Warum:** Erik mag die Depot-Startseite, ging taeglich aber zuerst auf Analyse, um den Tag zu
