@@ -321,19 +321,31 @@ else:
         st.markdown(t(
             "dividend_calendar.decomp_lead_buy" if _saldo >= 0 else "dividend_calendar.decomp_lead_sell"
         ).format(seit=_seit, kurs=_euro(_kurs), betrag=f"{abs(_saldo):,.0f} €".replace(",", ".")))
+        _kurs_anfang = _decomp[-1]["cum_price_effect_anfang"]
+        st.markdown(t("dividend_calendar.decomp_lead_split").format(
+            seit=_seit, anfang=_euro(_kurs_anfang), zukauf=_euro(_kurs - _kurs_anfang)))
         st.caption(t("dividend_calendar.decomp_help"))
+        _dec_dates = [p["date"] for p in _decomp]
         _fig_dec = go.Figure()
-        _fig_dec.add_trace(go.Scatter(
-            x=[p["date"] for p in _decomp], y=[p["cum_price_effect"] for p in _decomp],
-            mode="lines", name=t("dividend_calendar.decomp_price"),
-            hovertemplate="<b>%{x}</b><br>%{y:+,.0f} €<extra></extra>",
-        ))
+        for _name, _werte, _linie in [
+            (t("dividend_calendar.decomp_price"),
+             [p["cum_price_effect"] for p in _decomp], dict(width=3)),
+            (t("dividend_calendar.decomp_price_anfang"),
+             [p["cum_price_effect_anfang"] for p in _decomp], dict(width=1.5, dash="dot")),
+            (t("dividend_calendar.decomp_price_zukauf"),
+             [p["cum_price_effect"] - p["cum_price_effect_anfang"] for p in _decomp],
+             dict(width=1.5, dash="dash")),
+        ]:
+            _fig_dec.add_trace(go.Scatter(
+                x=_dec_dates, y=_werte, mode="lines", name=_name, line=_linie,
+                hovertemplate="%{y:+,.0f} €",
+            ))
         _fig_dec.update_layout(
             hovermode="x unified", height=320, margin=dict(l=50, r=50, t=20, b=50),
             xaxis_title=t("wealth_history.date_label"),
             yaxis_title=t("dividend_calendar.decomp_yaxis"),
             xaxis_tickformat="%d.%m.%Y",
-            template="plotly_white", showlegend=False,
+            template="plotly_white",
         )
         _fig_dec.add_hline(y=0, line_width=1, line_color="gray")
         st.plotly_chart(_fig_dec)
@@ -399,12 +411,17 @@ else:
                         t("dividend_calendar.decomp_col_class"): z["asset_class"],
                         t("dividend_calendar.decomp_quantity"): round(z["quantity_effect"]),
                         t("dividend_calendar.decomp_price"): round(z["price_effect"]),
+                        t("dividend_calendar.decomp_price_anfang"): round(z["price_effect_anfang"]),
+                        t("dividend_calendar.decomp_price_zukauf"):
+                            round(z["price_effect"] - z["price_effect_anfang"]),
                         t("dividend_calendar.decomp_col_jump"): _sprung(z),
                     } for z in _decomp_rows],
                     width="stretch", hide_index=True,
                     column_config={
                         t("dividend_calendar.decomp_quantity"): st.column_config.NumberColumn(format="%+d €"),
                         t("dividend_calendar.decomp_price"): st.column_config.NumberColumn(format="%+d €"),
+                        t("dividend_calendar.decomp_price_anfang"): st.column_config.NumberColumn(format="%+d €"),
+                        t("dividend_calendar.decomp_price_zukauf"): st.column_config.NumberColumn(format="%+d €"),
                     },
                 )
 

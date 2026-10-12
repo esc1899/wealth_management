@@ -251,7 +251,8 @@ class TestValueDecomposition:
             _snap("2026-02-01", holdings=[_hp("A", 1.0, 11.0)]),
         ]
         out = value_decomposition_series(snaps)
-        assert out[0] == {"date": "2026-01-01", "cum_price_effect": 0.0, "cum_quantity_effect": 0.0}
+        assert out[0] == {"date": "2026-01-01", "cum_price_effect": 0.0,
+                          "cum_price_effect_anfang": 0.0, "cum_quantity_effect": 0.0}
 
     def test_new_position_counts_as_accumulation(self):
         snaps = [
@@ -436,3 +437,53 @@ class TestFlowsByPeriod:
 
     def test_fewer_than_two_holdings_snapshots(self):
         assert flows_by_period([]) == []
+
+
+class TestKursbeitragAnfangsbestand:
+    """Wie viel vom Kursgewinn verdient der Anfangsbestand, wie viel das seither Zugekaufte (FIFO)."""
+
+    def test_bought_shares_earn_from_purchase_on(self):
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("A", 10.0, 100.0)]),
+            _snap("2026-02-01", holdings=[_hp("A", 12.0, 110.0)]),   # +2 zum neuen Kurs
+            _snap("2026-03-01", holdings=[_hp("A", 12.0, 120.0)]),
+        ]
+        last = value_decomposition_series(snaps)[-1]
+        assert last["cum_price_effect"] == pytest.approx(10 * 10 + 12 * 10)
+        assert last["cum_price_effect_anfang"] == pytest.approx(10 * 10 + 10 * 10)   # Zukauf: 20
+
+    def test_fifo_sale_consumes_start_first(self):
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("A", 10.0, 100.0)]),
+            _snap("2026-02-01", holdings=[_hp("A", 15.0, 100.0)]),
+            _snap("2026-03-01", holdings=[_hp("A", 8.0, 100.0)]),    # 7 verkauft: 3 vom Anfang uebrig
+            _snap("2026-04-01", holdings=[_hp("A", 8.0, 110.0)]),
+        ]
+        last = value_decomposition_series(snaps)[-1]
+        assert last["cum_price_effect"] == pytest.approx(80.0)
+        assert last["cum_price_effect_anfang"] == pytest.approx(30.0)
+
+    def test_new_and_rebought_tickers_have_no_start(self):
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("A", 1.0, 10.0)]),
+            _snap("2026-02-01", holdings=[_hp("B", 1.0, 10.0)]),                    # A weg, B neu
+            _snap("2026-03-01", holdings=[_hp("A", 1.0, 10.0), _hp("B", 1.0, 12.0)]),  # A zurueck
+            _snap("2026-04-01", holdings=[_hp("A", 1.0, 15.0), _hp("B", 1.0, 12.0)]),
+        ]
+        last = value_decomposition_series(snaps)[-1]
+        assert last["cum_price_effect"] == pytest.approx(2.0 + 5.0)
+        assert last["cum_price_effect_anfang"] == pytest.approx(0.0)
+
+    def test_data_gap_keeps_start(self):
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("A", 10.0, 100.0)]),
+            _snap("2026-02-01", holdings=[_hp("A", 10.0, None)]),
+            _snap("2026-03-01", holdings=[_hp("A", 10.0, 110.0)]),
+        ]
+        assert value_decomposition_series(snaps)[-1]["cum_price_effect_anfang"] == pytest.approx(100.0)
+
+    def test_by_ticker_sums_equal_series(self):
+        snaps = TestValueDecompositionByTicker()._gemischt()
+        zeilen = value_decomposition_by_ticker(snaps)
+        last = value_decomposition_series(snaps)[-1]
+        assert sum(z["price_effect_anfang"] for z in zeilen) == pytest.approx(last["cum_price_effect_anfang"])

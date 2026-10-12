@@ -18,6 +18,9 @@ machten in der kumulierten Kurve Sprünge.
 **Änderungen:**
 - „Wertzuwachs aus dem Kurs“: nur noch der aufsummierte Kursbeitrag als Linie mit Nulllinie,
   vorweg ein Satz mit Kursbeitrag und dem Netto-Zukauf bzw. -Verkauf.
+- Der Kursbeitrag geteilt nach Anfangsbestand und seither zugekauften Anteilen (eigene Linien,
+  ein Satz, zwei Spalten im Klapper): Zugekaufte Anteile verdienen ab dem Kauf mit. Verkäufe
+  zehren nach FIFO zuerst den Anfangsbestand auf, wie beim Finanzamt.
 - „Zu- und Abgänge“: Balken je Monat oder Jahr (umschaltbar), Zukäufe nach oben, Verkäufe nach
   unten, Saldo als Punkt (`flows_by_period`). Ein Zeitraum ohne Snapshot fehlt statt 0 zu zeigen.
 - Klapper „Woher kommt der Anteilszuwachs?“: je Titel Anlageklasse, Anteilszuwachs, Kurs und der

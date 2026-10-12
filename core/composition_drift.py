@@ -125,9 +125,14 @@ def portfolio_income_series(snapshots) -> List[dict]:
 def _zerlegungsschritte(snapshots, classes=None):
     """Die Zerlegung Schritt fuer Schritt: je Folge-Snapshot und Titel ein Beitrag.
 
-    Liefert (erstes_datum, [(date, [(ticker, price_effect, quantity_effect, q0, q1), ...]), ...],
-    {ticker: (name, asset_class)}) -- je Folge-Snapshot seine Schritte -- oder None bei weniger
-    als zwei Snapshots mit Holdings. Die Rechnung erklaert ``value_decomposition_series``; beide
+    Liefert (erstes_datum, [(date, [(ticker, price_effect, quantity_effect, q0, q1,
+    price_effect_anfang), ...]), ...], {ticker: (name, asset_class)}) -- je Folge-Snapshot seine
+    Schritte -- oder None bei weniger als zwei Snapshots mit Holdings.
+
+    ``price_effect_anfang`` ist der Teil des Kursbeitrags, der auf den Anfangsbestand entfaellt
+    (die Stueckzahl im ersten Snapshot); den Rest verdienen die seither zugekauften Anteile.
+    Verkaeufe zehren nach FIFO zuerst den Anfangsbestand auf -- wie das Finanzamt rechnet. Ein
+    Titel, der spaeter neu dazukommt oder nach einem Komplettverkauf wiederkehrt, hat keinen. Die Rechnung erklaert ``value_decomposition_series``; beide
     Sichten lesen aus dieser einen Schleife, damit die Summe je Titel genau die Kurve ergibt.
     """
     holding_snaps = [s for s in snapshots if getattr(s, "holdings", None)]
@@ -163,6 +168,7 @@ def _zerlegungsschritte(snapshots, classes=None):
 
     je_snapshot: List[tuple] = []
     ref, _ = _by_ticker(holding_snaps[0])   # letzte vollstaendige Werte je Titel
+    anfang = {ticker: q for ticker, (q, _v) in ref.items()}   # verbleibender Anfangsbestand
     for snap in holding_snaps[1:]:
         cur, da = _by_ticker(snap)
         schritte: List[tuple] = []
@@ -170,14 +176,18 @@ def _zerlegungsschritte(snapshots, classes=None):
             p1 = v1 / q1
             alt = ref.get(ticker)
             if alt is None:                         # neue Position: voller Wert ist Zukauf
-                schritte.append((ticker, 0.0, v1, 0.0, q1))
+                schritte.append((ticker, 0.0, v1, 0.0, q1, 0.0))
                 continue
             q0, v0 = alt
             p0 = v0 / q0
-            schritte.append((ticker, q0 * (p1 - p0), (q1 - q0) * p1, q0, q1))
+            b = anfang.get(ticker, 0.0)
+            schritte.append((ticker, q0 * (p1 - p0), (q1 - q0) * p1, q0, q1, b * (p1 - p0)))
+            if q1 < q0:                             # FIFO: Verkauf zehrt erst den Anfang auf
+                anfang[ticker] = max(0.0, b - (q0 - q1))
         for ticker in [t for t in ref if t not in da]:
             q0, v0 = ref.pop(ticker)                # verkauft: zum letzten Wert abgehen
-            schritte.append((ticker, 0.0, -v0, q0, 0.0))
+            anfang.pop(ticker, None)
+            schritte.append((ticker, 0.0, -v0, q0, 0.0, 0.0))
         ref.update(cur)                             # Datenluecken behalten ihre alte Referenz
         je_snapshot.append((snap.date, schritte))
     return holding_snaps[0].date, je_snapshot, titel
@@ -201,8 +211,10 @@ def value_decomposition_series(snapshots, classes=None) -> List[dict]:
     - ``classes``: only holdings of these asset classes (market-priced ones). Cash or fixed
       deposits carry a quantity too, but a deposit is no share accumulation. None = all.
 
-    Returns [{date, cum_price_effect, cum_quantity_effect}] cumulated forward, starting at 0.0
-    on the first holdings-bearing date. Returns [] with fewer than two such snapshots.
+    Returns [{date, cum_price_effect, cum_price_effect_anfang, cum_quantity_effect}] cumulated
+    forward, starting at 0.0 on the first holdings-bearing date. cum_price_effect_anfang is the
+    part earned by the shares held at the start (FIFO, see ``_zerlegungsschritte``); the rest
+    of cum_price_effect was earned by shares added since. [] with fewer than two such snapshots.
 
     Honest limit: quantity_effect captures EVERY share increase (purchases incl. reinvested
     dividends) — the snapshots cannot separate reinvested dividends from fresh capital.
@@ -213,19 +225,23 @@ def value_decomposition_series(snapshots, classes=None) -> List[dict]:
     erstes_datum, je_snapshot, _ = zerlegt
 
     cum_price = 0.0
+    cum_price_anfang = 0.0
     cum_qty = 0.0
     series: List[dict] = [{
         "date": erstes_datum,
         "cum_price_effect": 0.0,
+        "cum_price_effect_anfang": 0.0,
         "cum_quantity_effect": 0.0,
     }]
     for date, schritte in je_snapshot:
-        for _ticker, kurs, anteile, _q0, _q1 in schritte:
+        for _ticker, kurs, anteile, _q0, _q1, kurs_anfang in schritte:
             cum_price += kurs
+            cum_price_anfang += kurs_anfang
             cum_qty += anteile
         series.append({
             "date": date,
             "cum_price_effect": cum_price,
+            "cum_price_effect_anfang": cum_price_anfang,
             "cum_quantity_effect": cum_qty,
         })
     return series
@@ -234,7 +250,8 @@ def value_decomposition_series(snapshots, classes=None) -> List[dict]:
 def value_decomposition_by_ticker(snapshots, classes=None) -> List[dict]:
     """Dieselbe Zerlegung je Titel -- woher der Anteilszuwachs der Kurve kommt.
 
-    Je Titel: {ticker, name, asset_class, price_effect, quantity_effect, groesster_schritt},
+    Je Titel: {ticker, name, asset_class, price_effect, price_effect_anfang, quantity_effect,
+    groesster_schritt} (price_effect_anfang: Kursbeitrag des Anfangsbestands, FIFO),
     wobei ``groesster_schritt`` der eine Snapshot-Schritt mit dem betragsmaessig groessten
     Anteilszuwachs ist ({date, q0, q1, quantity_effect}; q0 = 0 heisst neu, q1 = 0 verkauft).
     Ein Rechenfehler zeigt sich meist als ein solcher Sprung, nicht als Drift. Sortiert nach
@@ -248,13 +265,15 @@ def value_decomposition_by_ticker(snapshots, classes=None) -> List[dict]:
 
     je_titel: Dict[str, dict] = {}
     for date, schritte in je_snapshot:
-        for ticker, kurs, anteile, q0, q1 in schritte:
+        for ticker, kurs, anteile, q0, q1, kurs_anfang in schritte:
             name, klasse = titel.get(ticker, (ticker, ""))
             zeile = je_titel.setdefault(ticker, {
                 "ticker": ticker, "name": name, "asset_class": klasse,
-                "price_effect": 0.0, "quantity_effect": 0.0, "groesster_schritt": None,
+                "price_effect": 0.0, "price_effect_anfang": 0.0, "quantity_effect": 0.0,
+                "groesster_schritt": None,
             })
             zeile["price_effect"] += kurs
+            zeile["price_effect_anfang"] += kurs_anfang
             zeile["quantity_effect"] += anteile
             bisher = zeile["groesster_schritt"]
             if anteile and (bisher is None or abs(anteile) > abs(bisher["quantity_effect"])):
@@ -288,7 +307,7 @@ def flows_by_period(snapshots, classes=None, period: str = "month") -> List[dict
         schluessel = str(date)[:laenge]
         zeile = je_zeitraum.setdefault(
             schluessel, {"period": schluessel, "zukaeufe": 0.0, "verkaeufe": 0.0, "saldo": 0.0})
-        for _ticker, _kurs, anteile, _q0, _q1 in schritte:
+        for _ticker, _kurs, anteile, _q0, _q1, _kurs_anfang in schritte:
             zeile["zukaeufe" if anteile > 0 else "verkaeufe"] += anteile
             zeile["saldo"] += anteile
     return [je_zeitraum[k] for k in sorted(je_zeitraum)]

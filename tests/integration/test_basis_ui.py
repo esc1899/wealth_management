@@ -105,21 +105,25 @@ def test_dividenden_klapper_anteilszuwachs_je_titel(monkeypatch):
     monkeypatch.setattr(cd, "portfolio_income_series", lambda s: [
         {"date": "2026-01-01", "total_annual_dividend_eur": 1.0}])
     monkeypatch.setattr(cd, "value_decomposition_series", lambda s, classes=None: [
-        {"date": "2026-01-01", "cum_price_effect": 0.0, "cum_quantity_effect": 0.0},
-        {"date": "2026-02-01", "cum_price_effect": 10.0, "cum_quantity_effect": 50.0}])
+        {"date": "2026-01-01", "cum_price_effect": 0.0, "cum_price_effect_anfang": 0.0,
+         "cum_quantity_effect": 0.0},
+        {"date": "2026-02-01", "cum_price_effect": 10.0, "cum_price_effect_anfang": 7.0,
+         "cum_quantity_effect": 50.0}])
     monkeypatch.setattr(cd, "flows_by_period", lambda s, classes=None, period="month": [
         {"period": "2026-02", "zukaeufe": 80.0, "verkaeufe": -30.0, "saldo": 50.0}])
     monkeypatch.setattr(cd, "value_decomposition_by_ticker", lambda s, classes=None: [
         {"ticker": "XEON", "name": "Geldmarkt", "asset_class": "ETF", "price_effect": 1.0,
-         "quantity_effect": 60.0, "groesster_schritt": {"date": "2026-02-01", "q0": 0.0,
+         "price_effect_anfang": 0.0, "quantity_effect": 60.0, "groesster_schritt": {"date": "2026-02-01", "q0": 0.0,
                                                           "q1": 2.0, "quantity_effect": 60.0}},
         {"ticker": "A", "name": "Alpha", "asset_class": "Aktie", "price_effect": 9.0,
-         "quantity_effect": -10.0, "groesster_schritt": None},
+         "price_effect_anfang": 9.0, "quantity_effect": -10.0, "groesster_schritt": None},
     ])
     at = AppTest.from_file(PAGES / "dividend_calendar.py", default_timeout=30)
     at.run()
     assert not at.exception, at.exception
     assert any("netto für 50 € zugekauft" in m.value for m in at.markdown)
+    assert any("verdiente der Bestand vom 01.01.2026 +7 €" in m.value and "+3 €" in m.value
+               for m in at.markdown)
     assert at.get("plotly_chart"), "Kurslinie und Balken fehlen"
     klapper = next(e for e in at.expander if e.label == "Woher kommt der Anteilszuwachs?")
     assert "Geldmarkt (ETF)" in klapper.markdown[0].value
