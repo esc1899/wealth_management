@@ -74,10 +74,11 @@ Offen:
   seit 11.10.2026 aus dem Menue): je Einzelcheck einen Skill waehlen und im Storychecker und
   Fundamental Analyzer nachfragen (Chat). Die Titelseite prueft mit dem Skill aus dem
   Scheduler und kennt keine Nachfrage. Faellt es Erik nicht auf, entfaellt beides mit dem
-  Loeschen; sonst gehoert es zum Durchgang (unten, "Checks je Liste").
+  Loeschen; sonst gehoert es zur Auswahl je Liste (Einstellungen, `core/pruefung.py`).
 - **Ausgeblendetes loeschen**, wenn es zwei Wochen keiner vermisst hat (das "gut genug" aus
-  dem Lotsee-Plan). Dashboard: vorher klaeren, ob sein Kopf (Tagesbild, Allokation) auf die
-  Depot-Kacheln wandert.
+  dem Lotsee-Plan). Darunter Portfolio Checker und Watchlist Checker: Ihre Jobs je Check sind
+  seit 12.10.2026 geloescht, "Depot pruefen" und "Watchlist pruefen" tragen. Dashboard: vorher
+  klaeren, ob sein Kopf (Tagesbild, Allokation) auf die Depot-Kacheln wandert.
 
 Offen fuer Erik: ob Marktdaten unter Einstellungen gehoert (heute auch zum Nachsehen einzelner Kurse
 genutzt?).
@@ -88,16 +89,6 @@ Seit 11.10.2026 zeigt `core/ui/ki.py::ki_knopf` mit der Farbe des Sterns, ob ein
 oder in der Cloud rechnet; umgestellt sind erst Portfolio-Story und These auf der Seite
 Positionen, dazu die Startknoepfe der Suche. Die Knoepfe auf der Titelseite folgen, wenn die Seite
 das naechste Mal ohnehin dran ist -- vorher lohnt es nicht, weil manche Seite entfaellt.
-
-## Checks je Liste: eine Auswahl, ein Durchgang (10.10.2026)
-
-Seit 11.10.2026 stehen Schritt 1 und 2: je Liste eine Auswahl mit Skill je Check
-(Einstellungen, `core/pruefung.py`), "Jetzt checken" je Titel, die Jobs "Depot pruefen" und
-"Watchlist pruefen" (aus) statt der Jobs je Check, der Portfolio Checker am Ende des
-Depot-Jobs; seit demselben Tag verfallen Volltexte (`core/storage/volltexte.py`). Offen:
-
-**Nach dem ersten Lauf (Erik):** die abgeschalteten Jobs je Check loeschen, wenn "Depot
-pruefen" traegt; dann auch die Seiten Portfolio Checker und Watchlist Checker (ausgeblendet).
 
 ## Wertzuwachs "Kurs vs. Anteile" mit echten Daten pruefen (10.10.2026)
 
