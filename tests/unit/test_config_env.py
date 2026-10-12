@@ -49,3 +49,23 @@ class TestBaseUrlFallback:
     def test_empty_when_neither_set(self, reloaded_config):
         cfg = reloaded_config({})
         assert cfg.LLM_BASE_URL == ""
+
+
+class TestDbPfad:
+    """Der Sondername fuer eine Datenbank im Arbeitsspeicher ist kein relativer Pfad.
+
+    Bis 12.10.2026 machte `_resolve_db_path` daraus `<Projekt>/:memory:` -- eine echte
+    Datei im Repo, in die die ganze Suite schrieb und deren Stand von Lauf zu Lauf liegen blieb.
+    """
+
+    def test_speicher_bleibt_speicher(self, monkeypatch):
+        from config import _resolve_db_path
+
+        monkeypatch.setenv("WM_TEST_PFAD", ":memory:")
+        assert _resolve_db_path("WM_TEST_PFAD", "irgendwo/x.db") == ":memory:"
+
+    def test_relativer_pfad_wird_absolut(self, monkeypatch):
+        from config import _PROJECT_ROOT, _resolve_db_path
+
+        monkeypatch.setenv("WM_TEST_PFAD", "irgendwo/x.db")
+        assert _resolve_db_path("WM_TEST_PFAD", "anderswo/y.db") == str(_PROJECT_ROOT / "irgendwo/x.db")

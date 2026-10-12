@@ -9,8 +9,14 @@ _PROJECT_ROOT = Path(__file__).parent
 
 
 def _resolve_db_path(env_var: str, default: str) -> str:
-    """Convert relative DB paths to absolute (relative to project root)."""
+    """Convert relative DB paths to absolute (relative to project root).
+
+    ``:memory:`` is SQLite's name for a database in RAM, not a path -- made absolute it
+    became a real file in the repo that the whole test suite shared (until 2026-10-12).
+    """
     path_str = os.getenv(env_var, default)
+    if path_str == ":memory:":
+        return path_str
     path = Path(path_str)
     if not path.is_absolute():
         path = _PROJECT_ROOT / path

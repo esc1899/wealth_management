@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Tests: `:memory:` ist wieder Arbeitsspeicher — 2026-10-12
+
+**Warum:** `config._resolve_db_path` machte den Sondernamen der Suite zu `<Projekt>/:memory:`,
+einer echten Datei im Repo (in `.gitignore`, im April kurz versioniert -- nur Testdaten). Alle
+Tests ueber die gemeinsamen Getter schrieben hinein, und ihr Stand blieb von Lauf zu Lauf liegen.
+
+**Änderungen:** `:memory:` bleibt unveraendert; die Datei ist geloescht, die Suite laeuft ohne
+sie und legt keine neue an.
+
 ### Abrundung 3: Statistiken auf Monate und Agenten gekuerzt — 2026-10-12
 
 **Warum:** Jeder Aufruf steht ohnehin im Run-Log, und der Maschinenraum summiert den laufenden
