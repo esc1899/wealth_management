@@ -8,18 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
-### Wertzuwachs „Kurs vs. Anteile“ je Titel — 2026-10-12
+### Wertzuwachs: Kurs als Verlauf, Zu- und Abgänge je Monat/Jahr — 2026-10-12
 
-**Warum:** Nach der Korrektur vom 10.10. wirkte die Kurve noch nicht ganz richtig. Statt in den
-Daten zu suchen, zeigt die Seite jetzt selbst, welche Position den Anteilszuwachs treibt — ein
-Rechenfehler zeigt sich meist als einzelner unplausibler Sprung.
+**Warum:** Nach der Korrektur vom 10.10. wirkte die Kurve noch falsch. Sie war es nicht: Der
+Anteilszuwachs war negativ (netto verkauft), und gestapelt las sich das wie ein Zuwachs. Dazu
+passt die Form nicht -- der Kurs ist ein Verlauf, Zukäufe und Verkäufe sind Ereignisse und
+machten in der kumulierten Kurve Sprünge.
 
 **Änderungen:**
-- Klapper „Woher kommt der Anteilszuwachs?“ unter der Kurve: je Titel Anlageklasse,
-  Anteilszuwachs, Kurs und der größte Sprung (Datum, Stück vorher → nachher, „neu“/„verkauft“),
-  sortiert nach Betrag; vorweg ein Satz, wer am meisten beiträgt.
-- `value_decomposition_by_ticker` liest aus derselben Schleife wie `value_decomposition_series`
-  (`_zerlegungsschritte`); die Spalten ergeben zusammen genau den letzten Punkt der Kurve.
+- „Wertzuwachs aus dem Kurs“: nur noch der aufsummierte Kursbeitrag als Linie mit Nulllinie,
+  vorweg ein Satz mit Kursbeitrag und dem Netto-Zukauf bzw. -Verkauf.
+- „Zu- und Abgänge“: Balken je Monat oder Jahr (umschaltbar), Zukäufe nach oben, Verkäufe nach
+  unten, Saldo als Punkt (`flows_by_period`). Ein Zeitraum ohne Snapshot fehlt statt 0 zu zeigen.
+- Klapper „Woher kommt der Anteilszuwachs?“: je Titel Anlageklasse, Anteilszuwachs, Kurs und der
+  größte Sprung (Datum, Stück vorher → nachher), sortiert nach Betrag.
+- Alle drei Sichten lesen aus derselben Schleife (`_zerlegungsschritte`); die Summen stimmen
+  mit `value_decomposition_series` überein.
 
 ### Einstieg: der Tag oben auf dem Depot, Analyse-Kopf kompakt — 2026-10-12
 

@@ -90,12 +90,3 @@ oder in der Cloud rechnet; umgestellt sind erst Portfolio-Story und These auf de
 Positionen, dazu die Startknoepfe der Suche. Die Knoepfe auf der Titelseite folgen, wenn die Seite
 das naechste Mal ohnehin dran ist -- vorher lohnt es nicht, weil manche Seite entfaellt.
 
-## Wertzuwachs "Kurs vs. Anteile" mit echten Daten pruefen (10.10.2026)
-
-Die Zerlegung auf der Dividenden-Seite ist am 10.10.2026 korrigiert (Bargeld/Festgeld ausser
-Rechnung, Gramm-Positionen, Datenluecken, Tranchen, Verkaeufe; siehe CHANGELOG). Eriks
-Eindruck danach: noch nicht ganz korrekt. Er sieht sich die Anlagearten seiner Positionen an,
-vor allem, wie Tagesgeld (Fonds mit Ticker oder Bargeld) eingeordnet ist.
-
-Seit 12.10.2026 zeigt der Klapper "Woher kommt der Anteilszuwachs?" den Beitrag je Titel mit
-Anlageklasse und groesstem Sprung. Liegt, bis Erik dort nachgesehen hat, welche Zeile nicht passt.

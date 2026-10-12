@@ -96,7 +96,7 @@ def test_ki_knoepfe_sagen_wo_das_modell_rechnet(ollama):
 
 
 def test_dividenden_klapper_anteilszuwachs_je_titel(monkeypatch):
-    """Der Klapper unter "Kurs vs. Anteile" wird gezeichnet: Satz vorweg, Tabelle dahinter."""
+    """Kurs als Verlauf, Zu- und Abgaenge je Zeitraum, darunter der Klapper je Titel."""
     import core.composition_drift as cd
     import core.dividend_calendar as dk
     beitrag = dk.DividendContribution("A", "Alpha", "Aktie", 12.0, 1.0)
@@ -107,6 +107,8 @@ def test_dividenden_klapper_anteilszuwachs_je_titel(monkeypatch):
     monkeypatch.setattr(cd, "value_decomposition_series", lambda s, classes=None: [
         {"date": "2026-01-01", "cum_price_effect": 0.0, "cum_quantity_effect": 0.0},
         {"date": "2026-02-01", "cum_price_effect": 10.0, "cum_quantity_effect": 50.0}])
+    monkeypatch.setattr(cd, "flows_by_period", lambda s, classes=None, period="month": [
+        {"period": "2026-02", "zukaeufe": 80.0, "verkaeufe": -30.0, "saldo": 50.0}])
     monkeypatch.setattr(cd, "value_decomposition_by_ticker", lambda s, classes=None: [
         {"ticker": "XEON", "name": "Geldmarkt", "asset_class": "ETF", "price_effect": 1.0,
          "quantity_effect": 60.0, "groesster_schritt": {"date": "2026-02-01", "q0": 0.0,
@@ -117,6 +119,8 @@ def test_dividenden_klapper_anteilszuwachs_je_titel(monkeypatch):
     at = AppTest.from_file(PAGES / "dividend_calendar.py", default_timeout=30)
     at.run()
     assert not at.exception, at.exception
+    assert any("netto für 50 € zugekauft" in m.value for m in at.markdown)
+    assert at.get("plotly_chart"), "Kurslinie und Balken fehlen"
     klapper = next(e for e in at.expander if e.label == "Woher kommt der Anteilszuwachs?")
     assert "Geldmarkt (ETF)" in klapper.markdown[0].value
     tabelle = klapper.dataframe[0].value

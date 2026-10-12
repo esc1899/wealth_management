@@ -24,6 +24,7 @@ from core.composition_drift import (
     portfolio_income_series,
     value_decomposition_series,
     value_decomposition_by_ticker,
+    flows_by_period,
 )
 from core.asset_class_config import get_asset_class_registry
 from core.i18n import t
@@ -308,35 +309,71 @@ else:
         )
         st.plotly_chart(_fig_inc)
 
-    # --- Value decomposition: price vs. share accumulation ---
+    # --- Value decomposition: price as a path, flows as events per period ---
     if _decomp:
+        def _euro(x: float) -> str:
+            return f"{x:+,.0f} €".replace(",", ".")
+
         st.markdown(f"**{t('dividend_calendar.decomp_section')}**")
+        _kurs = _decomp[-1]["cum_price_effect"]
+        _saldo = _decomp[-1]["cum_quantity_effect"]
+        _seit = "{2}.{1}.{0}".format(*str(_decomp[0]["date"])[:10].split("-"))
+        st.markdown(t(
+            "dividend_calendar.decomp_lead_buy" if _saldo >= 0 else "dividend_calendar.decomp_lead_sell"
+        ).format(seit=_seit, kurs=_euro(_kurs), betrag=f"{abs(_saldo):,.0f} €".replace(",", ".")))
         st.caption(t("dividend_calendar.decomp_help"))
-        _dates = [p["date"] for p in _decomp]
         _fig_dec = go.Figure()
         _fig_dec.add_trace(go.Scatter(
-            x=_dates, y=[p["cum_price_effect"] for p in _decomp],
-            mode="lines", stackgroup="one", name=t("dividend_calendar.decomp_price"),
-            hovertemplate="<b>%{x}</b><br>%{y:,.0f} €<extra></extra>",
-        ))
-        _fig_dec.add_trace(go.Scatter(
-            x=_dates, y=[p["cum_quantity_effect"] for p in _decomp],
-            mode="lines", stackgroup="one", name=t("dividend_calendar.decomp_quantity"),
-            hovertemplate="<b>%{x}</b><br>%{y:,.0f} €<extra></extra>",
+            x=[p["date"] for p in _decomp], y=[p["cum_price_effect"] for p in _decomp],
+            mode="lines", name=t("dividend_calendar.decomp_price"),
+            hovertemplate="<b>%{x}</b><br>%{y:+,.0f} €<extra></extra>",
         ))
         _fig_dec.update_layout(
-            hovermode="x unified", height=360, margin=dict(l=50, r=50, t=20, b=50),
+            hovermode="x unified", height=320, margin=dict(l=50, r=50, t=20, b=50),
             xaxis_title=t("wealth_history.date_label"),
             yaxis_title=t("dividend_calendar.decomp_yaxis"),
             xaxis_tickformat="%d.%m.%Y",
-            template="plotly_white",
+            template="plotly_white", showlegend=False,
         )
+        _fig_dec.add_hline(y=0, line_width=1, line_color="gray")
         st.plotly_chart(_fig_dec)
 
-        if _decomp_rows:
-            def _euro(x: float) -> str:
-                return f"{x:+,.0f} €".replace(",", ".")
+        st.markdown(f"**{t('dividend_calendar.flows_section')}**")
+        st.caption(t("dividend_calendar.flows_help"))
+        _zeitraum = st.segmented_control(
+            t("dividend_calendar.flows_section"),
+            options=["month", "year"],
+            format_func=lambda z: t(f"dividend_calendar.flows_{z}"),
+            default="month",
+            key="_div_flows_period",
+            label_visibility="collapsed",
+        ) or "month"
+        _flows = flows_by_period(_snapshots, classes=_decomp_classes, period=_zeitraum)
+        _perioden = [f["period"] for f in _flows]
+        _fig_fl = go.Figure()
+        _fig_fl.add_trace(go.Bar(
+            x=_perioden, y=[f["zukaeufe"] for f in _flows], name=t("dividend_calendar.flows_buy"),
+            hovertemplate="<b>%{x}</b><br>%{y:+,.0f} €<extra></extra>",
+        ))
+        _fig_fl.add_trace(go.Bar(
+            x=_perioden, y=[f["verkaeufe"] for f in _flows], name=t("dividend_calendar.flows_sell"),
+            hovertemplate="<b>%{x}</b><br>%{y:+,.0f} €<extra></extra>",
+        ))
+        _fig_fl.add_trace(go.Scatter(
+            x=_perioden, y=[f["saldo"] for f in _flows], mode="markers",
+            name=t("dividend_calendar.flows_net"), marker=dict(size=10, color="black"),
+            hovertemplate="<b>%{x}</b><br>%{y:+,.0f} €<extra></extra>",
+        ))
+        _fig_fl.update_layout(
+            barmode="relative", hovermode="x unified", height=320,
+            margin=dict(l=50, r=50, t=20, b=50),
+            xaxis=dict(type="category"),
+            yaxis_title=t("dividend_calendar.decomp_yaxis_flows"),
+            template="plotly_white",
+        )
+        st.plotly_chart(_fig_fl)
 
+        if _decomp_rows:
             def _sprung(z: dict) -> str:
                 s_ = z["groesster_schritt"]
                 if s_ is None:

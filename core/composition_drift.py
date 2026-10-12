@@ -264,6 +264,36 @@ def value_decomposition_by_ticker(snapshots, classes=None) -> List[dict]:
     return sorted(je_titel.values(), key=lambda z: abs(z["quantity_effect"]), reverse=True)
 
 
+def flows_by_period(snapshots, classes=None, period: str = "month") -> List[dict]:
+    """Zu- und Abgaenge aus der Zerlegung, je Monat oder Jahr -- Ereignisse statt Verlauf.
+
+    Der Kursbeitrag ist ein Verlauf; Zukaeufe und Verkaeufe passieren an einem Tag und machten
+    in der kumulierten Kurve Spruenge. Hier wird jeder positive Anteilsschritt eines Titels als
+    Zukauf, jeder negative als Verkauf in den Zeitraum des Snapshots gebucht, der ihn sieht
+    (nach einer Datenluecke also womoeglich spaeter als geschehen).
+
+    ``period``: "month" (YYYY-MM) oder "year" (YYYY). Liefert [{period, zukaeufe, verkaeufe,
+    saldo}] aufsteigend, verkaeufe <= 0; nur Zeitraeume mit mindestens einem Folge-Snapshot --
+    ein Zeitraum ohne Snapshot fehlt, statt 0 zu behaupten. Die Summe aller Salden ist der
+    letzte cum_quantity_effect von ``value_decomposition_series``.
+    """
+    zerlegt = _zerlegungsschritte(snapshots, classes)
+    if zerlegt is None:
+        return []
+    _erstes_datum, je_snapshot, _ = zerlegt
+    laenge = 7 if period == "month" else 4
+
+    je_zeitraum: Dict[str, dict] = {}
+    for date, schritte in je_snapshot:
+        schluessel = str(date)[:laenge]
+        zeile = je_zeitraum.setdefault(
+            schluessel, {"period": schluessel, "zukaeufe": 0.0, "verkaeufe": 0.0, "saldo": 0.0})
+        for _ticker, _kurs, anteile, _q0, _q1 in schritte:
+            zeile["zukaeufe" if anteile > 0 else "verkaeufe"] += anteile
+            zeile["saldo"] += anteile
+    return [je_zeitraum[k] for k in sorted(je_zeitraum)]
+
+
 def sold_positions_summary(snapshots) -> List[dict]:
     """Positions that appear in past holdings but are no longer currently held.
 

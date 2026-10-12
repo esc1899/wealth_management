@@ -13,6 +13,7 @@ from core.composition_drift import (
     portfolio_income_series,
     value_decomposition_series,
     value_decomposition_by_ticker,
+    flows_by_period,
 )
 
 
@@ -399,3 +400,39 @@ class TestValueDecompositionByTicker:
 
     def test_fewer_than_two_holdings_snapshots(self):
         assert value_decomposition_by_ticker([_snap("2026-01-01", holdings=[_hp("A", 1.0, 10.0)])]) == []
+
+
+class TestFlowsByPeriod:
+    def _reihe(self):
+        return [
+            _snap("2026-01-05", holdings=[_hp("A", 10.0, 100.0), _hp("B", 5.0, 20.0)]),
+            _snap("2026-01-20", holdings=[_hp("A", 12.0, 100.0), _hp("B", 5.0, 20.0)]),  # +200
+            _snap("2026-02-10", holdings=[_hp("A", 12.0, 110.0)]),                       # B weg -100
+            _snap("2026-04-01", holdings=[_hp("A", 11.0, 110.0), _hp("C", 1.0, 50.0)]),  # -110 +50
+        ]
+
+    def test_month_buckets(self):
+        out = flows_by_period(self._reihe())
+        assert [z["period"] for z in out] == ["2026-01", "2026-02", "2026-04"]   # Maerz ungesehen
+        assert out[0] == {"period": "2026-01", "zukaeufe": 200.0, "verkaeufe": 0.0, "saldo": 200.0}
+        assert out[1]["verkaeufe"] == pytest.approx(-100.0)
+        assert out[2]["zukaeufe"] == pytest.approx(50.0)
+        assert out[2]["verkaeufe"] == pytest.approx(-110.0)
+
+    def test_year_and_sum_equal_series(self):
+        snaps = self._reihe()
+        (jahr,) = flows_by_period(snaps, period="year")
+        assert jahr["period"] == "2026"
+        assert jahr["saldo"] == pytest.approx(value_decomposition_series(snaps)[-1]["cum_quantity_effect"])
+        assert jahr["zukaeufe"] + jahr["verkaeufe"] == pytest.approx(jahr["saldo"])
+
+    def test_price_only_month_shows_zero(self):
+        snaps = [
+            _snap("2026-01-01", holdings=[_hp("A", 1.0, 10.0)]),
+            _snap("2026-02-01", holdings=[_hp("A", 1.0, 12.0)]),
+        ]
+        assert flows_by_period(snaps) == [
+            {"period": "2026-02", "zukaeufe": 0.0, "verkaeufe": 0.0, "saldo": 0.0}]
+
+    def test_fewer_than_two_holdings_snapshots(self):
+        assert flows_by_period([]) == []
