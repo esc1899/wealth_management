@@ -82,19 +82,12 @@ Offen:
 Offen fuer Erik: ob Marktdaten unter Einstellungen gehoert (heute auch zum Nachsehen einzelner Kurse
 genutzt?).
 
-## Abrundung: einzelne Seiten aufraeumen und vereinfachen (12.10.2026)
-
-Menue und Grundlagen des Umbaus tragen (Erik, 12.10.2026); auf einzelnen Seiten ist noch
-aufzuraeumen und zu vereinfachen. Die erste Runde ist am 12.10.2026 gebaut (CHANGELOG,
-"Abrundung 1-3"). Offen: Erik sieht die Seiten in der neuen Optik durch und nennt, was ihm
-weiter auffaellt; dazu gehoeren die uebrigen KI-Knoepfe (Abschnitt unten).
-
 ## Uebrige KI-Knoepfe auf den Stern umstellen (11.10.2026)
 
 Seit 11.10.2026 zeigt `core/ui/ki.py::ki_knopf` mit der Farbe des Sterns, ob ein Knopf lokal
 oder in der Cloud rechnet; umgestellt sind erst Portfolio-Story und These auf der Seite
 Positionen, dazu die Startknoepfe der Suche. Die Knoepfe auf der Titelseite folgen, wenn die Seite
-beim Aufraeumen ohnehin dran ist -- vorher lohnt es nicht, weil manche Seite entfaellt.
+das naechste Mal ohnehin dran ist -- vorher lohnt es nicht, weil manche Seite entfaellt.
 
 ## Checks je Liste: eine Auswahl, ein Durchgang (10.10.2026)
 
