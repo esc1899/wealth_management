@@ -1,9 +1,9 @@
 """Die Kachel-Ansicht: Depot und Watchlist als Raster, in der Gestalt der Serien-Watchlist.
 
-Oben ein Kopf in der Farbe der Anlageklasse mit dem Namen als Absprung in die Analyse,
-darunter Anlageart und Ticker; dieselbe Farbe läuft als Streifen an der linken Kante (Logos
-bräuchten einen Lizenzgeber; die Farbe steht je Klasse in ``config/asset_classes.yaml`` und
-ist überall in der App dieselbe). Darunter Chips für die Zahlen, der eine Satz als Notiz mit
+Oben ein Monogramm (Ticker) in der Farbe der Anlageklasse, daneben der Name als Absprung in
+die Analyse, darunter Anlageart und Ticker (Logos bräuchten einen Lizenzgeber; die Farbe steht
+je Klasse in ``config/asset_classes.yaml`` und ist überall in der App dieselbe). Darunter Chips
+für die Zahlen, der eine Satz mit seinem Licht davor (Lotsee-Optik, ``core/ui/optik.py``), mit
 fester Höhe (lange Sätze scrollen) und je Check ein Kästchen, das zu genau diesem Check springt. Was auf der Kachel steht und in welcher Reihenfolge, entscheidet ``core.kacheln``.
 
 Alles, was aus der Datenbank kommt (Namen, Sätze der Checker), geht durch ``html.escape``,
@@ -40,43 +40,59 @@ KACHELN = {"depot": str(_SEITEN / "kacheln_depot.py"), "watchlist": str(_SEITEN 
 _SPALTEN = 3
 _FARBE_SONST = "#5E6B7A"
 
-# Linienfarbe der Notiz je Grund (wie die Ampel der Startseite: rot, gelb, ohne).
+# Das Licht vor dem Satz je Grund (wie die Ampel der Startseite: rot, gelb, ohne, hohl).
 _NOTIZ = {"gefaehrdet": "rot", "bewegung": "gelb", "geprueft": "", "nie": "leer"}
 
 CSS = """
 <style>
-.wk-einl { color: #5B6372; margin: -0.4rem 0 0.2rem; max-width: 80ch; }
-.wk-zaehler { color: #5B6372; font-size: 0.85rem; margin-bottom: 0.8rem; }
-div[class*="st-key-wk-karte-"] { border: 1px solid #D6DAE3; border-left-width: 5px;
-  border-radius: 4px; background: #FFFFFF; padding: 0 12px 10px; gap: 0.45rem; overflow: hidden; }
-div[class*="st-key-wk-kopf-"] { margin: 0 -12px; padding: 8px 12px 9px; gap: 0; }
+.wk-einl { color: var(--lotsee-text-leise); margin: -0.4rem 0 0.2rem; max-width: 80ch; }
+.wk-zaehler { color: var(--lotsee-text-leise); font-size: 0.85rem; margin-bottom: 0.8rem; }
+div[class*="st-key-wk-karte-"] { background: var(--lotsee-flaeche); border-radius: var(--lotsee-rundung-karte);
+  box-shadow: 0 1px 2px rgba(11, 30, 45, 0.08), 0 0 0 1px var(--lotsee-linie);
+  padding: 14px 16px 12px; gap: 0.5rem; overflow: hidden; }
+/* Der Kopf: links das Monogramm in der Farbe der Anlageklasse (Kuerzel und Farbe je Kachel aus
+   farbe_css), daneben Name und Zeile darunter. */
+div[class*="st-key-wk-kopf-"] { position: relative; padding-left: 52px; min-height: 40px; gap: 0;
+  justify-content: center; }
+div[class*="st-key-wk-kopf-"]::before { position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  color: #FFFFFF; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.02em; }
 div[class*="st-key-wk-kopf-"] [data-testid="stPageLink-NavLink"] { padding: 0; }
 div[class*="st-key-wk-kopf-"] [data-testid="stPageLink-NavLink"] p { font-weight: 600;
-  font-size: 1rem; color: #FFFFFF; line-height: 1.3; }
+  font-size: 1rem; color: var(--lotsee-text); line-height: 1.3; }
 div[class*="st-key-wk-kopf-"] [data-testid="stPageLink-NavLink"]:hover p { text-decoration: underline; }
 /* Streamlit gibt jedem Markdown-Block -1rem Abstand nach unten; in der Kachel rechnete der Kopf
-   seine Hoehe darum eine Zeile zu knapp, und die letzte Zeile ragte ueber den Farbbalken. */
+   seine Hoehe darum eine Zeile zu knapp. */
 div[class*="st-key-wk-karte-"] [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }
 /* Lange Namen umbrechen statt mit "..." abschneiden; der Kopf waechst mit. */
 div[class*="st-key-wk-kopf-"] [data-testid="stPageLink-NavLink"] * { white-space: normal !important;
   overflow: visible !important; text-overflow: clip !important; }
-.wk-unter { color: rgba(255, 255, 255, 0.82); font-size: 0.72rem; letter-spacing: 0.04em; }
+.wk-unter { color: var(--lotsee-text-leise); font-size: 0.75rem; }
 .wk-unter b { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 600; }
 .wk-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 7px; }
-.wk-chip { font-size: 0.74rem; padding: 1px 7px; border-radius: 3px; background: #F2F4F8;
-  white-space: nowrap; font-variant-numeric: tabular-nums; }
-.wk-chip.plus { color: #1A7F4B; } .wk-chip.minus { color: #C0262D; }
-.wk-notiz { font-size: 0.86rem; line-height: 1.4; padding-left: 9px; border-left: 2px solid #D6DAE3;
+.wk-chip { font-size: 0.74rem; padding: 1px 7px; border-radius: var(--lotsee-rundung-chip);
+  background: var(--lotsee-flaeche-leise); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wk-chip.plus { color: var(--lotsee-zustand-plus); } .wk-chip.minus { color: var(--lotsee-zustand-minus); }
+/* Der Satz mit seinem Licht davor: rot gefaehrdet, Bernstein Bewegung, grau geprueft, hohl nie
+   geprueft (Blindzeit ist eine Aussage). */
+.wk-notiz { position: relative; font-size: 0.88rem; line-height: 1.4; padding-left: 20px;
   overflow-wrap: anywhere; max-height: calc(4 * 1.4em); overflow-y: auto; }
-.wk-notiz.rot { border-left-color: #C0262D; } .wk-notiz.gelb { border-left-color: #B26A00; }
-.wk-notiz.leer { color: #8A92A3; font-style: italic; }
-.wk-quelle { color: #8A92A3; font-size: 0.74rem; margin-top: 4px; }
-div[class*="st-key-wk-urteile-"] { gap: 4px !important; margin-top: 4px; }
-div[class*="st-key-wk-urteile-"] [data-testid="stPageLink-NavLink"] { border: 1px solid #D6DAE3;
-  border-radius: 3px; padding: 1px 7px; background: #FFFFFF; }
-div[class*="st-key-wk-urteile-"] [data-testid="stPageLink-NavLink"]:hover { border-color: #0018A8; }
+.wk-notiz::before { content: ""; position: absolute; left: 1px; top: 0.4em; width: 10px; height: 10px;
+  border-radius: 50%; background: var(--lotsee-zustand-ruhig); box-sizing: border-box; }
+.wk-notiz.rot::before { background: var(--lotsee-zustand-alarm);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--lotsee-zustand-alarm) 15%, transparent); }
+.wk-notiz.gelb::before { background: var(--lotsee-zustand-hinweis);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--lotsee-zustand-hinweis) 20%, transparent); }
+.wk-notiz.leer { color: var(--lotsee-text-leise); font-style: italic; }
+.wk-notiz.leer::before { background: transparent; border: 2px solid var(--lotsee-zustand-blind); }
+.wk-quelle { color: var(--lotsee-text-leise); font-size: 0.74rem; margin-top: 4px; padding-left: 20px; }
+div[class*="st-key-wk-urteile-"] { gap: 4px !important; margin-top: 4px; padding-top: 8px;
+  border-top: 1px solid var(--lotsee-linie-leise); }
+div[class*="st-key-wk-urteile-"] [data-testid="stPageLink-NavLink"] { border: 1px solid var(--lotsee-linie);
+  border-radius: var(--lotsee-rundung-cursor); padding: 1px 8px; background: var(--lotsee-flaeche); }
+div[class*="st-key-wk-urteile-"] [data-testid="stPageLink-NavLink"]:hover { border-color: var(--lotsee-leit-tief); }
 div[class*="st-key-wk-urteile-"] [data-testid="stPageLink-NavLink"] p { font-size: 0.74rem;
-  color: #3A4150; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  color: var(--lotsee-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
 """
 
@@ -124,14 +140,21 @@ def farbe(anlageklasse: str) -> str:
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 
 
+def monogramm(k: Kachel) -> str:
+    """Das Kuerzel im Kopf: der Ticker ohne Boersenendung, hoechstens vier Zeichen (Logos
+    braeuchten einen Lizenzgeber). Nur Buchstaben und Ziffern -- es landet in einem CSS-String."""
+    roh = (k.ticker or "").split(".")[0] or k.name
+    return re.sub(r"[^A-Z0-9]", "", roh.upper())[:4] or "?"
+
+
 def farbe_css(k: Kachel, hintergrund: str) -> str:
-    """Kopf und Streifen dieser einen Kachel in der Farbe ihrer Klasse. Die Farbe kommt aus der
+    """Das Monogramm dieser einen Kachel in der Farbe ihrer Klasse. Die Farbe kommt aus der
     YAML-Datei; was nicht wie #RRGGBB aussieht, kommt nicht ins CSS."""
     if not _HEX.fullmatch(hintergrund):
         hintergrund = _FARBE_SONST
     i = int(k.position_id)
-    return (f"<style>div.st-key-wk-kopf-{i} {{ background: {hintergrund}; }} "
-            f"div.st-key-wk-karte-{i} {{ border-left-color: {hintergrund}; }}</style>")
+    return (f'<style>div.st-key-wk-kopf-{i}::before {{ content: "{monogramm(k)}"; '
+            f"background: {hintergrund}; }}</style>")
 
 
 def unter_html(k: Kachel) -> str:
@@ -181,7 +204,7 @@ def inhalt_html(k: Kachel) -> str:
 
 
 def karte(k: Kachel, art: str, position=None) -> None:
-    """Eine Kachel: farbiger Kopf mit Name (Absprung), Anlageart und Ticker; darunter Inhalt,
+    """Eine Kachel: Kopf mit Monogramm, Name (Absprung), Anlageart und Ticker; darunter Inhalt,
     die Kästchen der gewählten Checks (auch der nie gelaufenen) und mit ``position`` der Knopf
     "Jetzt checken"."""
     st.markdown(farbe_css(k, farbe(k.anlageklasse)), unsafe_allow_html=True)

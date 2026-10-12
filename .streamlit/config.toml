@@ -13,24 +13,25 @@ headless = true
 # deploy/dienste/dienste.toml, zugang = "lokal": nur vom Rechner selbst).
 baseUrlPath = "wealth"
 
-# Das Erscheinungsbild einer Bank (seit 21.09.2026): ein Blau, Weiß, wenig
-# Rundung, sonst nichts. Die Seitenleiste trägt das Blau und das Zeichen
-# (assets/marke.svg, st.logo in app.py); die Fläche bleibt weiß.
+# Die Lotsee-Optik (seit 12.10.2026, Fassung C2 "Richtfeuer"): Nacht in der Seitenleiste,
+# ein kuehles Grau als Grund, Blau als Leitfarbe von Wealth. Die Werte stammen aus
+# assets/lotsee/tokens.json (Kopie aus dem Repo lotsee); tests/test_optik.py haelt sie gleich.
+# Cursor im Menue, Zeichen und Lichtschein: core/ui/optik.py.
 [theme]
 base = "light"
-primaryColor = "#0018A8"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F2F4F8"
-textColor = "#1F2328"
-linkColor = "#0018A8"
-borderColor = "#D6DAE3"
-baseRadius = "0.25rem"
+primaryColor = "#1F4FD1"
+backgroundColor = "#F3F6F8"
+secondaryBackgroundColor = "#E9EFF3"
+textColor = "#0B1E2D"
+linkColor = "#1F4FD1"
+borderColor = "#DCE6EC"
+baseRadius = "0.5rem"
 font = "sans-serif"
 headingFont = "sans-serif"
 
 [theme.sidebar]
-backgroundColor = "#0018A8"
-secondaryBackgroundColor = "#0B2BC0"
-textColor = "#FFFFFF"
-primaryColor = "#FFFFFF"
-borderColor = "#3A50C4"
+backgroundColor = "#0B1E2D"
+secondaryBackgroundColor = "#13293A"
+textColor = "#D3E0EA"
+primaryColor = "#5B8CFF"
+borderColor = "#1E3546"

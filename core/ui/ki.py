@@ -22,7 +22,8 @@ from core.i18n import t
 Wo = Literal["lokal", "cloud"]
 
 STERN = ":material/auto_awesome:"
-FARBE = {"lokal": "#1A7F4B", "cloud": "#0018A8"}
+# Die Farben sind Variablen der Lotsee-Optik (core/ui/optik.py); Cloud ist die Leitfarbe der App.
+FARBE = {"lokal": "var(--lotsee-ki-lokal)", "cloud": "var(--lotsee-ki-cloud)"}
 
 _CSS = "<style>" + "".join(
     f'div[class*="st-key-ki-{wo}-"] button:not(:disabled) [data-testid="stIconMaterial"] {{ color: {farbe}; }}'

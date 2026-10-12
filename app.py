@@ -12,18 +12,11 @@ st.set_page_config(
     page_icon="💰",
     layout="wide",
 )
-# Das Erscheinungsbild einer Bank (seit 21.09.2026): Farben und Rundung stehen in
-# .streamlit/config.toml, hier nur das Zeichen mit Schriftzug in der Seitenleiste
-# (eingeklappt nur das Zeichen) und ein blauer Strich über der Fläche — die
-# Kopfleiste, ohne Streamlits Header umzubauen.
-st.logo("assets/marke-schriftzug.svg", size="large", icon_image="assets/marke.svg")
-st.markdown(
-    "<style>"
-    "header[data-testid='stHeader'] { border-top: 5px solid #0018A8; }"
-    "[data-testid='stSidebar'] img { height: 2.2rem; width: auto; max-width: 100%; }"
-    "</style>",
-    unsafe_allow_html=True,
-)
+# Die Lotsee-Optik (seit 12.10.2026): Grundfarben im Theme (.streamlit/config.toml), Zeichen,
+# Menü-Cursor und Lichtschein aus core/ui/optik.py.
+from core.ui import optik  # noqa: E402
+
+optik.einbinden()
 
 from config import config  # noqa: E402
 

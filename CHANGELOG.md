@@ -8,6 +8,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Lotsee-Optik "Richtfeuer" statt Bank-Optik — 2026-10-12
+
+**Warum:** Wealth ist ein Kandidat fuer Lotsee, und die Optik der Familie soll an einer echten
+App erprobt werden, bevor es Swift-Code gibt (Fahrplan des Hauses, lotsee `docs/plan.md` L1.3).
+Gewaehlt hat Erik Fassung C2 von vier (Zeichenflaeche im lotsee-README): Nacht als Familie,
+die Leitfarbe als Licht der App, fuer Wealth Blau.
+
+**Änderungen:**
+- `assets/lotsee/`: Kopie aus `lotsee/optik/erzeuge.py` -- `tokens.json`, `lotsee.css`
+  (CSS-Variablen) und das Zeichen (zwei Richtfeuer, Punkt dazwischen) gross, klein und mit
+  Schriftzug. `assets/marke*.svg` und `tests/test_marke.py` entfallen.
+- `core/ui/optik.py`: bindet Zeichen und Variablen ein und setzt Streamlit-Regeln darauf -- der
+  offene Menuepunkt gefuellt in der Leitfarbe ("Cursor"), Licht von oben links hinter der
+  Ueberschrift. `app.py` ruft nur noch `optik.einbinden()`.
+- `.streamlit/config.toml`: Theme aus denselben Werten (Nacht in der Seitenleiste, kuehles Grau
+  als Grund, Blau `#1F4FD1` fuer Knoepfe und Links, Rundung 0,5 rem).
+- Kacheln: weisse Karten mit runden Ecken; statt Farbkopf und Randstreifen ein Monogramm
+  (Ticker) in der Farbe der Anlageklasse; vor dem Satz ein Licht (rot gefaehrdet, Bernstein
+  Bewegung, grau geprueft, hohl nie geprueft). Alle Farben als Variablen.
+- KI-Stern und Kurslinie der Titelseite folgen den Werten (Cloud = Leitfarbe).
+- `tests/test_optik.py`: Kopie gleich Quelle (wenn lotsee daneben liegt), Theme gleich Werte,
+  Regeln ohne feste Farben, SVG gueltig.
+
 ### Suche: Kandidaten statt Ankreuzliste — 2026-10-11
 
 **Warum:** Bisher legte die Suche angekreuzte Vorschläge direkt auf die Watchlist und startete

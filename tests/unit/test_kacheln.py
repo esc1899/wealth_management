@@ -8,7 +8,7 @@ import pytest
 
 from core.kacheln import BEWEGUNG_PROZENT, kachel, sortiert, tagesprozent
 from core.storage.models import Position, PositionAnalysis
-from core.ui.kacheln import farbe_css, inhalt_html, unter_html, urteil_label, urteile_sortiert, ziel
+from core.ui.kacheln import farbe_css, inhalt_html, monogramm, unter_html, urteil_label, urteile_sortiert, ziel
 
 
 def _pos(pid=1, name="Munich Re", ticker="MUV2.DE", **kw):
@@ -122,6 +122,11 @@ class TestHtml:
         assert "#2F5D8A" in farbe_css(k, "#2F5D8A")
         boese = farbe_css(k, "red;} body{display:none")
         assert "display:none" not in boese and "#5E6B7A" in boese
+
+    def test_monogramm_nur_buchstaben_und_ziffern(self):
+        assert monogramm(kachel(_pos(ticker="SIE.DE"), "depot", _bew())) == "SIE"
+        assert monogramm(kachel(_pos(ticker='a"};x'), "depot", _bew())) == "AX"
+        assert 'content: "SIE"' in farbe_css(kachel(_pos(ticker="SIE.DE"), "depot", _bew()), "#2F5D8A")
 
     def test_seit_aufnahme_chip(self):
         k = kachel(_pos(), "watchlist", _bew(kurs=110.0), aufnahme_kurs=100.0)

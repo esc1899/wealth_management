@@ -24,6 +24,7 @@ from plotly.subplots import make_subplots
 
 from core.i18n import current_language, fmt_date, t
 from core.tagesbild import prozent
+from core.ui import optik
 from core.titelseite import (FARBE, FARBE_SONST, band, kurs_veraenderung, news_abschnitt,
                              symbol, urteile_zaehlen)
 from core.ui import kacheln as kachel_ui
@@ -126,7 +127,7 @@ def _chart(verlauf, strecken, agenten, von: date, bis: date) -> go.Figure:
     if verlauf:
         fig.add_trace(go.Scatter(
             x=[h.date for h in verlauf], y=[h.close_eur for h in verlauf], mode="lines",
-            line=dict(color="#0018A8", width=2), name=t("market_data.price_col"),
+            line=dict(color=optik.farbe("leit_tief"), width=2), name=t("market_data.price_col"),
             hovertemplate="%{x|%d.%m.%Y}: %{y:,.2f} €<extra></extra>",
         ), row=1, col=1)
 

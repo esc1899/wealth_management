@@ -1,0 +1,31 @@
+/* Lotsee-Optik fuer Wealth, erzeugt aus lotsee/optik/tokens.json.
+   Nicht von Hand aendern: dort aendern und optik/erzeuge.py laufen lassen. */
+:root {
+  --lotsee-nacht: #0B1E2D;
+  --lotsee-nacht-hell: #13293A;
+  --lotsee-nacht-linie: #1E3546;
+  --lotsee-grund: #F3F6F8;
+  --lotsee-flaeche: #FFFFFF;
+  --lotsee-flaeche-leise: #E9EFF3;
+  --lotsee-linie: #DCE6EC;
+  --lotsee-linie-leise: #E6EEF2;
+  --lotsee-text: #0B1E2D;
+  --lotsee-text-leise: #4A5D6C;
+  --lotsee-text-menue: #D3E0EA;
+  --lotsee-text-menue-leise: #7F97AA;
+  --lotsee-zustand-alarm: #D23A2A;
+  --lotsee-zustand-hinweis: #E8A317;
+  --lotsee-zustand-ruhig: #C9D6DE;
+  --lotsee-zustand-blind: #9AABB7;
+  --lotsee-zustand-plus: #1A7F4B;
+  --lotsee-zustand-minus: #C0262D;
+  --lotsee-ki-lokal: #1F7A4D;
+  --lotsee-leit-licht: #5B8CFF;
+  --lotsee-leit-tief: #1F4FD1;
+  --lotsee-ki-cloud: #1F4FD1;
+  --lotsee-rundung-karte: 12px;
+  --lotsee-rundung-cursor: 8px;
+  --lotsee-rundung-chip: 4px;
+  --lotsee-rundung-zeichen: 22px;
+  --lotsee-schrift: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+}
