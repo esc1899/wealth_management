@@ -64,7 +64,7 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Model Selection** — one cloud model per area (Depot, Watchlist, Research), one local model for everything on the machine; prices read-only from the household catalog and OpenRouter
 - **Scheduled Tasks** — run cloud agents automatically on a schedule (daily / weekly / monthly / yearly); dedicated Scheduler page with per-job run history
 - **Batch API** — scheduled jobs (all eight cloud agents) go out as Anthropic batches at half price when the household switch is on (Maschinenraum, "Eingeplante Läufe als Batch" → `batch = true` under `[claude]` in `~/.ops-core/modelle.toml`). "Run now" stays live. The job `agenten` collects results hourly and reports what it still waits for to the ops-core tile. Background and decisions: heimnetzwerk `docs/haus/integrationen.md`, profile "Claude".
-- **Cost & Token Tracking** — per-agent/skill/model token counts and USD costs; split by manual vs. scheduled runs; daily trend chart; non-destructive per-row reset
+- **Cost Tracking** — Statistics page: this and last month by provider, the last twelve months, cost per agent; models without a price are named, not counted silently. The household month across all apps is in the Maschinenraum
 - **Recommendation & Story** — investment thesis per position
 - **Demo Mode** — pre-seeded database with 20 realistic positions + sample analyses for testing
 - **Bilingual UI** — German / English, switchable in Settings

@@ -1,87 +1,45 @@
 """
-Statistics — LLM costs and usage per agent/month.
+Statistics — was Wealth die Sprachmodelle kostet, je Monat und je Agent.
+
+Seit 12.10.2026 nur noch, was der Maschinenraum nicht zeigt: Er summiert den laufenden Monat
+des ganzen Hauses je Anbieter, Zweck und Programm; hier stehen der Verlauf ueber die Monate und
+die Kosten je Agent seit dem letzten Reset. Tokens, Tageskurve, letzte Aufrufe und der Knopf
+zum Abgleich mit OpenRouter sind entfallen -- den Abgleich macht der Job ``kosten``.
 """
 
-from datetime import date, timedelta
+from datetime import date
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from config import config
-from core.i18n import t
-from core.llm.openrouter_costs import fetch_account_usage, fetch_and_store_costs
 from core import preise
+from core.i18n import t
 from core.storage.usage import compute_cost
 from state import get_app_config_repo, get_usage_repo
 
 st.set_page_config(page_title="Statistics", page_icon="📊", layout="wide")
 st.title(f"📊 {t('statistics.title')}")
-st.caption(t("statistics.subtitle"))
+st.markdown(t("statistics.satz"))
 
 repo = get_usage_repo()
-config_repo = get_app_config_repo()
-# Preise und Anbieter aus core/preise.py (12.10.2026): Katalog des Hauses, OpenRouter-Liste,
-# lokal kostenlos. Ein Modell ohne Preis zaehlt hier 0 -- die Seite Einstellungen > Preise
-# zeigt es als "offen".
-_preisliste = preise.preisliste(config_repo)
+# Preise und Anbieter aus core/preise.py: Katalog des Hauses, OpenRouter-Liste, lokal kostenlos.
+_preisliste = preise.preisliste(get_app_config_repo())
 
 # Provider display names (brand names — language-neutral).
 _PROVIDER_LABELS = {
     "claude": "Anthropic",
     "openrouter": "OpenRouter",
-    "deepseek": "DeepSeek (direkt, bis 12.10.2026)",
+    "deepseek": "DeepSeek (direkt, alt)",
     "ollama": "Ollama",
 }
 
-
-def _provider_for(model: str) -> str:
-    return preise.anbieter(model)
-
-_OR_ACTIVE = bool(config.OPENAI_BASE_URL and config.OPENAI_API_KEY)
-
-# ------------------------------------------------------------------
-# Source filter
-# ------------------------------------------------------------------
-
-_SOURCE_OPTIONS = {"all": "Alle", "manual": "Manuell", "scheduled": "Geplant (Auto)"}
-_sel_source = st.radio(
-    "Quelle",
-    options=list(_SOURCE_OPTIONS.keys()),
-    format_func=lambda k: _SOURCE_OPTIONS[k],
-    key="_stats_source",
-    horizontal=True,
-    label_visibility="collapsed",
-)
-
-# ------------------------------------------------------------------
-# Load data
-# ------------------------------------------------------------------
-
-today_rows_raw = repo.total_today()
-alltime_rows_raw = repo.total_all_time()
-monthly_rows_raw = repo.monthly_totals_by_model()
-DAILY_WINDOW_DAYS = 30
-daily_rows_raw = repo.daily_totals_by_model(days=DAILY_WINDOW_DAYS)
-
-
-def _filter_source(rows: list[dict]) -> list[dict]:
-    if _sel_source == "all":
-        return rows
-    return [r for r in rows if r.get("source") == _sel_source]
-
-
-today_rows = _filter_source(today_rows_raw)
-alltime_rows = _filter_source(alltime_rows_raw)
-monthly_rows = _filter_source(monthly_rows_raw)
-daily_rows = _filter_source(daily_rows_raw)
-
-# ------------------------------------------------------------------
-# Cost helpers
-# ------------------------------------------------------------------
+alltime_rows = repo.total_all_time()
+monthly_rows = repo.monthly_totals_by_model()
 
 
 def _row_cost(r: dict) -> float:
+    """Listenpreis einer Zeile; ein Modell ohne Preis zaehlt 0 und wird unten genannt."""
     return compute_cost(
         r["input_tokens"],
         r["output_tokens"],
@@ -94,9 +52,8 @@ def _row_cost(r: dict) -> float:
     )
 
 
-
 # ------------------------------------------------------------------
-# KPI: this month / last month
+# Dieser und letzter Monat
 # ------------------------------------------------------------------
 
 today = date.today()
@@ -106,110 +63,32 @@ last_month = f"{today.year - 1}-12" if today.month == 1 else f"{today.year}-{tod
 this_month_rows = [r for r in monthly_rows if r["month"] == current_month]
 last_month_rows = [r for r in monthly_rows if r["month"] == last_month]
 
-today_cost = sum(_row_cost(r) for r in today_rows)
-today_calls = sum(r.get("calls", 0) for r in today_rows)
-this_month_cost = sum(_row_cost(r) for r in this_month_rows)
-this_month_calls = sum(r.get("calls", 0) for r in this_month_rows)
-last_month_cost = sum(_row_cost(r) for r in last_month_rows)
-last_month_calls = sum(r.get("calls", 0) for r in last_month_rows)
+m1, m2 = st.columns(2)
+m1.metric(t("statistics.this_month"), f"${sum(_row_cost(r) for r in this_month_rows):.2f}",
+          delta=f"{sum(r.get('calls', 0) for r in this_month_rows)} Calls", delta_color="off")
+m2.metric(t("statistics.last_month"), f"${sum(_row_cost(r) for r in last_month_rows):.2f}",
+          delta=f"{sum(r.get('calls', 0) for r in last_month_rows)} Calls", delta_color="off")
 
-# ------------------------------------------------------------------
-# Header KPIs
-# ------------------------------------------------------------------
-
-st.subheader(f"💰 {t('statistics.costs_header')}")
-st.caption(t("statistics.costs_caption"))
-m1, m2, m3 = st.columns(3)
-m1.metric(t("statistics.today"), f"${today_cost:.4f}", delta=f"{today_calls} Calls", delta_color="off")
-m2.metric(t("statistics.this_month"), f"${this_month_cost:.4f}", delta=f"{this_month_calls} Calls", delta_color="off")
-m3.metric(t("statistics.last_month"), f"${last_month_cost:.4f}", delta=f"{last_month_calls} Calls", delta_color="off")
-
-# Per-provider breakdown of the cost (this month) — makes explicit that the total
-# spans Anthropic + OpenRouter + Ollama, not just one provider.
+# Je Anbieter (dieser Monat): die Summe geht ueber Anthropic, OpenRouter und Ollama.
 _provider_month: dict[str, float] = {}
 for r in this_month_rows:
-    p = _provider_for(r["model"])
+    p = preise.anbieter(r["model"])
     _provider_month[p] = _provider_month.get(p, 0.0) + _row_cost(r)
 
 if _provider_month:
     st.caption(t("statistics.by_provider_header"))
     _ordered = [p for p in ("claude", "openrouter", "deepseek", "ollama") if p in _provider_month]
-    _pcols = st.columns(len(_ordered))
-    for _col, _p in zip(_pcols, _ordered):
-        _col.metric(_PROVIDER_LABELS.get(_p, _p), f"${_provider_month[_p]:.4f}")
+    for _col, _p in zip(st.columns(len(_ordered)), _ordered):
+        _col.metric(_PROVIDER_LABELS.get(_p, _p), f"${_provider_month[_p]:.2f}")
+
+# Blindzeit ist eine Aussage: Ein Modell ohne Preis ist in den Summen 0 -- das sagt die Seite.
+_offen = sorted({r["model"] for r in monthly_rows if preise.preis(r["model"], _preisliste) is None})
+if _offen:
+    st.caption(t("statistics.ohne_preis").format(modelle=", ".join(_offen)))
 
 st.divider()
 
-# ------------------------------------------------------------------
-# Tokens
-# ------------------------------------------------------------------
-
-
-def _fmt_tokens(n: float) -> str:
-    if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f} Mio"
-    if n >= 1_000:
-        return f"{n / 1_000:.0f}k"
-    return str(int(n))
-
-
-def _token_split(rows: list[dict]) -> tuple[int, int]:
-    """Return (input_incl_cache, output) token totals for the given rows."""
-    inp = sum(
-        int(r.get("input_tokens") or 0)
-        + int(r.get("cache_read_tokens") or 0)
-        + int(r.get("cache_write_tokens") or 0)
-        for r in rows
-    )
-    out = sum(int(r.get("output_tokens") or 0) for r in rows)
-    return inp, out
-
-
-_tok_today_in, _tok_today_out = _token_split(today_rows)
-_tok_month_in, _tok_month_out = _token_split(this_month_rows)
-
-st.subheader(f"🔢 {t('statistics.tokens_header')}")
-st.caption(t("statistics.tokens_caption"))
-_t1, _t2 = st.columns(2)
-_t1.metric(
-    t("statistics.today"), _fmt_tokens(_tok_today_in + _tok_today_out),
-    delta=f"In {_fmt_tokens(_tok_today_in)} · Out {_fmt_tokens(_tok_today_out)}", delta_color="off",
-)
-_t2.metric(
-    t("statistics.this_month"), _fmt_tokens(_tok_month_in + _tok_month_out),
-    delta=f"In {_fmt_tokens(_tok_month_in)} · Out {_fmt_tokens(_tok_month_out)}", delta_color="off",
-)
-
-# Per-provider token breakdown (this month) — symmetric to the cost breakdown.
-_provider_tokens: dict[str, tuple[int, int]] = {}
-for r in this_month_rows:
-    p = _provider_for(r["model"])
-    _in, _out = _token_split([r])
-    _prev_in, _prev_out = _provider_tokens.get(p, (0, 0))
-    _provider_tokens[p] = (_prev_in + _in, _prev_out + _out)
-
-if _provider_tokens:
-    st.caption(t("statistics.by_provider_header"))
-    _ordered_t = [p for p in ("claude", "openrouter", "deepseek", "ollama") if p in _provider_tokens]
-    _tcols = st.columns(len(_ordered_t))
-    for _col, _p in zip(_tcols, _ordered_t):
-        _pin, _pout = _provider_tokens[_p]
-        _col.metric(
-            _PROVIDER_LABELS.get(_p, _p), _fmt_tokens(_pin + _pout),
-            delta=f"In {_fmt_tokens(_pin)} · Out {_fmt_tokens(_pout)}", delta_color="off",
-        )
-
-st.divider()
-
-# ------------------------------------------------------------------
-# Tabs
-# ------------------------------------------------------------------
-
-tab_trend, tab_agents, tab_calls = st.tabs([
-    t("statistics.tab_trend"),
-    t("statistics.tab_agents"),
-    t("statistics.tab_calls"),
-])
+tab_trend, tab_agents = st.tabs([t("statistics.tab_trend"), t("statistics.tab_agents")])
 
 # ── Tab: Verlauf ───────────────────────────────────────────────────────────────
 
@@ -217,7 +96,6 @@ with tab_trend:
     st.subheader(t("statistics.monthly_chart"))
 
     if monthly_rows:
-        # Aggregate cost by month
         monthly_agg: dict[str, dict] = {}
         for r in monthly_rows:
             m = r["month"]
@@ -245,7 +123,7 @@ with tab_trend:
             y="cost",
             labels={"label": "", "cost": "Kosten ($)"},
             color_discrete_sequence=["#4C9BE8"],
-            text=df_monthly["cost"].apply(lambda v: f"${v:.3f}"),
+            text=df_monthly["cost"].apply(lambda v: f"${v:.2f}"),
         )
         fig.update_traces(textposition="outside")
         fig.update_layout(
@@ -256,81 +134,18 @@ with tab_trend:
     else:
         st.info(t("statistics.no_data"))
 
-    st.subheader(t("statistics.daily_costs"))
-
-    if daily_rows:
-        # Aggregate cost by day
-        daily_agg: dict[str, float] = {}
-        for r in daily_rows:
-            d = r["day"]
-            daily_agg[d] = daily_agg.get(d, 0.0) + _row_cost(r)
-
-        # Über das volle 30-Tage-Fenster auffüllen (Nulltage inklusive). Ohne das
-        # bemisst Plotly die Balkenbreite am Abstand der vorhandenen Punkte — bei
-        # zwei Nutzungstagen werden daraus wochenbreite Balken.
-        _window_end = date.today()
-        _window_start = _window_end - timedelta(days=DAILY_WINDOW_DAYS)
-        _days = [
-            (_window_start + timedelta(days=i)).isoformat()
-            for i in range((_window_end - _window_start).days + 1)
-        ]
-        df_daily = pd.DataFrame(
-            [{"day": d, "cost": daily_agg.get(d, 0.0)} for d in _days],
-        )
-        df_daily["day"] = pd.to_datetime(df_daily["day"])
-        fig2 = px.bar(
-            df_daily,
-            x="day",
-            y="cost",
-            labels={"day": "", "cost": "Kosten ($)"},
-            color_discrete_sequence=["#4C9BE8"],
-        )
-        fig2.update_traces(hovertemplate="%{x|%d.%m.%Y}<br>$%{y:.3f}<extra></extra>")
-        fig2.update_layout(yaxis_title="Kosten ($)", showlegend=False, bargap=0.2)
-        fig2.update_xaxes(
-            tickformat="%d.%m.",
-            dtick="D1",
-            tickangle=-45,
-        )
-        st.plotly_chart(fig2)
-    else:
-        st.info(t("statistics.no_data"))
-
-    with st.expander(t("statistics.today_detail")):
-        if today_rows:
-            df_today = pd.DataFrame(today_rows)
-            df_today["cost"] = df_today.apply(_row_cost, axis=1).round(4)
-            display_cols = [c for c in ["agent", "skill", "model", "source", "input_tokens", "output_tokens", "calls", "cost"] if c in df_today.columns]
-            df_today = df_today[display_cols].rename(columns={
-                "agent": t("statistics.col_agent"),
-                "skill": t("statistics.col_skill"),
-                "model": t("statistics.col_model"),
-                "source": "Quelle",
-                "input_tokens": t("statistics.col_input"),
-                "output_tokens": t("statistics.col_output"),
-                "calls": t("statistics.col_calls"),
-                "cost": t("statistics.col_cost"),
-            })
-            st.dataframe(df_today, width="stretch", hide_index=True)
-        else:
-            st.info(t("statistics.no_data_today"))
-
-    st.caption(t("statistics.prices_note"))
-
 # ── Tab: Nach Agent ────────────────────────────────────────────────────────────
 
 with tab_agents:
     if alltime_rows:
-        # All-time per agent
         agent_alltime: dict[str, dict] = {}
         for r in alltime_rows:
             a = r["agent"]
             if a not in agent_alltime:
-                agent_alltime[a] = {"agent": a, "cost_total": 0.0, "calls_total": 0}
+                agent_alltime[a] = {"cost_total": 0.0, "calls_total": 0}
             agent_alltime[a]["cost_total"] += _row_cost(r)
             agent_alltime[a]["calls_total"] += r.get("calls", 0)
 
-        # This month per agent
         agent_month: dict[str, dict] = {}
         for r in this_month_rows:
             a = r["agent"]
@@ -353,108 +168,6 @@ with tab_agents:
                 "Ø Kosten/Call": round(cost_total / calls_total, 6) if calls_total else 0.0,
             })
 
-        df_agents = pd.DataFrame(rows_agent)
-        st.dataframe(df_agents, width="stretch", hide_index=True)
+        st.dataframe(pd.DataFrame(rows_agent), width="stretch", hide_index=True)
     else:
         st.info(t("statistics.no_data"))
-
-# ── Tab: Letzte Calls ──────────────────────────────────────────────────────────
-
-with tab_calls:
-    st.caption("Letzte 50 LLM-Aufrufe (neueste zuerst)")
-    st.caption(
-        "**Eff. Input** = reguläre Input-Tokens + Cache Write + Cache Read. "
-        "**Cache Write** = neue Cache-Einträge (1.25×). "
-        "**Cache Read** = aus Cache gelesen (0.1×, fast kostenlos)."
-    )
-
-    recent_calls = repo.get_recent_calls(limit=50)
-
-    if recent_calls:
-        df_recent = pd.DataFrame(recent_calls)
-        df_recent["created_at"] = pd.to_datetime(df_recent["created_at"]).dt.strftime("%d.%m %H:%M:%S")
-
-        def _duration_label(duration_ms):
-            if duration_ms is None:
-                return "—"
-            if duration_ms < 1000:
-                return f"🟢 {duration_ms:.0f}"
-            elif duration_ms < 3000:
-                return f"🟡 {duration_ms:.0f}"
-            return f"🔴 {duration_ms:.0f}"
-
-        df_recent["duration_ms"] = df_recent["duration_ms"].apply(_duration_label)
-        df_recent["eff_input"] = (
-            df_recent["input_tokens"].fillna(0).astype(int)
-            + df_recent.get("cache_write_tokens", pd.Series(0, index=df_recent.index)).fillna(0).astype(int)
-            + df_recent.get("cache_read_tokens", pd.Series(0, index=df_recent.index)).fillna(0).astype(int)
-        )
-        if "actual_cost_usd" in df_recent.columns:
-            df_recent["actual_cost_usd"] = df_recent["actual_cost_usd"].apply(
-                lambda v: f"${v:.5f}" if v is not None else "—"
-            )
-        df_recent = df_recent.rename(columns={
-            "created_at":         "Zeit",
-            "agent":              t("statistics.col_agent"),
-            "skill":              t("statistics.col_skill"),
-            "model":              t("statistics.col_model"),
-            "source":             "Quelle",
-            "input_tokens":       t("statistics.col_input"),
-            "output_tokens":      t("statistics.col_output"),
-            "cache_write_tokens": "Cache Write (1.25×)",
-            "cache_read_tokens":  "Cache Read (0.1×)",
-            "eff_input":          "Eff. Input",
-            "duration_ms":        "Dauer (ms)",
-            "actual_cost_usd":    "Echte Kosten ($)",
-        })
-        display_recent_cols = [c for c in [
-            "Zeit", t("statistics.col_agent"), t("statistics.col_skill"),
-            t("statistics.col_model"), "Quelle",
-            t("statistics.col_input"), t("statistics.col_output"),
-            "Cache Write (1.25×)", "Cache Read (0.1×)", "Eff. Input",
-            "Dauer (ms)", "Echte Kosten ($)",
-        ] if c in df_recent.columns]
-        st.dataframe(df_recent[display_recent_cols], width="stretch", hide_index=True)
-    else:
-        st.info("Noch keine Aufrufe aufgezeichnet.")
-
-# ------------------------------------------------------------------
-# Provider-Abgleich (OpenRouter) — verification that estimate ≈ reality.
-# Costs are reconciled automatically by the scheduler; this is just the readout
-# plus a manual fallback.
-# ------------------------------------------------------------------
-
-if _OR_ACTIVE:
-    st.divider()
-    actual_summary = repo.actual_costs_summary()
-    _ac_month = actual_summary.get("this_month") or 0.0
-    _ac_all = actual_summary.get("all_time") or 0.0
-    _pending = actual_summary.get("pending") or 0
-
-    with st.expander(f"ℹ️ {t('statistics.reconcile_header')}"):
-        st.caption(t("statistics.reconcile_caption"))
-        _r1, _r2, _r3 = st.columns(3)
-        _r1.metric(t("statistics.this_month"), f"${_ac_month:.4f}")
-        _r2.metric(t("statistics.all_time"), f"${_ac_all:.4f}")
-        _r3.metric(t("statistics.reconcile_pending"), str(_pending))
-
-        _fcol, _acol = st.columns([1, 2])
-        with _fcol:
-            if st.button(t("statistics.reconcile_fetch"), key="_reconcile_fetch"):
-                _uncosted = repo.get_uncosted_openrouter_records(limit=200)
-                if _uncosted:
-                    with st.spinner(f"… {len(_uncosted)}"):
-                        _updated = fetch_and_store_costs(
-                            config.OPENAI_API_KEY, config.OPENAI_BASE_URL, _uncosted, repo
-                        )
-                    st.success(f"✅ {_updated}/{len(_uncosted)}")
-                    st.rerun()
-                else:
-                    st.info(t("statistics.reconcile_none"))
-        with _acol:
-            if st.button(t("statistics.reconcile_account"), key="_reconcile_account"):
-                _total = fetch_account_usage(config.OPENAI_API_KEY, config.OPENAI_BASE_URL)
-                if _total is not None:
-                    st.info(f"OpenRouter Account: **${_total:.4f}**")
-                else:
-                    st.warning("—")

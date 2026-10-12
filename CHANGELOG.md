@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Abrundung 3: Statistiken auf Monate und Agenten gekuerzt — 2026-10-12
+
+**Warum:** Jeder Aufruf steht ohnehin im Run-Log, und der Maschinenraum summiert den laufenden
+Monat des Hauses je Anbieter, Zweck und Programm. Wealth zeigt nur noch, was dort fehlt.
+
+**Änderungen:**
+- `pages/usage_statistics.py`: ein Satz mit Link zum Maschinenraum, dieser und letzter Monat je
+  Anbieter, Verlauf der letzten zwoelf Monate, Kosten je Agent. Modelle ohne Preis werden genannt.
+- Entfallen: Quellenfilter, Tokens, Tageskurve, "Heute im Detail", die letzten 50 Aufrufe und der
+  Abgleich mit OpenRouter per Knopf (macht der Job `kosten` stuendlich).
+
 ### Abrundung 2: Preise aus Quellen, Einstellungen nach Bedeutung, kein DeepSeek direkt — 2026-10-12
 
 **Warum:** Die Modell-Registry liess Preis, Anbieter und Ollama-Parameter je Modell von Hand

@@ -1,8 +1,8 @@
 """
-UI smoke tests for the Statistics page — FEAT-58 provider × method framing.
+UI smoke tests for the Statistics page: months and agents, provider split, models without price named.
 
 Verifies the page renders without exception and that estimated costs are split
-by provider (registry-driven). Seeds a couple of usage rows via the shared
+by provider (core/preise.py). Seeds a couple of usage rows via the shared
 state singletons and removes them in teardown.
 """
 
@@ -46,12 +46,16 @@ class TestStatisticsPage:
         assert "Anthropic" in labels, labels
         assert "OpenRouter" in labels, labels
 
-    def test_costs_and_tokens_sections_present(self, seeded_usage):
+    def test_models_without_price_are_named_not_hidden(self, seeded_usage, tmp_path, monkeypatch):
+        """Blindzeit ist eine Aussage: Was keinen Preis hat, zaehlt 0 -- und die Seite sagt es."""
+        monkeypatch.setenv("OPS_CORE_KATALOG", str(tmp_path / "fehlt.toml"))
         at = AppTest.from_file(PAGES / "usage_statistics.py")
         at.run()
-        headers = " ".join(sh.value for sh in at.subheader)
-        assert "Kosten" in headers, headers
-        assert "Tokens" in headers, headers
-        # The old "Geschätzt"/"Abgefragt" wording is gone from the headers
-        assert "Geschätzt" not in headers, headers
-        assert "Abgefragt" not in headers, headers
+        captions = " ".join(c.value for c in at.caption)
+        assert "claude-sonnet-4-6" in captions and "mistralai/mistral-large-2512" in captions
+
+    def test_points_to_the_maschinenraum_and_has_no_buttons(self, seeded_usage):
+        at = AppTest.from_file(PAGES / "usage_statistics.py")
+        at.run()
+        assert "/maschinenraum/" in at.markdown[0].value
+        assert not at.button
