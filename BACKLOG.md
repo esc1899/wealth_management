@@ -85,10 +85,9 @@ genutzt?).
 ## Abrundung: einzelne Seiten aufraeumen und vereinfachen (12.10.2026)
 
 Menue und Grundlagen des Umbaus tragen (Erik, 12.10.2026); auf einzelnen Seiten ist noch
-aufzuraeumen und zu vereinfachen. Aufgefallen ist Erik unter anderem die Modellpflege, dazu
-aehnliche Verbesserungspunkte -- die Liste je Seite entsteht zu Beginn mit Erik. Liegt hinter
-der Lotsee-Optik (Fahrplan des Hauses), damit die Seiten gleich in der neuen Optik aufgeraeumt
-werden. Hierher gehoeren dann auch die uebrigen KI-Knoepfe (Abschnitt unten).
+aufzuraeumen und zu vereinfachen. Die erste Runde ist am 12.10.2026 gebaut (CHANGELOG,
+"Abrundung 1-3"). Offen: Erik sieht die Seiten in der neuen Optik durch und nennt, was ihm
+weiter auffaellt; dazu gehoeren die uebrigen KI-Knoepfe (Abschnitt unten).
 
 ## Uebrige KI-Knoepfe auf den Stern umstellen (11.10.2026)
 
