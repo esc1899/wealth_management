@@ -228,6 +228,10 @@ market_data:
   price_col: "Kurs"
 
 analysis:
+  werte_erklaerung: "**Analyse** – Depot-Positionen mit Ticker, ohne ausgeschlossene; Basis für Monats- und Jahresanalyse.  
+**Vermögen** – alle Depot-Positionen, wie in der Vermögenshistorie.  
+**Ausgeschlossen** – {n} Position(en), auf der Seite Positionen von der Analyse ausgenommen."
+  werte_erklaerung_knopf: "Was heißt das?"
   title: "Analyse"
   attribution_qty_note: "Beiträge basieren auf der zu Periodenbeginn gehaltenen Stückzahl (aus Snapshots). Für Perioden ohne gespeicherte Bestände dient die heutige Stückzahl als Näherung."
   pnl_chart: "Gewinn / Verlust je Position"
@@ -1521,3 +1525,6 @@ kandidaten:
   herkunft: "Herkunft"
   bericht: "Bericht des Laufs ({lauf})"
   bericht_fehlt: "Den Lauf, der ihn fand, gibt es nicht mehr."
+
+tagesperformance:
+  heute: "Heute"

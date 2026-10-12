@@ -229,6 +229,10 @@ market_data:
   price_col: "Price"
 
 analysis:
+  werte_erklaerung: "**Analysis** – portfolio positions with a ticker, excluding excluded ones; basis for the monthly and yearly analysis.  
+**Wealth** – all portfolio positions, as in the wealth history.  
+**Excluded** – {n} position(s) excluded from the analysis on the Positions page."
+  werte_erklaerung_knopf: "What does this mean?"
   title: "Analysis"
   attribution_qty_note: "Contributions are based on the quantity held at the start of the period (from snapshots). For periods without stored holdings, today's quantity is used as an approximation."
   pnl_chart: "Profit / Loss per Position"
@@ -1523,3 +1527,6 @@ kandidaten:
   herkunft: "Origin"
   bericht: "Run report ({lauf})"
   bericht_fehlt: "The run that found it no longer exists."
+
+tagesperformance:
+  heute: "Today"

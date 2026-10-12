@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Einstieg: der Tag oben auf dem Depot, Analyse-Kopf kompakt — 2026-10-12
+
+**Warum:** Erik mag die Depot-Startseite, ging taeglich aber zuerst auf Analyse, um den Tag zu
+sehen. Statt eines Links von der Kachel der Startseite (haette den Kachel-Vertrag erweitert) steht
+der Tag jetzt auf dem Depot selbst; und auf der Analyse ist er ohne Scrollen ganz sichtbar.
+
+**Änderungen:**
+- `core/ui/tagesperformance.py`: Summen, Kursstand, Satz und Balken des Tages -- eine Anzeige fuer
+  Depot und Analyse.
+- Depot: oben Kursstand, "Heute: ..." und das Tages-Chart (flacher), darunter wie bisher.
+- Analyse: Titel und 🔄 in einer Zeile; Kursstand, VIX, EUR/USD, Gold und DAX als eine Textzeile
+  statt vier Kennzahlen; die drei Gesamtwerte als eine Zeile, die Erklaerung hinter "Was heisst
+  das?"; danach direkt "Tagesperformance".
+
 ### Tests: `:memory:` ist wieder Arbeitsspeicher — 2026-10-12
 
 **Warum:** `config._resolve_db_path` machte den Sondernamen der Suite zu `<Projekt>/:memory:`,

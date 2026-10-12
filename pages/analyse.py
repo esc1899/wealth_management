@@ -2,9 +2,8 @@
 Analysis — performance charts, historical prices, allocation.
 """
 
-import calendar
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Optional
 
 import pandas as pd
@@ -17,8 +16,9 @@ from core.macro_context import load_or_refresh_macro
 from core.monthly_attribution import compute_monthly_attribution
 from core.monthly_digest_generator import generate_monthly_digest
 from core.symbol_aggregation import (
-    aggregate_contributions, aggregate_day_pnl, aggregate_pnl,
+    aggregate_contributions, aggregate_pnl,
 )
+from core.ui import tagesperformance
 from core.ui.charts import bar_label, style_bar_chart
 from core.yearly_attribution import compute_yearly_attribution
 from core.yearly_digest_generator import generate_yearly_digest
@@ -29,174 +29,67 @@ from state import (
 )
 
 st.set_page_config(page_title="Analyse", page_icon="🔍", layout="wide")
-st.title(f"🔍 {t('analysis.title')}")
-
 agent = get_market_agent()
 
 # ------------------------------------------------------------------
-# Kein Abruf beim Öffnen (seit 22.09.2026). Bis dahin holte die Seite Kurse
-# samt Historie nach, sobald der letzte Abruf über eine Stunde her war — der
-# langsame Weg, und man wartete beim Öffnen. Die Kurse hält der stündliche
-# Kachel-Job frisch (ops-core.wealth_management.kachel, ~/.ops-core/jobs.toml),
-# die Historie der 18-Uhr-Abruf der App. Die Seite zeigt den Stand aus der
-# Datenbank und sagt, wie alt er ist; wer es jetzt genau wissen will, drückt 🔄.
+# Kopf (seit 12.10.2026 kompakt, damit "Heute" ohne Scrollen ganz zu sehen ist): Titel und 🔄
+# in einer Zeile, Kursstand und Makro als eine Textzeile, die drei Gesamtwerte als eine Zeile.
+#
+# Kein Abruf beim Öffnen (seit 22.09.2026). Die Kurse hält der stündliche Kachel-Job frisch
+# (ops-core.wealth_management.kachel, ~/.ops-core/jobs.toml), die Historie der 18-Uhr-Abruf
+# der App. Die Seite zeigt den Stand aus der Datenbank und sagt, wie alt er ist; wer es jetzt
+# genau wissen will, drückt 🔄.
 # ------------------------------------------------------------------
 
-col_title, col_refresh = st.columns([5, 1])
+col_title, col_refresh = st.columns([5, 1], vertical_alignment="center")
+with col_title:
+    st.title(f"🔍 {t('analysis.title')}")
 with col_refresh:
     if st.button(f"🔄 {t('common.refresh')}"):
         with st.spinner(t("analysis.auto_fetch_notice")):
             agent.fetch_all_now(fetch_history=True)
         st.rerun()
 
-_last_fetch = agent.get_latest_fetch_time()
-if _last_fetch:
-    st.caption(f"{t('analysis.prices_as_of')}: {fmt_dt(_last_fetch.replace(tzinfo=timezone.utc).astimezone())}")  # naives UTC -> Ortszeit
-else:
-    st.caption(t("analysis.no_price_data"))
-
 valuations = agent.get_portfolio_valuation()
 
-_excluded_count = sum(
-    1 for v in valuations
-    if v.in_portfolio and getattr(v, "analysis_excluded", False)
-    and v.current_value_eur and v.current_value_eur > 0
-)
-
-# ------------------------------------------------------------------
-# FEAT-35: Makro-Kontext Chips
-# ------------------------------------------------------------------
+# FEAT-35: Makro-Kontext -- eine Zeile hinter dem Kursstand statt vier großer Kennzahlen.
 _app_config_repo = get_app_config_repo()
 _macro = load_or_refresh_macro(_app_config_repo)
-
-with st.container():
-    m1, m2, m3, m4 = st.columns(4)
-    if _macro:
-        m1.metric(
-            "VIX",
-            f"{_macro.vix:.1f}" if _macro.vix is not None else "—",
-            help="CBOE Volatility Index — Maß für Markt-Unsicherheit",
-        )
-        m2.metric(
-            "EUR/USD",
-            f"{_macro.eur_usd:.3f}" if _macro.eur_usd is not None else "—",
-        )
-        m3.metric(
-            "Gold (€/oz)",
-            f"{_macro.gold_eur:,.0f}" if _macro.gold_eur is not None else "—",
-        )
-        if _macro.dax_change_pct is not None:
-            m4.metric(
-                "DAX (heute)",
-                f"{_macro.dax_change_pct:+.1f}%",
-                delta=_macro.dax_change_pct,
-                delta_color="normal",
-            )
-        else:
-            m4.metric("DAX (heute)", "—")
-        try:
-            _ts = datetime.fromisoformat(_macro.fetched_at)
-            st.caption(f"{t('analysis.macro_timestamp')} {fmt_dt(_ts)} UTC")
-        except Exception:
-            pass
-    else:
-        m1.metric("VIX", "—")
-        m2.metric("EUR/USD", "—")
-        m3.metric("Gold (€/oz)", "—")
-        m4.metric("DAX (heute)", "—")
+_kopf = [tagesperformance.kursstand(agent.get_latest_fetch_time())]
+if _macro:
+    _kopf += [
+        f"VIX {_macro.vix:.1f}" if _macro.vix is not None else "VIX —",
+        f"EUR/USD {_macro.eur_usd:.3f}" if _macro.eur_usd is not None else "EUR/USD —",
+        f"Gold {_macro.gold_eur:,.0f} €/oz".replace(",", ".") if _macro.gold_eur is not None else "Gold —",
+        f"DAX {_macro.dax_change_pct:+.1f} %" if _macro.dax_change_pct is not None else "DAX —",
+    ]
+st.caption(" · ".join(_kopf))
 
 if not valuations:
     st.info(t("analysis.portfolio_empty"))
     st.stop()
 
-has_prices = any(v.current_value_eur is not None for v in valuations)
-
-if not has_prices:
+if not any(v.current_value_eur is not None for v in valuations):
     st.warning(t("analysis.no_price_data"))
 
-# ------------------------------------------------------------------
-# Gesamtwert-Übersicht
-# ------------------------------------------------------------------
-_analyse_total = sum(
-    v.current_value_eur
-    for v in valuations
-    if v.current_value_eur and v.in_portfolio and not getattr(v, "analysis_excluded", False)
-)
-_vermoegen_total = sum(
-    v.current_value_eur
-    for v in valuations
-    if v.current_value_eur and v.in_portfolio
-)
-_excluded_value = _vermoegen_total - _analyse_total
-
-_c1, _c2, _c3 = st.columns(3)
-with _c1:
-    st.metric(
-        "Analyse-Gesamtwert",
-        f"{symbol()}{_analyse_total:,.0f}".replace(",", "X").replace(".", ",").replace("X", "."),
-        help="Portfolio-Positionen mit Ticker, ohne ausgeschlossene Positionen — Basis für Monats-/Jahresanalyse",
-    )
-with _c2:
-    st.metric(
-        "Vermögens-Gesamtwert",
-        f"{symbol()}{_vermoegen_total:,.0f}".replace(",", "X").replace(".", ",").replace("X", "."),
-        help="Alle Portfolio-Positionen inkl. ausgeschlossener — entspricht der Vermögenshistorie",
-    )
-with _c3:
-    if _excluded_value > 0:
-        st.metric(
-            "Davon ausgeschlossen",
-            f"{symbol()}{_excluded_value:,.0f}".replace(",", "X").replace(".", ",").replace("X", "."),
-            help=f"{_excluded_count} Position{'en' if _excluded_count != 1 else ''} von der Analyse ausgeschlossen",
-        )
-    else:
-        st.metric("Ausgeschlossen", "—", help="Keine Positionen ausgeschlossen")
-
-st.divider()
+# Gesamtwerte: eine Zeile, die Erklärung im Klapper.
+_summen = tagesperformance.summen(valuations)
+_excluded_count = _summen.ausgeschlossen_zahl
+_vermoegen_total = _summen.vermoegen
+_werte = (f"Analyse {symbol()}{tagesperformance._euro(_summen.analyse)} · "
+          f"Vermögen {symbol()}{tagesperformance._euro(_summen.vermoegen)}")
+if _summen.ausgeschlossen > 0:
+    _werte += f" · davon ausgeschlossen {symbol()}{tagesperformance._euro(_summen.ausgeschlossen)}"
+_w1, _w2 = st.columns([5, 2], vertical_alignment="center")
+_w1.markdown(_werte)
+with _w2.popover(t("analysis.werte_erklaerung_knopf")):
+    st.markdown(t("analysis.werte_erklaerung").format(n=_excluded_count))
 
 # ------------------------------------------------------------------
-# Today's performance (daily P&L)
+# Heute (core/ui/tagesperformance.py, dieselbe Anzeige wie oben auf dem Depot)
 # ------------------------------------------------------------------
 st.subheader(t("analysis.day_pnl_header"))
-
-col_day_eur = t("analysis.day_pnl_col")
-col_day_pct = t("analysis.day_pnl_pct_col")
-
-# Aggregate per symbol first — the same ticker in two depots is one bar, and
-# sorting must use the merged value (see core/symbol_aggregation.py).
-day_rows = [
-    {
-        "Symbol": s.symbol,
-        col_day_eur: s.day_pnl_eur,
-        col_day_pct: s.day_pnl_pct,
-    }
-    for s in aggregate_day_pnl(valuations)
-]
-
-if day_rows:
-    df_day = pd.DataFrame(day_rows).sort_values(col_day_eur)
-    total_day = df_day[col_day_eur].sum()
-    _analyse_prev = _analyse_total - total_day
-    _gesamt_prev = _vermoegen_total - total_day
-    _day_pct_analyse = (total_day / _analyse_prev * 100) if _analyse_prev else None
-    _day_pct_gesamt = (total_day / _gesamt_prev * 100) if _gesamt_prev else None
-    _day_abs = f"{total_day:+,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    _pct_a = f"{_day_pct_analyse:+.2f}% Analyse" if _day_pct_analyse is not None else ""
-    _pct_g = f"{_day_pct_gesamt:+.2f}% Gesamt" if _day_pct_gesamt is not None else ""
-    _sep = " · " if _pct_a and _pct_g else ""
-    st.caption(f"**Heute: {symbol()}{_day_abs} — {_pct_a}{_sep}{_pct_g}**")
-
-    fig_day = px.bar(
-        df_day, x="Symbol", y=col_day_eur,
-        color=col_day_eur,
-        color_continuous_scale=["red", "lightgrey", "green"],
-        color_continuous_midpoint=0,
-        text=[bar_label(row[col_day_eur], row[col_day_pct]) for _, row in df_day.iterrows()],
-    )
-    style_bar_chart(fig_day)
-    st.plotly_chart(fig_day)
-else:
-    st.info(t("analysis.no_day_pnl"))
+tagesperformance.zeigen(valuations, _summen)
 
 st.divider()
 

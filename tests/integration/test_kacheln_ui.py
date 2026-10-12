@@ -125,3 +125,42 @@ def test_titelseite_urteile_und_band(depot_und_watchlist):
     texte = " ".join(m.value for m in at.markdown)
     assert "Von 4 Checks: 1 kritisch, 3 nie geprüft." in texte
     assert "nie geprüft" in texte
+
+
+# ---------------------------------------------------------------------------
+# Der Tag oben auf dem Depot (12.10.2026): dieselbe Zeile wie auf der Analyse
+# ---------------------------------------------------------------------------
+
+def _bewertung(symbol, wert, tag, ausgeschlossen=False):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(symbol=symbol, name=symbol, in_portfolio=True, current_value_eur=wert,
+                           day_pnl_eur=tag, analysis_excluded=ausgeschlossen, position_id=None)
+
+
+def test_tagesperformance_summen_wie_die_analyse():
+    from core.ui.tagesperformance import summen
+
+    s = summen([_bewertung("A", 1000.0, 10.0), _bewertung("B", 500.0, -5.0, ausgeschlossen=True),
+                _bewertung("C", None, None)])
+    assert (s.analyse, s.vermoegen, s.ausgeschlossen, s.ausgeschlossen_zahl) == (1000.0, 1500.0, 500.0, 1)
+
+
+def test_depot_zeigt_den_tag_wie_die_analyse(depot_und_watchlist, monkeypatch):
+    from unittest.mock import MagicMock
+
+    import state
+
+    markt = MagicMock()
+    markt.get_portfolio_valuation.return_value = [_bewertung("AAA", 1010.0, 10.0),
+                                                  _bewertung("BBB", 495.0, -5.0)]
+    markt.get_latest_fetch_time.return_value = None
+    monkeypatch.setattr(state, "get_market_agent", lambda: markt)
+
+    depot = _app("kacheln_depot.py")
+    depot.run()
+    assert not depot.exception, depot.exception
+    # Die Zeile kommt aus core/ui/tagesperformance.zeigen -- dieselbe Funktion wie auf der Analyse.
+    zeile = next(m.value for m in depot.markdown if m.value.startswith("**Heute:"))
+    assert "+5,00" in zeile and "+0.33% Analyse" in zeile and "+0.33% Gesamt" in zeile
+    assert depot.get("plotly_chart"), "das Tages-Chart fehlt"

@@ -306,6 +306,17 @@ def _portfolio_satz() -> None:
         pass
 
 
+def _heute() -> None:
+    """Oben auf dem Depot der Tag (12.10.2026): Erik schaute taeglich zuerst auf der Analyse
+    nach ihm. Dieselbe Anzeige wie dort (core/ui/tagesperformance.py), flacher, mit Kursstand."""
+    from core.ui import tagesperformance
+    from state import get_market_agent
+
+    agent = get_market_agent()
+    st.caption(tagesperformance.kursstand(agent.get_latest_fetch_time()))
+    tagesperformance.zeigen(agent.get_portfolio_valuation(), hoehe=280)
+
+
 def seite(art: str) -> None:
     """Die ganze Seite für ``art`` = "depot" oder "watchlist"."""
     from state import get_portfolio_service
@@ -323,6 +334,7 @@ def seite(art: str) -> None:
         return
 
     if art == "depot":
+        _heute()
         _portfolio_satz()
 
     kacheln = sortiert(kacheln_fuer(art, positionen))
