@@ -454,7 +454,10 @@ class ClaudeProvider(LLMProvider):
         if batch.processing_status != "ended":
             return None
         results = []
-        async for result in self._client.messages.batches.results(batch_id):
+        # `results` ist im asynchronen SDK eine Coroutine, die den Iterator liefert --
+        # ohne `await` scheiterte jedes Abholen (11.-14.10.2026: zwei Batches bezahlt,
+        # nie ausgewertet, nie gebucht).
+        async for result in await self._client.messages.batches.results(batch_id):
             results.append(result)
         return results
 

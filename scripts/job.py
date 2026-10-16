@@ -83,9 +83,13 @@ def _marktdaten_agent():
 
 def agenten(dienst, batch_api: bool) -> int:
     gelaufen, fehlgeschlagen, gebremst = dienst.laufen_lassen()
+    abholfehler = []
     if batch_api:
+        from core.scheduler import ABHOLFEHLER
         for zeile in dienst.batches_abholen():
             print(zeile)
+            if ABHOLFEHLER in zeile:
+                abholfehler.append(zeile)
         # Fuer die ops-core-Kachel: worauf noch gewartet wird (auch "nichts").
         from core import ops_events
         stand = dienst.wartet()
@@ -113,7 +117,11 @@ def agenten(dienst, batch_api: bool) -> int:
         print(f"{gelaufen} Job{'s' if gelaufen != 1 else ''} gelaufen.")
     elif not gebremst:
         print("Nichts fällig.")
-    return 1 if fehlgeschlagen or gebremst else 0
+    if abholfehler:
+        # Rot, nicht "wartet": Ein Batch, der sich nicht abholen laesst, ist bezahlt und
+        # wird nie ausgewertet -- und waere auf der Kachel sonst gruen.
+        print(f"{len(abholfehler)} Batch(es) ließen sich nicht abholen.")
+    return 1 if fehlgeschlagen or gebremst or abholfehler else 0
 
 
 def kurse(markt, fetch_hour: int, dienst=None) -> int:

@@ -357,8 +357,14 @@ async def test_fetch_batch_results_complete(provider):
     mock_result = MagicMock()
     mock_result.custom_id = "sc_42"
 
-    async def mock_results(batch_id):
+    # Wie das echte SDK: `AsyncBatches.results` ist eine Coroutine, die erst den
+    # Iterator liefert. Bis 14.10.2026 stand hier ein Async-Generator -- der Test war
+    # gruen, das Abholen scheiterte seit dem ersten echten Batch (11.10.) jede Stunde.
+    async def ergebnisse():
         yield mock_result
+
+    async def mock_results(batch_id):
+        return ergebnisse()
 
     provider._client.messages.batches.results = mock_results
 

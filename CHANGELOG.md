@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Batches werden wieder abgeholt — 2026-10-14
+
+**Warum:** Am 11.10. gingen die ersten echten Batches hinaus (Konsens-Lücken, Kapitalallokation,
+51 Positionen). Anthropic rechnete sie ab, das Abholen scheiterte aber jede Stunde:
+`AsyncBatches.results` ist eine Coroutine, und ohne `await` gab es nichts zu iterieren. Die
+Urteile fehlten, die Kosten auch -- in der Summe des Maschinenraums klaffte eine Lücke zur
+Abrechnung von Anthropic. Der Unit-Test baute das SDK als Async-Generator nach und war grün.
+Der Lauf endete trotz Fehler mit 0, auf der Kachel stand drei Tage lang grün „wartet“.
+
+**Änderungen:**
+- `fetch_batch_results` wartet auf `results()`; der Test bildet das SDK jetzt in seiner echten
+  Form nach.
+- Lässt sich ein Batch nicht abholen, endet der Job `agenten` rot (`ABHOLFEHLER`).
+
 ### Wertzuwachs: Kurs als Verlauf, Zu- und Abgänge je Monat/Jahr — 2026-10-12
 
 **Warum:** Nach der Korrektur vom 10.10. wirkte die Kurve noch falsch. Sie war es nicht: Der

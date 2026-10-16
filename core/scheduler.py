@@ -45,6 +45,10 @@ from core.constants import WEB_SEARCH_TYPE
 # "Jetzt ausfuehren" auf der Seite (dort kaeme das Ergebnis erst eine Stunde spaeter).
 _BATCH_ERLAUBT: contextvars.ContextVar[bool] = contextvars.ContextVar("batch_erlaubt", default=False)
 
+#: Woran der Job `agenten` ein gescheitertes Abholen erkennt: Er endet dann rot, nicht
+#: gruen mit "wartet" (14.10.2026 -- drei Tage lang unbemerkt).
+ABHOLFEHLER = "Fehler beim Abholen"
+
 #: Wie ein Mensch die Batch-Agenten liest (Job-Ausgabe, ops-core-Kachel).
 BATCH_NAMEN = {
     "storychecker": "Storychecker", "fundamental_analyzer": "Fundamentalwert",
@@ -1253,7 +1257,7 @@ class AgentSchedulerService:
                                   + (f", {errors} ohne Ergebnis" if errors else ""))
                 except Exception as exc:
                     logger.exception("Error processing batch %s", batch_row.batch_id)
-                    zeilen.append(f"Batch {BATCH_NAMEN.get(batch_row.agent_name, batch_row.agent_name)}: Fehler beim Abholen ({type(exc).__name__})")
+                    zeilen.append(f"Batch {BATCH_NAMEN.get(batch_row.agent_name, batch_row.agent_name)}: {ABHOLFEHLER} ({type(exc).__name__})")
         finally:
             conn.close()
         return zeilen

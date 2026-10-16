@@ -214,6 +214,19 @@ class TestSkript:
         skript.agenten(d, batch_api=True)
         d.batches_abholen.assert_called_once()
 
+    def test_ein_batch_der_sich_nicht_abholen_laesst_macht_den_lauf_rot(self, capsys):
+        """14.10.2026: Drei Tage lang scheiterte das Abholen jede Stunde, der Lauf endete
+        mit 0, und die Kachel zeigte gruen und "wartet" -- zwei bezahlte Batches, nie
+        ausgewertet."""
+        from core.scheduler import ABHOLFEHLER
+        d = MagicMock()
+        d.laufen_lassen.return_value = (0, [], [])
+        d.batches_abholen.return_value = [f"Batch Kapitalallokation: {ABHOLFEHLER} (TypeError)"]
+        d.wartet.return_value = {"anzahl": 1, "seit": "2026-10-11T13:05:02+02:00",
+                                 "was": ["Kapitalallokation"]}
+        assert skript.agenten(d, batch_api=True) == 1
+        assert "Kapitalallokation" in capsys.readouterr().out
+
     def test_meldet_ins_run_log_worauf_es_wartet(self, capsys, tmp_path, monkeypatch):
         """02.10.2026: der Messwert wartet fuer die ops-core-Kachel, Form wie im
         Vertrag (heimnetzwerk docs/haus/vertraege/wartet.ndjson)."""
