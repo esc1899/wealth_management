@@ -42,9 +42,13 @@ class PositionAnalysesRepository:
         summary: Optional[str],
         session_id: Optional[int] = None,
         analysis_text: Optional[str] = None,
+        created_at: Optional[datetime] = None,
     ) -> PositionAnalysis:
-        """Insert a new analysis record and return it."""
-        now = datetime.now(timezone.utc)
+        """Insert a new analysis record and return it.
+
+        ``created_at``: wann das Urteil entstand, wenn nicht jetzt -- bei einem Batch der
+        Zeitpunkt des Abschickens, nicht der des Abholens (UTC-aware)."""
+        now = created_at or datetime.now(timezone.utc)
         # Survivorship insurance (FEAT-59 v2): capture ticker + scope now, while the
         # position still exists, so the verdict stays evaluable if it is later sold.
         ticker_snapshot, scope_snapshot = self._position_snapshot(position_id)

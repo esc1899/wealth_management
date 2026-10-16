@@ -388,3 +388,29 @@ def test_devils_advocate_aus_dem_batch_braucht_ein_urteil(tmp_path):
                                           [_ergebnis("da_7", [urteil]), _ergebnis("da_8", [nur_text])], conn)
     assert (ok, fehler) == (1, 1)
     assert PositionAnalysesRepository(conn).get_latest_bulk([7], "devils_advocate")[7].verdict == "fragil"
+
+
+# ------------------------------------------------------------------
+# 16.10.2026: Ein Urteil aus dem Batch traegt den Tag, an dem der Batch abging
+# ------------------------------------------------------------------
+
+
+def test_urteil_aus_dem_batch_traegt_den_zeitpunkt_des_abschickens(tmp_path):
+    from core.scheduler import _abgeschickt
+    from core.storage.analyses import PositionAnalysesRepository
+    s = _scheduler_mit_db(tmp_path)
+    s._lookup_position = lambda pid, conn: None
+    conn = s._open_conn()
+    urteil = MagicMock(type="tool_use", input={"verdict": "fragil", "summary": "kurz", "analysis": "lang"})
+    urteil.name = "submit_da_verdict"
+    stand = _abgeschickt("2026-10-11 11:05:00")   # wie SQLite datetime('now') schreibt
+    assert s._process_batch_results("devils_advocate", "Standard", [_ergebnis("da_7", [urteil])],
+                                    conn, stand=stand) == (1, 0)
+    gespeichert = PositionAnalysesRepository(conn).get_latest_bulk([7], "devils_advocate")[7].created_at
+    assert gespeichert == datetime(2026, 10, 11, 11, 5, tzinfo=stand.tzinfo)
+
+
+def test_ohne_zeitpunkt_des_abschickens_gilt_jetzt():
+    from core.scheduler import _abgeschickt
+    assert _abgeschickt(None) is None and _abgeschickt("kaputt") is None
+    assert _abgeschickt("2026-10-11T11:05:00+00:00").utcoffset().total_seconds() == 0

@@ -75,6 +75,19 @@ FEHLVERSUCHE_JE_TERMIN = 3
 # (jobs_umstellen); "Jetzt ausfuehren" geht bei ihnen weiter.
 
 
+def _abgeschickt(submitted_at: Optional[str]) -> Optional[datetime]:
+    """Wann ein Batch abgeschickt wurde, UTC-aware -- das Datum seiner Urteile. Abgeholt
+    wurden die Batches vom 11.10.2026 erst am 14.10.; die Kacheln nannten den 14. und
+    machten die Urteile drei Tage juenger, als sie waren."""
+    if not submitted_at:
+        return None
+    try:
+        zeit = datetime.fromisoformat(submitted_at)
+    except ValueError:
+        return None
+    return zeit if zeit.tzinfo else zeit.replace(tzinfo=timezone.utc)
+
+
 def letzte_feuerzeit(job: ScheduledJob, now: datetime) -> Optional[datetime]:
     """The most recent scheduled time of this job at or before `now` (local, naive).
     None for manual jobs — they are never due."""
@@ -1250,7 +1263,8 @@ class AgentSchedulerService:
                         continue
                     logger.info("Batch %s complete (%d results)", batch_row.batch_id, len(results))
                     success, errors = self._process_batch_results(
-                        batch_row.agent_name, batch_row.skill_name or "", results, conn, batch_row.kontext)
+                        batch_row.agent_name, batch_row.skill_name or "", results, conn, batch_row.kontext,
+                        stand=_abgeschickt(batch_row.submitted_at))
                     batch_repo.mark_done(batch_row.batch_id, success, errors)
                     logger.info("Batch %s: %d ok, %d errors", batch_row.batch_id, success, errors)
                     zeilen.append(f"Batch {BATCH_NAMEN.get(batch_row.agent_name, batch_row.agent_name)}: {success} ausgewertet"
@@ -1281,7 +1295,9 @@ class AgentSchedulerService:
             logger.exception("Batch usage not booked (%s)", agent_name)
 
     def _process_batch_results(self, agent_name: str, skill_name: str, results, conn,
-                               kontext: Optional[str] = None) -> tuple[int, int]:
+                               kontext: Optional[str] = None,
+                               stand: Optional[datetime] = None) -> tuple[int, int]:
+        """``stand``: wann der Batch abgeschickt wurde -- das Datum seiner Urteile."""
         success, errors = 0, 0
         for result in results:
             try:
@@ -1301,11 +1317,11 @@ class AgentSchedulerService:
                         errors += 1
                         continue
                 if agent_name == "storychecker":
-                    ok = self._process_sc_result(result, skill_name, conn)
+                    ok = self._process_sc_result(result, skill_name, conn, stand)
                 elif agent_name == "consensus_gap":
-                    ok = self._process_cg_result(result, skill_name, conn)
+                    ok = self._process_cg_result(result, skill_name, conn, stand)
                 elif agent_name == "fundamental_analyzer":
-                    ok = self._process_fa_result(result, skill_name, conn)
+                    ok = self._process_fa_result(result, skill_name, conn, stand)
                 elif agent_name == "sector_rotation":
                     ok = self._process_sr_result(result, skill_name, conn)
                 elif agent_name == "structural_scan":
@@ -1315,9 +1331,9 @@ class AgentSchedulerService:
                 elif agent_name == "news_digest":
                     ok = self._process_news_result(result, skill_name, kontext, conn)
                 elif agent_name == "devils_advocate":
-                    ok = self._process_da_result(result, skill_name, conn)
+                    ok = self._process_da_result(result, skill_name, conn, stand)
                 elif agent_name == "capital_allocator":
-                    ok = self._process_ca_result(result, skill_name, conn)
+                    ok = self._process_ca_result(result, skill_name, conn, stand)
                 else:
                     logger.warning("Unknown batch agent_name: %s", agent_name)
                     ok = False
@@ -1341,7 +1357,8 @@ class AgentSchedulerService:
         except Exception:
             return None
 
-    def _process_sc_result(self, result, skill_name: str, conn) -> bool:
+    def _process_sc_result(self, result, skill_name: str, conn,
+                           stand: Optional[datetime] = None) -> bool:
         from agents.storychecker_agent import _extract_verdict, _extract_summary
         from core.storage.analyses import PositionAnalysesRepository
         from core.storage.storychecker import StorycheckerRepository
@@ -1383,10 +1400,12 @@ class AgentSchedulerService:
             verdict=_extract_verdict(content),
             summary=_extract_summary(content),
             session_id=session.id,
+            created_at=stand,
         )
         return True
 
-    def _process_cg_result(self, result, skill_name: str, conn) -> bool:
+    def _process_cg_result(self, result, skill_name: str, conn,
+                           stand: Optional[datetime] = None) -> bool:
         from agents.consensus_gap_agent import VALID_VERDICTS
         from core.storage.analyses import PositionAnalysesRepository
         from core.storage.consensus_gap import ConsensusGapRepository
@@ -1431,10 +1450,12 @@ class AgentSchedulerService:
             verdict=verdict,
             summary=summary,
             session_id=session.id,
+            created_at=stand,
         )
         return True
 
-    def _process_fa_result(self, result, skill_name: str, conn) -> bool:
+    def _process_fa_result(self, result, skill_name: str, conn,
+                           stand: Optional[datetime] = None) -> bool:
         from agents.fundamental_analyzer_agent import VALID_VERDICTS, _extract_verdict, _extract_summary
         from core.storage.analyses import PositionAnalysesRepository
         from core.storage.fundamental_analyzer import FundamentalAnalyzerRepository
@@ -1482,6 +1503,7 @@ class AgentSchedulerService:
             verdict=verdict,
             summary=summary,
             session_id=session.id,
+            created_at=stand,
         )
         return True
 
@@ -1575,7 +1597,8 @@ class AgentSchedulerService:
         repo.add_message(run.id, "assistant", digest)
         return True
 
-    def _process_da_result(self, result, skill_name: str, conn) -> bool:
+    def _process_da_result(self, result, skill_name: str, conn,
+                           stand: Optional[datetime] = None) -> bool:
         """Wie live, ohne den zweiten Aufruf: Gibt das Modell kein Urteil ab,
         zaehlt die Position als ohne Ergebnis (wie bei den Konsens-Luecken)."""
         from agents.devils_advocate_agent import AGENT_NAME, VALID_VERDICTS, format_position
@@ -1609,7 +1632,7 @@ class AgentSchedulerService:
         da_repo.add_message(session.id, "assistant", analysis or self._text_from_batch_message(message) or summary)
         PositionAnalysesRepository(conn).save(
             position_id=position_id, agent=AGENT_NAME, skill_name=skill_name,
-            verdict=verdict, summary=summary, session_id=session.id)
+            verdict=verdict, summary=summary, session_id=session.id, created_at=stand)
         return True
 
     async def _submit_news_batch(self, tickers, ticker_names, skill_name, skill_prompt, model, conn) -> str:
@@ -1669,7 +1692,8 @@ class AgentSchedulerService:
         BatchQueueRepository(conn).create(batch_id, "capital_allocator", skill_name, "de", len(requests))
         return batch_id
 
-    def _process_ca_result(self, result, skill_name: str, conn) -> bool:
+    def _process_ca_result(self, result, skill_name: str, conn,
+                           stand: Optional[datetime] = None) -> bool:
         """Wie live: Urteil aus dem Tool ``submit_ca_verdict``, Sitzung und Analyse; ohne
         gueltiges Urteil zaehlt die Position als ohne Ergebnis."""
         from agents.capital_allocator_agent import AGENT_NAME, VALID_VERDICTS, format_position
@@ -1703,7 +1727,7 @@ class AgentSchedulerService:
         ca_repo.add_message(session.id, "assistant", self._text_from_batch_message(message) or analysis or summary)
         PositionAnalysesRepository(conn).save(
             position_id=position_id, agent=AGENT_NAME, skill_name=skill_name,
-            verdict=verdict, summary=summary, session_id=session.id)
+            verdict=verdict, summary=summary, session_id=session.id, created_at=stand)
         return True
 
     async def _submit_sector_rotation_batch(self, pub_positions, skill_name: str, skill_prompt: str, model: str, conn, _log) -> str:

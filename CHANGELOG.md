@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Urteile aus dem Batch tragen den Tag des Abschickens — 2026-10-16
+
+**Warum:** „Depot prüfen“ lief am 11.10., die Batches wurden erst am 14.10. abgeholt -- die
+Kacheln nannten für Konsens und Kapital den 14. und machten die Urteile drei Tage jünger, als sie
+waren. Blindzeit ist eine Aussage.
+
+**Änderungen:**
+- Ein Urteil aus dem Batch (Storychecker, Konsens-Lücken, Fundamentalanalyse, Devil's Advocate,
+  Kapitalallokation) bekommt als Datum `submitted_at` des Batches, nicht den Zeitpunkt des
+  Abholens (`core/scheduler.py::_abgeschickt`, `PositionAnalysesRepository.save(created_at=...)`).
+- Die schon am 14.10. gespeicherten Urteile bleiben so; es gilt ab dem nächsten Lauf.
+
 ### Batches werden wieder abgeholt — 2026-10-14
 
 **Warum:** Am 11.10. gingen die ersten echten Batches hinaus (Konsens-Lücken, Kapitalallokation,
