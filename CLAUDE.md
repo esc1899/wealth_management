@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**The house first:** This repo is one system among several on the Mac mini. System map and roadmap ("naechster Punkt" = top open line): `~/Projects/heimnetzwerk/docs/haus/` (`systeme.md`, `fahrplan.md`).
+**The house first:** This repo is one system among several on the Mac mini. System map and roadmap ("naechster Punkt" = first `ops baustellen`, what is broken in operation, then the top open line): `~/Projects/heimnetzwerk/docs/haus/` (`systeme.md`, `fahrplan.md`).
 
 ## Commands
 
