@@ -1431,6 +1431,7 @@ kacheln:
   bewegung_grund: "Heute {prozent}: {grund}"
   agent_news: "Nachrichten"
   nie: "Noch nie geprüft."
+  ohne_checks: "Keine Checks für {klasse} – sie beurteilen Unternehmen und Fonds."
   ohne_satz: "Geprüft, ohne Zusammenfassung."
   heute: "heute"
   seit_kauf: "seit Kauf"

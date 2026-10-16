@@ -55,6 +55,24 @@ class TestVorrang:
         k = kachel(_pos(), "depot", _bew(), {})
         assert k.grund == "nie" and k.satz is None
 
+    def test_rohstoff_ohne_checks_auch_ohne_alte_urteile(self):
+        k = kachel(_pos(), "depot", _bew(day=1.0), {
+            "storychecker": _urteil("storychecker", "gefaehrdet", "Alt.")}, pruefbar=False)
+        assert (k.grund, k.satz, k.urteile, k.nie) == ("ohne", None, [], [])
+        assert "Keine Checks für Aktie" in inhalt_html(k)
+
+    def test_rohstoff_mit_starker_bewegung(self):
+        k = kachel(_pos(), "depot", _bew(day=-BEWEGUNG_PROZENT), {}, pruefbar=False)
+        assert k.grund == "bewegung"
+
+    def test_edelmetall_ist_nicht_pruefbar(self):
+        from core.pruefung import pruefbar
+        assert pruefbar(SimpleNamespace(asset_class="Aktie"))
+        assert pruefbar(SimpleNamespace(asset_class="Unbekannt"))
+        assert not pruefbar(SimpleNamespace(asset_class="Edelmetall"))
+        assert sortiert([kachel(_pos(1), "depot", _bew(), {}, pruefbar=False),
+                         kachel(_pos(2), "depot", _bew(), {})])[0].position_id == 2
+
     def test_urteil_ohne_satz_ist_geprueft(self):
         k = kachel(_pos(), "depot", _bew(), {"storychecker": _urteil("storychecker", "intact", None)})
         assert k.grund == "geprueft" and k.satz is None

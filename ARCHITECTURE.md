@@ -211,6 +211,13 @@ Welche Checks zu einer Prüfung gehören, steht je Liste in `app_config`
 eine feste Reihe (`MOEGLICH`); Devil's Advocate nur auf der Watchlist. Kacheln und Titelseite
 zeigen genau die Auswahl, ein gewählter Check ohne Urteil steht als „nie geprüft“ da.
 
+Rohstoffe prüft kein Check (`core/pruefung.py::pruefbar`, Merkmal `pruefbar: false` der Klasse
+in `config/asset_classes.yaml`, heute nur Edelmetall): Die Checks beurteilen Unternehmen und
+Fonds -- These, Zahlen, Konsens, Kapitalverwendung --, ein Rohstoff hat nichts davon. Kein Job,
+kein Knopf und nicht die Seite Watchlist Checker nehmen ihn; seine Kachel sagt „Keine Checks
+für …“ (Grund `ohne`, ganz unten), zeigt keine Urteile, auch alte nicht, und der Portfolio
+Checker bekommt statt der Urteile denselben Hinweis.
+
 „Jetzt checken“ (Kachel und Titelseite) ruft `core/background_jobs.py::run_durchgang`: einen
 Durchgang beginnen, die Cloud-Checks parallel, danach der Watchlist Checker (er liest deren
 Urteile), abschließen. Der Abschluss ordnet dem Durchgang per UPDATE die Analysen zu, die seit

@@ -10,6 +10,9 @@
 #   manual_valuation: true — "Schätzwert aktualisieren" button shown in detail view
 #   extra_fields — type-specific fields stored in extra_data (JSON, encrypted)
 #   farbe — the class colour, the same everywhere in the app (tiles; monogram instead of a logo)
+#   pruefbar: false — the checks (story, fundamentals, consensus, capital allocation, devil's
+#                     advocate) do not run for this class and its tiles show no verdicts: they
+#                     judge companies and funds, a commodity has none of that (default: true)
 
 asset_classes:
 
@@ -128,6 +131,7 @@ asset_classes:
   Edelmetall:
     investment_type: Rohstoffe
     farbe: "#A07A1C"
+    pruefbar: false
     default_unit: Troy Oz
     unit_options:
       - Troy Oz

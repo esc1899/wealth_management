@@ -252,6 +252,13 @@ def test_urteilszeilen_lesen_alle_gewaehlten_checks():
     assert "  - fundamental_analyzer: fair — Preis passt." in text
 
 
+def test_urteilszeilen_rohstoff_ohne_checks():
+    gold = SimpleNamespace(id=2, name="Gold", ticker="GC=F", asset_class="Edelmetall")
+    alt = SimpleNamespace(verdict="gefaehrdet", summary="Alt.")
+    text = urteilszeilen([gold], {"storychecker": {2: alt}}, ("storychecker",))
+    assert text == "- Gold (GC=F): keine Checks für Edelmetall"
+
+
 # --- Scheduler mit einer Datenbank im Testordner -----------------------------
 
 @pytest.fixture
@@ -357,6 +364,16 @@ class TestPruefungsJob:
         for p in (a, b):
             [x] = ds.fuer_titel(p.id)
             assert x.beendet and x.ausloeser == "job" and x.fehler is None
+
+    def test_rohstoffe_laufen_nicht_mit(self, dienst):
+        d, c, enc = dienst
+        a, b, laeufe = self._vorbereiten(d, c, enc)
+        gold = PositionsRepository(c, enc).add(Position(
+            asset_class="Edelmetall", investment_type="Rohstoffe", name="Gold", ticker="GC=F",
+            unit="Troy Oz", added_date=date(2026, 1, 1), in_portfolio=True))
+        asyncio.run(d._run_pruefung_job(self._job(), c, lambda _: None, "depot"))
+        assert all(namen == ["Alpha", "Beta"] for _, _, namen in laeufe)
+        assert DurchgaengeRepository(c).fuer_titel(gold.id) == []
 
     def test_ein_check_scheitert_der_job_bleibt_gruen(self, dienst):
         d, c, enc = dienst

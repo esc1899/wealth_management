@@ -23,6 +23,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from core.i18n import current_language, fmt_date, t
+from core.pruefung import pruefbar
 from core.tagesbild import prozent
 from core.ui import optik
 from core.titelseite import (FARBE, FARBE_SONST, band, kurs_veraenderung, news_abschnitt,
@@ -109,13 +110,14 @@ def _kurs(art: str, position) -> None:
         st.markdown(t("titelseite.kurs_satz").format(jahr=prozent(jahr), monat=prozent(monat)))
 
     von = verlauf[0].date if verlauf else heute - timedelta(days=365)
-    agenten = auswahl_der_liste(art)
+    agenten = auswahl_der_liste(art) if pruefbar(position) else ()
     strecken = band(get_analyses_repo().get_for_position(position.id, limit=1000), agenten, von, heute)
     if not verlauf and not strecken:
         return
 
     st.plotly_chart(_chart(verlauf, strecken, agenten, von, heute), key="ts-chart")
-    st.caption(t("titelseite.band_hinweis"))
+    if agenten:
+        st.caption(t("titelseite.band_hinweis"))
 
 
 def _chart(verlauf, strecken, agenten, von: date, bis: date) -> go.Figure:
@@ -195,6 +197,9 @@ def _urteile(art: str, position, offener_check: str | None) -> None:
     from state import get_analysis_service
 
     st.subheader(t("titelseite.urteile"))
+    if not pruefbar(position):
+        st.markdown(t("kacheln.ohne_checks").format(klasse=position.asset_class))
+        return
     agenten = auswahl_der_liste(art)
     dienst = get_analysis_service()
     jeweils = {a: dienst.get_verdict(position.id, a) for a in agenten}
@@ -248,7 +253,7 @@ def jetzt_checken(art: str, position, jeweils: dict, key: str, klein: bool = Fal
     from core.background_jobs import run_durchgang
 
     agenten = auswahl_der_liste(art)
-    if not agenten:
+    if not agenten or not pruefbar(position):
         return
     jetzt = datetime.now(timezone.utc)
     veraltet = sum(_veraltet(jeweils.get(a), jetzt) for a in agenten)

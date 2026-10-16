@@ -17,12 +17,20 @@ from core.storage.models import PortfolioStoryAnalysis
 
 
 def urteilszeilen(positionen: Sequence, urteile: dict, checks: Sequence[str],
-                  name_von: Callable[[str], str] = str, ausstehend: str = "noch nicht geprüft") -> str:
-    """Je Titel eine Zeile, darunter je gewähltem Check Urteil und Satz.
+                  name_von: Callable[[str], str] = str, ausstehend: str = "noch nicht geprüft",
+                  ohne: str = "keine Checks für {klasse}") -> str:
+    """Je Titel eine Zeile, darunter je gewähltem Check Urteil und Satz; ein Rohstoff
+    (``core/pruefung.py::pruefbar``) nur mit dem Hinweis, dass ihn kein Check prüft -- sonst
+    läse das Modell "noch nicht geprüft" oder ein altes Urteil.
     ``urteile``: ``{check: {position_id: PositionAnalysis}}``."""
+    from core.pruefung import pruefbar
+
     zeilen = []
     for p in positionen:
         if p.id is None:
+            continue
+        if not pruefbar(p):
+            zeilen.append(f"- {p.name} ({p.ticker or '—'}): {ohne.format(klasse=p.asset_class)}")
             continue
         zeilen.append(f"- {p.name} ({p.ticker or '—'})")
         for check in checks:
@@ -38,14 +46,14 @@ def urteilszeilen(positionen: Sequence, urteile: dict, checks: Sequence[str],
 async def story_check(agent, story, positionen: Sequence, bewertungen: Sequence, urteile: dict,
                       checks: Sequence[str], name_von: Callable[[str], str] = str,
                       leer: str = "", ausstehend: str = "noch nicht geprüft",
-                      keine: str = "") -> PortfolioStoryAnalysis:
+                      keine: str = "", ohne: str = "keine Checks für {klasse}") -> PortfolioStoryAnalysis:
     """Ein Lauf gegen die Story; gibt die Analyse zum Speichern zurück (speichert nicht)."""
     snapshot = (build_portfolio_snapshot(list(positionen), list(bewertungen)) if positionen
                 else "## Portfolio\n" + leer + "\n")
     ergebnis = await agent.analyze_story_and_performance(
         story=story,
         portfolio_snapshot=snapshot,
-        position_verdicts=urteilszeilen(positionen, urteile, checks, name_von, ausstehend) or keine,
+        position_verdicts=urteilszeilen(positionen, urteile, checks, name_von, ausstehend, ohne) or keine,
     )
     return PortfolioStoryAnalysis(
         verdict=ergebnis.verdict,

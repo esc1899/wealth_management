@@ -24,6 +24,7 @@ from core.ui.verdicts import VERDICT_CONFIGS, verdict_icon, cloud_notice, fmt_ve
 from core.accumulation import accumulation_for_position
 from core.shareholder_yield import cached_buyback_yield_map
 from core.i18n import t, current_language
+from core.pruefung import pruefbar
 
 st.set_page_config(page_title="Watchlist Checker", layout="wide")
 
@@ -139,7 +140,8 @@ agent = get_watchlist_checker_agent()
 agent_runs_repo = get_agent_runs_repo()
 wc_repo = get_watchlist_checker_repo()
 
-watchlist = _portfolio_service.get_watchlist_positions()
+# Rohstoffe prueft kein Check -- auch dieser nicht (core/pruefung.py::pruefbar).
+watchlist = [p for p in _portfolio_service.get_watchlist_positions() if pruefbar(p)]
 
 if not watchlist:
     st.info(t("watchlist_checker.no_watchlist"))

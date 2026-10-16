@@ -41,7 +41,7 @@ _SPALTEN = 3
 _FARBE_SONST = "#5E6B7A"
 
 # Das Licht vor dem Satz je Grund (wie die Ampel der Startseite: rot, gelb, ohne, hohl).
-_NOTIZ = {"gefaehrdet": "rot", "bewegung": "gelb", "geprueft": "", "nie": "leer"}
+_NOTIZ = {"gefaehrdet": "rot", "bewegung": "gelb", "geprueft": "", "nie": "leer", "ohne": ""}
 
 CSS = """
 <style>
@@ -188,6 +188,8 @@ def inhalt_html(k: Kachel) -> str:
         satz = t("kacheln.bewegung").format(prozent=prozent(k.tag_prozent))
     elif k.grund == "nie":
         satz = t("kacheln.nie")
+    elif k.grund == "ohne":
+        satz = t("kacheln.ohne_checks").format(klasse=k.anlageklasse)
     else:
         satz = k.satz or t("kacheln.ohne_satz")
 
@@ -248,7 +250,7 @@ def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:
     from state import (get_analysis_service, get_app_config_repo, get_market_agent, get_market_repo,
                        get_news_repo)
     from core import bewegung
-    from core.pruefung import auswahl
+    from core.pruefung import auswahl, pruefbar
 
     # Nur gespeicherte Bewertungen — die Seite holt keine Kurse (das tun Kachel- und Kurs-Job).
     bewertungen = {
@@ -278,7 +280,8 @@ def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:
         urteile = {a: je_agent[a][p.id] for a in agenten if p.id in je_agent[a]}
         lauf = gesucht.get((p.ticker or "").upper())
         kacheln.append(kachel(p, art, v, urteile, vortag, aufnahme, agenten=agenten, schwelle=schwelle,
-                              bewegung_grund=bewegung.grund(lauf.result, p.ticker) if lauf else None))
+                              bewegung_grund=bewegung.grund(lauf.result, p.ticker) if lauf else None,
+                              pruefbar=pruefbar(p)))
     return kacheln
 
 

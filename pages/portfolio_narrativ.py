@@ -167,6 +167,7 @@ def _story_check(story: PortfolioStory) -> None:
             leer=t("portfolio_story.empty_portfolio"),
             ausstehend=t("portfolio_story.verdict_pending"),
             keine=t("portfolio_story.no_verdicts"),
+            ohne=t("kacheln.ohne_checks"),
         ))
     repo.save_analysis(analyse)
 

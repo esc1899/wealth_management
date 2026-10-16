@@ -833,7 +833,7 @@ class AgentSchedulerService:
         Durchgang; die Cloud-Checks laufen einer nach dem anderen ueber alle Titel, als Batch
         oder live. Fertig wird der Durchgang in ``durchgaenge_nachziehen`` -- gleich am Ende,
         oder beim Abholen, wenn alle Batches seiner Checks da sind."""
-        from core.pruefung import auswahl, modell, reihenfolge, skill_fuer
+        from core.pruefung import auswahl, modell, pruefbar, reihenfolge, skill_fuer
         from core.storage.app_config import AppConfigRepository
         from core.storage.durchgaenge import DurchgaengeRepository
         from core.storage.skills import SkillsRepository
@@ -842,7 +842,8 @@ class AgentSchedulerService:
         enc = build_encryption_service(self._enc_key, self._salt_path)
         positions_repo = PositionsRepository(conn, enc)
         quelle = positions_repo.get_portfolio() if liste == "depot" else positions_repo.get_watchlist()
-        titel = [p for p in quelle if p.id is not None and not p.analysis_excluded]
+        # Rohstoffe nicht: die Checks beurteilen Unternehmen und Fonds (pruefbar).
+        titel = [p for p in quelle if p.id is not None and not p.analysis_excluded and pruefbar(p)]
         app_cfg, skills_repo = AppConfigRepository(conn), SkillsRepository(conn)
         checks = auswahl(app_cfg, liste)
         if not titel or not checks:

@@ -43,6 +43,7 @@ class AssetClassConfig(BaseModel):
     extra_fields: List[str] = []
     anlagearten: List[str] = []
     farbe: str = "#5E6B7A"   # Farbe der Klasse, ueberall in der App dieselbe
+    pruefbar: bool = True    # laufen die Checks fuer Titel dieser Klasse (core/pruefung.py)
 
     @field_validator("visible_fields")
     @classmethod

@@ -40,6 +40,17 @@ def auswahl(app_cfg, liste: str) -> tuple[str, ...]:
     return tuple(c for c in moeglich if c in gespeichert)
 
 
+def pruefbar(position) -> bool:
+    """Ob die Checks zu dem Titel etwas sagen können. Sie beurteilen Unternehmen und Fonds
+    (These, Zahlen, Konsens, Kapitalverwendung); ein Rohstoff hat nichts davon (Erik,
+    16.10.2026). Das sagt die Klasse (``pruefbar`` in config/asset_classes.yaml); eine
+    unbekannte gilt als prüfbar. Kein Lauf nimmt den Titel, keine Kachel zeigt ein Urteil."""
+    from core.asset_class_config import get_asset_class_registry
+
+    cfg = get_asset_class_registry().get(getattr(position, "asset_class", None) or "")
+    return cfg is None or cfg.pruefbar
+
+
 def auswahl_setzen(app_cfg, liste: str, checks: Iterable[str]) -> tuple[str, ...]:
     """Speichert die Auswahl (nur Mögliches, feste Reihenfolge) und gibt sie zurück."""
     gewaehlt = set(checks)

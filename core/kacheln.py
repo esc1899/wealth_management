@@ -12,6 +12,8 @@ Welcher Satz oben steht, entscheidet ein fester Vorrang, nicht der Agent:
    Richtung; seit 11.10.2026 mit dem Grund aus den Nachrichten, wenn der Job ihn gefunden hat
 3. **geprüft** — sonst der jüngste Satz irgendeines Checkers, mit Datum
 4. **nie geprüft** — ohne jedes Urteil; Blindzeit ist eine Aussage, kein "alles gut"
+5. **ohne Checks** — ein Rohstoff (``core/pruefung.py::pruefbar``): kein Check sagt etwas zu
+   ihm, also steht auch kein Urteil da, nur seine Bewegung
 
 Termine (Zahlen, Ex-Tag) und Zielkurse fehlen, weil die App für beides keine Quelle hat.
 Nach demselben Vorrang wird sortiert: Was handeln lässt, steht oben.
@@ -40,7 +42,7 @@ _GEFAEHRDET = {("storychecker", "gefährdet"), ("storychecker", "gefaehrdet"),
                ("devils_advocate", "kritisch")}
 
 # Rang je Grund — kleiner steht weiter oben.
-RANG = {"gefaehrdet": 0, "bewegung": 1, "geprueft": 2, "nie": 3}
+RANG = {"gefaehrdet": 0, "bewegung": 1, "geprueft": 2, "nie": 3, "ohne": 4}
 
 
 @dataclass
@@ -92,13 +94,16 @@ def tagesprozent(day_pnl_pct: Optional[float], kurs: Optional[float],
 def kachel(position, art: str, valuation=None, urteile: Optional[dict] = None,
            vortag: Optional[float] = None, aufnahme_kurs: Optional[float] = None,
            agenten: Optional[Sequence[str]] = None, schwelle: float = BEWEGUNG_PROZENT,
-           bewegung_grund: Optional[str] = None) -> Kachel:
+           bewegung_grund: Optional[str] = None, pruefbar: bool = True) -> Kachel:
     """Eine Kachel aus Position, Bewertung (``PortfolioValuation`` oder None) und den
     jüngsten Urteilen je Agent (``{agent: PositionAnalysis}``). ``aufnahme_kurs``: der
     gespeicherte Schlusskurs am Tag, an dem der Titel auf die Watchlist kam. ``agenten``: die
-    Auswahl der Liste; ohne sie alles, was die Liste kennt."""
+    Auswahl der Liste; ohne sie alles, was die Liste kennt. ``pruefbar=False``: keine Checks,
+    auch alte Urteile nicht."""
     if agenten is None:
         agenten = MOEGLICH[art]
+    if not pruefbar:
+        agenten = ()
     vorhanden = [
         Urteil(a, u.verdict, u.summary, _utc(u.created_at))
         for a in agenten
@@ -108,7 +113,7 @@ def kachel(position, art: str, valuation=None, urteile: Optional[dict] = None,
     kurs = valuation.current_price_eur if valuation else None
     tag = tagesprozent(valuation.day_pnl_pct if valuation else None, kurs, vortag)
 
-    grund, satz, quelle = "nie", None, None
+    grund, satz, quelle = ("nie" if pruefbar else "ohne"), None, None
     angriff = [u for u in vorhanden if (u.agent, u.verdict) in _GEFAEHRDET]
     mit_satz = sorted((u for u in vorhanden if u.summary),
                       key=lambda u: u.created_at or datetime.min.replace(tzinfo=timezone.utc),

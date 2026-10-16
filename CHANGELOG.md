@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Rohstoffe ohne Checks — 2026-10-16
+
+**Warum:** Die Checks liefen auch über Gold & Co. Storychecker, Fundamentalanalyse, Konsens,
+Kapitalallokation und Devil's Advocate beurteilen Unternehmen und Fonds; zu einem Rohstoff
+sagen sie nichts, was handeln lässt -- sie kosten nur und füllen die Kachel mit Scheinurteilen.
+
+**Änderungen:**
+- Neues Merkmal `pruefbar` je Anlageklasse (`config/asset_classes.yaml`), `false` bei
+  Edelmetall; gelesen über `core/pruefung.py::pruefbar`.
+- „Depot prüfen“/„Watchlist prüfen“ und die Seite Watchlist Checker lassen solche Titel aus,
+  „Jetzt checken“ erscheint bei ihnen nicht.
+- Kachel und Titelseite: statt der Urteile ein Satz „Keine Checks für Edelmetall“ (Grund
+  `ohne`, sortiert ans Ende); eine starke Bewegung steht weiter oben. Alte Urteile bleiben in
+  der Datenbank, werden aber nicht mehr gezeigt.
+- Der Portfolio Checker liest für sie denselben Hinweis statt „noch nicht geprüft“.
+
 ### Urteile aus dem Batch tragen den Tag des Abschickens — 2026-10-16
 
 **Warum:** „Depot prüfen“ lief am 11.10., die Batches wurden erst am 14.10. abgeholt -- die
