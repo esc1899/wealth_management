@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Der Tag mit einer Prozentzahl — 2026-10-16
+
+**Warum:** Oben auf dem Depot und auf der Analyse stand „+x % Analyse · +y % Gesamt“ -- zwei
+Zahlen für eine Frage. Erik braucht eine.
+
+**Änderungen:**
+- `core/ui/tagesperformance.zeigen` nennt nur noch eine Prozentzahl, dieselbe wie die Kachel der
+  Startseite (`core/tagesbild.py`: Tagesgewinn gegen den Vortageswert der Titel mit Tageskurs).
+
 ### Rohstoffe ohne Checks — 2026-10-16
 
 **Warum:** Die Checks liefen auch über Gold & Co. Storychecker, Fundamentalanalyse, Konsens,

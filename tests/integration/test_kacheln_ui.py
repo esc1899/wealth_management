@@ -162,5 +162,6 @@ def test_depot_zeigt_den_tag_wie_die_analyse(depot_und_watchlist, monkeypatch):
     assert not depot.exception, depot.exception
     # Die Zeile kommt aus core/ui/tagesperformance.zeigen -- dieselbe Funktion wie auf der Analyse.
     zeile = next(m.value for m in depot.markdown if m.value.startswith("**Heute:"))
-    assert "+5,00" in zeile and "+0.33% Analyse" in zeile and "+0.33% Gesamt" in zeile
+    assert "+5,00" in zeile and "+0,33 %" in zeile
+    assert "Analyse" not in zeile and "Gesamt" not in zeile
     assert depot.get("plotly_chart"), "das Tages-Chart fehlt"

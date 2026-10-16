@@ -89,7 +89,7 @@ with _w2.popover(t("analysis.werte_erklaerung_knopf")):
 # Heute (core/ui/tagesperformance.py, dieselbe Anzeige wie oben auf dem Depot)
 # ------------------------------------------------------------------
 st.subheader(t("analysis.day_pnl_header"))
-tagesperformance.zeigen(valuations, _summen)
+tagesperformance.zeigen(valuations)
 
 st.divider()
 

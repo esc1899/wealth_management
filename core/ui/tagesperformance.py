@@ -20,6 +20,7 @@ import streamlit as st
 from core.currency import symbol
 from core.i18n import fmt_dt, t
 from core.symbol_aggregation import aggregate_day_pnl
+from core.tagesbild import prozent, tagesbild
 from core.ui.charts import bar_label, style_bar_chart
 
 
@@ -51,9 +52,9 @@ def kursstand(letzter_abruf: Optional[datetime]) -> str:
     return f"{t('analysis.prices_as_of')} {fmt_dt(letzter_abruf.replace(tzinfo=timezone.utc).astimezone())}"
 
 
-def zeigen(valuations, s: Optional[Summen] = None, hoehe: Optional[int] = None) -> None:
-    """Satz und Balken; ohne Tageskurse ein Hinweis statt der Balken."""
-    s = s or summen(valuations)
+def zeigen(valuations, hoehe: Optional[int] = None) -> None:
+    """Satz und Balken; ohne Tageskurse ein Hinweis statt der Balken. Eine Prozentzahl, die
+    der Kachel auf der Startseite (``core/tagesbild.py``): Erik braucht nicht zwei (16.10.2026)."""
     spalte_eur, spalte_pct = t("analysis.day_pnl_col"), t("analysis.day_pnl_pct_col")
     # Erst je Symbol zusammenfassen -- derselbe Titel in zwei Depots ist ein Balken.
     zeilen = [{"Symbol": a.symbol, spalte_eur: a.day_pnl_eur, spalte_pct: a.day_pnl_pct}
@@ -64,13 +65,9 @@ def zeigen(valuations, s: Optional[Summen] = None, hoehe: Optional[int] = None) 
 
     df = pd.DataFrame(zeilen).sort_values(spalte_eur)
     tag = df[spalte_eur].sum()
-    teile = []
-    if s.analyse - tag:
-        teile.append(f"{tag / (s.analyse - tag) * 100:+.2f}% Analyse")
-    if s.vermoegen - tag:
-        teile.append(f"{tag / (s.vermoegen - tag) * 100:+.2f}% Gesamt")
-    st.markdown(f"**{t('tagesperformance.heute')}: {symbol()}{_euro(tag, vorzeichen=True)} — "
-                f"{' · '.join(teile)}**")
+    pct = tagesbild(valuations).prozent
+    rest = f" — {prozent(pct)}" if pct is not None else ""
+    st.markdown(f"**{t('tagesperformance.heute')}: {symbol()}{_euro(tag, vorzeichen=True)}{rest}**")
 
     fig = px.bar(
         df, x="Symbol", y=spalte_eur,
