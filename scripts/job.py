@@ -131,8 +131,11 @@ def kurse(markt, fetch_hour: int, dienst=None) -> int:
         print(f"Nicht fällig: {fetch_hour:02d}:00 ist heute noch nicht erreicht, "
               f"oder der Tagesabruf lief seitdem schon.")
     if dienst is not None:
-        # Der Grund starker Bewegungen (core/bewegung.py): je Titel einmal am Tag, live.
-        dienst.bewegungen_nachrichten()
+        # Der Grund starker Bewegungen (core/bewegung.py): je Titel einmal am Tag, als Batch,
+        # wo das Modell es erlaubt. Wer Batches einreicht, meldet danach, worauf er wartet.
+        dienst.bewegungen_nachrichten(batch=True)
+        from core import ops_events
+        ops_events.report_waiting(**dienst.wartet())
     return 0
 
 

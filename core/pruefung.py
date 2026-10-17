@@ -105,19 +105,23 @@ def skill_fuer(app_cfg, skills_repo, liste: str, check: str) -> tuple[str, str]:
 # Ein Cloud-Modell je Bereich (Erik, 11.10.2026, mit Blick auf Lotsee: so einfach wie möglich)
 # ------------------------------------------------------------------
 
-#: Die drei Bereiche nach Datengrenze und die Agenten, deren Eintrag je Agent (``model_public_*``)
+#: Die Bereiche nach Datengrenze und die Agenten, deren Eintrag je Agent (``model_public_*``)
 #: der Bereich mitschreibt. Die Checks stehen im Depot, weil das ihr Rückfall ist; auf der
 #: Watchlist bekommen sie das Modell der Watchlist ausdrücklich (Knopf und Job). Devil's Advocate
-#: prüft nur die Watchlist.
+#: prüft nur die Watchlist. Der Grund starker Kursbewegungen (core/bewegung.py) hat ein eigenes
+#: Modell (Erik, 17.10.2026): eine kurze Suche je Titel, die ein kleines Modell trägt, ohne den
+#: Digest im Depot mitzuziehen.
 BEREICHE: dict[str, tuple[str, ...]] = {
     "depot": ("storychecker", "fundamental_analyzer", "consensus_gap", "capital_allocator",
               "news", "sector_rotation", "position_story"),
     "watchlist": ("devils_advocate",),
     "research": ("search", "structural_scan", "research"),
+    "bewegung": ("bewegung",),
 }
 
 #: Woher ein Bereich sein Modell nimmt, solange er noch keins gespeichert hat.
-_BISHER = {"depot": "storychecker", "watchlist": "devils_advocate", "research": "research"}
+_BISHER = {"depot": "storychecker", "watchlist": "devils_advocate", "research": "research",
+           "bewegung": "news"}
 
 
 def modell(app_cfg, bereich: str) -> str:

@@ -2,6 +2,7 @@
 Repository for LLM token usage tracking.
 """
 
+import os
 import sqlite3
 import sys
 from datetime import datetime, date
@@ -31,15 +32,22 @@ class UsageRepository:
         cache_write_tokens: Optional[int] = None,
         web_search_requests: Optional[int] = None,
         generation_id: Optional[str] = None,
+        lauf: Optional[str] = None,
     ) -> None:
+        """``lauf``: wozu der Aufruf gehoert -- ohne Angabe die run_id von ops-core, wenn ein Job
+        laeuft; ein Aufruf aus der App hat keinen Lauf (die Statistik fasst ihn je Tag zusammen)."""
+        from core.ops_events import _job
+
         self._conn.execute(
             "INSERT INTO llm_usage"
             " (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count,"
-            "  cache_read_tokens, cache_write_tokens, web_search_requests, generation_id, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "  cache_read_tokens, cache_write_tokens, web_search_requests, generation_id, created_at,"
+            "  lauf, job)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (agent, model, skill, source, input_tokens, output_tokens, duration_ms, position_count,
              cache_read_tokens, cache_write_tokens, web_search_requests, generation_id,
-             datetime.utcnow().isoformat()),
+             datetime.utcnow().isoformat(), lauf or os.environ.get("OPS_RUN_ID") or None,
+             _job(source)),
         )
         self._conn.commit()
         # The household books (2026-09-22): every call also goes into the
@@ -306,6 +314,19 @@ class UsageRepository:
             return 0.0
         avg_web_search = rows["avg_web_search"] or 0
         return _compute_cost(rows["avg_in"], rows["avg_out"], model, model_prices, web_search_requests=avg_web_search)
+
+    def aufrufe_seit(self, tage: int = 14) -> list[dict]:
+        """Jeder Aufruf der letzten ``tage`` Tage, ohne Reset-Filter -- fuer "Letzte Laeufe"
+        (``core/laeufe.py``); ein Reset setzt Summen zurueck, nicht, was gelaufen ist."""
+        rows = self._conn.execute(
+            """SELECT created_at, agent, skill, model, source, input_tokens, output_tokens,
+                      cache_read_tokens, cache_write_tokens, web_search_requests, lauf, job
+               FROM llm_usage
+               WHERE created_at >= datetime('now', ?)
+               ORDER BY created_at""",
+            (f"-{int(tage)} days",),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def get_recent_calls(self, limit: int = 50) -> list[dict]:
         """Last N LLM calls (newest first), regardless of reset filters."""

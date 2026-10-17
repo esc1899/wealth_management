@@ -492,6 +492,12 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE llm_usage ADD COLUMN generation_id TEXT")
     if "actual_cost_usd" not in existing_usage:
         conn.execute("ALTER TABLE llm_usage ADD COLUMN actual_cost_usd REAL")
+    # Zu welchem Lauf ein Aufruf gehoert (17.10.2026, Statistik "Letzte Laeufe"): die run_id
+    # von ops-core, bei einem Batch seine batch_id; job wie im Run-Log (kurse, interaktiv, ...).
+    if "lauf" not in existing_usage:
+        conn.execute("ALTER TABLE llm_usage ADD COLUMN lauf TEXT")
+    if "job" not in existing_usage:
+        conn.execute("ALTER TABLE llm_usage ADD COLUMN job TEXT")
 
     # Create portfolio_story_position_fits table if it doesn't exist
     conn.execute("""CREATE TABLE IF NOT EXISTS portfolio_story_position_fits (

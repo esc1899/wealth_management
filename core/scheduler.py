@@ -55,7 +55,7 @@ BATCH_NAMEN = {
     "consensus_gap": "Konsens-Lücken", "sector_rotation": "Sektor-Rotation",
     "structural_scan": "Strukturwandel", "search_agent": "Investment-Suche",
     "news_digest": "News-Digest", "devils_advocate": "Devil's Advocate",
-    "capital_allocator": "Kapitalallokation",
+    "capital_allocator": "Kapitalallokation", "bewegung": "Kursbewegung",
 }
 
 logger = logging.getLogger(__name__)
@@ -879,14 +879,17 @@ class AgentSchedulerService:
             raise RuntimeError("; ".join(fehler))
 
     def bewegungen_nachrichten(self, now: Optional[datetime] = None,
-                               aus: Callable[[str], None] = print) -> int:
+                               aus: Callable[[str], None] = print, batch: bool = False) -> int:
         """Fuer die staerksten Kursbewegungen des Tages Nachrichten nur zu diesem Titel suchen
         (core/bewegung.py): ab der Schwelle der Einstellungen, hoechstens DECKEL je Tag, jeder
-        einmal -- idempotent ueber die Laeufe von heute. Live, nicht als Batch: Der Grund soll am
-        selben Abend auf der Kachel stehen. Nur Ticker und Name gehen an das Cloud-Modell.
-        Gibt die Zahl der Suchen zurueck."""
+        einmal -- idempotent ueber die Laeufe von heute und die noch offenen Batches. Mit
+        ``batch`` (der Job ``kurse``) als ein Batch fuer alle, wo das Modell es erlaubt; den Grund
+        holt der Job ``agenten`` ab, er steht dann eine bis zwei Stunden spaeter auf der Kachel
+        (Erik, 17.10.2026: Hausregel "eingeplant heisst Batch"). Das Modell ist das des Bereichs
+        "bewegung". Nur Ticker und Name gehen an das Cloud-Modell. Gibt die Zahl der Suchen
+        zurueck, eingereichte mitgezaehlt."""
         from agents.news_agent import NewsAgent
-        from core import bewegung
+        from core import bewegung, pruefung
         from core.llm.claude import WebsucheGescheitert
         from core.storage.app_config import AppConfigRepository
         from core.storage.market_data import MarketDataRepository
@@ -910,15 +913,31 @@ class AgentSchedulerService:
                 bewegt[ticker] = bewegung.tagesbewegung(preis.price_eur, vortag)
 
             news_repo = NewsRepository(conn)
-            schon = bewegung.heute_gesucht(news_repo.list_runs(limit=30), heute)
-            grenze = bewegung.schwelle(AppConfigRepository(conn))
+            schon = set(bewegung.heute_gesucht(news_repo.list_runs(limit=30), heute))
+            schon |= self._bewegung_eingereicht(conn)
+            app_cfg = AppConfigRepository(conn)
+            grenze = bewegung.schwelle(app_cfg)
             auswahl = bewegung.staerkste(bewegt, grenze, schon)
             if not auswahl:
                 aus(f"Bewegungen: keine neue ab {grenze:.1f} % (heute schon gesucht: {len(schon)}).")
                 return 0
 
-            model = self._resolve_model("news", "", conn)
-            agent = NewsAgent(llm=self._make_scheduled_llm("news_digest", model, conn))
+            model = self._resolve_model(bewegung.AGENT, pruefung.modell(app_cfg, "bewegung"), conn)
+            token = _BATCH_ERLAUBT.set(batch)
+            try:
+                als_batch = self._can_use_batch_api(model)
+            finally:
+                _BATCH_ERLAUBT.reset(token)
+            if als_batch:
+                eintraege = [{"ticker": titel[t].ticker, "name": titel[t].name, "prozent": round(pr, 2)}
+                             for t, pr in auswahl]
+                batch_id = asyncio.run(self._submit_bewegung_batch(eintraege, model, conn))
+                for e in eintraege:
+                    aus(f"Bewegung {e['ticker']} {e['prozent']:+.1f} %: als Batch eingereicht.")
+                aus(f"Batch {batch_id} ({model}): der Job agenten holt den Grund ab.")
+                return len(eintraege)
+
+            agent = NewsAgent(llm=self._make_scheduled_llm(bewegung.AGENT, model, conn))
             gesucht = 0
             for ticker, prozent in auswahl:
                 p = titel[ticker]
@@ -927,9 +946,9 @@ class AgentSchedulerService:
                         tickers=[p.ticker], ticker_names={p.ticker: p.name}, skill_name=bewegung.LAUF,
                         skill_prompt=bewegung.auftrag(p.name, p.ticker, prozent),
                         user_context=f"Starke Bewegung: {prozent:+.1f} %", repo=news_repo,
-                        websuche_pflicht=True))
+                        websuche_pflicht=True, max_suchen=bewegung.SUCHEN))
                     gesucht += 1
-                    aus(f"Bewegung {p.ticker} {prozent:+.1f} %: Nachrichten gesucht.")
+                    aus(f"Bewegung {p.ticker} {prozent:+.1f} %: Nachrichten gesucht ({model}).")
                 except WebsucheGescheitert as exc:
                     aus(f"Bewegung {p.ticker} {prozent:+.1f} %: {exc}")
                 except Exception as exc:
@@ -938,6 +957,76 @@ class AgentSchedulerService:
             return gesucht
         finally:
             conn.close()
+
+    @staticmethod
+    def _bewegung_eingereicht(conn) -> set[str]:
+        """Die Ticker der Bewegungs-Batches, die noch nicht abgeholt sind: Sie gelten als gesucht,
+        sonst reichte der naechste Lauf von ``kurse`` sie ein zweites Mal ein. Ein abgeholter
+        Batch zaehlt ueber seinen Lauf in ``news_runs``; einer ohne Ergebnis (Suche gescheitert)
+        darf am selben Tag noch einmal."""
+        import json as _json
+        from core import bewegung
+        from core.storage.batch_queue import BatchQueueRepository
+
+        aus = set()
+        for b in BatchQueueRepository(conn).get_pending():
+            if b.agent_name != bewegung.AGENT:
+                continue
+            for e in (_json.loads(b.kontext) if b.kontext else {}).get("titel", []):
+                aus.add(str(e.get("ticker", "")).upper())
+        return aus
+
+    async def _submit_bewegung_batch(self, eintraege: list[dict], model: str, conn) -> str:
+        """Ein Batch, eine Anfrage je Titel -- dieselbe wie live (``NewsAgent``), nur abgeschickt.
+        ``custom_id`` ist die Stelle in ``kontext``: Ticker mit Punkt passen nicht ins Muster."""
+        import json as _json
+        from agents.news_agent import build_digest_request
+        from core import bewegung
+        from core.llm.claude import ClaudeProvider
+        from core.storage.batch_queue import BatchQueueRepository
+
+        llm = ClaudeProvider(api_key=self._anthropic_key, model=model, base_url=self._llm_base_url)
+        anfragen = []
+        for i, e in enumerate(eintraege):
+            system, user_message, web_search_tool = build_digest_request(
+                [e["ticker"]], {e["ticker"]: e["name"]}, bewegung.LAUF,
+                bewegung.auftrag(e["name"], e["ticker"], e["prozent"]), max_suchen=bewegung.SUCHEN)
+            anfragen.append(ClaudeProvider.build_batch_request(
+                custom_id=f"bewegung_{i}", model=model, system=system,
+                messages=[{"role": "user", "content": user_message}],
+                tools=[web_search_tool], max_tokens=4096))
+        batch_id = await llm.submit_batch(anfragen)
+        BatchQueueRepository(conn).create(batch_id, bewegung.AGENT, bewegung.LAUF, "de", len(anfragen),
+                                          kontext=_json.dumps({"titel": eintraege}))
+        return batch_id
+
+    def _process_bewegung_result(self, result, kontext: Optional[str], conn) -> bool:
+        """Wie live: ein Lauf ``Bewegung`` in ``news_runs`` je Titel. Kam keine Suche durch,
+        wird nichts gespeichert (live: ``websuche_pflicht``) -- der naechste ``kurse`` darf neu."""
+        import json as _json
+        from core import bewegung
+        from core.llm.claude import websuche_bilanz
+
+        cid = result.custom_id or ""
+        if not cid.startswith("bewegung_"):
+            return False
+        try:
+            e = (_json.loads(kontext) if kontext else {}).get("titel", [])[int(cid[len("bewegung_"):])]
+        except (ValueError, IndexError):
+            return False
+        message = result.result.message
+        ok_suchen, suchfehler = websuche_bilanz(message.content)
+        if suchfehler and not ok_suchen:
+            logger.warning("Bewegung %s: Websuche fehlgeschlagen (%s)", e["ticker"], ", ".join(suchfehler))
+            return False
+        digest = self._text_from_batch_message(message)
+        if not digest:
+            return False
+        repo = NewsRepository(conn)
+        run = repo.save_run(skill_name=bewegung.LAUF, tickers=[e["ticker"]], result=digest)
+        repo.add_message(run.id, "user", f"Starke Bewegung: {e['prozent']:+.1f} %")
+        repo.add_message(run.id, "assistant", digest)
+        return True
 
     def volltexte_verfallen(self) -> int:
         """Volltexte aelter als die juengsten je Titel und Check loeschen, Urteile bleiben
@@ -1265,7 +1354,7 @@ class AgentSchedulerService:
                     logger.info("Batch %s complete (%d results)", batch_row.batch_id, len(results))
                     success, errors = self._process_batch_results(
                         batch_row.agent_name, batch_row.skill_name or "", results, conn, batch_row.kontext,
-                        stand=_abgeschickt(batch_row.submitted_at))
+                        stand=_abgeschickt(batch_row.submitted_at), batch_id=batch_row.batch_id)
                     batch_repo.mark_done(batch_row.batch_id, success, errors)
                     logger.info("Batch %s: %d ok, %d errors", batch_row.batch_id, success, errors)
                     zeilen.append(f"Batch {BATCH_NAMEN.get(batch_row.agent_name, batch_row.agent_name)}: {success} ausgewertet"
@@ -1278,10 +1367,12 @@ class AgentSchedulerService:
         return zeilen
 
     @staticmethod
-    def _book_batch_usage(agent_name: str, skill_name: str, message, conn) -> None:
+    def _book_batch_usage(agent_name: str, skill_name: str, message, conn,
+                          lauf: Optional[str] = None) -> None:
         """Book one batch answer like any other call (bis 02.10.2026 fehlten
         Batch-Laeufe in Statistik und Hausbuchhaltung). source="batch" prices
-        the tokens at Anthropic's batch discount."""
+        the tokens at Anthropic's batch discount; ``lauf`` is the batch_id, so the
+        statistics show one run per batch, not the hourly job that collected it."""
         try:
             usage = message.usage
             stu = getattr(usage, "server_tool_use", None)
@@ -1291,13 +1382,15 @@ class AgentSchedulerService:
                 cache_read_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
                 cache_write_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
                 web_search_requests=getattr(stu, "web_search_requests", 0) or 0,
+                lauf=lauf,
             )
         except Exception:  # noqa: BLE001 — a result is never lost over its books
             logger.exception("Batch usage not booked (%s)", agent_name)
 
     def _process_batch_results(self, agent_name: str, skill_name: str, results, conn,
                                kontext: Optional[str] = None,
-                               stand: Optional[datetime] = None) -> tuple[int, int]:
+                               stand: Optional[datetime] = None,
+                               batch_id: Optional[str] = None) -> tuple[int, int]:
         """``stand``: wann der Batch abgeschickt wurde -- das Datum seiner Urteile."""
         success, errors = 0, 0
         for result in results:
@@ -1306,7 +1399,8 @@ class AgentSchedulerService:
                     logger.warning("Batch item %s: %s", result.custom_id, result.result.type)
                     errors += 1
                     continue
-                self._book_batch_usage(agent_name, skill_name, result.result.message, conn)
+                self._book_batch_usage(agent_name, skill_name, result.result.message, conn,
+                                       lauf=batch_id)
                 if agent_name in self._CHECK_LAEUFE:
                     # Wie live (core/llm/claude.py::WebsucheGescheitert): Scheiterten alle Suchen
                     # eines Checks, wird sein Urteil ohne Beleg nicht gespeichert.
@@ -1331,6 +1425,8 @@ class AgentSchedulerService:
                     ok = self._process_search_result(result, skill_name, conn)
                 elif agent_name == "news_digest":
                     ok = self._process_news_result(result, skill_name, kontext, conn)
+                elif agent_name == "bewegung":
+                    ok = self._process_bewegung_result(result, kontext, conn)
                 elif agent_name == "devils_advocate":
                     ok = self._process_da_result(result, skill_name, conn, stand)
                 elif agent_name == "capital_allocator":

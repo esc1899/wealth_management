@@ -67,16 +67,20 @@ def build_digest_request(
     ticker_names: Optional[dict[str, str]],
     skill_name: str,
     skill_prompt: str,
+    max_suchen: Optional[int] = None,
 ) -> tuple[str, str, dict]:
     """(system, user_message, web_search_tool) des Digests -- live und im
-    Batch (Scheduler) derselbe."""
+    Batch (Scheduler) derselbe. ``max_suchen`` ersetzt die Staffel unten: Der
+    Grund einer Kursbewegung braucht fuer einen Titel keine vier Suchen, und jede
+    bringt ihre Treffer als Eingabe mit (core/bewegung.py::SUCHEN)."""
     names = ticker_names or {}
     system = current_date_context() + BASE_SYSTEM_PROMPT
     if skill_prompt:
         system += f"\n\n## Filter Strategy: {skill_name}\n{skill_prompt}"
 
     # 1 search per ticker, min 4, max 10 — keeps costs proportional but bounded
-    web_search_tool = {**_WEB_SEARCH_BASE, "max_uses": min(max(4, len(tickers)), 10)}
+    web_search_tool = {**_WEB_SEARCH_BASE,
+                       "max_uses": max_suchen or min(max(4, len(tickers)), 10)}
 
     position_lines = "\n".join(
         f"- **{t}** ({names.get(t, t)})" for t in tickers
@@ -110,6 +114,7 @@ class NewsAgent:
         user_context: str,
         repo: NewsRepository,
         websuche_pflicht: bool = False,
+        max_suchen: Optional[int] = None,
     ) -> Tuple[NewsRun, str]:
         """
         Run a news digest, persist run + messages in DB, return (run, digest).
@@ -124,7 +129,8 @@ class NewsAgent:
         """
         self._llm.skill_context = skill_name
         self._llm.position_count = len(tickers)  # Track how many tickers in digest
-        digest = await self._run_digest(tickers, ticker_names, skill_name, skill_prompt, websuche_pflicht)
+        digest = await self._run_digest(tickers, ticker_names, skill_name, skill_prompt, websuche_pflicht,
+                                        max_suchen)
         run = repo.save_run(skill_name=skill_name, tickers=tickers, result=digest)
 
         user_message = user_context.strip() if user_context.strip() else (
@@ -191,13 +197,14 @@ class NewsAgent:
         skill_name: str,
         skill_prompt: str,
         websuche_pflicht: bool = False,
+        max_suchen: Optional[int] = None,
     ) -> str:
         """Execute the web-search digest and return the markdown result."""
         if not tickers:
             return "No positions found. Add positions in Portfolio Chat first."
 
         system, user_message, web_search_tool = build_digest_request(
-            tickers, ticker_names, skill_name, skill_prompt)
+            tickers, ticker_names, skill_name, skill_prompt, max_suchen)
 
         response = await self._llm.chat_with_tools(
             messages=[{"role": "user", "content": user_message}],

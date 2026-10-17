@@ -8,6 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Kursbewegung mit eigenem Modell und als Batch, letzte Läufe in der Statistik — 2026-10-17
+
+**Warum:** Der Grund starker Kursbewegungen lief seit dem 11.10. im Job `kurse` live mit dem
+Modell des News-Digest und wurde auch unter dessen Namen gebucht. Erik sah die Kosten (0,09 bis
+0,19 $ je Titel, Sonnet) nur im Maschinenraum, wusste nicht, dass `kurse` ein Sprachmodell ruft,
+und konnte das Modell weder sehen noch einstellen. Ein eingeplanter Lauf gehört nach der
+Hausregel in den Batch; dass der Grund dann ein bis zwei Stunden später auf der Kachel steht,
+ist der Preis. Mit Blick auf Lotsee muss die App selbst zeigen, welcher Lauf was gekostet hat.
+
+**Änderungen:**
+- Einstellungen: vierter Cloud-Bereich „Kursbewegung“ (`core/pruefung.py::BEREICHE`), ohne
+  Eintrag gilt weiter das Modell des News-Digest. Gebucht wird als Agent `bewegung`.
+- `bewegungen_nachrichten(batch=True)` aus `kurse`: ein Batch mit einer Anfrage je Titel, wo
+  das Modell es erlaubt (Hausschalter, echte claude-ID); `agenten` holt ab und legt wie live je
+  Titel einen News-Lauf „Bewegung“ an. Ohne einen Treffer der Websuche kein Lauf. Ein offener
+  Batch zählt als gesucht. `kurse` meldet danach `wartet` ins Run-Log.
+- Höchstens zwei Websuchen je Titel (`bewegung.SUCHEN`, `build_digest_request(max_suchen=)`),
+  statt mindestens vier wie im Digest: Die Treffer jeder Suche gehen als Eingabe ein.
+- `llm_usage` hat `lauf` (run_id von ops-core, bei einem Batch die batch_id) und `job`
+  (DB-Schema-Änderung, App neu starten).
+- Statistik: neuer erster Reiter „Letzte Läufe“ (`core/laeufe.py`), 14 Tage, je Lauf Wann, Job,
+  Was, Modell, Aufrufe, Kosten; was in der App angestoßen wird, je Tag und Agent. Ältere Aufrufe
+  ohne Lauf stehen je Tag, Agent und Weg.
+
 ### Der Tag mit einer Prozentzahl — 2026-10-16
 
 **Warum:** Oben auf dem Depot und auf der Analyse stand „+x % Analyse · +y % Gesamt“ -- zwei

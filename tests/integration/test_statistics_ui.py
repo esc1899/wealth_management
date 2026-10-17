@@ -59,3 +59,23 @@ class TestStatisticsPage:
         at.run()
         assert "/maschinenraum/" in at.markdown[0].value
         assert not at.button
+
+
+def test_recent_runs_tab_shows_a_job_run(request, monkeypatch):
+    """Letzte Läufe (core/laeufe.py): ein Aufruf aus einem ops-core-Job steht mit seinem Job da."""
+    repo = get_usage_repo()
+    conn = repo._conn
+    _before = conn.execute("SELECT COALESCE(MAX(id), 0) FROM llm_usage").fetchone()[0]
+    request.addfinalizer(lambda: (conn.execute("DELETE FROM llm_usage WHERE id > ?", (_before,)),
+                                  conn.commit()))
+    monkeypatch.setenv("OPS_JOB", "kurse")
+    monkeypatch.setenv("OPS_RUN_ID", "01TESTLAUF")
+    repo.record("bewegung", "claude-haiku-4-5", 1000, 100, skill="Bewegung", source="scheduled")
+    row = conn.execute("SELECT lauf, job FROM llm_usage WHERE id > ?", (_before,)).fetchone()
+    assert (row["lauf"], row["job"]) == ("01TESTLAUF", "kurse")
+
+    at = AppTest.from_file(PAGES / "usage_statistics.py")
+    at.run()
+    assert not at.exception, at.exception
+    tabelle = at.dataframe[0].value
+    assert "kurse" in tabelle.iloc[:, 1].tolist() and "Kursbewegung" in tabelle.iloc[:, 2].tolist()

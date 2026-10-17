@@ -46,7 +46,8 @@ ops run wealth_management kachel
 launchctl kickstart -k gui/$(id -u)/ops-core.wealth_management.meldungen
 
 # Scheduled jobs are ops-core jobs (scripts/job.py): agenten (due jobs of the Scheduler
-# page, hourly), kurse (daily fetch, 18:05, then news for the strongest moves: core/bewegung.py),
+# page, hourly), kurse (daily fetch, 18:05, then news for the strongest moves: core/bewegung.py,
+# own model "Kursbewegung" in Settings, as a batch that agenten collects),
 # kosten (OpenRouter, hourly). The checks per title
 # run as "Depot prüfen"/"Watchlist prüfen" (core/pruefung.py: selection, skills per list).
 # Never a scheduler inside the app — Streamlit only runs app.py once a browser opens the page.

@@ -135,7 +135,7 @@ sequenceDiagram
 | **WealthSnapshotRepository** | Historical portfolio snapshots | `wealth_snapshots` |
 | **ScheduledJobsRepository** | Periodic agent runs + run history | `scheduled_jobs`, `scheduled_job_runs` |
 | **NewsRepository** | News digest runs + messages | `news_runs`, `news_messages` |
-| **UsageRepository** | Token counts + costs per call | `llm_usage`, `usage_resets` |
+| **UsageRepository** | Token counts + costs per call; `lauf` (ops-core run_id or batch_id) and `job` group them into runs (`core/laeufe.py`, Statistik „Letzte Läufe“) | `llm_usage`, `usage_resets` |
 | **ResearchQueueRepository** | MCP back channel: requests + answers (FEAT-50/52) | `research_requests`, `research_answers` |
 | **BatchQueueRepository** | Pending Anthropic Batch API jobs | `pending_batches` |
 | **AgentRunsRepository** | Agent run telemetry | `agent_runs` |
@@ -247,9 +247,12 @@ Die bekannten Ticker für die Strategien (`bekannte_ticker`) lassen das Depot au
 in die Cloud.
 
 Starke Kursbewegung (`core/bewegung.py`): Schwelle aus `app_config` (`bewegung_prozent`), von
-Kachel und Job `kurse` gelesen; der Job sucht live höchstens 3 Titel je Tag
+Kachel und Job `kurse` gelesen; der Job sucht höchstens 3 Titel je Tag
 (`AgentSchedulerService.bewegungen_nachrichten`), gespeichert als News-Lauf „Bewegung“, den
-Kachel und Titelseite lesen.
+Kachel und Titelseite lesen. Eigenes Modell (Bereich `bewegung` in `core/pruefung.py::BEREICHE`,
+ohne Eintrag das des News-Digest), gebucht als Agent `bewegung`. Erlaubt das Modell den Batch,
+reicht `kurse` alle Titel als einen Batch ein und `agenten` holt ab; ein offener Batch zählt als
+gesucht, sonst ginge derselbe Titel beim nächsten `kurse` noch einmal hinaus.
 
 Volltexte verfallen, Urteile bleiben (`core/storage/volltexte.py`, im Job `agenten`): je Titel
 und Check die Texte der zwei jüngsten Urteile, ältere Sitzungen ohne Nachrichten; Dialoge nie.

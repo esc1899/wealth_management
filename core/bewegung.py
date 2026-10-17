@@ -6,6 +6,9 @@ Nachrichten nur zu diesem Titel (``core/scheduler.py::bewegungen_nachrichten``),
 Titelseite nennen den Grund. Anlass: Schneider Electric, Übernahme angekündigt, Kurs stark
 bewegt -- der monatliche Digest wusste nichts davon.
 
+Seit 17.10.2026 mit eigenem Modell (Bereich "Kursbewegung" in den Einstellungen) und als Batch,
+wo das Modell es erlaubt: Der Grund steht dann eine bis zwei Stunden nach dem Lauf da.
+
 Die Schwelle ist eine Einstellung (Erik: ein Titel springt ständig über 4 %); Kachel und Job
 lesen dieselbe. Höchstens ``DECKEL`` Titel je Tag, jeder einmal. An das Cloud-Modell gehen nur
 Ticker und Name.
@@ -20,8 +23,15 @@ from typing import Iterable, Optional
 STANDARD_PROZENT = 4.0
 #: So viele Titel sucht der Job höchstens je Tag (Erik, 11.10.2026).
 DECKEL = 3
+#: So viele Websuchen hat eine Suche nach dem Grund höchstens (Erik, 17.10.2026). Der Digest
+#: erlaubt mindestens vier; jede bringt ihre Treffer als Eingabe mit, bei Sonnet 20 bis 67 k
+#: Token je Titel -- für einen Titel und einen Tag reichen zwei.
+SUCHEN = 2
 #: So heißen die Läufe in ``news_runs``; daran erkennt der Job, was heute schon gesucht ist.
 LAUF = "Bewegung"
+#: Unter diesem Namen bucht die Suche ihre Kosten, steht ihr Batch in ``pending_batches`` und
+#: hat sie ihr Modell (``core/pruefung.py::BEREICHE``). Bis 17.10.2026 lief sie als News-Digest.
+AGENT = "bewegung"
 
 _SCHLUESSEL = "bewegung_prozent"
 

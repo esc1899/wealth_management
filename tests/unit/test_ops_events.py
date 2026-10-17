@@ -31,7 +31,8 @@ def conn():
             input_tokens INTEGER, output_tokens INTEGER, duration_ms INTEGER,
             position_count INTEGER, cache_read_tokens INTEGER,
             cache_write_tokens INTEGER, web_search_requests INTEGER,
-            generation_id TEXT, actual_cost_usd REAL, created_at TEXT
+            generation_id TEXT, actual_cost_usd REAL, created_at TEXT,
+            lauf TEXT, job TEXT
         );
         CREATE TABLE app_config (key TEXT PRIMARY KEY, value TEXT);
         """

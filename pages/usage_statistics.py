@@ -3,7 +3,8 @@ Statistics — was Wealth die Sprachmodelle kostet, je Monat und je Agent.
 
 Seit 12.10.2026 nur noch, was der Maschinenraum nicht zeigt: Er summiert den laufenden Monat
 des ganzen Hauses je Anbieter, Zweck und Programm; hier stehen der Verlauf ueber die Monate und
-die Kosten je Agent seit dem letzten Reset. Tokens, Tageskurve, letzte Aufrufe und der Knopf
+die Kosten je Agent seit dem letzten Reset. Seit 17.10.2026 vorn die letzten Laeufe mit ihren
+Kosten (``core/laeufe.py``): Die App soll ohne das Haus sagen, was wann Geld gekostet hat. Tokens, Tageskurve, letzte Aufrufe und der Knopf
 zum Abgleich mit OpenRouter sind entfallen -- den Abgleich macht der Job ``kosten``.
 """
 
@@ -88,7 +89,41 @@ if _offen:
 
 st.divider()
 
-tab_trend, tab_agents = st.tabs([t("statistics.tab_trend"), t("statistics.tab_agents")])
+tab_laeufe, tab_trend, tab_agents = st.tabs([t("statistics.tab_laeufe"), t("statistics.tab_trend"),
+                                             t("statistics.tab_agents")])
+
+# ── Tab: Letzte Läufe ──────────────────────────────────────────────────────────
+
+with tab_laeufe:
+    from core import laeufe as _laeufe
+
+    _TAGE = 14
+    st.markdown(t("statistics.laeufe_satz").format(tage=_TAGE))
+
+    def _kosten_oder_offen(r: dict):
+        return _row_cost(r) if preise.preis(r["model"], _preisliste) is not None else None
+
+    def _wer(z: dict) -> str:
+        if z["wie"] == _laeufe.BATCH:
+            return t("statistics.laeufe_batch")
+        if z["wie"] == _laeufe.HAND:
+            return t("statistics.laeufe_hand")
+        if z["job"] in (None, "scheduler"):
+            return t("statistics.laeufe_app_job")
+        return z["job"]
+
+    _zeilen = _laeufe.laeufe(repo.aufrufe_seit(_TAGE), _kosten_oder_offen)
+    if _zeilen:
+        st.dataframe(pd.DataFrame([{
+            t("statistics.col_wann"): z["wann"].strftime("%d.%m. %H:%M"),
+            t("statistics.col_job"): _wer(z),
+            t("statistics.col_was"): ", ".join(z["agenten"]),
+            t("statistics.col_modell"): ", ".join(z["modelle"]),
+            "Calls": z["aufrufe"],
+            t("statistics.col_kosten"): (f"{z['kosten']:.3f}" + (t("statistics.laeufe_offen").format(n=z["offen"]) if z["offen"] else "")),
+        } for z in _zeilen]), width="stretch", hide_index=True)
+    else:
+        st.info(t("statistics.laeufe_keine").format(tage=_TAGE))
 
 # ── Tab: Verlauf ───────────────────────────────────────────────────────────────
 
