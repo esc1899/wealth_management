@@ -10,8 +10,9 @@ Closed feedback loops:
      put the class in exactly one bucket (cloud / local / non-LLM). Until then the
      test fails. This is what makes guards 2+3 reach every future agent.
   2. ``test_cloud_agents_never_accept_private_position`` — cloud agents may only take
-     ``PublicPosition`` as input, never the encrypted ``Position``. StorycheckerAgent
-     is the single documented exception (it needs ``name`` + ``story``).
+     ``PublicPosition`` as input, never the encrypted ``Position``. Since 23.10.2026
+     there is no exception; which *field* may go to the cloud says ontologie/wealth.ttl
+     (tests/integration/test_ontologie.py).
   3. ``test_agent_classification_matches_llm_provider`` — anti-misclassification:
      a cloud agent cannot be hidden in the local bucket to dodge guard 2, because its
      ``llm`` parameter type is cross-checked against the bucket.
@@ -87,11 +88,11 @@ NON_LLM_AGENTS = [
     WealthSnapshotAgent,
 ]
 
-# StorycheckerAgent is the documented privacy exception (CLAUDE.md §1, footnote):
-# it deliberately sends position.name + position.story to the cloud to validate the
-# investment thesis. A *new* exception must be added here consciously — which is the
-# point: an accidental one fails the test below.
-PRIVACY_EXCEPTIONS = {StorycheckerAgent}
+# No exception since 23.10.2026: the StorycheckerAgent took the whole Position but only read
+# watchlist-like fields; it takes PublicPosition now, without the private recommendation.
+# A *new* exception must be added here consciously (and in ontologie/wealth.ttl with
+# wm:ausnahme) — which is the point: an accidental one fails the test below.
+PRIVACY_EXCEPTIONS: set = set()
 
 # Matches a standalone ``Position`` token. Does NOT match ``PublicPosition`` (no word
 # boundary after "Public") nor ``PositionsRepository`` / ``PositionAnalysesRepository``
@@ -197,20 +198,22 @@ def test_cloud_agents_never_accept_private_position(agent_cls):
     )
 
 
-def test_storychecker_is_still_an_exception():
-    """Self-check: the whitelisted exception must actually take Position.
+@pytest.mark.parametrize("agent_cls", sorted(PRIVACY_EXCEPTIONS, key=lambda c: c.__name__),
+                         ids=lambda c: c.__name__)
+def test_every_exception_is_still_one(agent_cls):
+    """Self-check: a whitelisted exception must actually take Position.
 
-    If StorycheckerAgent ever stops taking Position, drop it from PRIVACY_EXCEPTIONS so
-    the whitelist can't silently mask a future real leak.
+    If it stops taking Position, drop it from PRIVACY_EXCEPTIONS so the whitelist can't
+    silently mask a future real leak.
     """
     found = any(
         _PRIVATE_POSITION_RE.search(_annotation_str(p.annotation))
-        for _, method in _public_methods(StorycheckerAgent)
+        for _, method in _public_methods(agent_cls)
         for p in inspect.signature(method).parameters.values()
         if p.annotation is not inspect.Parameter.empty
     )
     assert found, (
-        "StorycheckerAgent no longer takes Position — remove it from PRIVACY_EXCEPTIONS "
+        f"{agent_cls.__name__} no longer takes Position — remove it from PRIVACY_EXCEPTIONS "
         "so the whitelist does not hide a future leak."
     )
 

@@ -187,7 +187,7 @@ def _render_proposal_panel(entry: ResearchEntry, candidates: list[WatchlistSugge
                 try:
                     from state import get_storychecker_agent
                     with st.spinner(t("cowork.storychecker_running").format(ticker=saved.ticker)):
-                        get_storychecker_agent().start_session(position=saved)
+                        get_storychecker_agent().start_session(position=saved.oeffentlich())
                 except Exception:
                     pass
             if error_count == 0:

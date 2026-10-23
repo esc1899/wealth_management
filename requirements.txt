@@ -24,6 +24,12 @@ plotly>=5.0.0,<6.0.0
 pandas>=2.0.0,<3.0.0
 openpyxl>=3.1.0,<4.0.0
 
+# Ontologie und Formen (ontologie/): rdflib + pyshacl pruefen im Test, pyvis zeichnet das
+# Bild auf der Seite "Ontologie". Dieselben wie in Serien und Sound.
+rdflib>=7.0,<8.0
+pyshacl>=0.30,<1.0
+pyvis>=0.3.2,<0.4
+
 # Scheduling
 
 # File watching (Cowork Research Ingest)

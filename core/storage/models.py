@@ -237,6 +237,13 @@ class Position(BaseModel):
         # Validation of required fields per asset type is handled at the service/UI layer.
         return self
 
+    def oeffentlich(self) -> "PublicPosition":
+        """Was ein Cloud-Modell von dieser Position sehen darf: Oeffentliches und
+        Watchlist-artiges, nie der Bestand (ontologie/wealth.ttl, CLAUDE.md §1)."""
+        return PublicPosition(id=self.id, name=self.name, ticker=self.ticker, isin=self.isin,
+                              asset_class=self.asset_class, anlageart=self.anlageart,
+                              story=self.story, story_skill=self.story_skill)
+
 
 class PublicPosition(BaseModel):
     """Read-only view of a position for public/cloud agents.
@@ -247,9 +254,11 @@ class PublicPosition(BaseModel):
     - ❌ notes (private annotations)
     - ❌ extra_data (private metadata)
     - ❌ in_portfolio / in_watchlist (reveals ownership intent)
+    - ❌ empfehlung (private, Erik 23.10.2026)
 
-    Safe to pass to cloud LLM agents. Investment thesis (story) is included
-    as it is the core input for analysis.
+    Safe to pass to cloud LLM agents. The investment thesis (story) is included: it is the core
+    input for analysis and counts as watchlist-like (Erik, 23.10.2026); the positions page says
+    so at the story field. Which field may go where: ontologie/wealth.ttl.
     """
 
     id: Optional[int] = None

@@ -8,6 +8,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Ontologie und Formen, mit Bild — 2026-10-22
+
+**Warum:** Nach Sound und Serien soll auch Wealth seine Begriffe und Regeln an einer Stelle
+kurz und genau führen und gegen den Code prüfen. Erik nannte zwei Stellen, an denen es sicher
+etwas bringt: die Bezeichnungen der Finanzwelt und die Regel, dass an ein Cloud-Modell nur geht,
+was auch auf einer Watchlist stehen könnte. Wie in Serien ohne Wissensgraph und, weil die Daten
+tabu sind, nur gegen Demo-Seeder und Repository in `:memory:`.
+
+**Änderungen:**
+- `ontologie/` mit Ontologie, 20 Formen, Projektion und Bild; Test
+  `tests/integration/test_ontologie.py` (31 Fälle); Seite Einstellungen › Ontologie.
+  Neue Abhängigkeiten `rdflib`, `pyshacl`, `pyvis` (pip-audit: keine bekannten Lücken).
+- Die Privacy-Grenze je Feld statt je Agent: Jedes Feld von `Position` hat eine Schutzstufe;
+  wer ein Feld hinzufügt, muss sie in `wealth.ttl` setzen, sonst ist der Test rot.
+- Demo-Seeder: Edelmetall mit Anlagetyp „Rohstoffe“ statt „Edelmetalle“. Der Seeder schrieb den
+  alten Wert nach der Migration vom 20.04.2026; erst der nächste App-Start bog ihn gerade.
+
+**Was die Ontologie aufgedeckt hat, und was Erik am 23.10.2026 entschieden hat:**
+- Die Story ging nicht nur über den Storychecker in die Cloud, wie CLAUDE.md §1 sagte: Consensus
+  Gap, Advocatus Diaboli und der Story-Entwurf schreiben sie in den Prompt, Kapitalallokation,
+  Fundamental und Sektorrotation bekommen sie über `PublicPosition` mit, ohne sie zu nutzen.
+  Erik: Die Story einer Position ist watchlist-artig — ohne Cloud-Modell lässt sich die These
+  nicht sinnvoll prüfen; weil man Privates hineinschreiben kann, sagt die Positionen-Seite es
+  jetzt am Feld. Die Portfolio-Story ist es nicht: Sie bleibt lokal (heute schon so, jetzt als
+  Regel in der Ontologie, mit Form). CLAUDE.md §1 ist umgeschrieben.
+- Der Storychecker war nur dem Typ nach eine Ausnahme und schickte als Einziger die Empfehlung
+  mit. Erik: Die Empfehlung ist privat, der Check braucht sie nicht. Der Storychecker nimmt jetzt
+  `PublicPosition` (`Position.oeffentlich()` an allen Aufrufern), ohne Empfehlung im Prompt;
+  `PRIVACY_EXCEPTIONS` ist leer.
+- Der Story-Entwurf (`PositionStoryService`) ist ein Weg in die Cloud, den der Guard der
+  Agenten nicht sah; jetzt steht er in der Ontologie und der Test liest seine Signatur.
+- Der Liquiditätsbedarf der Portfolio-Story (etwa „2028: Immobilienkauf ~150k“) lag im
+  Klartext, verschlüsselt war nur ihre Erzählung. Erik: verschlüsseln. Neue Werte gehen
+  verschlüsselt in die Datenbank; ältere Klartext-Zeilen bleiben lesbar und werden beim ersten
+  Start nach dem Update umgeschlüsselt (`PortfolioStoryRepository.verschluessele_altbestand`).
+- Begriffe wie „Renten“ (Rentenpapier und Altersrente) bleiben, wie sie sind: Der Anlagetyp
+  bestimmt Josefs Drittel, und dort rechnet er richtig. Die Ontologie erklärt die Namen.
+- Begriffe: „Renten“ heißt hier Rentenpapier und Altersrente zugleich; Tagesgeld steht unter
+  Bargeld, Festgeld unter Geld; „Anlageklasse“ mischt Basiswert und Hülle (Aktie und
+  Aktienfonds); eine Wealth-`Position` ist auch ein Watchlist-Eintrag, in FIBO nur, was man
+  besitzt.
+
 ### Kursbewegung mit eigenem Modell und als Batch, letzte Läufe in der Statistik — 2026-10-17
 
 **Warum:** Der Grund starker Kursbewegungen lief seit dem 11.10. im Job `kurse` live mit dem

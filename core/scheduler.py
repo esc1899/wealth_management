@@ -698,7 +698,7 @@ class AgentSchedulerService:
             llm=llm,
             skills_repo=skills_repo,
         )
-        for name, fehler in await agent.batch_check_all(positions=positions, language="de"):
+        for name, fehler in await agent.batch_check_all(positions=[p.oeffentlich() for p in positions], language="de"):
             if fehler:
                 _log(f"ohne Urteil: {name}: {fehler}")
         _log("Storychecker abgeschlossen")
@@ -1945,7 +1945,7 @@ class AgentSchedulerService:
                 custom_id=f"sc_{pos.id}",
                 model=model,
                 system=system,
-                messages=[{"role": "user", "content": _build_initial_message(pos, skill_name, skill_prompt)}],
+                messages=[{"role": "user", "content": _build_initial_message(pos.oeffentlich(), skill_name, skill_prompt)}],
                 tools=[WEB_SEARCH_TOOL],
                 max_tokens=4096,
             ))

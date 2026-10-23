@@ -149,7 +149,10 @@ def get_wealth_snapshot_repo() -> WealthSnapshotRepository:
 
 @st.cache_resource
 def get_portfolio_story_repo() -> PortfolioStoryRepository:
-    return PortfolioStoryRepository(get_db_connection(), get_encryption_service())
+    repo = PortfolioStoryRepository(get_db_connection(), get_encryption_service())
+    # Einmal je Prozess: Klartext-Liquiditaetsbedarf aus der Zeit vor dem 23.10.2026 verschluesseln.
+    repo.verschluessele_altbestand()
+    return repo
 
 
 @st.cache_resource

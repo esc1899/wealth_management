@@ -199,10 +199,10 @@ DEMO_POSITIONS = [
     dict(name="Vanguard FTSE All-World",        ticker="VWRL.AS", asset_class="Aktienfonds",    investment_type="Wertpapiere", unit="Stück", purchase_date="2021-03-15"),
     dict(name="iShares Global Aggregate Bond",  ticker="AGGG.L",  asset_class="Rentenfonds",    investment_type="Renten",      unit="Stück", purchase_date="2019-10-07"),
     dict(name="iShares Global REIT ETF",        ticker="REET",    asset_class="Immobilienfonds", investment_type="Immobilien",  unit="Stück", purchase_date="2020-08-03"),
-    # Precious metals — asset_class="Edelmetall", investment_type="Edelmetalle"
-    dict(name="Gold (Unzen)",  ticker="GC=F", asset_class="Edelmetall", investment_type="Edelmetalle", unit="Troy Oz", purchase_date="2021-01-04"),
-    dict(name="Gold (Gramm)",  ticker="GC=F", asset_class="Edelmetall", investment_type="Edelmetalle", unit="g",       purchase_date="2020-07-20"),
-    dict(name="Silber (Gramm)",ticker="SI=F", asset_class="Edelmetall", investment_type="Edelmetalle", unit="g",       purchase_date="2022-02-14"),
+    # Precious metals — asset_class="Edelmetall", investment_type="Rohstoffe"
+    dict(name="Gold (Unzen)",  ticker="GC=F", asset_class="Edelmetall", investment_type="Rohstoffe", unit="Troy Oz", purchase_date="2021-01-04"),
+    dict(name="Gold (Gramm)",  ticker="GC=F", asset_class="Edelmetall", investment_type="Rohstoffe", unit="g",       purchase_date="2020-07-20"),
+    dict(name="Silber (Gramm)",ticker="SI=F", asset_class="Edelmetall", investment_type="Rohstoffe", unit="g",       purchase_date="2022-02-14"),
     # Crypto
     dict(name="Bitcoin",       ticker="BTC-USD", asset_class="Kryptowährung", investment_type="Krypto", unit="Stück", purchase_date="2021-01-04", empfehlung="Halten", story="Digitales Gold — langfristiger Wertspeicher als Beimischung."),
     # --- Watchlist-only positions (in_portfolio=0, in_watchlist=1) ---

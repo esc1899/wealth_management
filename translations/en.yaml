@@ -79,6 +79,7 @@ nav:
   wealth_history: "Wealth History"
   group_system: "System ⚙️"
   statistics: "Statistics"
+  ontologie: "Ontology"
   verdict_hindsight: "Verdict Hindsight"
   cowork_inbox: "Research Inbox"
   research_answers: "Research Answers"
@@ -740,7 +741,6 @@ positionen:
   new_recommendation_source_label: "New Recommendation Source"
   anlageart_label: "Investment Sub-Type"
   story_label: "Investment Thesis"
-  story_label: "Investment Thesis"
   story_suggest_button: "Suggest thesis"
   story_update_button: "Update thesis"
   story_suggest_spinner: "Claude is generating a suggestion…"
@@ -749,6 +749,7 @@ positionen:
   story_skill_label: "Investment Idea"
   story_skill_help: "What type of investment idea is behind this story? The Story Checker uses this as context."
   story_placeholder: "Why do you hold this position?"
+  story_cloud_hinweis: "☁️ The thesis may be sent to a cloud model (story check, consensus gap, devil's advocate, \"Suggest thesis\"). Anything private belongs in the notes, which stay local."
   detail_title: "Position Details"
   edit_button_detail: "Edit"
   update_value_header: "Update Estimated Value"
@@ -1566,3 +1567,13 @@ kandidaten:
 
 tagesperformance:
   heute: "Today"
+
+ontologie:
+  title: "Ontology"
+  lesehilfe: "Hover over a box or arrow to see what it means, which rules apply and what FIBO says. Each field shows its protection level: ○ public, ◐ watchlist-like, ● private, 🔒 encrypted at rest. Dashed: superclasses and FIBO counterparts. Drag, zoom and pan with the mouse."
+  fehlt: "The picture is missing: it cannot be drawn without `{paket}` (`.venv/bin/pip install -r requirements.txt`)."
+  grenze_titel: "The privacy boundary: who may see which field"
+  grenze_satz: "A path to the cloud may only take what could also be on a watchlist -- never the holding. Which fields a path takes is read from the code signatures by the test."
+  wege_titel: "The paths to a language model"
+  regeln_titel: "The rules in full"
+  regeln_fussnote: "The code enforces the rules; in the test the shapes check that code, demo data and rules agree. No shape ever sees real data."

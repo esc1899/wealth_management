@@ -61,7 +61,7 @@ def _run_batch_background(ag, positions, language: str, job: dict):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        results = loop.run_until_complete(ag.batch_check_all(positions=positions, language=language))
+        results = loop.run_until_complete(ag.batch_check_all(positions=[p.oeffentlich() for p in positions], language=language))
         errors = sum(1 for _, err in results if err)
         job.update({"running": False, "done": True, "count": len(results), "errors": errors, "error": None})
     except Exception as exc:
@@ -198,7 +198,7 @@ with col_left:
                     if current_session and current_session.position_id != selected_position.id:
                         st.session_state.pop("sc_session_id", None)
 
-                    session = agent.start_session(position=selected_position, language=current_language())
+                    session = agent.start_session(position=selected_position.oeffentlich(), language=current_language())
                     st.session_state["sc_session_id"] = session.id
                 except Exception as exc:
                     st.session_state["sc_start_error"] = str(exc)

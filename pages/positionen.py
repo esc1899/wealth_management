@@ -468,6 +468,9 @@ def _render_edit_form(pos_id: int | None, readonly: bool = False):
             height=120,
             disabled=readonly,
         )
+        # Die Story gilt als watchlist-artig und geht an Cloud-Checks (Erik, 23.10.2026,
+        # ontologie/wealth.ttl) -- wer schreibt, soll das vorher wissen.
+        st.caption(t("positionen.story_cloud_hinweis"))
 
         # Anlage-Idee selector — only visible when a story is being written
         _sc_skills = get_skills_repo().get_by_area("storychecker")

@@ -138,7 +138,7 @@ def run_storychecker_job(positions: list, language: str, job: dict, db_path: str
         agent = StorycheckerAgent(positions_repo=positions_repo, storychecker_repo=storychecker_repo, analyses_repo=analyses_repo, llm=llm, skills_repo=skills_repo)
         pos_valid = [p for p in positions if p.id]
         _log_to_job(job, f"StorycheckerAgent: {len(pos_valid)} positions")
-        results = loop.run_until_complete(agent.batch_check_all(positions=pos_valid, language=language))
+        results = loop.run_until_complete(agent.batch_check_all(positions=[p.oeffentlich() for p in pos_valid], language=language))
         count = sum(1 for _, err in results if err is None)
         _log_to_job(job, f"StorycheckerAgent: {count}/{len(pos_valid)} completed")
         fehler = [f"Story Checker, {name}: {err}" for name, err in results if err]

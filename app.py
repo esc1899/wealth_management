@@ -169,6 +169,8 @@ pg = st.navigation({
         st.Page("pages/skills.py",           title="Skills",            icon=":material/psychology:"),
         st.Page("pages/scheduler.py",        title="Scheduler",         icon=":material/schedule:"),
         st.Page("pages/usage_statistics.py", title=t("nav.statistics"), icon=":material/bar_chart:"),
+        # Das Schema als Bild (22.10.2026): nur fuer Erik, nichts zum Bedienen.
+        st.Page("pages/ontologie.py",        title=t("nav.ontologie"),  icon=":material/hub:"),
     ],
 })
 

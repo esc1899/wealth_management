@@ -50,7 +50,7 @@ class PortfolioStoryRepository:
                 (
                     self._enc.encrypt(story.story),
                     story.target_year,
-                    story.liquidity_need,
+                    self._verschluesselt(story.liquidity_need),
                     story.priority,
                     now.isoformat(),
                     story.id,
@@ -68,7 +68,7 @@ class PortfolioStoryRepository:
                 (
                     self._enc.encrypt(story.story),
                     story.target_year,
-                    story.liquidity_need,
+                    self._verschluesselt(story.liquidity_need),
                     story.priority,
                     now.isoformat(),
                     now.isoformat(),
@@ -173,6 +173,40 @@ class PortfolioStoryRepository:
     # Deserializers
     # ────────────────────────────────────────────────────────────────────
 
+    # Der Liquiditaetsbedarf ("2028: Immobilienkauf ~150k") ist privat und wird seit 23.10.2026
+    # verschluesselt (Erik, aufgefallen in ontologie/wealth.ttl). Aeltere Zeilen tragen ihn im
+    # Klartext: Sie bleiben lesbar und werden beim Start einmal umgeschluesselt.
+
+    _TOKEN = "gAAAAA"  # so beginnt jedes Fernet-Token
+
+    def _verschluesselt(self, wert: Optional[str]) -> Optional[str]:
+        return self._enc.encrypt(wert) if wert else None
+
+    def _entschluesselt(self, wert: Optional[str]) -> Optional[str]:
+        if not wert:
+            return None
+        return self._enc.decrypt(wert) if wert.startswith(self._TOKEN) else wert
+
+    def verschluessele_altbestand(self) -> int:
+        """Klartext-Bedarf in allen Zeilen verschluesseln; gibt die Zahl der Zeilen zurueck.
+        Idempotent. Im Demo-Modus (Passthrough) aendert sich nichts, also schreibt er nichts."""
+        n = 0
+        for row in self._conn.execute(
+                "SELECT id, liquidity_need FROM portfolio_story WHERE liquidity_need IS NOT NULL"
+        ).fetchall():
+            roh = row["liquidity_need"]
+            if not roh or roh.startswith(self._TOKEN):
+                continue
+            neu = self._enc.encrypt(roh)
+            if neu == roh:
+                continue
+            self._conn.execute("UPDATE portfolio_story SET liquidity_need = ? WHERE id = ?",
+                               (neu, row["id"]))
+            n += 1
+        if n:
+            self._conn.commit()
+        return n
+
     def _row_to_story(self, row: sqlite3.Row) -> PortfolioStory:
         """Deserialize a portfolio_story row."""
         decrypted_story = (
@@ -182,7 +216,7 @@ class PortfolioStoryRepository:
             id=row["id"],
             story=decrypted_story,
             target_year=row["target_year"],
-            liquidity_need=row["liquidity_need"],
+            liquidity_need=self._entschluesselt(row["liquidity_need"]),
             priority=row["priority"],
             created_at=datetime.fromisoformat(row["created_at"]),
             updated_at=datetime.fromisoformat(row["updated_at"]),

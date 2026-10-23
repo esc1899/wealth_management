@@ -1,8 +1,9 @@
 """
 Story Checker Agent — checks if an investment thesis is still intact.
 
-Cloud-only (ClaudeProvider). Watchlist positions only — no portfolio quantities
-or purchase prices are passed to the API.
+Cloud-only (ClaudeProvider). Takes only ``PublicPosition`` (name, ticker, class, story) — no
+quantities, prices, notes or recommendation reach the API. Seit 23.10.2026 keine Ausnahme mehr
+von der Privacy-Grenze (CLAUDE.md §1).
 
 Uses Anthropic's built-in web search to find current news and data about the
 company, then evaluates whether the original investment thesis still holds.
@@ -22,7 +23,7 @@ from typing import List, Tuple
 
 from core.llm.claude import ClaudeProvider
 from core.storage.analyses import PositionAnalysesRepository
-from core.storage.models import Position, StorycheckerSession
+from core.storage.models import PublicPosition, StorycheckerSession
 from core.storage.storychecker import StorycheckerRepository
 from agents.agent_language import response_language_instruction, current_date_context
 from core.asset_class_config import FUND_ASSET_CLASSES
@@ -157,7 +158,7 @@ class StorycheckerAgent:
     def model(self) -> str:
         return self._llm.model
 
-    def _metrics_block(self, position: Position, language: str) -> str:
+    def _metrics_block(self, position: PublicPosition, language: str) -> str:
         """Verified price-return metrics from our own data, or "" if unavailable."""
         if not self._market or not position.ticker:
             return ""
@@ -171,7 +172,7 @@ class StorycheckerAgent:
     # Session management
     # ------------------------------------------------------------------
 
-    def start_session(self, position: Position, language: str = "de") -> StorycheckerSession:
+    def start_session(self, position: PublicPosition, language: str = "de") -> StorycheckerSession:
         """Create a new session and run the initial story check.
 
         Args:
@@ -196,7 +197,7 @@ class StorycheckerAgent:
         _urteil_speichern(self._analyses, position.id, skill_name, response, session.id)
         return session
 
-    async def start_session_async(self, position: Position, language: str = "de") -> StorycheckerSession:
+    async def start_session_async(self, position: PublicPosition, language: str = "de") -> StorycheckerSession:
         """Async version of start_session — for use in batch_check_all.
 
         Args:
@@ -219,7 +220,7 @@ class StorycheckerAgent:
         _urteil_speichern(self._analyses, position.id, skill_name, response, session.id)
         return session
 
-    async def batch_check_all(self, positions: List[Position], language: str = "de") -> List[Tuple[str, str | None]]:
+    async def batch_check_all(self, positions: List[PublicPosition], language: str = "de") -> List[Tuple[str, str | None]]:
         """
         Run story checks for all eligible positions in parallel.
         Each position uses its own story_skill (or none if not set).
@@ -235,7 +236,7 @@ class StorycheckerAgent:
         eligible = [p for p in positions if p.story and p.id is not None]
         self._llm.position_count = len(eligible)
 
-        async def _check_one(pos: Position) -> Tuple[str, str | None]:
+        async def _check_one(pos: PublicPosition) -> Tuple[str, str | None]:
             try:
                 await self.start_session_async(pos, language=language)
                 return (pos.name, None)
@@ -263,7 +264,7 @@ class StorycheckerAgent:
     def delete_session(self, session_id: int) -> None:
         self._storychecker.delete_session(session_id)
 
-    async def generate_story_proposal(self, session_id: int | None = None, position: Position | None = None) -> str:
+    async def generate_story_proposal(self, session_id: int | None = None, position: PublicPosition | None = None) -> str:
         """
         Generate an updated investment story.
 
@@ -281,9 +282,11 @@ class StorycheckerAgent:
             if not session:
                 raise ValueError(f"Session {session_id} not found")
 
-            position = self._positions.get(session.position_id)
-            if not position:
+            gespeichert = self._positions.get(session.position_id)
+            if not gespeichert:
                 raise ValueError(f"Position {session.position_id} not found")
+            # Aus dem Repository kommt die ganze Position; in den Prompt nur die oeffentliche Sicht.
+            position = gespeichert.oeffentlich()
 
             messages = self.get_messages(session_id)
             context_block = "\n".join([f"{m.role.upper()}: {m.content[:200]}" for m in messages[-4:]])
@@ -318,7 +321,7 @@ Schreibe nur die These selbst, keine Einleitung oder Überschrift."""
     # Internal
     # ------------------------------------------------------------------
 
-    def _resolve_skill(self, position: Position) -> tuple[str, str]:
+    def _resolve_skill(self, position: PublicPosition) -> tuple[str, str]:
         """Return (skill_name, skill_prompt) from the position's story_skill, or ('', '') if none."""
         if not position.story_skill or not self._skills_repo:
             return "", ""
@@ -425,7 +428,7 @@ def _extract_summary(text: str) -> str | None:
     return None
 
 
-def _build_initial_message(position: Position, skill_name: str = "", skill_prompt: str = "", metrics_block: str = "") -> str:
+def _build_initial_message(position: PublicPosition, skill_name: str = "", skill_prompt: str = "", metrics_block: str = "") -> str:
     ticker_str = f" ({position.ticker})" if position.ticker else ""
     _subject_label = "Fonds" if position.asset_class in FUND_ASSET_CLASSES else "Unternehmen"
     lines = [
@@ -434,8 +437,8 @@ def _build_initial_message(position: Position, skill_name: str = "", skill_promp
         f"**{_subject_label}:** {position.name}{ticker_str}",
         f"**Asset-Klasse:** {position.asset_class}",
     ]
-    if position.empfehlung:
-        lines.append(f"**Aktuelle Empfehlung:** {position.empfehlung}")
+    # Keine Empfehlung: Sie ist privat (Erik, 23.10.2026, ontologie/wealth.ttl), und der
+    # Check prueft die These, nicht den Rat des Empfehlers.
 
     if position.story:
         lines.append(f"")

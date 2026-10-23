@@ -1,0 +1,526 @@
+# Die Ontologie von Wealth (22.10.2026, ARCHITECTURE.md "Ontologie und Formen").
+#
+# Zwei Dinge, die sonst ueber Prosa, YAML und Code verteilt sind, kurz und genau an einer Stelle:
+#
+# 1. Die Bezeichnungen. Was eine Anlageklasse, ein Anlagetyp, eine Anlageart ist, was ISIN, WKN
+#    und Ticker hier bedeuten -- je Begriff deutsch und englisch, mit einer Definition und, wo es
+#    einen gibt, dem Begriff aus FIBO (Financial Industry Business Ontology, EDM Council), der
+#    gemeint ist. Die Begriffe selbst kommen aus `config/asset_classes.yaml`; der Test haelt
+#    beide gleich.
+# 2. Die Privacy-Grenze (CLAUDE.md §1) als Regel ueber Felder statt ueber Agenten: Jedes Feld
+#    einer Position hat eine Schutzstufe -- oeffentlich, watchlist-artig, privat. Ein Weg zu
+#    einem Cloud-Modell darf nur nehmen, was auch auf einer Watchlist stehen koennte: nie den
+#    Bestand. Welche Felder ein Weg nimmt, liest der Test aus den Signaturen im Code.
+#
+# Kein Wissensgraph: Es gibt keinen Export und keine echten Daten. Daten erzeugt nur der Test
+# (`ontologie/projektion.py`, aus dem Demo-Seeder und dem Repository in :memory:) und wirft sie
+# danach weg. Was gelten muss, pruefen die Formen in `formen.ttl` (SHACL).
+#
+# FIBO-Adressen: aus den RDF-Dateien von github.com/edmcouncil/fibo (master, 22.10.2026)
+# gelesen, nicht geraten. `skos:closeMatch` heisst "meint ungefaehr dasselbe", nicht "ist".
+
+@prefix wm:     <urn:lotsee:wealth#> .
+@prefix skos:   <http://www.w3.org/2004/02/skos/core#> .
+@prefix owl:    <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+@prefix fibo-fi:   <https://spec.edmcouncil.org/fibo/ontology/FBC/FinancialInstruments/FinancialInstruments/> .
+@prefix fibo-acc:  <https://spec.edmcouncil.org/fibo/ontology/FBC/ProductsAndServices/ClientsAndAccounts/> .
+@prefix fibo-fps:  <https://spec.edmcouncil.org/fibo/ontology/FBC/ProductsAndServices/FinancialProductsAndServices/> .
+@prefix fibo-id:   <https://spec.edmcouncil.org/fibo/ontology/SEC/Securities/SecuritiesIdentification/> .
+@prefix fibo-eq:   <https://spec.edmcouncil.org/fibo/ontology/SEC/Equities/EquityInstruments/> .
+@prefix fibo-dr:   <https://spec.edmcouncil.org/fibo/ontology/SEC/Equities/DepositaryReceipts/> .
+@prefix fibo-fund: <https://spec.edmcouncil.org/fibo/ontology/SEC/Funds/Funds/> .
+@prefix fibo-civ:  <https://spec.edmcouncil.org/fibo/ontology/SEC/Funds/CollectiveInvestmentVehicles/> .
+@prefix fibo-bond: <https://spec.edmcouncil.org/fibo/ontology/SEC/Debt/Bonds/> .
+
+<urn:lotsee:wealth> a owl:Ontology ;
+    rdfs:label "Wealth"@de , "Wealth"@en ;
+    rdfs:comment "Titel, Positionen, ihre Bezeichnungen und wer welches Feld sehen darf."@de ,
+                 "Titles, positions, their terms and who may see which field."@en ;
+    owl:versionInfo "1 (22.10.2026)" .
+
+# --- Die Hilfsbegriffe dieser Datei ------------------------------------------------------------
+
+wm:imCode a owl:AnnotationProperty ;
+    rdfs:label "heißt im Code"@de , "named in code"@en ;
+    rdfs:comment "Der Name des Feldes in `Position` (core/storage/models.py) und der Spalte in `positions`, oder der Name der Klasse im Code. Daran bindet der Test die Ontologie."@de .
+
+wm:schutz a owl:AnnotationProperty ;
+    rdfs:label "Schutzstufe"@de , "protection level"@en ;
+    rdfs:domain wm:Feld ; rdfs:range wm:Schutzstufe .
+
+wm:verschluesselt a owl:AnnotationProperty ;
+    rdfs:label "verschlüsselt gespeichert"@de , "encrypted at rest"@en ;
+    rdfs:comment "Fernet in `PositionsRepository._serialize`. Schützt die Datei, nicht vor Code, der lokal läuft (CLAUDE.md §4)."@de .
+
+# --- Titel: worüber man spricht -----------------------------------------------------------------
+
+wm:Titel a owl:Class ;
+    rdfs:subClassOf fibo-fi:FinancialInstrument ;
+    rdfs:label "Titel"@de , "instrument"@en ;
+    rdfs:comment "Ein Wertpapier oder eine Anlage, ob man sie besitzt oder nicht: Apple, ein MSCI-World-ETF, Gold, eine Wohnung. Im Code keine eigene Tabelle -- jede Zeile in `positions` trägt ihren Titel mit. Was zum Titel gehört, steht in jeder Börsenzeitung und ist öffentlich."@de ,
+                 "A security or asset, owned or not. No table of its own in code; every row in `positions` carries its instrument. Everything about it is public."@en ;
+    skos:scopeNote "FIBO kennt eine Wohnung oder Festgeld nicht als FinancialInstrument; hier ist Titel weiter gefasst: alles, was in Wealth eine Zeile bekommt."@de .
+
+wm:name a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Titel ; rdfs:range xsd:string ;
+    rdfs:label "Name"@de , "name"@en ;
+    wm:imCode "name" ; wm:schutz wm:oeffentlich ; wm:verschluesselt false .
+
+wm:isin a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Titel ; rdfs:range xsd:string ;
+    rdfs:label "ISIN"@de , "ISIN"@en ;
+    rdfs:comment "International Securities Identification Number (ISO 6166): zwei Buchstaben Land, neun Zeichen, eine Prüfziffer. Gilt für das Wertpapier, nicht für einen Börsenplatz -- dieselbe Aktie hat an jeder Börse dieselbe ISIN."@de ,
+                 "ISO 6166: two-letter country, nine characters, one check digit. Identifies the security, not a listing."@en ;
+    skos:closeMatch fibo-id:InternationalSecuritiesIdentificationNumber ;
+    wm:imCode "isin" ; wm:schutz wm:oeffentlich ; wm:verschluesselt false .
+
+wm:wkn a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Titel ; rdfs:range xsd:string ;
+    rdfs:label "WKN"@de , "WKN (German securities code)"@en ;
+    rdfs:comment "Wertpapierkennnummer: sechs Zeichen, nur in Deutschland. Steckt bei deutschen Titeln in der ISIN (DE000 + WKN + Prüfziffer), bei anderen nicht."@de ,
+                 "Wertpapierkennnummer: six characters, German only; embedded in German ISINs."@en ;
+    skos:closeMatch fibo-id:NationalSecuritiesIdentifyingNumber ;
+    wm:imCode "wkn" ; wm:schutz wm:oeffentlich ; wm:verschluesselt false .
+
+wm:ticker a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Titel ; rdfs:range xsd:string ;
+    rdfs:label "Ticker"@de , "ticker"@en ;
+    rdfs:comment "Hier das Symbol bei Yahoo Finance, nicht das Börsenkürzel: NESN.SW (Nestlé an der SIX), GC=F (Gold-Future), BTC-USD. Ein Titel hat je Börse ein anderes; Wealth merkt sich eines, das für den Kurs taugt. Fehlt er, wird er noch aufgelöst (FIGI)."@de ,
+                 "Here the Yahoo Finance symbol, not the exchange ticker (NESN.SW, GC=F, BTC-USD). Missing means still to be resolved via FIGI."@en ;
+    skos:closeMatch fibo-id:TickerSymbol ;
+    rdfs:seeAlso <https://www.omg.org/spec/FIGI> ;
+    wm:imCode "ticker" ; wm:schutz wm:oeffentlich ; wm:verschluesselt false .
+
+wm:anlageklasse a owl:ObjectProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Titel ; rdfs:range wm:Anlageklasse ;
+    rdfs:label "Anlageklasse"@de , "asset class"@en ;
+    wm:imCode "asset_class" ; wm:schutz wm:oeffentlich ; wm:verschluesselt false .
+
+wm:anlagetyp a owl:ObjectProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Titel ; rdfs:range wm:Anlagetyp ;
+    rdfs:label "Anlagetyp"@de , "investment type"@en ;
+    rdfs:comment "Folgt aus der Anlageklasse (YAML) und steht nur für schnelles Lesen mit in der Zeile."@de ;
+    wm:imCode "investment_type" ; wm:schutz wm:oeffentlich ; wm:verschluesselt false .
+
+wm:anlageart a owl:ObjectProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Titel ; rdfs:range wm:Anlageart ;
+    rdfs:label "Anlageart"@de , "sub-type"@en ;
+    wm:imCode "anlageart" ; wm:schutz wm:oeffentlich ; wm:verschluesselt false .
+
+# --- Position: Eriks Eintrag zu einem Titel ------------------------------------------------------
+
+wm:Position a owl:Class ;
+    rdfs:label "Position"@de , "position"@en ;
+    rdfs:comment "Eine Zeile in `positions`: ein Titel und was Erik dazu hat -- seine Sicht und vielleicht einen Bestand. Achtung, Begriff: In der Finanzwelt (FIBO) ist eine Position ein Engagement aus Besitz. In Wealth ist auch ein Watchlist-Eintrag oder ein Kandidat eine `Position`; nur die Depotposition ist eine im Sinne von FIBO."@de ,
+                 "A row in `positions`. Note: in finance (FIBO) a position is an exposure from holding; in Wealth a watchlist entry or candidate is a `Position` too. Only the holding matches FIBO."@en .
+
+wm:zuTitel a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain wm:Position ; rdfs:range wm:Titel ;
+    rdfs:label "zum Titel"@de , "of instrument"@en .
+
+wm:Depotposition a owl:Class ;
+    rdfs:subClassOf wm:Position ;
+    rdfs:label "Depotposition"@de , "holding"@en ;
+    rdfs:comment "`in_portfolio`: Erik besitzt den Titel. Kann zugleich auf der Watchlist stehen."@de ;
+    skos:closeMatch fibo-fps:Position .
+
+wm:WatchlistEintrag a owl:Class ;
+    rdfs:subClassOf wm:Position ;
+    rdfs:label "Watchlist-Eintrag"@de , "watchlist entry"@en ;
+    rdfs:comment "`in_watchlist`: Erik beobachtet den Titel. Was ein solcher Eintrag an Angaben haben kann, ohne dass Erik etwas besitzt, ist das Maß der Privacy-Grenze: watchlist-artig."@de ;
+    skos:scopeNote "Kein Gegenstück in FIBO -- dort gibt es nur, was man besitzt oder schuldet."@de .
+
+wm:Kandidat a owl:Class ;
+    rdfs:subClassOf wm:Position ;
+    rdfs:label "Kandidat"@de , "candidate"@en ;
+    rdfs:comment "Weder im Depot noch auf der Watchlist: ein Fund der Suche, der erst geprüft wird (core/kandidaten.py)."@de .
+
+# Die Sicht: watchlist-artig -- gäbe es genauso für einen Titel, den Erik nicht besitzt.
+
+wm:story a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:string ;
+    rdfs:label "Story (Investment-These)"@de , "investment thesis"@en ;
+    rdfs:comment "Warum der Titel interessant ist. Watchlist-artig (Erik, 23.10.2026): Ohne Cloud-Modell lässt sich die These nicht sinnvoll prüfen. Weil man Privates hineinschreiben kann, sagt die Positionen-Seite am Feld, dass sie in die Cloud gehen kann; Privates gehört in die Notiz. Verschlüsselt gespeichert."@de ,
+                 "Watchlist-like (Erik, 2026-10-23): the thesis cannot be checked without a cloud model. The positions page says so at the field; private things belong in the notes."@en ;
+    wm:imCode "story" ; wm:schutz wm:watchlistArtig ; wm:verschluesselt true .
+
+wm:storySkill a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:string ;
+    rdfs:label "Anlage-Idee"@de , "investment idea"@en ;
+    wm:imCode "story_skill" ; wm:schutz wm:watchlistArtig ; wm:verschluesselt false .
+
+
+wm:empfehler a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:string ;
+    rdfs:label "Empfehler"@de , "recommended by"@en ;
+    wm:imCode "recommendation_source" ; wm:schutz wm:watchlistArtig ; wm:verschluesselt false .
+
+wm:strategie a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:string ;
+    rdfs:label "Strategie"@de , "strategy"@en ;
+    wm:imCode "strategy" ; wm:schutz wm:watchlistArtig ; wm:verschluesselt false .
+
+wm:aufgenommenAm a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:date ;
+    rdfs:label "aufgenommen am"@de , "added on"@en ;
+    wm:imCode "added_date" ; wm:schutz wm:watchlistArtig ; wm:verschluesselt false .
+
+wm:einheit a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:string ;
+    rdfs:label "Einheit"@de , "unit"@en ;
+    rdfs:comment "Worin gezählt wird: Stück, g, Troy Oz. Sagt nicht, wie viel."@de ;
+    wm:imCode "unit" ; wm:schutz wm:watchlistArtig ; wm:verschluesselt false .
+
+wm:aufWatchlist a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:boolean ;
+    rdfs:label "auf der Watchlist"@de , "on watchlist"@en ;
+    wm:imCode "in_watchlist" ; wm:schutz wm:watchlistArtig ; wm:verschluesselt false .
+
+wm:ohneAuswertung a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:boolean ;
+    rdfs:label "aus der Auswertung genommen"@de , "excluded from analysis"@en ;
+    rdfs:comment "Zählt nicht in der Rückschau der Empfehlungen."@de ;
+    wm:imCode "analysis_excluded" ; wm:schutz wm:watchlistArtig ; wm:verschluesselt false .
+
+# Der Bestand: privat -- was Erik besitzt, notiert und geraten bekommt. Geht nie in die Cloud.
+
+wm:empfehlung a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:string ;
+    rdfs:label "Empfehlung"@de , "recommendation"@en ;
+    rdfs:comment "Was der Empfehler rät: Kaufen, Halten, Beobachten. Privat (Erik, 23.10.2026) -- „Halten“ verrät schon, dass Erik den Titel hat. Im Klartext gespeichert."@de ;
+    wm:imCode "empfehlung" ; wm:schutz wm:privat ; wm:verschluesselt false .
+
+wm:imDepot a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:boolean ;
+    rdfs:label "im Depot"@de , "held"@en ;
+    rdfs:comment "Privat, aber im Klartext gespeichert: Wer die Datei liest, sieht, was Erik besitzt -- nicht wie viel (CLAUDE.md §4)."@de ;
+    wm:imCode "in_portfolio" ; wm:schutz wm:privat ; wm:verschluesselt false .
+
+wm:stueckzahl a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:decimal ;
+    rdfs:label "Stückzahl"@de , "quantity"@en ;
+    wm:imCode "quantity" ; wm:schutz wm:privat ; wm:verschluesselt true .
+
+wm:kaufpreis a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:decimal ;
+    rdfs:label "Kaufpreis je Einheit"@de , "cost basis per unit"@en ;
+    wm:imCode "purchase_price" ; wm:schutz wm:privat ; wm:verschluesselt true .
+
+wm:kaufdatum a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:date ;
+    rdfs:label "Kaufdatum"@de , "purchase date"@en ;
+    rdfs:comment "Privat, aber im Klartext gespeichert."@de ;
+    wm:imCode "purchase_date" ; wm:schutz wm:privat ; wm:verschluesselt false .
+
+wm:notiz a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:string ;
+    rdfs:label "Notiz"@de , "notes"@en ;
+    wm:imCode "notes" ; wm:schutz wm:privat ; wm:verschluesselt true .
+
+wm:zusatzangaben a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:Position ; rdfs:range xsd:string ;
+    rdfs:label "Zusatzangaben"@de , "extra data"@en ;
+    rdfs:comment "Je Anlageklasse eigene Felder (Zins, Laufzeit, Schätzwert), als JSON."@de ;
+    wm:imCode "extra_data" ; wm:schutz wm:privat ; wm:verschluesselt true .
+
+# --- Die Portfolio-Story: privat, ganz ------------------------------------------------------------
+
+wm:PortfolioStory a owl:Class ;
+    rdfs:label "Portfolio-Story"@de , "portfolio story"@en ;
+    rdfs:comment "Eriks Erzählung über das ganze Depot: Ziele, Zeithorizont, Geldbedarf (Tabelle `portfolio_story`, `PortfolioStory` im Code). Anders als die Story einer Position ganz privat (Erik, 23.10.2026): Sie bleibt lokal, nur lokale Wege nehmen sie."@de ,
+                 "Erik's narrative for the whole portfolio. Unlike a position's thesis, wholly private: it stays local."@en .
+
+wm:portfolioThese a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:PortfolioStory ; rdfs:range xsd:string ;
+    rdfs:label "Portfolio-These"@de , "portfolio narrative"@en ;
+    wm:imCode "PortfolioStory.story" ; wm:schutz wm:privat ; wm:verschluesselt true .
+
+wm:zieljahr a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:PortfolioStory ; rdfs:range xsd:integer ;
+    rdfs:label "Zieljahr"@de , "target year"@en ;
+    wm:imCode "PortfolioStory.target_year" ; wm:schutz wm:privat ; wm:verschluesselt false .
+
+wm:liquiditaetsbedarf a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:PortfolioStory ; rdfs:range xsd:string ;
+    rdfs:label "Liquiditätsbedarf"@de , "liquidity need"@en ;
+    rdfs:comment "Etwa „2028: Immobilienkauf ~150k“. Verschlüsselt seit 23.10.2026 (Erik); ältere Zeilen schlüsselt die App beim Start um."@de ;
+    wm:imCode "PortfolioStory.liquidity_need" ; wm:schutz wm:privat ; wm:verschluesselt true .
+
+wm:prioritaet a owl:DatatypeProperty , owl:FunctionalProperty , wm:Feld ;
+    rdfs:domain wm:PortfolioStory ; rdfs:range xsd:string ;
+    rdfs:label "Priorität"@de , "priority"@en ;
+    rdfs:comment "Wachstum, Einkommen, Sicherheit oder gemischt."@de ;
+    wm:imCode "PortfolioStory.priority" ; wm:schutz wm:privat ; wm:verschluesselt false .
+
+# --- Die Schutzstufen ----------------------------------------------------------------------------
+
+wm:Feld a owl:Class ;
+    rdfs:label "Feld"@de , "field"@en ;
+    rdfs:comment "Ein Feld einer Position oder der Portfolio-Story. Jedes hat genau eine Schutzstufe -- wer `Position` oder `PortfolioStory` ein Feld gibt, sagt hier, wer es sehen darf."@de .
+
+wm:Schutzstufe a owl:Class ;
+    rdfs:subClassOf skos:Concept ;
+    rdfs:label "Schutzstufe"@de , "protection level"@en ;
+    rdfs:comment "Wer ein Feld sehen darf."@de .
+
+wm:schutzstufen a skos:ConceptScheme ; rdfs:label "Schutzstufen"@de , "protection levels"@en .
+
+wm:oeffentlich a wm:Schutzstufe ; skos:inScheme wm:schutzstufen ;
+    skos:prefLabel "öffentlich"@de , "public"@en ;
+    skos:definition "Steht in jeder Börsenzeitung: Name, Kennungen, Klasse."@de .
+
+wm:watchlistArtig a wm:Schutzstufe ; skos:inScheme wm:schutzstufen ;
+    skos:prefLabel "watchlist-artig"@de , "watchlist-like"@en ;
+    skos:definition "Eriks Sicht auf einen Titel, die es genauso gäbe, wenn er ihn nur beobachtete. Darf zu einem Cloud-Modell."@de .
+
+wm:privat a wm:Schutzstufe ; skos:inScheme wm:schutzstufen ;
+    skos:prefLabel "privat"@de , "private"@en ;
+    skos:definition "Was Erik besitzt, notiert und geraten bekommt: ob, wie viel, zu welchem Preis, seit wann, auf wessen Rat, und die Portfolio-Story. Verlässt den Rechner nie."@de .
+
+# --- Wege zu einem Sprachmodell ------------------------------------------------------------------
+
+wm:Weg a owl:Class ;
+    rdfs:label "Weg zu einem Modell"@de , "model path"@en ;
+    rdfs:comment "Ein Agent oder Dienst, der etwas an ein Sprachmodell gibt (oder, ohne Modell, nur rechnet). Die Liste entspricht den Töpfen in tests/unit/test_architecture_guards.py; der Test hält beide gleich."@de .
+
+wm:laeuftBei a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain wm:Weg ; rdfs:range wm:Ort ;
+    rdfs:label "läuft bei"@de , "runs at"@en .
+
+wm:nimmt a owl:ObjectProperty ;
+    rdfs:domain wm:Weg ; rdfs:range wm:Feld ;
+    rdfs:label "nimmt"@de , "takes"@en ;
+    rdfs:comment "Die Felder, die der Weg laut seiner Signatur annehmen kann (`PublicPosition`, `Position` oder einzelne Parameter). Gesetzt nur vom Test, aus dem Code gelesen."@de .
+
+wm:ausnahme a owl:DatatypeProperty ;
+    rdfs:domain wm:Weg ; rdfs:range xsd:string ;
+    rdfs:label "Ausnahme, weil"@de , "exception because"@en ;
+    rdfs:comment "Ein Cloud-Weg, der mehr nehmen darf, mit Grund. Nur mit Eriks Zustimmung (CLAUDE.md §1)."@de .
+
+wm:Ort a owl:Class ;
+    rdfs:subClassOf skos:Concept ;
+    rdfs:label "Ort"@de , "location"@en .
+
+wm:orte a skos:ConceptScheme ; rdfs:label "Orte"@de , "locations"@en .
+
+wm:lokal a wm:Ort ; skos:inScheme wm:orte ;
+    skos:prefLabel "lokal (Ollama)"@de , "local (Ollama)"@en ;
+    skos:definition "Bleibt auf dem Rechner und darf alles sehen."@de .
+wm:cloud a wm:Ort ; skos:inScheme wm:orte ;
+    skos:prefLabel "Cloud (Claude, OpenRouter)"@de , "cloud (Claude, OpenRouter)"@en ;
+    skos:definition "Verlässt den Rechner und darf nur Öffentliches und Watchlist-artiges nehmen."@de .
+wm:ohneModell a wm:Ort ; skos:inScheme wm:orte ;
+    skos:prefLabel "ohne Modell"@de , "no model"@en ;
+    skos:definition "Rechnet nur, sendet nichts."@de .
+
+# Die Wege, je mit dem Namen der Klasse im Code.
+
+wm:CapitalAllocatorAgent a wm:Weg ; wm:imCode "CapitalAllocatorAgent" ; wm:laeuftBei wm:cloud ;
+    rdfs:label "Kapitalallokation"@de , "capital allocation"@en .
+wm:ConsensusGapAgent a wm:Weg ; wm:imCode "ConsensusGapAgent" ; wm:laeuftBei wm:cloud ;
+    rdfs:label "Consensus Gap"@de , "consensus gap"@en .
+wm:DevilsAdvocateAgent a wm:Weg ; wm:imCode "DevilsAdvocateAgent" ; wm:laeuftBei wm:cloud ;
+    rdfs:label "Advocatus Diaboli"@de , "devil's advocate"@en .
+wm:FundamentalAnalyzerAgent a wm:Weg ; wm:imCode "FundamentalAnalyzerAgent" ; wm:laeuftBei wm:cloud ;
+    rdfs:label "Fundamentalanalyse"@de , "fundamental analysis"@en .
+wm:NewsAgent a wm:Weg ; wm:imCode "NewsAgent" ; wm:laeuftBei wm:cloud ;
+    rdfs:label "Nachrichten"@de , "news"@en .
+wm:ResearchAgent a wm:Weg ; wm:imCode "ResearchAgent" ; wm:laeuftBei wm:cloud ;
+    rdfs:label "Recherche"@de , "research"@en .
+wm:SearchAgent a wm:Weg ; wm:imCode "SearchAgent" ; wm:laeuftBei wm:cloud ;
+    rdfs:label "Suche"@de , "search"@en .
+wm:SectorRotationAgent a wm:Weg ; wm:imCode "SectorRotationAgent" ; wm:laeuftBei wm:cloud ;
+    rdfs:label "Sektorrotation"@de , "sector rotation"@en .
+wm:StorycheckerAgent a wm:Weg ; wm:imCode "StorycheckerAgent" ; wm:laeuftBei wm:cloud ;
+    rdfs:label "Storychecker"@de , "story checker"@en ;
+    rdfs:comment "Bis 23.10.2026 die eine Ausnahme: Er nahm die ganze Position und schickte die Empfehlung mit. Seitdem nimmt er `PublicPosition` wie alle."@de .
+wm:StructuralChangeAgent a wm:Weg ; wm:imCode "StructuralChangeAgent" ; wm:laeuftBei wm:cloud ;
+    rdfs:label "Strukturwandel"@de , "structural change"@en .
+wm:PositionStoryService a wm:Weg ; wm:imCode "PositionStoryService" ; wm:laeuftBei wm:cloud ;
+    rdfs:label "Story-Entwurf"@de , "story draft"@en ;
+    rdfs:comment "Kein Agent, darum in keinem Topf des Guards: der Knopf „Story vorschlagen“ auf der Positionen-Seite."@de .
+
+wm:DividendCalendarAgent a wm:Weg ; wm:imCode "DividendCalendarAgent" ; wm:laeuftBei wm:lokal ;
+    rdfs:label "Dividendenkalender"@de , "dividend calendar"@en .
+wm:PortfolioAgent a wm:Weg ; wm:imCode "PortfolioAgent" ; wm:laeuftBei wm:lokal ;
+    rdfs:label "Portfolio"@de , "portfolio"@en .
+wm:PortfolioRobustnessAgent a wm:Weg ; wm:imCode "PortfolioRobustnessAgent" ; wm:laeuftBei wm:lokal ;
+    rdfs:label "Robustheit"@de , "robustness"@en .
+wm:PortfolioStoryAgentV2 a wm:Weg ; wm:imCode "PortfolioStoryAgentV2" ; wm:laeuftBei wm:lokal ;
+    rdfs:label "Portfolio-These"@de , "portfolio thesis"@en .
+wm:RebalanceAgent a wm:Weg ; wm:imCode "RebalanceAgent" ; wm:laeuftBei wm:lokal ;
+    rdfs:label "Umschichten"@de , "rebalance"@en .
+wm:TaxLossHarvestingAgent a wm:Weg ; wm:imCode "TaxLossHarvestingAgent" ; wm:laeuftBei wm:lokal ;
+    rdfs:label "Verlustverrechnung"@de , "tax-loss harvesting"@en .
+wm:WatchlistCheckerAgent a wm:Weg ; wm:imCode "WatchlistCheckerAgent" ; wm:laeuftBei wm:lokal ;
+    rdfs:label "Watchlist-Prüfung"@de , "watchlist check"@en .
+
+wm:MarketDataAgent a wm:Weg ; wm:imCode "MarketDataAgent" ; wm:laeuftBei wm:ohneModell ;
+    rdfs:label "Marktdaten"@de , "market data"@en .
+wm:WealthSnapshotAgent a wm:Weg ; wm:imCode "WealthSnapshotAgent" ; wm:laeuftBei wm:ohneModell ;
+    rdfs:label "Vermögensstand"@de , "net worth snapshot"@en .
+
+# --- Die Bezeichnungen: Anlagetyp > Anlageklasse > Anlageart -------------------------------------
+#
+# Drei Ebenen aus config/asset_classes.yaml. Gebunden am deutschen prefLabel, das genau der
+# Schreibweise in der YAML entspricht (der Test vergleicht).
+
+wm:Anlagetyp a owl:Class ;
+    rdfs:subClassOf skos:Concept ;
+    rdfs:label "Anlagetyp"@de , "investment type"@en ;
+    rdfs:comment "Die grobe Ebene für die Aufteilung des Vermögens (Josefs Drittel-Regel, core/portfolio_stability.py)."@de .
+
+wm:Anlageklasse a owl:Class ;
+    rdfs:subClassOf skos:Concept ;
+    rdfs:label "Anlageklasse"@de , "asset class"@en ;
+    rdfs:comment "Die Ebene, die man beim Anlegen wählt. Achtung, Begriff: In der Finanzwelt ist eine Anlageklasse der Basiswert (Aktien, Anleihen, Immobilien, Rohstoffe, Geld). Wealth mischt Basiswert und Hülle: Aktie und Aktienfonds sind dort dieselbe Anlageklasse, hier zwei."@de ,
+                 "Note: in finance an asset class is the underlying. Wealth mixes underlying and wrapper: a share and an equity fund are one asset class there, two here."@en .
+
+wm:Anlageart a owl:Class ;
+    rdfs:subClassOf skos:Concept ;
+    rdfs:label "Anlageart"@de , "sub-type"@en ;
+    rdfs:comment "Die feinste Ebene, je Klasse eine Auswahl. Eine Art kann bei mehreren Klassen vorkommen (ETF)."@de .
+
+wm:gehoertZuTyp a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:subPropertyOf skos:broader ;
+    rdfs:domain wm:Anlageklasse ; rdfs:range wm:Anlagetyp ;
+    rdfs:label "gehört zum Typ"@de , "belongs to type"@en .
+
+wm:moeglichBei a owl:ObjectProperty ;
+    rdfs:domain wm:Anlageart ; rdfs:range wm:Anlageklasse ;
+    rdfs:label "möglich bei"@de , "allowed for"@en .
+
+wm:watchlistFaehig a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain wm:Anlageklasse ; rdfs:range xsd:boolean ;
+    rdfs:label "kann auf die Watchlist"@de , "watchlist eligible"@en ;
+    rdfs:comment "`watchlist_eligible` in der YAML."@de .
+
+wm:pruefbar a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain wm:Anlageklasse ; rdfs:range xsd:boolean ;
+    rdfs:label "wird geprüft"@de , "checkable"@en ;
+    rdfs:comment "`pruefbar` in der YAML: Die Checks beurteilen Unternehmen und Fonds; ein Rohstoff hat nichts davon."@de .
+
+wm:kursAutomatisch a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain wm:Anlageklasse ; rdfs:range xsd:boolean ;
+    rdfs:label "Kurs automatisch"@de , "price fetched"@en ;
+    rdfs:comment "`auto_fetch` in der YAML: Kurs über yfinance, sonst ein Schätzwert von Hand."@de .
+
+# Anlagetypen
+
+wm:typ-Wertpapiere a wm:Anlagetyp ; skos:prefLabel "Wertpapiere"@de , "equities"@en ;
+    skos:definition "Aktien und Aktienfonds -- trotz des Namens nicht alle Wertpapiere: Anleihen und Rentenfonds sind „Renten“."@de ;
+    skos:closeMatch fibo-fi:EquityInstrument .
+wm:typ-Renten a wm:Anlagetyp ; skos:prefLabel "Renten"@de , "fixed income and pensions"@en ;
+    skos:definition "Zwei Bedeutungen unter einem Wort: Rentenpapiere (Anleihen, Rentenfonds) und Altersrenten (Betriebsrente, Direktzusage). Im Börsendeutsch heißt „Renten“ nur das erste."@de ;
+    skos:closeMatch fibo-fi:DebtInstrument .
+wm:typ-Immobilien a wm:Anlagetyp ; skos:prefLabel "Immobilien"@de , "real assets"@en ;
+    skos:definition "Immobilien, Grundstücke, Immobilien- und Infrastrukturfonds."@de .
+wm:typ-Rohstoffe a wm:Anlagetyp ; skos:prefLabel "Rohstoffe"@de , "commodities"@en ;
+    skos:definition "Heute nur Edelmetalle. Hieß bis 20.04.2026 „Edelmetalle“ (Migration in core/storage/base.py)."@de ;
+    skos:closeMatch fibo-fi:CommodityInstrument .
+wm:typ-Krypto a wm:Anlagetyp ; skos:prefLabel "Krypto"@de , "crypto"@en ;
+    skos:definition "Kryptowährungen. FIBO kennt sie (noch) nicht."@de .
+wm:typ-Geld a wm:Anlagetyp ; skos:prefLabel "Geld"@de , "deposits"@en ;
+    skos:definition "Gebundenes Geld: Festgeld, Sparkonto, Auszahlungen aus der Altersvorsorge. Tagesgeld steht dagegen unter Bargeld."@de ;
+    skos:closeMatch fibo-acc:TimeDepositAccount .
+wm:typ-Bargeld a wm:Anlagetyp ; skos:prefLabel "Bargeld"@de , "cash"@en ;
+    skos:definition "Sofort verfügbar: Bargeld, Girokonto, Verrechnungskonto, Tagesgeld."@de ;
+    skos:closeMatch fibo-fi:CashInstrument .
+
+# Anlageklassen
+
+wm:klasse-Aktie a wm:Anlageklasse ; skos:prefLabel "Aktie"@de , "share"@en ;
+    wm:gehoertZuTyp wm:typ-Wertpapiere ; wm:watchlistFaehig true ; wm:pruefbar true ; wm:kursAutomatisch true ;
+    skos:closeMatch fibo-eq:Share .
+wm:klasse-Aktienfonds a wm:Anlageklasse ; skos:prefLabel "Aktienfonds"@de , "equity fund"@en ;
+    wm:gehoertZuTyp wm:typ-Wertpapiere ; wm:watchlistFaehig true ; wm:pruefbar true ; wm:kursAutomatisch true ;
+    skos:closeMatch fibo-civ:EquityFund .
+wm:klasse-Rentenfonds a wm:Anlageklasse ; skos:prefLabel "Rentenfonds"@de , "bond fund"@en ;
+    wm:gehoertZuTyp wm:typ-Renten ; wm:watchlistFaehig true ; wm:pruefbar true ; wm:kursAutomatisch true ;
+    skos:closeMatch fibo-fund:CollectiveInvestmentVehicle .
+wm:klasse-Immobilienfonds a wm:Anlageklasse ; skos:prefLabel "Immobilienfonds"@de , "real estate fund"@en ;
+    wm:gehoertZuTyp wm:typ-Immobilien ; wm:watchlistFaehig true ; wm:pruefbar true ; wm:kursAutomatisch true ;
+    skos:closeMatch fibo-fund:CollectiveInvestmentVehicle .
+wm:klasse-Infrastrukturfonds a wm:Anlageklasse ; skos:prefLabel "Infrastrukturfonds"@de , "infrastructure fund"@en ;
+    skos:definition "Steht unter Immobilien, obwohl Infrastruktur (Netze, Häfen, Energie) ein eigener Basiswert ist."@de ;
+    wm:gehoertZuTyp wm:typ-Immobilien ; wm:watchlistFaehig true ; wm:pruefbar true ; wm:kursAutomatisch true ;
+    skos:closeMatch fibo-fund:CollectiveInvestmentVehicle .
+wm:klasse-Edelmetall a wm:Anlageklasse ; skos:prefLabel "Edelmetall"@de , "precious metal"@en ;
+    wm:gehoertZuTyp wm:typ-Rohstoffe ; wm:watchlistFaehig true ; wm:pruefbar false ; wm:kursAutomatisch true ;
+    skos:closeMatch fibo-fi:CommodityInstrument .
+wm:klasse-Kryptowaehrung a wm:Anlageklasse ; skos:prefLabel "Kryptowährung"@de , "cryptocurrency"@en ;
+    wm:gehoertZuTyp wm:typ-Krypto ; wm:watchlistFaehig true ; wm:pruefbar true ; wm:kursAutomatisch true .
+wm:klasse-Anleihe a wm:Anlageklasse ; skos:prefLabel "Anleihe"@de , "bond"@en ;
+    skos:definition "Kann nicht auf die Watchlist und hat keinen automatischen Kurs, obwohl eine Anleihe eine ISIN und einen Börsenkurs hat."@de ;
+    wm:gehoertZuTyp wm:typ-Renten ; wm:watchlistFaehig false ; wm:pruefbar true ; wm:kursAutomatisch false ;
+    skos:closeMatch fibo-bond:Bond .
+wm:klasse-Festgeld a wm:Anlageklasse ; skos:prefLabel "Festgeld"@de , "time deposit"@en ;
+    wm:gehoertZuTyp wm:typ-Geld ; wm:watchlistFaehig false ; wm:pruefbar true ; wm:kursAutomatisch false ;
+    skos:closeMatch fibo-acc:TimeDepositAccount .
+wm:klasse-Bargeld a wm:Anlageklasse ; skos:prefLabel "Bargeld"@de , "cash"@en ;
+    wm:gehoertZuTyp wm:typ-Bargeld ; wm:watchlistFaehig false ; wm:pruefbar true ; wm:kursAutomatisch false ;
+    skos:closeMatch fibo-acc:DemandDepositAccount .
+wm:klasse-Immobilie a wm:Anlageklasse ; skos:prefLabel "Immobilie"@de , "real estate"@en ;
+    wm:gehoertZuTyp wm:typ-Immobilien ; wm:watchlistFaehig false ; wm:pruefbar true ; wm:kursAutomatisch false .
+wm:klasse-Grundstueck a wm:Anlageklasse ; skos:prefLabel "Grundstück"@de , "land"@en ;
+    wm:gehoertZuTyp wm:typ-Immobilien ; wm:watchlistFaehig false ; wm:pruefbar true ; wm:kursAutomatisch false .
+wm:klasse-Altersvorsorge-Rente a wm:Anlageklasse ; skos:prefLabel "Altersvorsorge-Rente"@de , "pension (annuity)"@en ;
+    skos:definition "Ein Rentenanspruch, kein Rentenpapier -- steht trotzdem unter dem Typ „Renten“."@de ;
+    wm:gehoertZuTyp wm:typ-Renten ; wm:watchlistFaehig false ; wm:pruefbar true ; wm:kursAutomatisch false .
+wm:klasse-Altersvorsorge-Festgeld a wm:Anlageklasse ; skos:prefLabel "Altersvorsorge-Festgeld"@de , "pension (lump sum)"@en ;
+    wm:gehoertZuTyp wm:typ-Geld ; wm:watchlistFaehig false ; wm:pruefbar true ; wm:kursAutomatisch false .
+
+# Anlagearten
+
+wm:art-Einzelaktie a wm:Anlageart ; skos:prefLabel "Einzelaktie"@de , "single share"@en ;
+    wm:moeglichBei wm:klasse-Aktie ; skos:closeMatch fibo-eq:CommonShare .
+wm:art-ADR-GDR a wm:Anlageart ; skos:prefLabel "ADR / GDR"@de , "depositary receipt"@en ;
+    skos:definition "Hinterlegungsschein: ein Papier, das eine Aktie an einer fremden Börse vertritt (TSMC als TSM in New York)."@de ;
+    wm:moeglichBei wm:klasse-Aktie ; skos:closeMatch fibo-dr:DepositaryReceipt .
+wm:art-ETF a wm:Anlageart ; skos:prefLabel "ETF"@de , "ETF"@en ;
+    skos:definition "Eine Hülle, kein Basiswert: börsengehandelter Fonds, bei vier Klassen möglich."@de ;
+    wm:moeglichBei wm:klasse-Aktienfonds , wm:klasse-Rentenfonds , wm:klasse-Immobilienfonds , wm:klasse-Infrastrukturfonds ;
+    skos:closeMatch fibo-fund:ExchangeTradedFund .
+wm:art-AktivGemanagterFonds a wm:Anlageart ; skos:prefLabel "Aktiv gemanagter Fonds"@de , "actively managed fund"@en ;
+    wm:moeglichBei wm:klasse-Aktienfonds , wm:klasse-Rentenfonds , wm:klasse-Immobilienfonds , wm:klasse-Infrastrukturfonds ;
+    skos:closeMatch fibo-fund:MutualFund .
+wm:art-REIT a wm:Anlageart ; skos:prefLabel "REIT"@de , "REIT"@en ;
+    wm:moeglichBei wm:klasse-Immobilienfonds ; skos:closeMatch fibo-fund:RealEstateInvestmentTrust .
+wm:art-InfrastructureFund a wm:Anlageart ; skos:prefLabel "Infrastructure Fund"@de , "infrastructure fund"@en ;
+    wm:moeglichBei wm:klasse-Infrastrukturfonds .
+wm:art-Muenze a wm:Anlageart ; skos:prefLabel "Münze"@de , "coin (bullion)"@en ; wm:moeglichBei wm:klasse-Edelmetall .
+wm:art-Barren a wm:Anlageart ; skos:prefLabel "Barren"@de , "bar"@en ; wm:moeglichBei wm:klasse-Edelmetall .
+wm:art-ETC a wm:Anlageart ; skos:prefLabel "ETC"@de , "ETC"@en ;
+    skos:definition "Exchange Traded Commodity: eine Schuldverschreibung auf einen Rohstoff, kein Fonds -- trotz des ähnlichen Namens kein ETF."@de ;
+    wm:moeglichBei wm:klasse-Edelmetall .
+wm:art-Coin a wm:Anlageart ; skos:prefLabel "Coin"@de , "coin"@en ; wm:moeglichBei wm:klasse-Kryptowaehrung .
+wm:art-Token a wm:Anlageart ; skos:prefLabel "Token"@de , "token"@en ; wm:moeglichBei wm:klasse-Kryptowaehrung .
+wm:art-Staking a wm:Anlageart ; skos:prefLabel "Staking"@de , "staking"@en ; wm:moeglichBei wm:klasse-Kryptowaehrung .
+wm:art-Staatsanleihe a wm:Anlageart ; skos:prefLabel "Staatsanleihe"@de , "government bond"@en ;
+    wm:moeglichBei wm:klasse-Anleihe ; skos:closeMatch fibo-bond:GovernmentIssuedDebtSecurity .
+wm:art-Unternehmensanleihe a wm:Anlageart ; skos:prefLabel "Unternehmensanleihe"@de , "corporate bond"@en ; wm:moeglichBei wm:klasse-Anleihe .
+wm:art-Pfandbrief a wm:Anlageart ; skos:prefLabel "Pfandbrief"@de , "covered bond"@en ; wm:moeglichBei wm:klasse-Anleihe .
+wm:art-Festgeld a wm:Anlageart ; skos:prefLabel "Festgeld"@de , "time deposit"@en ;
+    wm:moeglichBei wm:klasse-Festgeld ; skos:closeMatch fibo-acc:TimeDepositAccount .
+wm:art-Sparkonto a wm:Anlageart ; skos:prefLabel "Sparkonto"@de , "savings account"@en ; wm:moeglichBei wm:klasse-Festgeld .
+wm:art-Bargeld a wm:Anlageart ; skos:prefLabel "Bargeld"@de , "cash"@en ; wm:moeglichBei wm:klasse-Bargeld .
+wm:art-Girokonto a wm:Anlageart ; skos:prefLabel "Girokonto"@de , "current account"@en ;
+    wm:moeglichBei wm:klasse-Bargeld ; skos:closeMatch fibo-acc:DemandDepositAccount .
+wm:art-Verrechnungskonto a wm:Anlageart ; skos:prefLabel "Verrechnungskonto"@de , "settlement account"@en ; wm:moeglichBei wm:klasse-Bargeld .
+wm:art-Tagesgeld a wm:Anlageart ; skos:prefLabel "Tagesgeld"@de , "overnight deposit"@en ; wm:moeglichBei wm:klasse-Bargeld .
+wm:art-Eigentumswohnung a wm:Anlageart ; skos:prefLabel "Eigentumswohnung"@de , "flat"@en ; wm:moeglichBei wm:klasse-Immobilie .
+wm:art-Einfamilienhaus a wm:Anlageart ; skos:prefLabel "Einfamilienhaus"@de , "house"@en ; wm:moeglichBei wm:klasse-Immobilie .
+wm:art-Mehrfamilienhaus a wm:Anlageart ; skos:prefLabel "Mehrfamilienhaus"@de , "apartment building"@en ; wm:moeglichBei wm:klasse-Immobilie .
+wm:art-Gewerbeimmobilie a wm:Anlageart ; skos:prefLabel "Gewerbeimmobilie"@de , "commercial property"@en ; wm:moeglichBei wm:klasse-Immobilie .
+wm:art-Baugrundstueck a wm:Anlageart ; skos:prefLabel "Baugrundstück"@de , "building plot"@en ; wm:moeglichBei wm:klasse-Grundstueck .
+wm:art-Ackerland a wm:Anlageart ; skos:prefLabel "Ackerland"@de , "farmland"@en ; wm:moeglichBei wm:klasse-Grundstueck .
+wm:art-Forstland a wm:Anlageart ; skos:prefLabel "Forstland"@de , "forest land"@en ; wm:moeglichBei wm:klasse-Grundstueck .
+wm:art-BetrieblicheRentenversicherung a wm:Anlageart ; skos:prefLabel "Betriebliche Rentenversicherung"@de , "occupational pension insurance"@en ; wm:moeglichBei wm:klasse-Altersvorsorge-Rente .
+wm:art-Direktzusage a wm:Anlageart ; skos:prefLabel "Direktzusage"@de , "direct pension promise"@en ; wm:moeglichBei wm:klasse-Altersvorsorge-Rente .
+wm:art-Pensionsfonds a wm:Anlageart ; skos:prefLabel "Pensionsfonds"@de , "pension fund"@en ;
+    wm:moeglichBei wm:klasse-Altersvorsorge-Rente ; skos:closeMatch fibo-fund:PensionFund .
+wm:art-bAVMitKapitaloption a wm:Anlageart ; skos:prefLabel "bAV mit Kapitaloption"@de , "occupational pension with lump-sum option"@en ; wm:moeglichBei wm:klasse-Altersvorsorge-Festgeld .
+wm:art-PensionskasseAuszahlung a wm:Anlageart ; skos:prefLabel "Pensionskasse (Auszahlung)"@de , "pension fund (payout)"@en ; wm:moeglichBei wm:klasse-Altersvorsorge-Festgeld .
+wm:art-PrivateAltersvorsorge a wm:Anlageart ; skos:prefLabel "Private Altersvorsorge"@de , "private pension"@en ; wm:moeglichBei wm:klasse-Altersvorsorge-Festgeld .

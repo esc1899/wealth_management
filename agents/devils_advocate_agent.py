@@ -14,7 +14,7 @@ Verdict values (robustness of the investment thesis):
 Storage: devils_advocate_sessions + devils_advocate_messages,
 referenced from position_analyses (agent='devils_advocate', session_id).
 
-Privacy note: sends position.name + position.story to cloud (Storychecker-exception-pattern).
+Privacy note: sends position.name + position.story to cloud (watchlist-like, CLAUDE.md §1).
 Story is optional — agent runs without it but produces more targeted output with it.
 
 Eligibility: ticker + id required. Story optional but improves quality.
@@ -163,7 +163,7 @@ def format_position(pos: PublicPosition) -> str:
 class DevilsAdvocateAgent:
     """
     Cloud agent (Claude ☁️) — finds the bear case for watchlist positions.
-    Privacy note: sends position.name + story to cloud (Storychecker-exception-pattern).
+    Privacy note: sends position.name + story to cloud (watchlist-like, CLAUDE.md §1).
     Watchlist-only, on-demand. Not scheduled.
     """
 

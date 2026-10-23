@@ -1,0 +1,125 @@
+# Die Formen von Wealth (SHACL, 22.10.2026): was fuer Titel, Positionen, Felder und Wege gelten muss.
+#
+# Ausgefuehrt werden die Regeln weiter vom Code (Formular in pages/positionen.py, YAML-Registry,
+# PublicPosition) -- sonst gaebe es zwei Wahrheiten. Die Formen pruefen im Test, dass Code und
+# Regelwerk dasselbe sagen: an einer Datenbank in :memory:, gefuellt vom Demo-Seeder und vom
+# Repository, und an den Signaturen der Wege (`tests/unit/test_ontologie.py`). Echte Daten sieht
+# keine Form.
+#
+# Nicht als Form, mit Grund:
+# - "Privat heisst verschluesselt": gilt nicht -- Kaufdatum und "im Depot" stehen im Klartext,
+#   die Story ist verschluesselt, obwohl sie watchlist-artig ist. Die Ontologie haelt fest, was
+#   ist (`wm:verschluesselt`), der Test vergleicht es mit `_serialize`.
+# - "Nur auf der Watchlist heisst ohne Stueckzahl": Das Formular laesst eine Stueckzahl auch
+#   ohne Depot zu, der Demo-Seeder gibt sie jedem Titel mit Ticker.
+# - "Eine Depotposition hat eine Stueckzahl": nicht bei Klassen mit Schaetzwert (Immobilie).
+# - Was ein Weg wirklich abschickt, sieht man der Signatur nicht an -- nur, was er annehmen kann.
+#   Das genuegt fuer die Grenze: Was er nicht annimmt, kann er nicht senden.
+
+@prefix wm:   <urn:lotsee:wealth#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+
+<urn:lotsee:wealth:formen> a owl:Ontology ;
+    sh:declare [ sh:prefix "wm" ; sh:namespace "urn:lotsee:wealth#"^^xsd:anyURI ] .
+
+# --- Die Privacy-Grenze (CLAUDE.md §1) ------------------------------------------------------------
+
+wm:FeldForm a sh:NodeShape ;
+    sh:targetClass wm:Feld ;
+    sh:property [ sh:path wm:schutz ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:in ( wm:oeffentlich wm:watchlistArtig wm:privat ) ;
+                  sh:message "Jedes Feld einer Position hat genau eine Schutzstufe: öffentlich, watchlist-artig oder privat." ] ;
+    sh:property [ sh:path wm:imCode ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:message "Jedes Feld nennt seinen Namen im Code." ] ;
+    sh:property [ sh:path wm:verschluesselt ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:boolean ;
+                  sh:message "Von jedem Feld steht fest, ob es verschlüsselt gespeichert wird." ] .
+
+wm:WegForm a sh:NodeShape ;
+    sh:targetClass wm:Weg ;
+    sh:property [ sh:path wm:laeuftBei ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:in ( wm:lokal wm:cloud wm:ohneModell ) ;
+                  sh:message "Jeder Weg läuft an genau einem Ort: lokal, in der Cloud oder ohne Modell." ] ;
+    sh:property [ sh:path wm:nimmt ; sh:class wm:Feld ;
+                  sh:message "Ein Weg nimmt nur Felder, die die Ontologie kennt." ] ;
+
+    sh:sparql [
+        sh:message "Ein Weg in die Cloud nimmt nur, was auch auf einer Watchlist stehen könnte -- nie den Bestand." ;
+        sh:prefixes <urn:lotsee:wealth:formen> ;
+        sh:select """
+            SELECT $this (wm:nimmt AS ?path) ?value WHERE {
+                $this wm:laeuftBei wm:cloud ; wm:nimmt ?value .
+                ?value wm:schutz wm:privat .
+                FILTER NOT EXISTS { $this wm:ausnahme ?grund }
+            }""" ] ;
+
+    sh:sparql [
+        sh:message "Eine Ausnahme gibt es nur für einen Weg in die Cloud." ;
+        sh:prefixes <urn:lotsee:wealth:formen> ;
+        sh:select """
+            SELECT $this WHERE {
+                $this wm:ausnahme ?grund .
+                FILTER NOT EXISTS { $this wm:laeuftBei wm:cloud }
+            }""" ] .
+
+# --- Titel: Bezeichnungen und Kennungen -----------------------------------------------------------
+
+wm:TitelForm a sh:NodeShape ;
+    sh:targetClass wm:Titel ;
+    sh:property [ sh:path wm:name ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:message "Ein Titel hat genau einen Namen." ] ;
+    sh:property [ sh:path wm:anlageklasse ; sh:minCount 1 ; sh:maxCount 1 ; sh:class wm:Anlageklasse ;
+                  sh:message "Ein Titel hat genau eine Anlageklasse aus der YAML." ] ;
+    sh:property [ sh:path wm:anlagetyp ; sh:minCount 1 ; sh:maxCount 1 ; sh:class wm:Anlagetyp ;
+                  sh:message "Ein Titel hat genau einen Anlagetyp, den die YAML kennt." ] ;
+    sh:property [ sh:path wm:anlageart ; sh:maxCount 1 ; sh:class wm:Anlageart ;
+                  sh:message "Eine Anlageart ist eine aus der YAML." ] ;
+    sh:property [ sh:path wm:isin ; sh:maxCount 1 ;
+                  sh:pattern "^[A-Z]{2}[A-Z0-9]{9}[0-9]$" ;
+                  sh:message "Eine ISIN hat zwölf Zeichen: zwei Buchstaben Land, neun Zeichen, eine Prüfziffer." ] ;
+    sh:property [ sh:path wm:wkn ; sh:maxCount 1 ;
+                  sh:pattern "^[A-Z0-9]{6}$" ;
+                  sh:message "Eine WKN hat sechs Zeichen, Großbuchstaben und Ziffern." ] ;
+    sh:property [ sh:path wm:ticker ; sh:maxCount 1 ;
+                  sh:pattern "^[A-Z0-9^][A-Z0-9.=^-]*$" ;
+                  sh:message "Ein Ticker ist ein Yahoo-Symbol: Großbuchstaben, Ziffern, . = ^ -, ohne Leerzeichen." ] ;
+
+    sh:sparql [
+        sh:message "Der Anlagetyp folgt aus der Anlageklasse (asset_classes.yaml)." ;
+        sh:prefixes <urn:lotsee:wealth:formen> ;
+        sh:select """
+            SELECT $this (wm:anlagetyp AS ?path) ?value WHERE {
+                $this wm:anlageklasse ?klasse ; wm:anlagetyp ?value .
+                ?klasse wm:gehoertZuTyp ?typ .
+                FILTER (?value != ?typ)
+            }""" ] ;
+
+    sh:sparql [
+        sh:message "Die Anlageart ist eine, die bei der Anlageklasse möglich ist." ;
+        sh:prefixes <urn:lotsee:wealth:formen> ;
+        sh:select """
+            SELECT $this (wm:anlageart AS ?path) ?value WHERE {
+                $this wm:anlageklasse ?klasse ; wm:anlageart ?value .
+                FILTER NOT EXISTS { ?value wm:moeglichBei ?klasse }
+            }""" ] .
+
+# --- Position -------------------------------------------------------------------------------------
+
+wm:PositionForm a sh:NodeShape ;
+    sh:targetClass wm:Position ;
+    sh:property [ sh:path wm:zuTitel ; sh:minCount 1 ; sh:maxCount 1 ; sh:class wm:Titel ;
+                  sh:message "Eine Position gilt genau einem Titel." ] ;
+    sh:property [ sh:path wm:imDepot ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:boolean ;
+                  sh:message "Von jeder Position steht fest, ob sie im Depot ist." ] ;
+    sh:property [ sh:path wm:aufWatchlist ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:boolean ;
+                  sh:message "Von jeder Position steht fest, ob sie auf der Watchlist ist." ] ;
+
+    sh:sparql [
+        sh:message "Auf die Watchlist kommt nur, was laut YAML dorthin kann (watchlist_eligible)." ;
+        sh:prefixes <urn:lotsee:wealth:formen> ;
+        sh:select """
+            SELECT $this WHERE {
+                $this wm:aufWatchlist true ; wm:zuTitel/wm:anlageklasse ?klasse .
+                ?klasse wm:watchlistFaehig false .
+            }""" ] .

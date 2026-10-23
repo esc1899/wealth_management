@@ -202,17 +202,19 @@ Die drei Buckets entsprechen exakt der Klassifikation in `tests/unit/test_archit
 | Provider | Agents | Darf sehen |
 |---|---|---|
 | **Ollama (lokal 🔒)** | PortfolioAgent, PortfolioStoryAgent, WatchlistCheckerAgent, PortfolioRobustnessAgent, RebalanceAgent, DividendCalendarAgent, TaxLossHarvestingAgent | Alles — Positionen, Namen, Stories, Zahlen |
-| **Claude API / OpenRouter (Cloud ☁️)** | ResearchAgent, NewsAgent, SearchAgent, StorycheckerAgent¹, ConsensusGapAgent, StructuralChangeAgent, FundamentalAnalyzerAgent, CapitalAllocatorAgent, DevilsAdvocateAgent, SectorRotationAgent | Nur öffentliche Daten (Ticker, Marktdaten, News) |
+| **Claude API / OpenRouter (Cloud ☁️)** | ResearchAgent, NewsAgent, SearchAgent, StorycheckerAgent, ConsensusGapAgent, StructuralChangeAgent, FundamentalAnalyzerAgent, CapitalAllocatorAgent, DevilsAdvocateAgent, SectorRotationAgent; dazu der Story-Entwurf (`PositionStoryService`) | Nur Watchlist-artiges (`PublicPosition`): Name, Kennungen, Klasse, Marktdaten, News und die Story einer Position — nie Bestand, Kaufdaten, Notiz, Empfehlung oder Portfolio-Story |
 | **Kein LLM (reine Berechnung 🔢)** | MarketDataAgent, WealthSnapshotAgent | Alles — sieht volle Positionen (Stückzahl, Kaufpreis), **sendet aber nichts**; schreibt nur Zahlen in die lokale DB |
 
-¹ **StorycheckerAgent Ausnahme**: Sendet `position.name` + `position.story` an die Claude API — bewusstes Design, da der Storychecker die Investment-These braucht um sie zu prüfen. Stories verlassen also das lokale System. Das ist ein akzeptierter Privacy-Trade-off, aber keine neue Einführung ohne explizite Zustimmung.
+**Die Story einer Position ist watchlist-artig** (Erik, 23.10.2026): Ohne Cloud-Modell lässt sich die These nicht sinnvoll prüfen, darum gehen Stories an Storychecker, Consensus Gap, Advocatus Diaboli und den Story-Entwurf. Weil man Privates hineinschreiben kann, sagt die Positionen-Seite es am Feld (`positionen.story_cloud_hinweis`). **Die Portfolio-Story ist es nicht** — sie bleibt lokal, ganz. **Die Empfehlung ist privat** („Halten“ verrät den Besitz). Es gibt keine Ausnahme mehr; eine neue nur mit Eriks Zustimmung.
 
 → Neuer Agent mit Portfolio-Zugriff? → **muss Ollama sein**
-→ Neuer Cloud-Agent? → **kein Zugriff auf Positionen/Stories/Namen** (außer StorycheckerAgent-Muster mit expliziter Begründung)
+→ Neuer Cloud-Agent? → **nur `PublicPosition`** (aus `Position.oeffentlich()`), nie `Position` oder `PortfolioStory`
 
-**Ausführbarer Guard (FEAT-60):** Diese Grenze ist kein Prosa-Versprechen, sondern Code: `tests/unit/test_architecture_guards.py` zwingt jeden neuen Agent in genau einen Provider-Bucket (cloud/local/non-LLM) und lässt keinen Cloud-Agent ein `Position` (statt `PublicPosition`) als Methoden-Input annehmen. StorycheckerAgent ist die einzige whitelisted Ausnahme. Ein vergessener Bucket oder ein Cloud-Agent mit `Position`-Signatur scheitert in CI, nicht erst im Review.
+**Ausführbarer Guard (FEAT-60):** Diese Grenze ist kein Prosa-Versprechen, sondern Code: `tests/unit/test_architecture_guards.py` zwingt jeden neuen Agent in genau einen Provider-Bucket (cloud/local/non-LLM) und lässt keinen Cloud-Agent ein `Position` (statt `PublicPosition`) als Methoden-Input annehmen. Ausnahmen gibt es keine (`PRIVACY_EXCEPTIONS` ist leer). Ein vergessener Bucket oder ein Cloud-Agent mit `Position`-Signatur scheitert in CI, nicht erst im Review.
 
 **Kein versteckter Modellaufruf:** Ein LLM-Provider wird nur in `state_llm.py` gebaut (`_make_public_provider` / `_make_ollama_provider`), dazu in den beiden Job-Weichen `core/background_jobs.py` und `core/scheduler.py`. Nur dort wird das Modell aus den Einstellungen gelesen, `home` aufgeloest, geroutet und der Verbrauch gebucht. Jeder Aufruf braucht eine Auswahl in den Einstellungen. `test_no_provider_built_outside_the_factories` macht jedes andere `ClaudeProvider(`/`OllamaProvider(`/`OpenAICompatibleProvider(` rot.
+
+**Je Feld, nicht nur je Agent (Ontologie, ARCHITECTURE.md "Ontologie und Formen"):** Jedes Feld von `Position` und `PortfolioStory` hat in `ontologie/wealth.ttl` eine Schutzstufe — öffentlich, watchlist-artig, privat —, und ein Weg in die Cloud darf nur nehmen, was auch auf einer Watchlist stehen könnte, nie den Bestand. `tests/integration/test_ontologie.py` liest aus den Signaturen, welche Felder jeder Weg annehmen kann. Wer `Position` oder `PortfolioStory` ein Feld gibt, setzt dort seine Schutzstufe; wer einen Agenten anlegt oder einem Dienst in `state_services.py` ein Cloud-Modell gibt, trägt ihn dort als Weg ein — sonst ist der Test rot. Warum: Der Guard oben sieht nur Typen; dass `PublicPosition` die Story trägt und der Story-Entwurf kein Agent ist, fiel erst je Feld auf.
 
 ### 2. Zweisprachigkeit (i18n)
 

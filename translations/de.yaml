@@ -79,6 +79,7 @@ nav:
   wealth_history: "Vermögenshistorie"
   group_system: "System ⚙️"
   statistics: "Statistiken"
+  ontologie: "Ontologie"
   verdict_hindsight: "Urteils-Rückblick"
   cowork_inbox: "Research Inbox"
   research_answers: "Research Answers"
@@ -740,6 +741,7 @@ positionen:
   anlageart_label: "Anlage-Art"
   story_label: "Investment-These"
   story_placeholder: "Warum hältst du diese Position?"
+  story_cloud_hinweis: "☁️ Die These kann an ein Cloud-Modell gehen (Story-Check, Consensus Gap, Advocatus Diaboli, „These vorschlagen“). Was nur dich angeht, gehört in die Notiz -- die bleibt lokal."
   story_suggest_button: "These vorschlagen"
   story_update_button: "These aktualisieren"
   story_suggest_spinner: "Claude generiert einen Vorschlag…"
@@ -1564,3 +1566,13 @@ kandidaten:
 
 tagesperformance:
   heute: "Heute"
+
+ontologie:
+  title: "Ontologie"
+  lesehilfe: "Fährst du mit der Maus über einen Kasten oder Pfeil, steht dort, was er bedeutet, welche Regeln für ihn gelten und was FIBO dazu sagt. Vor jedem Feld seine Schutzstufe: ○ öffentlich, ◐ watchlist-artig, ● privat, 🔒 verschlüsselt gespeichert. Gestrichelt die Oberbegriffe und Gegenstücke in FIBO. Ziehen, zoomen und verschieben geht mit der Maus."
+  fehlt: "Das Bild fehlt: Ohne `{paket}` lässt es sich nicht zeichnen (`.venv/bin/pip install -r requirements.txt`)."
+  grenze_titel: "Die Privacy-Grenze: wer welches Feld sehen darf"
+  grenze_satz: "Ein Weg in die Cloud darf nur nehmen, was auch auf einer Watchlist stehen könnte -- nie den Bestand. Welche Felder ein Weg nimmt, liest der Test aus den Signaturen im Code."
+  wege_titel: "Die Wege zu einem Sprachmodell"
+  regeln_titel: "Die Regeln im Wortlaut"
+  regeln_fussnote: "Ausgeführt werden die Regeln vom Code; die Formen prüfen im Test, dass Code, Demodaten und Regelwerk dasselbe sagen. Echte Daten sieht keine Form."

@@ -518,9 +518,46 @@ Pages use `core.currency.symbol()` and `core.currency.fmt()` for display.
 - **Prod**: Fernet encrypts five columns of `positions`: `quantity`, `purchase_price`, `notes`,
   `extra_data` (JSON), `story`. **Names, ticker, ISIN and `position_analyses` are plaintext** —
   the encryption protects against losing the file, not against local code. Authoritative:
-  `_serialize()` in `core/storage/positions.py` (table in CLAUDE.md).
+  `_serialize()` in `core/storage/positions.py` (table in CLAUDE.md). The portfolio story
+  encrypts its narrative and, since 23.10.2026, its liquidity need; older plaintext rows stay
+  readable and are re-encrypted once per app start (`verschluessele_altbestand`).
 - **Demo**: Plaintext (PassthroughEncryptionService)
 - **Migrations**: Auto-run on startup via `migrate_db()` — idempotent, no data loss
+
+---
+
+## Ontologie und Formen
+
+Seit 22.10.2026, wie in Serien und Sound: Begriffe und Regeln stehen kurz und genau als RDF in
+`ontologie/` und werden im Test gegen den Code geprüft. Kein Wissensgraph, kein Export, keine
+echten Daten.
+
+- `ontologie/wealth.ttl` — die Ontologie. Zwei Teile: **die Bezeichnungen** (Anlagetyp >
+  Anlageklasse > Anlageart aus `config/asset_classes.yaml`, ISIN, WKN, Ticker, Position,
+  Depot, Watchlist, Kandidat), je deutsch und englisch, mit Definition und dem Gegenstück in
+  FIBO (`skos:closeMatch`, 21 Begriffe); und **die Privacy-Grenze als Regel über Felder**:
+  Jedes Feld von `Position` und `PortfolioStory` hat eine Schutzstufe — öffentlich,
+  watchlist-artig, privat — und die Angabe, ob es verschlüsselt gespeichert wird. Die Story
+  einer Position ist watchlist-artig, Empfehlung und Portfolio-Story sind privat (Erik,
+  23.10.2026). Dazu die Wege zu einem Modell (alle Agenten und `PositionStoryService`) mit
+  ihrem Ort; eine Ausnahme gibt es keine.
+- `ontologie/formen.ttl` — 20 SHACL-Regeln: Kennungen (ISIN, WKN, Ticker), Klasse, Typ und Art
+  passen zur YAML, Watchlist nur für `watchlist_eligible`, jedes Feld hat genau eine
+  Schutzstufe, **ein Weg in die Cloud nimmt nur Öffentliches und Watchlist-artiges**, eine
+  Ausnahme nur in der Cloud.
+- `ontologie/projektion.py` — nur für Tests: `positions` roh als RDF, und aus den Signaturen der
+  Wege, welche Felder sie annehmen können (`PublicPosition`, `Position` oder einzelne
+  Parameter wie `existing_story`). Dieselbe Lesart wie `test_architecture_guards.py`, nur je
+  Feld statt je Typ.
+- `tests/integration/test_ontologie.py` — füllt je eine Datenbank in `:memory:` über den
+  Demo-Seeder und das Repository, prüft alle Formen, bricht jede einmal, vergleicht YAML,
+  `Position.model_fields`, `_serialize` und die Töpfe des Guards mit der Ontologie.
+- `ontologie/bild.py` + `core/ui/ontologie_bild.py` + `pages/ontologie.py` — das Schema als Bild
+  (pyvis) unter Einstellungen › Ontologie, mit den Schutzstufen am Feld und FIBO gestrichelt;
+  die Grenze und die Regeln im Wortlaut im Klapper. Nur für Erik, nicht für Lotsee.
+
+Was die Formen nicht sehen: was ein Weg wirklich abschickt. Sie prüfen, was er annehmen kann;
+ein Prompt, der aus einer Zusammenfassung statt aus `Position` gebaut wird, liegt außerhalb.
 
 ---
 
