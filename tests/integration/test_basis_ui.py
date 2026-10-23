@@ -73,17 +73,10 @@ def test_bereit_folgt_der_pruefung(ollama):
     assert not lokales_modell.lokales_modell_bereit()
 
 
-@pytest.mark.parametrize("seite", ["portfolio_story.py", "dividend_calendar.py"])
-def test_gekuerzte_seiten_laden(seite):
-    at = AppTest.from_file(PAGES / seite, default_timeout=30)
+def test_dividenden_seite_laedt():
+    at = AppTest.from_file(PAGES / "dividend_calendar.py", default_timeout=30)
     at.run()
     assert not at.exception, at.exception
-
-
-def test_portfolio_checker_ohne_story_formular():
-    at = AppTest.from_file(PAGES / "portfolio_story.py", default_timeout=30)
-    at.run()
-    assert not at.text_area, "das Story-Formular gehoert jetzt zur Pflege"
 
 
 def test_ki_knoepfe_sagen_wo_das_modell_rechnet(ollama):

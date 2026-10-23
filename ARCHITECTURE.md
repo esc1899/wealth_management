@@ -5,14 +5,12 @@
 ```mermaid
 graph TD
     subgraph UI["Streamlit UI"]
-        PG1["Dashboard / Positionen / Marktdaten"]
+        PG1["Kacheln Depot und Watchlist / Positionen"]
         PG2["Portfolio-Story mit Story-Check und Gegenanalyse / Titelseite (Depot)"]
-        PG3["Storychecker / Titelseite (Watchlist)"]
-        PG4["Consensus Gap / Fundamental Analyzer / Capital Allocator (Seiten ausgeblendet)"]
-        PG5["Research Chat / News / Search / Sector Rotation"]
-        PG6["Research Inbox / Research Answers (ausgeblendet)"]
+        PG3["Titelseite (Watchlist) mit allen Checks"]
+        PG5["Suche / Sector Rotation"]
         PG7["Dividenden / Tax Loss Harvesting / Analyse"]
-        PG8["System: Statistics / Skills / Scheduler / Settings"]
+        PG8["Einstellungen: Statistics / Skills / Scheduler / Ontologie"]
     end
 
     state["state.py — DI Factory<br/>@st.cache_resource Singletons"]
@@ -625,10 +623,6 @@ verdicts = analysis_service.get_verdicts(ids, "storychecker")
 ### Pages Using Services
 - `pages/sector_rotation.py` — PortfolioService
 - `pages/positionen.py` — AnalysisService
-- `pages/watchlist_checker.py` — AnalysisService, PortfolioService
-- `pages/portfolio_story.py` — AnalysisService, PortfolioService
-- `pages/consensus_gap.py` — AnalysisService, PortfolioService
-- `pages/fundamental_analyzer.py` — PortfolioService
 
 ---
 
@@ -685,7 +679,7 @@ here; this repo only delivers the pieces the house asks for:
 | LLM accounting | `core/ops_events.py` (see above) | read back by the Maschinenraum |
 | House model | model name `home` → `core/house_models.py`, resolved in `core.llm.router.resolve_house_model` at call time; `batch` and `effort` from the same file | `~/.ops-core/modelle.toml`, edited in the Maschinenraum |
 | Batch | scheduled runs go as an Anthropic batch when the household switch is on (`_BATCH_ERLAUBT`): half price, same effort/max_tokens as live, booked with `source="batch"`; the `agenten` job reports `wartet` to the run log. "Run now" stays live | switch in the Maschinenraum; see `docs/haus/integrationen.md` (Claude) |
-| Process diagrams | `deploy/n8n/ablaeufe/`: portfolio-check and watchlist-check, never run; `tests/unit/test_prozessbilder.py` checks the named code | imported with `deploy/ops-core/n8n-ablaeufe.sh` |
+| Process diagrams | `deploy/n8n/ablaeufe/`: portfolio-check, never runs; `tests/unit/test_prozessbilder.py` checks the named code | imported with `deploy/ops-core/n8n-ablaeufe.sh` |
 
 Two rules carry over from the house. **Nothing on the start page is
 computed when it is opened** — the hourly job decides, the page reads a
@@ -912,7 +906,8 @@ Claude → App:  research_answers table   +  submit_research_answer() tool
 ```
 
 **App → Claude (posting requests):**
-1. User fills in the form on the Research Answers page (hidden since 2026-10-10, reachable by URL)
+1. The form on the Research Answers page is gone (page deleted 2026-10-23, CHANGELOG); the
+   queue and the hook stay, so a request written by other means is still picked up
 2. `ResearchQueueRepository.create_request()` writes a row to the DB
 3. `mcp_server/check_queue.py` runs before every Claude Code message (hook)
 4. The hook reads open requests and injects them as `additionalContext`
@@ -921,7 +916,7 @@ Claude → App:  research_answers table   +  submit_research_answer() tool
 **Claude → App (answering requests):**
 1. Claude calls `get_research_queue()` for details
 2. Answers via `submit_research_answer(markdown, request_id)` 
-3. The answer appears in `pages/research_answers.py` under "Answers"
+3. The answer appears on the title page of its ticker (`core/ui/titelseite.py`)
 4. The request is automatically marked `done`
 
 ```mermaid

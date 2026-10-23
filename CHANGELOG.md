@@ -8,6 +8,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Ausgeblendete Seiten gelöscht — 2026-10-23
+
+**Warum:** Seit dem 10./11.10. waren 14 Seiten aus dem Menü genommen und nur noch über ihre
+Adresse erreichbar; gelöscht werden sollten sie, wenn sie zwei Wochen keiner vermisst (BACKLOG,
+das „gut genug“ aus dem Lotsee-Plan). Erik am 23.10.: Keine hat gefehlt, alles kann weg, auch
+die Marktdaten.
+
+**Änderungen:**
+- Gelöscht: Dashboard, Marktdaten, Portfolio Chat, Investieren / Rebalancieren, Research Chat,
+  News, Portfolio Checker, Watchlist Checker, Storychecker, Fundamental Analyzer, Consensus Gap,
+  Cowork Inbox, Cowork Setup, Research Answers samt Anfrage-Formular
+  (`core/ui/research_request_form.py`). Damit entfallen der Skill je Einzelcheck und die
+  Nachfrage im Storychecker und Fundamental Analyzer; die Titelseite prüft mit dem Skill der
+  Liste. Den Kopf des Dashboards (Tagesbild) trägt die Depot-Seite schon, die Aufteilung die
+  Analyse; Kurse aktualisieren geht auf Analyse und Vermögenshistorie.
+- Bleiben, ohne Menüpunkt: Positions- und Watchlist-Analyse und Kandidat — die Kacheln führen
+  dorthin. Der Cowork-Watcher läuft weiter, weil die Titelseite Research aus Claude zeigt.
+- Das Prozessbild `watchlist-check` zeichnete die gelöschte Seite und ist mit ihr weg.
+- Die Agenten hinter den Chats (Portfolio, Rebalance) und ihre Tabellen bleiben vorerst; sie
+  hat jetzt kein Aufrufer mehr.
+
 ### Ontologie und Formen, mit Bild — 2026-10-22
 
 **Warum:** Nach Sound und Serien soll auch Wealth seine Begriffe und Regeln an einer Stelle

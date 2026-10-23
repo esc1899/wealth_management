@@ -51,8 +51,7 @@ launchctl kickstart -k gui/$(id -u)/ops-core.wealth_management.meldungen
 # kosten (OpenRouter, hourly). The checks per title
 # run as "Depot prüfen"/"Watchlist prüfen" (core/pruefung.py: selection, skills per list).
 # Never a scheduler inside the app — Streamlit only runs app.py once a browser opens the page.
-# Process diagrams in n8n (deploy/n8n/ablaeufe/): portfolio-check (the scheduled `agenten`)
-# and watchlist-check (on demand, page Watchlist Checker). They never run,
+# Process diagram in n8n (deploy/n8n/ablaeufe/): portfolio-check (the scheduled `agenten`). It never runs,
 # no data, each node names its code (`Code: pfad::name`), tests/unit/test_prozessbilder.py checks it —
 # renaming a named function means updating the diagram. Import/export: heimnetzwerk/deploy/ops-core/n8n-ablaeufe.sh.
 ops status wealth_management                       # wann lief was zuletzt gut?
@@ -83,8 +82,7 @@ When building new components, use these as canonical examples:
 | Cloud agent — session-based chat + batch | `agents/fundamental_analyzer_agent.py` |
 | Local Ollama agent | `agents/watchlist_checker_agent.py` |
 | Repository (sessions + messages tables) | `core/storage/fundamental_analyzer.py` |
-| Analysis page (batch + inline history) | `pages/consensus_gap.py` |
-| Chat page (session nav + multi-turn) | `pages/fundamental_analyzer.py` |
+| Object page (one title, all its checks) | `pages/position_dashboard.py` → `core/ui/titelseite.py` |
 
 ## State Layer — 5-Module DI Factory
 

@@ -15,7 +15,7 @@ def _app(seite: str) -> AppTest:
         import streamlit as st
         st.navigation([st.Page(start)] + [st.Page(z) for z in ziele]).run()
 
-    ziele = [str(PAGES / z) for z in ("position_dashboard.py", "watchlist_analysis.py", "watchlist_checker.py")]
+    ziele = [str(PAGES / z) for z in ("position_dashboard.py", "watchlist_analysis.py")]
     return AppTest.from_function(skript, args=(str(PAGES / seite), ziele), default_timeout=30)
 
 

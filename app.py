@@ -70,12 +70,11 @@ if config.DEMO_MODE:
 # Initialise critical shared resources on first load
 # Other agents are lazy-loaded when pages access them via @st.cache_resource
 from state import (  # noqa: E402
-    get_portfolio_agent, get_market_agent, get_cowork_watcher,
+    get_market_agent, get_cowork_watcher,
     get_scheduled_job_runs_repo,
 )
-get_portfolio_agent()  # Portfolio Chat critical path
 get_market_agent()      # Market data (scheduled fetch runs in the planner service)
-get_cowork_watcher()    # Research Ingest file watcher + initial scan
+get_cowork_watcher()    # Research Ingest file watcher + initial scan; die Titelseite zeigt es
 
 @st.dialog("Disclaimer & Privacy Notice", width="large")
 def _legal_dialog():
@@ -94,16 +93,12 @@ if config.SHOW_LEGAL_NOTICE and not st.session_state.get("legal_accepted"):
     _legal_dialog()
     st.stop()
 
-# Neu oben: die Kacheln, Depot ist die Startseite. Darunter steht der Rest wie bisher und wird
-# nach und nach abgeloest (BACKLOG.md, "Kacheln loesen die alten Ansichten ab").
+# Oben die Kacheln, Depot ist die Startseite.
 _neu_pages = [
     st.Page("pages/kacheln_depot.py",      title=t("kacheln.nav_depot"),     icon=":material/grid_view:", default=True),
     st.Page("pages/kacheln_watchlist.py",  title=t("kacheln.nav_watchlist"), icon=":material/visibility:"),
 ]
 
-# Ausgeblendet (10.10.2026), nicht geloescht: Dashboard, Marktdaten, Cowork Setup und die Dialoge. Die Seiten
-# bleiben ueber ihre Adresse und st.switch_page erreichbar; geloescht wird erst, wenn klar ist,
-# dass sie keiner vermisst.
 _AUS = "hidden"
 
 # Pflege und Performance: die Basis ohne Sprachmodell (mit Kacheln oben). Ein KI-Knopf darin
@@ -129,32 +124,13 @@ _suche_pages = [
     st.Page("pages/suche.py", title=t("nav.suche"), icon=":material/manage_search:"),
 ]
 
-# Ausgeblendet, aber registriert. Positions- und Watchlist-Analyse erreicht man ueber Titel und
-# Kaestchen der Kacheln, nicht mehr ueber das Menue; Cowork ganz (10.10.2026). Sie haengen an
-# der ersten Gruppe, damit keine Gruppe ohne sichtbare Seite eine leere Ueberschrift zeigt.
-# Die Gruppe Assistent ist aufgeloest (11.10.2026): Story-Check und Gegenanalyse stehen unter
-# Pflege -> Portfolio-Story, der Portfolio Checker ist damit leer. Storychecker, Fundamental und
-# Konsens stehen auf Kacheln und Titelseite, die auch neu pruefen laesst. Portfolio Checker
-# und Watchlist Checker laufen seit 11.10.2026 in der Pruefung je Liste mit; ihre Seiten
-# fallen weg, wenn die abgeschalteten Jobs je Check geloescht sind (BACKLOG.md).
+# Ohne Menuepunkt: Positions- und Watchlist-Analyse erreicht man ueber Titel und Kaestchen der
+# Kacheln, den Kandidaten ueber seine Kachel. Sie haengen an der ersten Gruppe, damit keine
+# Gruppe ohne sichtbare Seite eine leere Ueberschrift zeigt.
 _ausgeblendet = [
-    st.Page("pages/dashboard.py",          title=t("nav.dashboard"),   icon=":material/dashboard:", visibility=_AUS),
-    st.Page("pages/marktdaten.py",         title=t("nav.market_data"), icon=":material/trending_up:", visibility=_AUS),
     st.Page("pages/position_dashboard.py", title="Positionsanalyse",   icon=":material/person_search:", visibility=_AUS),
     st.Page("pages/watchlist_analysis.py", title="Watchlist-Analyse",  icon=":material/search:", visibility=_AUS),
     st.Page("pages/kandidat.py",           title="Kandidat",           icon=":material/travel_explore:", visibility=_AUS),
-    st.Page("pages/cowork_inbox.py",       title=t("nav.cowork_inbox"),     icon=":material/inbox:", visibility=_AUS),
-    st.Page("pages/research_answers.py",   title=t("nav.research_answers"), icon=":material/question_answer:", visibility=_AUS),
-    st.Page("pages/cowork_setup.py",       title="Cowork Setup",            icon=":material/settings_suggest:", visibility=_AUS),
-    st.Page("pages/portfolio_chat.py",     title=t("nav.portfolio_chat"),   icon=":material/chat:", visibility=_AUS),
-    st.Page("pages/portfolio_story.py",    title="Portfolio Checker",       icon=":material/fact_check:", visibility=_AUS),
-    st.Page("pages/watchlist_checker.py",  title="Watchlist Checker",       icon=":material/check_circle:", visibility=_AUS),
-    st.Page("pages/rebalance_chat.py",     title=t("nav.rebalance_chat"),   icon=":material/balance:", visibility=_AUS),
-    st.Page("pages/storychecker.py",         title=t("nav.storychecker"),   icon=":material/fact_check:", visibility=_AUS),
-    st.Page("pages/fundamental_analyzer.py", title="Fundamental Analyzer", icon=":material/calculate:", visibility=_AUS),
-    st.Page("pages/consensus_gap.py",        title=t("nav.consensus_gap"), icon=":material/target:", visibility=_AUS),
-    st.Page("pages/research_chat.py",        title=t("nav.research_chat"), icon=":material/search:", visibility=_AUS),
-    st.Page("pages/news_chat.py",            title=t("nav.news_chat"),     icon=":material/newspaper:", visibility=_AUS),
 ]
 
 pg = st.navigation({
@@ -163,7 +139,7 @@ pg = st.navigation({
     t("nav.group_performance"): _performance_pages,
     t("nav.group_suche"): _suche_pages,
     # Einstellungen zuletzt: was den Betrieb einstellt, nichts zum Lesen. Die Gruppe System ist
-    # darin aufgegangen (11.10.2026); der Scheduler entfaellt mit "Checks je Liste" (BACKLOG.md).
+    # darin aufgegangen (11.10.2026).
     t("nav.settings"): [
         st.Page("pages/settings.py",         title=t("nav.settings"),   icon=":material/settings:"),
         st.Page("pages/skills.py",           title="Skills",            icon=":material/psychology:"),

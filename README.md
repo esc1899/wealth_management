@@ -34,21 +34,17 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Coverage Tracking** — visibility into which positions have valid values; warnings for incomplete data
 
 ### Local Assistants (private, Ollama)
-- **Portfolio Chat** — natural language CRUD interface for your positions; data never leaves your machine
 - **Portfolio Story** — on the upkeep page next to the story itself: measures the portfolio and the story-check verdicts against your narrative; greyed out without a reachable Ollama
-- **Watchlist Checker** — evaluates which watchlist positions fit into current portfolio structure and strategy; its page is hidden and reached via its box on the watchlist tiles
+- **Watchlist Checker** — evaluates which watchlist positions fit into current portfolio structure and strategy; runs in "Watchlist prüfen", verdicts on tiles and title page
 - **Portfolio Robustness** — portfolio-level stress assessment across scenarios (local, full portfolio visibility); below the story check on the Portfolio Story page
 - **Tax Loss Harvesting Assistant** — identifies loss positions, computes tax impact, suggests watchlist replacements, warns about wash-sale windows
 
 ### Research (cloud, Claude API + web search)
-- **Research Chat** — deep-dive research per position using Claude with multi-turn conversation
-- **News Digest** — recent news for all portfolio positions, filtered by investment strategy
+- **News Digest** — recent news for all portfolio positions, filtered by investment strategy; on tiles and title page
 - **Suche** — one page for new opportunities: pick a strategy (free search, single asset, structural change), a banner names the skill in use; proposals go to the watchlist
-- **Story Checker** — validates investment theses against current news and fundamentals (Claude API); verdicts on tiles and title page, its own page is hidden
-- **Fundamental Analyzer** — in-depth fundamental analysis of individual positions (cloud, Claude); verdicts on tiles and title page, its own page with follow-up chat is hidden
-- **Research Inbox** — ingest AI-generated research from an external Claude Project; file watcher detects new `.md` files in `~/wealth-research/outbox/`, parses YAML frontmatter, and presents watchlist candidates for one-click review and import
-- **Research Queue** — bidirectional channel between app and Claude Code: the app posts open research questions; Claude Code answers via `submit_research_answer()` and the answers appear in a dedicated page
-- **Research Answers** — shows all answers submitted by Claude Code, filterable by ticker; includes queue management (mark done, delete)
+- **Story Checker** — validates investment theses against current news and fundamentals (Claude API); verdicts on tiles and title page
+- **Fundamental Analyzer** — in-depth fundamental analysis of individual positions (cloud, Claude); verdicts on tiles and title page
+- **Research from Claude** — a file watcher ingests research `.md` files from `~/wealth-research/outbox/`, and Claude Code answers via `submit_research_answer()`; both appear on the title page of their ticker
 
 ### Claude Strategy (cloud, Claude Sonnet + web search)
 - **Structural Change Scanner** — identifies irreversible market shifts not yet priced by consensus; adds candidates directly to watchlist

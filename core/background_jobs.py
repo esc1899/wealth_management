@@ -1,7 +1,7 @@
 """
 Shared background job functions for running agent checks in background threads.
 
-Used by portfolio_story.py and watchlist_checker.py to avoid code duplication.
+Used by the checks per list (core/pruefung.py) and the scheduler to avoid code duplication.
 All functions follow the same signature: (positions, language, job, db_path, enc_key, api_key).
 The job dict is mutated in-place: {"running", "done", "count", "error", "logs"}.
 """
