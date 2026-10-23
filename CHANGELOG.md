@@ -28,6 +28,8 @@ zeigen weiter dasselbe wie vorher.
   in seiner Farbe. Die Zählerzeile (`kacheln.zaehler`) ist entfernt.
 - Analyse: der Sonnenkreis gruppiert nach denselben Blöcken und färbt sie in ihrer Farbe; die
   eigene Zuordnung `_SEKTOR_MAP` ist weg (Krypto war dort ein eigener Sektor).
+- Seite Positionen: Depot- und Watchlist-Tabelle in denselben Blöcken, je Block der Kopf der
+  Kacheln (ohne Sprungziel, `core/ui/kacheln.py::block_kopf`), darin nach Name; sonst unverändert.
 
 ### Chat-Agenten, Cowork-Zufluss und Research-Queue ausgebaut — 2026-10-23
 

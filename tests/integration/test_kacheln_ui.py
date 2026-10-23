@@ -175,3 +175,12 @@ def test_depot_in_bloecken_mit_feld(depot_und_watchlist):
     felder = next(m.value for m in at.markdown if 'class="wk-felder"' in m.value)
     assert "Novo Nordisk ist gefährdet" in felder and 'href="#block-aktien"' in felder
     assert any('id="block-aktien"' in m.value for m in at.markdown)
+
+
+def test_positionen_in_bloecken(depot_und_watchlist):
+    """Die Seite Positionen gliedert Depot und Watchlist in dieselben Bloecke, ohne Sprungziel."""
+    at = AppTest.from_file(str(PAGES / "positionen.py"), default_timeout=30)
+    at.run()
+    assert not at.exception, at.exception
+    koepfe = [m.value for m in at.markdown if 'class="wk-block"' in m.value]
+    assert len(koepfe) == 2 and all("Aktien" in k and " id=" not in k for k in koepfe)

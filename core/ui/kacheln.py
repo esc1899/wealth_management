@@ -47,7 +47,18 @@ _FARBE_SONST = "#5E6B7A"
 # Das Licht vor dem Satz je Grund (wie die Ampel der Startseite: rot, gelb, ohne, hohl).
 _NOTIZ = {"gefaehrdet": "rot", "bewegung": "gelb", "geprueft": "", "nie": "leer", "ohne": ""}
 
-CSS = """
+#: Der Kopf eines Blocks: Name in der Farbe der Familie, Linie darunter. Eigenes Stueck, weil auch
+#: die Seite Positionen ihre Tabellen damit gliedert.
+BLOCK_CSS = """
+<style>
+.wk-block { display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; margin: 1.4rem 0 0.4rem;
+  padding-bottom: 6px; border-bottom: 2px solid var(--farbe); scroll-margin-top: 4rem; }
+.wk-block b { font-size: 1.3rem; font-weight: 700; color: var(--farbe); }
+.wk-block span { color: var(--lotsee-text-leise); font-size: 0.85rem; }
+</style>
+"""
+
+CSS = BLOCK_CSS + """
 <style>
 .wk-einl { color: var(--lotsee-text-leise); margin: -0.4rem 0 0.2rem; max-width: 80ch; }
 /* Oben je Block ein Feld (Fassung B, 23.10.2026): im Licht seiner Farbfamilie, Satz und Marken,
@@ -74,11 +85,6 @@ a.wk-feld.ruhig .wk-feld-satz { color: var(--lotsee-text-leise); }
 .wk-marke.rot::before { background: var(--lotsee-zustand-alarm); }
 .wk-marke.gelb::before { background: var(--lotsee-zustand-hinweis); }
 .wk-marke.leer::before { border: 2px solid var(--lotsee-zustand-blind); }
-/* Der Kopf eines Blocks: Name in der Farbe der Familie, Linie darunter. */
-.wk-block { display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; margin: 1.4rem 0 0.4rem;
-  padding-bottom: 6px; border-bottom: 2px solid var(--farbe); scroll-margin-top: 4rem; }
-.wk-block b { font-size: 1.3rem; font-weight: 700; color: var(--farbe); }
-.wk-block span { color: var(--lotsee-text-leise); font-size: 0.85rem; }
 div[class*="st-key-wk-karte-"] { background: var(--lotsee-flaeche); border-radius: var(--lotsee-rundung-karte);
   box-shadow: 0 1px 2px rgba(11, 30, 45, 0.08), 0 0 0 1px var(--lotsee-linie);
   padding: 14px 16px 12px; gap: 0.5rem; overflow: hidden; }
@@ -235,9 +241,16 @@ def felder_html(gruppen: list[Block]) -> str:
     return f'<div class="wk-felder">{"".join(felder)}</div>'
 
 
+def block_kopf(block: str, anzahl: int, anker: bool = True) -> str:
+    """Der Kopf eines Blocks mit der Zahl seiner Positionen. ``anker``: das Sprungziel der Felder
+    -- nur einmal je Seite, sonst gaebe es dieselbe ID zweimal."""
+    ziel = f' id="{_anker(block)}"' if anker else ""
+    return (f'<div class="wk-block"{ziel} style="--farbe: {block_farbe(block)}">'
+            f'<b>{escape(block_name(block))}</b><span>{escape(_positionen(anzahl))}</span></div>')
+
+
 def block_kopf_html(b: Block) -> str:
-    return (f'<div class="wk-block" id="{_anker(b.name)}" style="--farbe: {block_farbe(b.name)}">'
-            f'<b>{escape(block_name(b.name))}</b><span>{escape(_positionen(len(b.kacheln)))}</span></div>')
+    return block_kopf(b.name, len(b.kacheln))
 
 
 def monogramm(k: Kachel) -> str:

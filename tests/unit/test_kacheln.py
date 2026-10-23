@@ -229,3 +229,10 @@ class TestBloecke:
         assert "<b>Böse</b>" not in html and "&lt;b&gt;Böse&lt;/b&gt;" in html
         assert 'href="#block-aktien"' in html and 'id="block-aktien"' in block_kopf_html(b)
         assert "1 nie geprüft" in html and "1 Position" in html
+
+
+def test_block_kopf_ohne_anker_fuer_die_seite_positionen():
+    from core.ui.kacheln import block_kopf
+    assert 'id="block-geldwerte"' in block_kopf("geldwerte", 2)
+    html = block_kopf("geldwerte", 2, anker=False)
+    assert " id=" not in html and "Geldwerte" in html and "2 Positionen" in html

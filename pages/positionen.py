@@ -21,6 +21,8 @@ from core.asset_class_config import get_asset_class_registry
 from core.figi import RELEVANT_EXCH, openfigi_lookup, to_yahoo_ticker
 from core.i18n import t
 from core.storage.models import Position
+from core.kacheln import SONSTIGE
+from core.ui.kacheln import BLOCK_CSS, block_kopf
 from core.ui.ki import ki_knopf
 from state import get_analysis_service, get_app_config_repo, get_market_agent, get_market_repo, get_position_story_service, get_positions_repo, get_skills_repo
 
@@ -895,64 +897,76 @@ def _render_table(positions: list[Position], empty_key: str, key_prefix: str):
 
     st.divider()
 
+    # In Bloecken wie die Kacheln (Aktien, Geldwerte, Sachwerte), in jedem nach Name.
+    je_block: dict[str, list[Position]] = {}
     for pos in positions:
-        cols = st.columns([3, 1, 0.9, 2, 1, 1, 1, 1.3, 0.8, 0.35, 0.35, 0.4, 0.4, 0.4])
-        analysis = verdicts.get(pos.id)
-        verdict_badge = _VERDICT_ICON.get(analysis.verdict, "") if analysis else ""
-        cols[0].write(f"{verdict_badge} {pos.name}" if verdict_badge else pos.name)
-        cols[1].write(pos.ticker or "—")
-        cols[2].write(pos.added_date.strftime("%d.%m.%y") if pos.added_date else "—")
-        cols[3].write(pos.isin or pos.wkn or "—")
-        cols[4].write(pos.asset_class)
-        cols[5].write(
-            _fmtnum(pos.quantity).rstrip("0").rstrip(",")
-            if pos.quantity else "—"
-        )
-        cols[6].write(pos.unit)
-
-        _cur_val = _position_current_value(pos)
-        if _cur_val is not None:
-            _val_str = f"**{_fmtnum(_cur_val, 0)} €**"
-            # Show gain/loss vs purchase cost if both are known
-            if pos.purchase_price and pos.quantity:
-                _cost = pos.purchase_price * pos.quantity
-                _pnl_pct = (_cur_val - _cost) / _cost * 100
-                _pnl_icon = "▲" if _pnl_pct >= 0 else "▼"
-                _val_str += f"  \n{_pnl_icon} {_pnl_pct:+.1f}%"
-            elif pos.purchase_price and not pos.quantity:
-                # single-unit (Immobilie etc.): compare directly
-                _pnl_pct = (_cur_val - pos.purchase_price) / pos.purchase_price * 100
-                _pnl_icon = "▲" if _pnl_pct >= 0 else "▼"
-                _val_str += f"  \n{_pnl_icon} {_pnl_pct:+.1f}%"
-            cols[7].markdown(_val_str)
-        else:
-            cols[7].write("—")
-
-        div_yield = _get_dividend_yield(pos)
-        cols[8].write(div_yield or "—")
-
-        # analysis_excluded indicator
-        cols[9].write("✖" if pos.analysis_excluded else "—")
-
-        # Manual override indicator
-        extra = pos.extra_data or {}
-        cfg = registry.get(pos.asset_class)
-        has_override = bool(extra.get("dividend_yield_override")) or (
-            bool(extra.get("estimated_value")) and cfg and cfg.manual_valuation
-        )
-        cols[10].write("⚠️" if has_override else "—")
-
-        if cols[11].button("🔍", key=f"{key_prefix}_det_{pos.id}", help=t("positionen.detail_tooltip")):
-            _open_detail(pos.id)
-            st.rerun()
-        if cols[12].button("✏️", key=f"{key_prefix}_edit_{pos.id}", help=t("positionen.edit_tooltip")):
-            _open_edit(pos.id)
-            st.rerun()
-        if cols[13].button("🗑️", key=f"{key_prefix}_del_{pos.id}", help=t("positionen.delete_tooltip")):
-            _open_delete(pos.id)
-            st.rerun()
+        je_block.setdefault(registry.block_von(pos.asset_class) or SONSTIGE, []).append(pos)
+    for block in registry.bloecke() + [b for b in je_block if b not in registry.bloecke()]:
+        if block in je_block:
+            st.markdown(block_kopf(block, len(je_block[block]), anker=False), unsafe_allow_html=True)
+            for pos in je_block[block]:
+                _render_row(pos, verdicts, key_prefix)
 
 
+def _render_row(pos: Position, verdicts: dict, key_prefix: str):
+    cols = st.columns([3, 1, 0.9, 2, 1, 1, 1, 1.3, 0.8, 0.35, 0.35, 0.4, 0.4, 0.4])
+    analysis = verdicts.get(pos.id)
+    verdict_badge = _VERDICT_ICON.get(analysis.verdict, "") if analysis else ""
+    cols[0].write(f"{verdict_badge} {pos.name}" if verdict_badge else pos.name)
+    cols[1].write(pos.ticker or "—")
+    cols[2].write(pos.added_date.strftime("%d.%m.%y") if pos.added_date else "—")
+    cols[3].write(pos.isin or pos.wkn or "—")
+    cols[4].write(pos.asset_class)
+    cols[5].write(
+        _fmtnum(pos.quantity).rstrip("0").rstrip(",")
+        if pos.quantity else "—"
+    )
+    cols[6].write(pos.unit)
+
+    _cur_val = _position_current_value(pos)
+    if _cur_val is not None:
+        _val_str = f"**{_fmtnum(_cur_val, 0)} €**"
+        # Show gain/loss vs purchase cost if both are known
+        if pos.purchase_price and pos.quantity:
+            _cost = pos.purchase_price * pos.quantity
+            _pnl_pct = (_cur_val - _cost) / _cost * 100
+            _pnl_icon = "▲" if _pnl_pct >= 0 else "▼"
+            _val_str += f"  \n{_pnl_icon} {_pnl_pct:+.1f}%"
+        elif pos.purchase_price and not pos.quantity:
+            # single-unit (Immobilie etc.): compare directly
+            _pnl_pct = (_cur_val - pos.purchase_price) / pos.purchase_price * 100
+            _pnl_icon = "▲" if _pnl_pct >= 0 else "▼"
+            _val_str += f"  \n{_pnl_icon} {_pnl_pct:+.1f}%"
+        cols[7].markdown(_val_str)
+    else:
+        cols[7].write("—")
+
+    div_yield = _get_dividend_yield(pos)
+    cols[8].write(div_yield or "—")
+
+    # analysis_excluded indicator
+    cols[9].write("✖" if pos.analysis_excluded else "—")
+
+    # Manual override indicator
+    extra = pos.extra_data or {}
+    cfg = registry.get(pos.asset_class)
+    has_override = bool(extra.get("dividend_yield_override")) or (
+        bool(extra.get("estimated_value")) and cfg and cfg.manual_valuation
+    )
+    cols[10].write("⚠️" if has_override else "—")
+
+    if cols[11].button("🔍", key=f"{key_prefix}_det_{pos.id}", help=t("positionen.detail_tooltip")):
+        _open_detail(pos.id)
+        st.rerun()
+    if cols[12].button("✏️", key=f"{key_prefix}_edit_{pos.id}", help=t("positionen.edit_tooltip")):
+        _open_edit(pos.id)
+        st.rerun()
+    if cols[13].button("🗑️", key=f"{key_prefix}_del_{pos.id}", help=t("positionen.delete_tooltip")):
+        _open_delete(pos.id)
+        st.rerun()
+
+
+st.markdown(BLOCK_CSS, unsafe_allow_html=True)
 st.subheader(t("positionen.tab_portfolio"))
 _render_table(repo.get_portfolio(), "positionen.empty_portfolio", "pf")
 
