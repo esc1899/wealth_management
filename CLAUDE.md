@@ -199,7 +199,7 @@ Die drei Buckets entsprechen exakt der Klassifikation in `tests/unit/test_archit
 
 | Provider | Agents | Darf sehen |
 |---|---|---|
-| **Ollama (lokal 🔒)** | PortfolioAgent, PortfolioStoryAgent, WatchlistCheckerAgent, PortfolioRobustnessAgent, RebalanceAgent, DividendCalendarAgent, TaxLossHarvestingAgent | Alles — Positionen, Namen, Stories, Zahlen |
+| **Ollama (lokal 🔒)** | PortfolioStoryAgent, WatchlistCheckerAgent, PortfolioRobustnessAgent, DividendCalendarAgent, TaxLossHarvestingAgent | Alles — Positionen, Namen, Stories, Zahlen |
 | **Claude API / OpenRouter (Cloud ☁️)** | ResearchAgent, NewsAgent, SearchAgent, StorycheckerAgent, ConsensusGapAgent, StructuralChangeAgent, FundamentalAnalyzerAgent, CapitalAllocatorAgent, DevilsAdvocateAgent, SectorRotationAgent; dazu der Story-Entwurf (`PositionStoryService`) | Nur Watchlist-artiges (`PublicPosition`): Name, Kennungen, Klasse, Marktdaten, News und die Story einer Position — nie Bestand, Kaufdaten, Notiz, Empfehlung oder Portfolio-Story |
 | **Kein LLM (reine Berechnung 🔢)** | MarketDataAgent, WealthSnapshotAgent | Alles — sieht volle Positionen (Stückzahl, Kaufpreis), **sendet aber nichts**; schreibt nur Zahlen in die lokale DB |
 
@@ -261,10 +261,10 @@ Vor dem ersten Commit prüfen:
 ### 6. Neue MCP-Tools: Checkliste
 
 Vor dem ersten Commit prüfen (SEC-4):
-- [ ] Tool greift **nur** auf `research_requests` und `research_answers` zu — keine anderen Tabellen
+- [ ] Tool greift **nur** auf `research_answers` zu — keine anderen Tabellen
 - [ ] Kein Zugriff auf `positions`, `position_analyses`, `storychecker_*`, `fundamental_*` oder andere Agent-Tabellen
-- [ ] String-Inputs haben explizite Längenbegrenzung (focus ≤ 500, context ≤ 2000, answer_md ≤ 100 KB)
-- [ ] Kein User-Input landet ohne Rahmung als `additionalContext` im Hook (Self-Injection-Risiko)
+- [ ] String-Inputs haben explizite Längenbegrenzung (ticker ≤ 20, answer_md ≤ 100 KB)
+- [ ] Kommt je wieder ein Hook dazu: kein User-Input ohne Rahmung als `additionalContext` (Self-Injection-Risiko)
 - [ ] Tool-Docstring beschreibt klar was in die DB geschrieben wird (sichtbar für User in `/mcp`)
 
 ---

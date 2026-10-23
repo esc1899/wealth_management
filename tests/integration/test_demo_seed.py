@@ -278,7 +278,6 @@ class TestDemoSeed:
         assert _count("SELECT COUNT(*) FROM sector_verdicts") == 4
         assert _count("SELECT COUNT(*) FROM structural_scan_runs") == 1
         # Cowork
-        assert _count("SELECT COUNT(*) FROM research_requests") == 2
         assert _count("SELECT COUNT(*) FROM research_answers") == 1
 
     @patch("yfinance.download", side_effect=_mock_download)

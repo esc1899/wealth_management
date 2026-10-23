@@ -370,7 +370,7 @@ BRUECHE_WEGE = {
     "nie die Empfehlung": (lambda: p.wege([_news_mit_empfehlung()]), "nie den Bestand"),
     "nie den Bestand (ein Parameter)": (lambda: p.wege([_news_mit_menge()]), "nie den Bestand"),
     "Ausnahme nur in der Cloud": (
-        lambda: Graph().add((WM.PortfolioAgent, WM.ausnahme, Literal("weil"))),
+        lambda: Graph().add((WM.DividendCalendarAgent, WM.ausnahme, Literal("weil"))),
         "Eine Ausnahme gibt es nur"),
     "Weg ohne Ort": (lambda: Graph().add((WM.NeuerAgent, RDF.type, WM.Weg)),
                      "Jeder Weg läuft an genau einem Ort"),

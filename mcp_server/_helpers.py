@@ -1,48 +1,18 @@
 """
 Pure helper functions for the MCP server — no mcp SDK dependency.
-Importable from the main project venv (Python 3.9) for testing.
+Importable from the main project venv for testing.
 """
 
 from __future__ import annotations
 
 import hmac
-import os
-from datetime import date
-from pathlib import Path
 from typing import Optional
-
-import yaml
 
 # SEC-5 (e): Limits müssen mit core/storage/research_queue.py synchron bleiben
 # (der MCP-Server schreibt per Raw-SQL am Repository vorbei — beide Pfade
 # validieren identisch; ein Test in test_research_queue.py erzwingt das).
 MAX_TICKER_LEN = 20
 MAX_ANSWER_BYTES = 100_000
-
-# Statische Routing-Hinweise je Anfragetyp für get_research_queue()
-# (kein User-Input — SEC-4-konform). Verhindert, dass reine Fragen/Analysen
-# als Watchlist-Vorschlag enden.
-ROUTING_HINTS = {
-    "watchlist_candidate": (
-        "→ propose_position(request_id={id}) / propose_multiple(request_id={id}), "
-        "then complete_research_request({id})"
-    ),
-    "research_question": (
-        "→ submit_research_answer(request_id={id}) only — no watchlist proposal "
-        "unless research surfaces a genuinely new candidate"
-    ),
-    "analysis_deepdive": (
-        "→ submit_research_answer(request_id={id}) only — no watchlist proposal "
-        "unless research surfaces a genuinely new candidate"
-    ),
-    "general": "→ submit_research_answer(request_id={id})",
-}
-ROUTING_HINT_DEFAULT = "→ submit_research_answer(request_id={id})"
-
-
-def routing_hint(request_type: str, request_id) -> str:
-    """Return the static routing hint line for a queue request."""
-    return ROUTING_HINTS.get(request_type, ROUTING_HINT_DEFAULT).format(id=request_id)
 
 
 def validate_answer_input(answer_markdown: str, ticker: Optional[str]) -> Optional[str]:
@@ -90,50 +60,3 @@ class BearerTokenMiddleware:
                 await send({"type": "http.response.body", "body": b'{"error":"unauthorized"}'})
                 return
         await self._app(scope, receive, send)
-
-
-def build_research_md(
-    research_id: str,
-    candidates: list,
-    primary_ticker: Optional[str] = None,
-    primary_name: Optional[str] = None,
-    primary_exchange: Optional[str] = None,
-    body: str = "",
-    sources: Optional[list] = None,
-    request_id: Optional[int] = None,
-) -> str:
-    """Build a valid cowork research .md file string."""
-    frontmatter: dict = {
-        "research_id": research_id,
-        "type": "watchlist_scan",
-        "date": date.today().isoformat(),
-        "ai_generated": True,
-        "model": "claude-code",
-        "status": "ready_for_import",
-        "disclaimer": "AI-generated research via Claude Code MCP tool. Not financial advice.",
-        "sources": sources or [],
-        "watchlist_candidates": candidates,
-    }
-    if request_id is not None:
-        frontmatter["request_id"] = int(request_id)
-    if primary_ticker and primary_name and primary_exchange:
-        frontmatter["primary"] = {
-            "ticker": primary_ticker.upper(),
-            "name": primary_name,
-            "exchange": primary_exchange.upper(),
-        }
-    fm_yaml = yaml.dump(frontmatter, allow_unicode=True, sort_keys=False, default_flow_style=False)
-    body_section = body.strip() if body.strip() else "*(no additional notes)*"
-    return f"---\n{fm_yaml}---\n\n{body_section}\n"
-
-
-def write_md_to_outbox(content: str, filename: str, outbox_path: Path) -> Path:
-    """Atomically write content to the outbox. Returns the final path."""
-    outbox_path.mkdir(parents=True, exist_ok=True)
-    tmp_dir = outbox_path / ".tmp"
-    tmp_dir.mkdir(exist_ok=True)
-    tmp_path = tmp_dir / filename
-    final_path = outbox_path / filename
-    tmp_path.write_text(content, encoding="utf-8")
-    tmp_path.rename(final_path)
-    return final_path

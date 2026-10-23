@@ -44,7 +44,7 @@ This app **must be self-hosted**. The authors do not operate any instance of thi
 - **Suche** — one page for new opportunities: pick a strategy (free search, single asset, structural change), a banner names the skill in use; proposals go to the watchlist
 - **Story Checker** — validates investment theses against current news and fundamentals (Claude API); verdicts on tiles and title page
 - **Fundamental Analyzer** — in-depth fundamental analysis of individual positions (cloud, Claude); verdicts on tiles and title page
-- **Research from Claude** — a file watcher ingests research `.md` files from `~/wealth-research/outbox/`, and Claude Code answers via `submit_research_answer()`; both appear on the title page of their ticker
+- **Research from Claude** — Claude Code answers via the MCP tool `submit_research_answer()`; the answer appears on the title page of its ticker
 
 ### Claude Strategy (cloud, Claude Sonnet + web search)
 - **Structural Change Scanner** — identifies irreversible market shifts not yet priced by consensus; adds candidates directly to watchlist
@@ -92,16 +92,13 @@ Portfolio data (quantities, prices, notes, investment thesis) is encrypted at re
 The Skills system lets you save and edit prompt templates for each agent. Learn that a well-written system prompt dramatically changes LLM output quality, and that externalising prompts from code makes them easier to iterate on.
 
 ### Agent design trade-offs
-The app has eighteen agents with different characteristics: stateful vs. stateless, local vs. cloud, one-shot vs. conversational, agentic loop vs. single call. Comparing Portfolio Chat, Portfolio Story, Research Chat, News Digest, Story Checker, Fundamental Analyzer, Watchlist Checker, Structural Change Scanner, Consensus Gap Analysis, Capital Allocator, Devil's Advocate, Sector Rotation, Portfolio Robustness, and Tax Loss Harvesting shows the practical trade-offs: privacy, cost, speed, and capability.
+The app has seventeen agents with different characteristics: stateful vs. stateless, local vs. cloud, one-shot vs. conversational, agentic loop vs. single call. Comparing Portfolio Story, Research, News Digest, Story Checker, Fundamental Analyzer, Watchlist Checker, Structural Change Scanner, Consensus Gap Analysis, Capital Allocator, Devil's Advocate, Sector Rotation, Portfolio Robustness, and Tax Loss Harvesting shows the practical trade-offs: privacy, cost, speed, and capability.
 
 ### Agentic loops and tool use
 The Structural Change Scanner runs an agentic loop: Claude decides when to call `web_search` and when to call the custom `add_structural_candidate` tool to populate your watchlist — no user interaction needed. Compare this to the simpler Research Chat (single call) to understand the cost/quality trade-off.
 
-### File-based AI ingest pipeline (Research Inbox)
-The Research Inbox shows a different integration pattern: instead of calling an AI API from inside the app, you run research in an external Claude Project and the app ingests the results as structured `.md` files. Learn how to define a strict YAML contract that an LLM must follow, how to watch a filesystem directory for changes using `watchdog`, how to parse and validate AI output with confidence (rejecting malformed files to `.invalid/`), and how to design a human-in-the-loop review step before AI suggestions reach your data. The Security section of the inbox code also demonstrates input sanitization for an AI-generated file source: URL protocol validation, markdown injection prevention, and file size limits.
-
 ### MCP Server — Claude Code as a first-class client
-The `mcp_server/` directory implements a [Model Context Protocol](https://modelcontextprotocol.io/) server that turns Claude Code into a direct write/read client of the app. Learn what MCP is and how it differs from the REST/webhook patterns you already know: tools are defined as Python functions, the transport is JSON-RPC 2.0 over stdio, and Claude Code discovers and calls them automatically. The `propose_position()` tool writes structured `.md` files that the existing file watcher imports — this shows how new integration layers can be added without changing the core app. The Research Queue pattern shows bidirectional communication: the app posts questions in a SQLite table, a `UserPromptSubmit` hook injects them as context before every Claude Code message, and the `submit_research_answer()` MCP tool writes answers back. The project also demonstrates why you sometimes need a second virtual environment (Python version incompatibility) and how to isolate testable helper logic from SDK-specific code.
+The `mcp_server/` directory implements a [Model Context Protocol](https://modelcontextprotocol.io/) server that lets Claude Code write into the app. Learn what MCP is and how it differs from the REST/webhook patterns you already know: tools are defined as Python functions, the transport is JSON-RPC 2.0 over stdio, and Claude Code discovers and calls them automatically. Its one tool, `submit_research_answer()`, writes an answer that the title page of the ticker shows. The project also demonstrates why you sometimes need a second virtual environment (Python version incompatibility) and how to isolate testable helper logic from SDK-specific code.
 
 ### Tracking costs and controlling spending
 The Statistics page gives an indication of what each agent call costs in USD, broken down by agent, skill, and model. Configurable daily and monthly alert thresholds warn you before spending gets out of hand. The monthly forecast extrapolates from actual average token usage of your scheduled jobs — so you see the projected bill before it arrives. Learn what makes one agent 10× more expensive than another (hint: agentic loops with web search vs. a single-shot call), and how to use this to choose the right model for each task.
@@ -116,7 +113,6 @@ The Statistics page gives an indication of what each agent call costs in USD, br
 - Anthropic Claude API (optional, for Research/News/Search — OpenRouter also supported)
 - yfinance for market data, optional Tavily web search
 - APScheduler for automated price fetching and scheduled agent runs
-- watchdog file watcher for the Research Inbox ingest pipeline
 - MCP server (Python 3.11, separate venv) connecting Claude Code / Claude Desktop as a research client
 
 ## Quick Start
@@ -140,7 +136,7 @@ DEMO_MODE=true streamlit run app.py
 `data/demo.db` is a **regenerable build artifact** — the seeder
 (`scripts/seed_demo.py`) is the single source of truth and populates every
 surface (positions, prices, all agent verdicts, wealth-snapshot history,
-dividends, news, sector rotation, portfolio story, Cowork queue) with
+dividends, news, sector rotation, portfolio story, a research answer) with
 `[Demodaten]`-tagged fixtures. Don't hand-edit `demo.db`; change the seeder and
 re-run it. It only ever writes to `demo.db` (guarded against the real
 `portfolio.db`).
@@ -160,15 +156,13 @@ Copy `.env.example` to `.env` and fill in your values.
 | `OPENAI_BASE_URL` | Optional | OpenRouter endpoint (`https://openrouter.ai/api/v1`) |
 | `OPENAI_MODELS` | Optional | Comma-separated OpenRouter models for the Settings dropdown (e.g. `deepseek/deepseek-v4-pro,mistralai/mistral-medium-3-5`) |
 | `OLLAMA_HOST` | Optional | Default: `http://localhost:11434` |
-| `OLLAMA_MODEL` | Optional | Default model for Portfolio Chat and Portfolio Story (overridable in Settings UI) |
+| `OLLAMA_MODEL` | Optional | Default local model (overridable in Settings UI) |
 | `TAVILY_API_KEY` | Optional | Tavily search — replaces Anthropic's built-in web_search when set. Free tier: 1000 searches/month |
 | `DEMO_MODE` | Optional | Set to `true` to use the demo database |
 | `DB_PATH` | Optional | Default: `data/portfolio.db` |
 | `MARKET_DATA_FETCH_HOUR` | Optional | Hour (0–23) for automatic price refresh, default `18` |
 | `LOG_LEVEL` | Optional | Logging level: DEBUG, INFO (default), WARNING, ERROR, CRITICAL |
 | `BASE_CURRENCY` | Optional | Currency for display: EUR (default), CHF, GBP, USD, JPY |
-| `COWORK_OUTBOX_PATH` | Optional | Path to Research Inbox outbox directory. Default: `~/wealth-research/outbox` |
-| `COWORK_WATCH_ENABLED` | Optional | Set to `false` to disable the file watcher (files scanned on startup only). Default: `true` |
 | `APP_PASSWORD` | Optional | Enables a login gate (works with Apple Passwords / Keychain autofill). Empty = no login |
 | `USE_BATCH_API` | Optional | Forces batch for scheduled jobs on this machine only; normally the household switch in the Maschinenraum decides. Anthropic direct only (no `LLM_BASE_URL`) |
 | `MCP_BEARER_TOKEN` | Optional | Bearer token for the MCP server's HTTP transport (only needed for sandboxed clients; stdio needs no token) |

@@ -16,7 +16,6 @@ graph TD
     state["state.py — DI Factory<br/>@st.cache_resource Singletons"]
 
     subgraph Local["Local Agents (Ollama 🔒)"]
-        PA["PortfolioAgent"]
         PSA["PortfolioStoryAgentV2"]
         WCA["WatchlistCheckerAgent"]
         MDA["MarketDataAgent"]
@@ -68,7 +67,6 @@ sequenceDiagram
 
     B->>A: Page request
     A->>A: validate config, login gate
-    A->>S: get_portfolio_agent() ← EAGER
     A->>S: get_market_agent() ← EAGER (no schedule — see ops-core jobs)
     A->>B: render navigation
 
@@ -86,11 +84,10 @@ sequenceDiagram
 
 ---
 
-## Agent Overview (18 Agents)
+## Agent Overview (17 Agents)
 
 | Agent | Provider | Model¹ | Session Type | Primary Method | Scope |
 |-------|----------|-------|--------------|--------|-------|
-| **PortfolioAgent** | Ollama | Local | Stateless | `chat()` + tools | Portfolio CRUD |
 | **PortfolioStoryAgentV2** | Ollama | Local | Stateless | `analyze()` / `analyze_stability()` / `analyze_story_and_performance()` | Modular portfolio checks (FEAT-18) |
 | **WatchlistCheckerAgent** | Ollama | Local | Stateless | `check_watchlist()` | Watchlist fit into portfolio |
 | **PortfolioRobustnessAgent** | Ollama | Local | Stateless | `analyze()` | Portfolio-level stress assessment (FEAT-48) |
@@ -134,10 +131,10 @@ sequenceDiagram
 | **ScheduledJobsRepository** | Periodic agent runs + run history | `scheduled_jobs`, `scheduled_job_runs` |
 | **NewsRepository** | News digest runs + messages | `news_runs`, `news_messages` |
 | **UsageRepository** | Token counts + costs per call; `lauf` (ops-core run_id or batch_id) and `job` group them into runs (`core/laeufe.py`, Statistik „Letzte Läufe“) | `llm_usage`, `usage_resets` |
-| **ResearchQueueRepository** | MCP back channel: requests + answers (FEAT-50/52) | `research_requests`, `research_answers` |
+| **ResearchQueueRepository** | Answers from Claude Code via MCP (FEAT-50) | `research_answers` |
 | **BatchQueueRepository** | Pending Anthropic Batch API jobs | `pending_batches` |
 | **AgentRunsRepository** | Agent run telemetry | `agent_runs` |
-| **CoworkRepository** | Research Inbox entries + suggestions | `cowork_research_entries`, `cowork_watchlist_suggestions` |
+| **CoworkRepository** | Former Research Inbox, read-only since 2026-10-23: the title page shows the research behind a watchlist title | `cowork_research_entries`, `cowork_watchlist_suggestions` |
 | **DevilsAdvocateRepository** | Bear case sessions (FEAT-47) | `devils_advocate_sessions`, `devils_advocate_messages` |
 | **SectorRotationRepository** | Sector scan runs + verdicts (FEAT-46) | `sector_rotation_runs`, `sector_rotation_messages`, `sector_verdicts` |
 | **PortfolioRobustnessRepository** | Portfolio stress analyses (FEAT-48) | `portfolio_robustness_analyses` |
@@ -285,9 +282,8 @@ class MyAgent:
 
 ## Dependency Injection (state.py)
 
-All agents are **lazy-loaded via `@st.cache_resource` factory functions**. Two agents are **eager-initialized** in `app.py`:
+All agents are **lazy-loaded via `@st.cache_resource` factory functions**. One agent is **eager-initialized** in `app.py`:
 
-- `get_portfolio_agent()` — Portfolio Chat critical path
 - `get_market_agent()` — market data for the pages
 
 **No schedule runs in the app.** Everything that runs regularly is an ops-core job (`scripts/job.py`, schedule in `~/.ops-core/jobs.toml`): `agenten` (hourly
@@ -851,13 +847,12 @@ out of the app's.
 mcp_venv/     — only mcp_server/wealth_mcp.py
 ```
 
-The separation is clean: `mcp_server/_helpers.py` contains the testable logic (no MCP import) — YAML building, atomic file writes, input validation (`validate_answer_input`), and the `BearerTokenMiddleware` — importable from `.venv`. `wealth_mcp.py` imports `_helpers` + FastMCP and runs only in `mcp_venv`.
+The separation is clean: `mcp_server/_helpers.py` contains the testable logic (no MCP import) — input validation (`validate_answer_input`) and the `BearerTokenMiddleware` — importable from `.venv`. `wealth_mcp.py` imports `_helpers` + FastMCP and runs only in `mcp_venv`.
 
 ```
 mcp_server/
 ├── _helpers.py       # no MCP import — testable from .venv (incl. auth middleware + validation)
 ├── wealth_mcp.py     # FastMCP server — runs in mcp_venv
-├── check_queue.py    # hook script — /usr/bin/python3
 ├── requirements.txt  # mcp[cli]>=1.0.0, pyyaml>=6.0, uvicorn
 └── __init__.py
 ```
@@ -886,119 +881,37 @@ mcp_server/
 
 `enabledMcpjsonServers` suppresses the manual approval prompt on every session start.
 
-### Tool Overview
+### The tool
 
 | Tool | Direction | What it does |
 |---|---|---|
-| `propose_position()` | Claude → App | Writes `.md` to the Cowork outbox, file watcher imports it |
-| `propose_multiple()` | Claude → App | Batch version, several candidates in one file |
-| `get_research_queue()` | Claude ← App | Reads open research requests from `research_requests` |
-| `complete_research_request(id)` | Claude → App | Marks a request as done |
-| `submit_research_answer(md, ...)` | Claude → App | Writes an answer to `research_answers`, marks the request done |
+| `submit_research_answer(md, ticker)` | Claude → App | Writes an answer to `research_answers`; the title page of its ticker shows it (`core/ui/titelseite.py`) |
 
-### Bidirectional Communication (FEAT-50/51)
-
-The research queue implements two complementary channels:
-
-```
-App → Claude:  research_requests table  +  UserPromptSubmit hook
-Claude → App:  research_answers table   +  submit_research_answer() tool
-```
-
-**App → Claude (posting requests):**
-1. The form on the Research Answers page is gone (page deleted 2026-10-23, CHANGELOG); the
-   queue and the hook stay, so a request written by other means is still picked up
-2. `ResearchQueueRepository.create_request()` writes a row to the DB
-3. `mcp_server/check_queue.py` runs before every Claude Code message (hook)
-4. The hook reads open requests and injects them as `additionalContext`
-5. Claude sees the requests at the start of every session/message
-
-**Claude → App (answering requests):**
-1. Claude calls `get_research_queue()` for details
-2. Answers via `submit_research_answer(markdown, request_id)` 
-3. The answer appears on the title page of its ticker (`core/ui/titelseite.py`)
-4. The request is automatically marked `done`
-
-```mermaid
-sequenceDiagram
-    participant U as User (App)
-    participant DB as SQLite
-    participant H as check_queue.py (Hook)
-    participant CC as Claude Code
-    participant T as wealth_mcp.py (MCP Tools)
-
-    U->>DB: create_request("Analyze AAPL Q3 numbers")
-    Note over H: On next CC message
-    CC->>H: UserPromptSubmit fired
-    H->>DB: SELECT * FROM research_requests WHERE status='open'
-    H-->>CC: additionalContext with open requests
-    CC->>T: get_research_queue() [optional — for details]
-    T->>DB: SELECT ...
-    T-->>CC: list with details
-    CC->>T: submit_research_answer("## AAPL Q3...", request_id=1)
-    T->>DB: INSERT research_answers + UPDATE status='done'
-    U->>DB: list_answers(ticker="AAPL")
-    DB-->>U: answer appears on the Research Answers page
-```
-
-### UserPromptSubmit Hook
-
-```python
-# mcp_server/check_queue.py — output format
-output = {
-    "hookSpecificOutput": {
-        "hookEventName": "UserPromptSubmit",
-        "additionalContext": "📋 2 open requests...",
-    }
-}
-print(json.dumps(output))
-```
-
-`additionalContext` is injected into the context before the user message — Claude sees the requests automatically, without the user doing anything.
-
-### Cowork Outbox Pattern (FEAT-49)
-
-`propose_position()` writes `.md` files atomically into the outbox directory:
-
-```python
-# Atomic write: tmp/ → rename (prevents partial file reads by the watcher)
-tmp_path.write_text(content, encoding="utf-8")
-tmp_path.rename(final_path)  # atomic on same filesystem
-```
-
-The app's existing watchdog file watcher detects new files and imports them as watchlist candidates for human review — with zero code changes to the app.
+Until 2026-10-23 there were four more: `propose_position`/`propose_multiple` wrote watchlist
+candidates into a file outbox that a watchdog watcher imported for the Cowork Inbox, and
+`get_research_queue`/`complete_research_request` plus a UserPromptSubmit hook carried
+requests from the Research Answers page to Claude. Pages, watcher and hook are gone
+(CHANGELOG); the tables `research_requests`, `cowork_research_entries` and
+`cowork_watchlist_suggestions` stay in existing databases, and the title page still shows the
+research that once proposed a watchlist title.
 
 ### Security Hardening (SEC-4 + SEC-5)
 
-The MCP server is the first external write path that does not go through the Streamlit UI. Mitigations:
+The MCP server is the one external write path that does not go through the Streamlit UI. Mitigations:
 
 | Vector | Mitigation |
 |---|---|
-| Path traversal in outbox filename | Slug sanitization (`[^A-Za-z0-9._-]` → `_`) + date prefix |
-| Prompt injection via hook context | XML framing **and** escaping (`xml.sax.saxutils`) — tag breakout from `focus`/`ticker` impossible, output is parseable XML |
-| Oversize inputs | `focus` ≤ 500, `context` ≤ 2000, `ticker` ≤ 20 chars, `answer_md` ≤ 100 KB |
+| Oversize inputs | `ticker` ≤ 20 chars, `answer_md` ≤ 100 KB |
 | Duplicate write paths (repo vs. raw SQL) | Limits defined in `core/storage/research_queue.py` **and** `mcp_server/_helpers.py`; a test enforces they stay in sync |
 | HTTP transport auth | Bearer token required, `hmac.compare_digest` (constant-time), websocket scope rejected, bound to `127.0.0.1` |
-| DB access | Convention + checklist (CLAUDE.md): tools touch only `research_requests`/`research_answers` |
+| DB access | Convention + checklist (CLAUDE.md): the tool touches only `research_answers` |
 
-### Storage Tables
+### Storage Table
 
 ```sql
-CREATE TABLE research_requests (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    request_type TEXT NOT NULL DEFAULT 'research_question',  -- watchlist_candidate | research_question | analysis_deepdive | general
-    ticker       TEXT,
-    focus        TEXT NOT NULL,   -- the actual question/request
-    context      TEXT,            -- additional context (optional)
-    source       TEXT NOT NULL DEFAULT 'manual',  -- manual | agent | batch
-    status       TEXT NOT NULL DEFAULT 'open',    -- open | in_progress | done
-    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
 CREATE TABLE research_answers (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    request_id INTEGER REFERENCES research_requests(id),
+    request_id INTEGER REFERENCES research_requests(id),  -- always NULL since 2026-10-23
     ticker     TEXT,
     answer_md  TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))

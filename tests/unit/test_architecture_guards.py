@@ -49,10 +49,8 @@ from agents.storychecker_agent import StorycheckerAgent
 from agents.structural_change_agent import StructuralChangeAgent
 
 from agents.dividend_calendar_agent import DividendCalendarAgent
-from agents.portfolio_agent import PortfolioAgent
 from agents.portfolio_robustness_agent import PortfolioRobustnessAgent
 from agents.portfolio_story_agent_v2 import PortfolioStoryAgentV2
-from agents.rebalance_agent import RebalanceAgent
 from agents.tax_loss_harvesting_agent import TaxLossHarvestingAgent
 from agents.watchlist_checker_agent import WatchlistCheckerAgent
 
@@ -74,10 +72,8 @@ CLOUD_AGENTS = [
 
 LOCAL_AGENTS = [
     DividendCalendarAgent,
-    PortfolioAgent,
     PortfolioRobustnessAgent,
     PortfolioStoryAgentV2,
-    RebalanceAgent,
     TaxLossHarvestingAgent,
     WatchlistCheckerAgent,
 ]

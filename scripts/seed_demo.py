@@ -901,24 +901,14 @@ def _seed_cowork(conn: sqlite3.Connection) -> None:
     from core.storage.research_queue import ResearchQueueRepository
 
     repo = ResearchQueueRepository(conn)
-    # One open request
-    repo.create_request(
-        _D + "Wie robust ist die Wettbewerbsposition von ASML gegenüber Canon/Nikon?",
-        request_type="research_question", ticker="ASML", source="manual",
-    )
-    # One answered request (linked answer)
-    req = repo.create_request(
-        _D + "Bear-Case für NVIDIA recherchieren.",
-        request_type="watchlist_candidate", ticker="NVDA", source="manual",
-    )
+    # Eine Antwort aus Claude Code, auf der Titelseite von NVDA
     repo.submit_answer(
         _D + "## NVIDIA — Bear-Case\n\nHauptrisiken: zyklische Hyperscaler-CapEx, "
              "Custom-Silicon der Cloud-Anbieter, China-Exportbeschränkungen. "
              "Bewertung preist anhaltend hohe Wachstumsraten ein.",
-        request_id=req.id, ticker="NVDA",
+        ticker="NVDA",
     )
-    repo.complete_request(req.id)
-    print("  [cowork] 2 requests (1 open, 1 answered)")
+    print("  [cowork] 1 research answer")
 
 
 def _seed_extras(conn: sqlite3.Connection) -> None:

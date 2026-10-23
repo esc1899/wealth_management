@@ -7,13 +7,12 @@ LLM and yfinance are mocked to avoid external dependencies.
 import os
 import sqlite3
 from datetime import date, datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
 from agents.market_data_agent import MarketDataAgent
 from agents.market_data_fetcher import MarketDataFetcher
-from agents.portfolio_agent import PortfolioAgent
 from core.encryption import EncryptionService
 from core.storage.base import init_db, migrate_db
 from core.storage.market_data import MarketDataRepository
@@ -57,11 +56,6 @@ def mock_llm():
     llm = MagicMock()
     llm.model = "qwen3:8b-test"
     return llm
-
-
-@pytest.fixture
-def portfolio_agent(positions_repo, mock_llm):
-    return PortfolioAgent(positions_repo=positions_repo, llm=mock_llm)
 
 
 @pytest.fixture
@@ -164,60 +158,6 @@ class TestPortfolioToValuation:
 
 # ------------------------------------------------------------------
 # E2E: Portfolio Agent Chat → Storage
-# ------------------------------------------------------------------
-
-class TestPortfolioChatToStorage:
-    @pytest.mark.asyncio
-    async def test_chat_add_entry_stored_in_db(self, positions_repo, mock_llm):
-        from core.llm.local import OllamaResponse, ToolCall
-        mock_llm.chat_with_tools = AsyncMock(side_effect=[
-            OllamaResponse(
-                content="",
-                tool_calls=[ToolCall(
-                    name="add_portfolio_entry",
-                    arguments={
-                        "ticker": "AAPL",
-                        "name": "Apple Inc.",
-                        "quantity": 10,
-                        "unit": "Stück",
-                        "purchase_price": 185.0,
-                        "purchase_date": "2024-06-01",
-                        "asset_class": "Aktie",
-                    },
-                )],
-            ),
-            OllamaResponse(content="10 Apple-Aktien wurden hinzugefügt.", tool_calls=[]),
-        ])
-
-        agent = PortfolioAgent(positions_repo=positions_repo, llm=mock_llm)
-        response = await agent.chat("Ich habe 10 Apple-Aktien für 185€ gekauft")
-
-        assert "Apple" in response or "hinzugefügt" in response
-        entries = positions_repo.get_portfolio()
-        assert len(entries) == 1
-        assert entries[0].ticker == "AAPL"
-        assert entries[0].quantity == 10
-        assert entries[0].purchase_price == 185.0
-
-    @pytest.mark.asyncio
-    async def test_agent_add_to_watchlist_direct_api(self, positions_repo, mock_llm):
-        agent = PortfolioAgent(positions_repo=positions_repo, llm=mock_llm)
-        entry = agent.add_to_watchlist(
-            ticker="TSLA",
-            name="Tesla",
-            asset_class="Aktie",
-            notes="Beobachten",
-        )
-
-        assert entry.id is not None
-        stored = positions_repo.get_by_ticker("TSLA")
-        assert len(stored) == 1
-        assert stored[0].recommendation_source == "agent"
-        assert stored[0].in_portfolio is False
-
-
-# ------------------------------------------------------------------
-# E2E: Market Data price persistence
 # ------------------------------------------------------------------
 
 class TestMarketDataPersistence:

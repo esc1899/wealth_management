@@ -70,11 +70,10 @@ if config.DEMO_MODE:
 # Initialise critical shared resources on first load
 # Other agents are lazy-loaded when pages access them via @st.cache_resource
 from state import (  # noqa: E402
-    get_market_agent, get_cowork_watcher,
+    get_market_agent,
     get_scheduled_job_runs_repo,
 )
 get_market_agent()      # Market data (scheduled fetch runs in the planner service)
-get_cowork_watcher()    # Research Ingest file watcher + initial scan; die Titelseite zeigt es
 
 @st.dialog("Disclaimer & Privacy Notice", width="large")
 def _legal_dialog():

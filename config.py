@@ -102,12 +102,6 @@ class Config:
     BACKUP_REPO_PATH: str = os.getenv("BACKUP_REPO_PATH", "")
     RESTIC_PASSWORD_FILE: str = os.getenv("RESTIC_PASSWORD_FILE", "")
 
-    # Cowork Research Ingest
-    COWORK_OUTBOX_PATH: str = os.getenv("COWORK_OUTBOX_PATH", "~/wealth-research/outbox")
-    COWORK_ARCHIVE_SUBFOLDER: str = os.getenv("COWORK_ARCHIVE_SUBFOLDER", "archive")
-    COWORK_WATCH_ENABLED: bool = os.getenv("COWORK_WATCH_ENABLED", "true").lower() == "true"
-    COWORK_AUTO_IMPORT_READY: bool = os.getenv("COWORK_AUTO_IMPORT_READY", "true").lower() == "true"
-
     # Batch API — 50% cheaper for scheduled background jobs (Anthropic only)
     # Ob eingeplante Laeufe als Anthropic-Batch gehen, sagt der Schalter im
     # Maschinenraum (modelle.toml, [claude] batch); USE_BATCH_API=true erzwingt es

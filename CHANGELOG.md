@@ -8,6 +8,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Chat-Agenten, Cowork-Zufluss und Research-Queue ausgebaut — 2026-10-23
+
+**Warum:** Nach dem Löschen der Seiten hatten PortfolioAgent und RebalanceAgent keinen Aufrufer
+mehr, und was Claude über MCP vorschlug (`propose_*`) oder die App fragte (Research-Queue),
+hatte keine Oberfläche mehr. Erik am 23.10.: alles weg.
+
+**Änderungen:**
+- Gelöscht: `agents/portfolio_agent.py`, `agents/rebalance_agent.py`, `core/storage/rebalance.py`
+  samt Modellen, Getter, Tests, Guard-Einträgen und Wegen in der Ontologie; der Skill-Bereich
+  „portfolio“ aus Vorgaben und Auswahl; beide aus der Liste der lokalen Agenten.
+- Gelöscht: `core/cowork/` (Watcher, Importer, Parser), die `COWORK_*`-Einstellungen, der
+  UserPromptSubmit-Hook `mcp_server/check_queue.py` und die MCP-Werkzeuge `propose_position`,
+  `propose_multiple`, `get_research_queue`, `complete_research_request`. Der MCP-Server hat
+  noch ein Werkzeug, `submit_research_answer` (ohne `request_id`); die Antwort steht auf der
+  Titelseite ihres Tickers. `ResearchQueueRepository` kennt nur noch Antworten.
+- Die Tabellen `rebalance_*`, `research_requests` und `cowork_*` bleiben in bestehenden
+  Datenbanken, neue legen `rebalance_*` nicht mehr an; gelöscht wird nichts. Die Titelseite
+  zeigt weiter die Recherche, die einst einen Watchlist-Titel vorschlug.
+- Übersetzungen der gelöschten Seiten entfernt (`rebalance_chat`, `news_chat`, `cowork_setup`,
+  ihre Menüeinträge).
+
 ### Ausgeblendete Seiten gelöscht — 2026-10-23
 
 **Warum:** Seit dem 10./11.10. waren 14 Seiten aus dem Menü genommen und nur noch über ihre

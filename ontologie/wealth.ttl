@@ -344,14 +344,10 @@ wm:PositionStoryService a wm:Weg ; wm:imCode "PositionStoryService" ; wm:laeuftB
 
 wm:DividendCalendarAgent a wm:Weg ; wm:imCode "DividendCalendarAgent" ; wm:laeuftBei wm:lokal ;
     rdfs:label "Dividendenkalender"@de , "dividend calendar"@en .
-wm:PortfolioAgent a wm:Weg ; wm:imCode "PortfolioAgent" ; wm:laeuftBei wm:lokal ;
-    rdfs:label "Portfolio"@de , "portfolio"@en .
 wm:PortfolioRobustnessAgent a wm:Weg ; wm:imCode "PortfolioRobustnessAgent" ; wm:laeuftBei wm:lokal ;
     rdfs:label "Robustheit"@de , "robustness"@en .
 wm:PortfolioStoryAgentV2 a wm:Weg ; wm:imCode "PortfolioStoryAgentV2" ; wm:laeuftBei wm:lokal ;
     rdfs:label "Portfolio-These"@de , "portfolio thesis"@en .
-wm:RebalanceAgent a wm:Weg ; wm:imCode "RebalanceAgent" ; wm:laeuftBei wm:lokal ;
-    rdfs:label "Umschichten"@de , "rebalance"@en .
 wm:TaxLossHarvestingAgent a wm:Weg ; wm:imCode "TaxLossHarvestingAgent" ; wm:laeuftBei wm:lokal ;
     rdfs:label "Verlustverrechnung"@de , "tax-loss harvesting"@en .
 wm:WatchlistCheckerAgent a wm:Weg ; wm:imCode "WatchlistCheckerAgent" ; wm:laeuftBei wm:lokal ;

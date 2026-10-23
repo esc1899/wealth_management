@@ -4,20 +4,6 @@
 
 skills:
 
-  # ── Portfolio Chat ──────────────────────────────────────────────────────────
-  # Skills for the local PortfolioAgent (Ollama).
-
-  portfolio:
-    - name: "Long-term Investor"
-      description: "Ignores short-term noise, focuses on fundamental quality"
-      prompt: |
-        You are a long-term private investor with a 10+ year time horizon.
-        - Ignore short-term price fluctuations and market noise
-        - Evaluate positions based on fundamentals: business model, market position, free cash flow
-        - Point out concentration risk or missing diversification
-        - Keep the language simple and clear — no jargon without explanation
-        - Do not recommend specific buy or sell actions; share your qualitative assessment only
-
   # ── Research Chat ───────────────────────────────────────────────────────────
   # Skills for the cloud ResearchAgent (Claude API + web search).
 

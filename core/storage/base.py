@@ -158,21 +158,6 @@ def init_db(conn: sqlite3.Connection) -> None:
         )""",
         "CREATE INDEX IF NOT EXISTS idx_position_analyses_position ON position_analyses(position_id)",
         "CREATE INDEX IF NOT EXISTS idx_position_analyses_agent ON position_analyses(position_id, agent)",
-        """CREATE TABLE IF NOT EXISTS rebalance_sessions (
-            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-            skill_name         TEXT NOT NULL,
-            skill_prompt       TEXT NOT NULL,
-            portfolio_snapshot TEXT NOT NULL,
-            created_at         TEXT NOT NULL
-        )""",
-        """CREATE TABLE IF NOT EXISTS rebalance_messages (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id INTEGER NOT NULL REFERENCES rebalance_sessions(id),
-            role       TEXT NOT NULL,
-            content    TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )""",
-        "CREATE INDEX IF NOT EXISTS idx_rebalance_messages_session ON rebalance_messages(session_id)",
         """CREATE TABLE IF NOT EXISTS llm_usage (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             agent         TEXT NOT NULL,

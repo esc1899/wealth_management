@@ -1,16 +1,14 @@
 """
 Wealth Management MCP Server.
 
-Exposes research tooling to Claude Code:
+Exposes one tool to Claude Code:
 
-  FEAT-49 — Cowork Ingest (write-only, no portfolio access)
-    propose_position(...)      — propose one watchlist candidate → .md in outbox
-    propose_multiple(...)      — propose several candidates at once
+    submit_research_answer(...) — write a research answer for a ticker; the app shows it on
+                                  the title page of that position
 
-  FEAT-50 — Research Queue (App → Claude)
-    get_research_queue()       — list open research requests from the app
-    complete_research_request(...) — mark a request as done
-    submit_research_answer(...)    — write an answer back to the app
+Proposals for the watchlist (propose_*) and the research queue (get_research_queue,
+complete_research_request, the UserPromptSubmit hook) were removed on 2026-10-23 together
+with the pages that read them (CHANGELOG).
 
 Usage (from project root):
   stdio (Claude Code CLI/Desktop):
@@ -31,20 +29,15 @@ Claude.ai Web registration:
 from __future__ import annotations
 
 import os
-import re
 import sqlite3
 import sys
-import uuid
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
 from mcp_server._helpers import BearerTokenMiddleware as _BearerTokenMiddleware
-from mcp_server._helpers import build_research_md as _build_research_md
-from mcp_server._helpers import routing_hint as _routing_hint
 from mcp_server._helpers import validate_answer_input as _validate_answer_input
-from mcp_server._helpers import write_md_to_outbox as _write_md_to_outbox_helper
 
 # ---------------------------------------------------------------------------
 # Config — read .env from the project root (one level up from this file)
@@ -62,10 +55,6 @@ if _env_path.exists():
                 _k, _, _v = _line.partition("=")
                 os.environ.setdefault(_k.strip(), _v.strip())
 
-_OUTBOX_PATH = Path(
-    os.environ.get("COWORK_OUTBOX_PATH", "~/wealth-research/outbox")
-).expanduser()
-
 _DB_PATH = Path(
     os.environ.get("DB_PATH", str(_PROJECT_ROOT / "data" / "portfolio.db"))
 ).expanduser()
@@ -79,270 +68,29 @@ if not _DB_PATH.is_absolute():
 mcp = FastMCP("wealth-research")
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def _get_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(str(_DB_PATH))
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def _write_md_to_outbox(content: str, filename: str) -> Path:
-    return _write_md_to_outbox_helper(content, filename, _OUTBOX_PATH)
-
-
 # ---------------------------------------------------------------------------
-# FEAT-49: Cowork Ingest tools
+# Research answers (FEAT-50)
 # ---------------------------------------------------------------------------
-
-@mcp.tool()
-def propose_position(
-    ticker: str,
-    name: str,
-    exchange: str,
-    rationale: str,
-    conviction: str,
-    suggested_action: str,
-    isin: Optional[str] = None,
-    category: Optional[str] = None,
-    story: Optional[str] = None,
-    price: Optional[float] = None,
-    sources: Optional[list[str]] = None,
-    request_id: Optional[int] = None,
-) -> str:
-    """Propose a single position for the watchlist.
-
-    Creates a research .md file in the outbox — the app's file watcher
-    picks it up automatically within seconds.
-
-    Use this only for watchlist candidates. For factual answers or deep-dive
-    analyses use submit_research_answer() instead.
-
-    Args:
-        ticker: Stock ticker symbol (e.g. "AAPL")
-        name: Full company name (e.g. "Apple Inc.")
-        exchange: Exchange code (e.g. "NASDAQ", "XETRA", "NYSE")
-        rationale: Investment thesis — why this position?
-        conviction: "low", "medium", or "high"
-        suggested_action: "add", "watch", or "skip"
-        isin: Optional ISIN (e.g. "US0378331005")
-        category: Asset class (e.g. "Aktie", "ETF", "Anleihe"). Defaults to "Aktie".
-        story: Optional full investment story / long-form thesis
-        price: Optional current price at time of research
-        sources: Optional list of source URLs used in research
-        request_id: Optional — ID from get_research_queue() if this proposal
-            answers a queue request (links it in the app's Research Answers view)
-    """
-    if conviction not in {"low", "medium", "high"}:
-        return f"Error: conviction must be 'low', 'medium', or 'high', got '{conviction}'"
-    if suggested_action not in {"add", "watch", "skip"}:
-        return f"Error: suggested_action must be 'add', 'watch', or 'skip', got '{suggested_action}'"
-    if request_id is not None and (not isinstance(request_id, int) or request_id < 1):
-        return f"Error: request_id must be a positive integer, got '{request_id}'"
-
-    _slug = re.sub(r"[^A-Za-z0-9._-]", "_", ticker.lower())
-    research_id = f"{date.today().isoformat()}-{_slug}-{uuid.uuid4().hex[:6]}"
-    candidate: dict = {
-        "ticker": ticker.upper(),
-        "name": name,
-        "exchange": exchange.upper(),
-        "rationale": rationale,
-        "conviction": conviction,
-        "suggested_action": suggested_action,
-    }
-    if isin:
-        candidate["isin"] = isin
-    if category:
-        candidate["category"] = category
-    if price is not None:
-        candidate["price_at_research"] = price
-
-    body = story or ""
-    content = _build_research_md(
-        research_id=research_id,
-        candidates=[candidate],
-        primary_ticker=ticker,
-        primary_name=name,
-        primary_exchange=exchange,
-        body=body,
-        sources=sources,
-        request_id=request_id,
-    )
-
-    filename = f"{research_id}.md"
-    path = _write_md_to_outbox(content, filename)
-    return (
-        f"✅ Position '{name}' ({ticker.upper()}) proposed.\n"
-        f"File written to outbox: {path.name}\n"
-        f"The app's file watcher will import it automatically."
-    )
-
-
-@mcp.tool()
-def propose_multiple(
-    candidates: list[dict],
-    body: Optional[str] = None,
-    sources: Optional[list[str]] = None,
-    request_id: Optional[int] = None,
-) -> str:
-    """Propose multiple watchlist candidates at once.
-
-    Each candidate dict must have:
-        ticker, name, exchange, rationale, conviction, suggested_action
-    Optional per-candidate fields:
-        isin, category, price_at_research
-
-    Args:
-        candidates: List of candidate dicts (see field list above)
-        body: Optional research summary / markdown body text
-        sources: Optional list of source URLs
-        request_id: Optional — ID from get_research_queue() if this proposal
-            answers a queue request (links it in the app's Research Answers view)
-    """
-    if not candidates:
-        return "Error: candidates list is empty"
-    if request_id is not None and (not isinstance(request_id, int) or request_id < 1):
-        return f"Error: request_id must be a positive integer, got '{request_id}'"
-
-    validated: list[dict] = []
-    for i, c in enumerate(candidates):
-        for req in ("ticker", "name", "exchange", "rationale", "conviction", "suggested_action"):
-            if not c.get(req):
-                return f"Error: candidates[{i}] missing required field '{req}'"
-        if c["conviction"] not in {"low", "medium", "high"}:
-            return f"Error: candidates[{i}].conviction must be 'low'/'medium'/'high'"
-        if c["suggested_action"] not in {"add", "watch", "skip"}:
-            return f"Error: candidates[{i}].suggested_action must be 'add'/'watch'/'skip'"
-        entry: dict = {
-            "ticker": c["ticker"].upper(),
-            "name": c["name"],
-            "exchange": c["exchange"].upper(),
-            "rationale": c["rationale"],
-            "conviction": c["conviction"],
-            "suggested_action": c["suggested_action"],
-        }
-        for opt in ("isin", "category", "price_at_research"):
-            if c.get(opt) is not None:
-                entry[opt] = c[opt]
-        validated.append(entry)
-
-    first = validated[0]
-    _slug = re.sub(r"[^A-Za-z0-9._-]", "_", first["ticker"].lower())
-    research_id = f"{date.today().isoformat()}-batch-{_slug}-{uuid.uuid4().hex[:8]}"
-    content = _build_research_md(
-        research_id=research_id,
-        candidates=validated,
-        primary_ticker=first["ticker"],
-        primary_name=first["name"],
-        primary_exchange=first["exchange"],
-        body=body or "",
-        sources=sources,
-        request_id=request_id,
-    )
-
-    filename = f"{research_id}.md"
-    path = _write_md_to_outbox(content, filename)
-    tickers = ", ".join(c["ticker"] for c in validated)
-    return (
-        f"✅ {len(validated)} candidates proposed: {tickers}\n"
-        f"File written to outbox: {path.name}\n"
-        f"The app's file watcher will import them automatically."
-    )
-
-
-# ---------------------------------------------------------------------------
-# FEAT-50: Research Queue tools
-# ---------------------------------------------------------------------------
-
-@mcp.tool()
-def get_research_queue() -> str:
-    """List all open research requests from the app.
-
-    Returns a formatted list of pending tasks — research questions,
-    watchlist candidates to investigate, or analysis deep-dives
-    requested by the app or user.
-
-    Each request carries a routing hint: watchlist_candidate requests are
-    answered via propose_position()/propose_multiple(), everything else via
-    submit_research_answer(). Pass the request id along so the app can link
-    the result to the request.
-    """
-    try:
-        conn = _get_conn()
-        rows = conn.execute(
-            "SELECT id, request_type, ticker, focus, context, source, created_at "
-            "FROM research_requests WHERE status = 'open' ORDER BY created_at ASC"
-        ).fetchall()
-        conn.close()
-    except Exception as exc:
-        return f"Error reading research queue: {exc}"
-
-    if not rows:
-        return "✅ Research queue is empty — no open requests."
-
-    lines = [f"📋 {len(rows)} open research request(s):\n"]
-    for row in rows:
-        ticker_part = f" [{row['ticker']}]" if row['ticker'] else ""
-        ctx_part = f"\n   Context: {row['context']}" if row['context'] else ""
-        ts = row['created_at'][:10]
-        lines.append(
-            f"  #{row['id']} [{row['request_type']}]{ticker_part} — {row['focus']}"
-            f"\n   Source: {row['source']} | Created: {ts}{ctx_part}"
-            f"\n   Routing: {_routing_hint(row['request_type'], row['id'])}"
-        )
-    return "\n".join(lines)
-
-
-@mcp.tool()
-def complete_research_request(request_id: int) -> str:
-    """Mark a research request as done.
-
-    Call this after you've answered a request (e.g. via propose_position or
-    submit_research_answer) so it disappears from the queue.
-
-    Args:
-        request_id: The numeric ID from get_research_queue()
-    """
-    try:
-        conn = _get_conn()
-        now = datetime.now(timezone.utc).isoformat()
-        cur = conn.execute(
-            "UPDATE research_requests SET status = 'done', updated_at = ? "
-            "WHERE id = ? AND status != 'done'",
-            (now, request_id),
-        )
-        conn.commit()
-        conn.close()
-    except Exception as exc:
-        return f"Error updating request #{request_id}: {exc}"
-
-    if cur.rowcount == 0:
-        return f"Request #{request_id} not found or already done."
-    return f"✅ Request #{request_id} marked as done."
-
 
 @mcp.tool()
 def submit_research_answer(
     answer_markdown: str,
-    request_id: Optional[int] = None,
     ticker: Optional[str] = None,
 ) -> str:
     """Submit a research answer back to the app.
 
-    Use this for non-watchlist results: factual answers, deep-dive analyses,
-    general findings. The answer will appear in the Research Answers section
-    of the app.
-
-    For watchlist candidates use propose_position() or propose_multiple() instead.
+    The answer appears on the title page of the position with this ticker.
 
     Args:
         answer_markdown: The full answer in Markdown format (max 100 KB)
-        request_id: Optional — link to a specific request from get_research_queue()
-        ticker: Optional ticker this answer relates to (max 20 chars).
-            If the request carries a ticker, reuse its exact notation
-            (e.g. "SAP.DE", not "SAP") so the app can link the answer.
+        ticker: Ticker this answer relates to (max 20 chars), in the app's notation
+            (e.g. "SAP.DE"); the app also matches the base symbol ("SAP").
     """
     error = _validate_answer_input(answer_markdown, ticker)
     if error:
@@ -353,23 +101,15 @@ def submit_research_answer(
         now = datetime.now(timezone.utc).isoformat()
         cur = conn.execute(
             "INSERT INTO research_answers (request_id, ticker, answer_md, created_at) VALUES (?, ?, ?, ?)",
-            (request_id, ticker.upper() if ticker else None, answer_markdown.strip(), now),
+            (None, ticker.upper() if ticker else None, answer_markdown.strip(), now),
         )
         answer_id = cur.lastrowid
-
-        if request_id:
-            conn.execute(
-                "UPDATE research_requests SET status = 'done', updated_at = ? WHERE id = ?",
-                (now, request_id),
-            )
         conn.commit()
         conn.close()
     except Exception as exc:
         return f"Error submitting answer: {exc}"
 
-    ref = f" (answer #{answer_id})"
-    req_note = f", request #{request_id} marked done" if request_id else ""
-    return f"✅ Answer saved{ref}{req_note}. It will appear in the app under Research Answers."
+    return f"✅ Answer saved (answer #{answer_id}). It will appear on the title page of its ticker."
 
 
 # ---------------------------------------------------------------------------

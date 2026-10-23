@@ -14,7 +14,6 @@ No mocking of storage. LLM and yfinance are mocked.
 
 from __future__ import annotations
 
-import os
 import sqlite3
 from datetime import date, datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
@@ -22,10 +21,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from agents.market_data_agent import MarketDataAgent
-from agents.portfolio_agent import PortfolioAgent
 from agents.research_agent import ResearchAgent
 from core.encryption import EncryptionService
-from core.llm.local import OllamaResponse, ToolCall
 from core.storage.base import init_db, migrate_db
 from core.storage.market_data import MarketDataRepository
 from core.storage.models import Position, PriceRecord
@@ -84,11 +81,6 @@ def mock_fetcher():
 
 
 @pytest.fixture
-def portfolio_agent(positions, mock_llm):
-    return PortfolioAgent(positions_repo=positions, llm=mock_llm)
-
-
-@pytest.fixture
 def market_agent(positions, market, mock_fetcher):
     return MarketDataAgent(
         positions_repo=positions, market_repo=market, fetcher=mock_fetcher,
@@ -114,7 +106,6 @@ def strategy_registry():
 
 @pytest.fixture
 def research_agent(positions, research, mock_llm, strategy_registry):
-    from unittest.mock import AsyncMock
     from core.llm.claude import ClaudeResponse
     mock_llm.chat_with_tools = AsyncMock(return_value=ClaudeResponse(
         content="Analyse abgeschlossen.",
@@ -247,38 +238,6 @@ class TestWatchlistLifecycle:
         saved = positions.add(pos)
         positions.delete(saved.id)
 
-        assert positions.get_watchlist() == []
-
-    def test_clear_watchlist_removes_all(self, portfolio_agent, positions):
-        for ticker in ["AAPL", "MSFT", "SAP.DE"]:
-            positions.add(Position(
-                ticker=ticker, name=ticker, asset_class="Aktie",
-                investment_type="Wertpapiere", unit="Stück",
-                added_date=date.today(), in_portfolio=False, in_watchlist=True,
-            ))
-        assert len(positions.get_watchlist()) == 3
-
-        result = portfolio_agent._tool_clear_watchlist()
-
-        assert result["deleted"] == 3
-        assert positions.get_watchlist() == []
-
-    def test_clear_watchlist_leaves_portfolio_intact(self, portfolio_agent, positions):
-        positions.add(Position(
-            ticker="AAPL", name="Apple", asset_class="Aktie",
-            investment_type="Wertpapiere", quantity=10, unit="Stück",
-            purchase_date=date.today(), added_date=date.today(), in_portfolio=True,
-        ))
-        positions.add(Position(
-            ticker="MSFT", name="Microsoft", asset_class="Aktie",
-            investment_type="Wertpapiere", unit="Stück",
-            added_date=date.today(), in_portfolio=False, in_watchlist=True,
-        ))
-
-        portfolio_agent._tool_clear_watchlist()
-
-        assert len(positions.get_portfolio()) == 1
-        assert positions.get_portfolio()[0].ticker == "AAPL"
         assert positions.get_watchlist() == []
 
     def test_watchlist_to_portfolio_promotion(self, positions):
@@ -495,92 +454,3 @@ class TestMarketDataAllPositions:
         assert len(vals) == 1
         assert vals[0].current_value_eur == 4000.0
         assert vals[0].pnl_eur == 400.0
-
-
-# ------------------------------------------------------------------
-# Portfolio agent tool execution with real DB
-# ------------------------------------------------------------------
-
-class TestPortfolioAgentWithRealDB:
-    """Tool execution tests — mock LLM returns tool call, real DB stores it."""
-
-    @pytest.mark.asyncio
-    async def test_add_stock_via_chat(self, portfolio_agent, positions, mock_llm):
-        mock_llm.chat_with_tools = AsyncMock(side_effect=[
-            OllamaResponse(content="", tool_calls=[ToolCall(
-                name="add_portfolio_entry",
-                arguments={
-                    "ticker": "SAP.DE", "name": "SAP SE", "asset_class": "Aktie",
-                    "quantity": 5, "unit": "Stück",
-                    "purchase_price": 185.0, "purchase_date": "2024-06-01",
-                },
-            )]),
-            OllamaResponse(content="5 SAP-Aktien hinzugefügt.", tool_calls=[]),
-        ])
-
-        await portfolio_agent.chat("Ich habe 5 SAP-Aktien für 185€ gekauft.")
-
-        portfolio = positions.get_portfolio()
-        assert len(portfolio) == 1
-        assert portfolio[0].ticker == "SAP.DE"
-        assert portfolio[0].quantity == 5
-        assert portfolio[0].asset_class == "Aktie"
-
-    @pytest.mark.asyncio
-    async def test_add_gold_coin_via_chat(self, portfolio_agent, positions, mock_llm):
-        mock_llm.chat_with_tools = AsyncMock(side_effect=[
-            OllamaResponse(content="", tool_calls=[ToolCall(
-                name="add_portfolio_entry",
-                arguments={
-                    "ticker": "GC=F", "name": "Krügerrand",
-                    "asset_class": "Edelmetall", "quantity": 1,
-                    "unit": "Troy Oz", "purchase_date": "2024-01-10",
-                    "purchase_price": 1850.0,
-                },
-            )]),
-            OllamaResponse(content="1 Krügerrand hinzugefügt.", tool_calls=[]),
-        ])
-
-        await portfolio_agent.chat("Ich habe einen Krügerrand für 1850€ gekauft.")
-
-        portfolio = positions.get_portfolio()
-        assert portfolio[0].asset_class == "Edelmetall"
-        assert portfolio[0].unit == "Troy Oz"
-        assert portfolio[0].ticker == "GC=F"
-
-    @pytest.mark.asyncio
-    async def test_clear_watchlist_via_chat(self, portfolio_agent, positions, mock_llm):
-        for ticker in ["AAPL", "MSFT"]:
-            positions.add(Position(
-                ticker=ticker, name=ticker, asset_class="Aktie",
-                investment_type="Wertpapiere", unit="Stück",
-                added_date=date.today(), in_portfolio=False, in_watchlist=True,
-            ))
-        mock_llm.chat_with_tools = AsyncMock(side_effect=[
-            OllamaResponse(content="", tool_calls=[ToolCall(
-                name="clear_watchlist", arguments={},
-            )]),
-            OllamaResponse(content="Watchlist geleert.", tool_calls=[]),
-        ])
-
-        await portfolio_agent.chat("Lösche alles aus der Watchlist.")
-
-        assert positions.get_watchlist() == []
-
-    @pytest.mark.asyncio
-    async def test_delete_single_watchlist_entry_via_chat(self, portfolio_agent, positions, mock_llm):
-        saved = positions.add(Position(
-            ticker="TSLA", name="Tesla", asset_class="Aktie",
-            investment_type="Wertpapiere", unit="Stück",
-            added_date=date.today(), in_portfolio=False, in_watchlist=True,
-        ))
-        mock_llm.chat_with_tools = AsyncMock(side_effect=[
-            OllamaResponse(content="", tool_calls=[ToolCall(
-                name="remove_from_watchlist", arguments={"entry_id": saved.id},
-            )]),
-            OllamaResponse(content="Tesla entfernt.", tool_calls=[]),
-        ])
-
-        await portfolio_agent.chat(f"Lösche Tesla (ID {saved.id}) aus der Watchlist.")
-
-        assert positions.get_watchlist() == []

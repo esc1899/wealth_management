@@ -90,7 +90,6 @@ st.divider()
 st.subheader(t("settings.add_skill"))
 
 AREA_OPTIONS = [
-    "portfolio",
     "research",
     "news",
     "consensus_gap",
