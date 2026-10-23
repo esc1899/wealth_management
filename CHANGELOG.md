@@ -8,6 +8,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Kacheln in Blöcken, Farben je Familie — 2026-10-23
+
+**Warum:** Depot und Watchlist standen als eine Liste nach Vorrang; Erik wollte Aktien,
+Geldwerte und Sachwerte optisch getrennt sehen, ohne dass dabei untergeht, was handeln lässt.
+Die 14 Klassenfarben verrieten nicht, wohin eine Klasse gehört (Krypto blau wie die Aktien,
+Festgeld und Bargeld beide grau). Aus drei Fassungen hat Erik B gewählt; die Kacheln selbst
+zeigen weiter dasselbe wie vorher.
+
+**Änderungen:**
+- `config/asset_classes.yaml`: neuer Abschnitt `bloecke` (aktien, geldwerte, sachwerte, je mit
+  Farbe), jede Klasse nennt ihren `block`; Krypto zählt zu den Sachwerten. Die Klassenfarben
+  sind jetzt Töne ihrer Familie (Aktien blau, Geldwerte grün, Sachwerte warm), alle mit
+  mindestens 4,5:1 gegen das weiße Kürzel (Test). Ein unbekannter Block scheitert beim Laden.
+- `core/kacheln.py::bloecke`: die Kacheln je Block, in jedem nach dem bisherigen Vorrang; ein
+  leerer Block fällt weg, eine Klasse ohne Block steht unter „Sonstige“.
+- Kachelseiten: oben je Block ein Feld (Satz mit den auffälligen Titeln, höchstens drei mit
+  Namen, Marken je Grund, Sprung zum Block) statt der Zählerzeile; darunter je Block ein Kopf
+  in seiner Farbe. Die Zählerzeile (`kacheln.zaehler`) ist entfernt.
+- Analyse: der Sonnenkreis gruppiert nach denselben Blöcken und färbt sie in ihrer Farbe; die
+  eigene Zuordnung `_SEKTOR_MAP` ist weg (Krypto war dort ein eigener Sektor).
+
 ### Chat-Agenten, Cowork-Zufluss und Research-Queue ausgebaut — 2026-10-23
 
 **Warum:** Nach dem Löschen der Seiten hatten PortfolioAgent und RebalanceAgent keinen Aufrufer

@@ -174,3 +174,58 @@ class TestKaestchen:
         # Seit dem Durchgang (11.10.2026) auch der Watchlist Checker: seine Seite entfaellt.
         assert ziel("watchlist", "watchlist_checker").endswith("pages/watchlist_analysis.py")
         assert Path(ziel("depot")).is_file()
+
+
+class TestBloecke:
+    """Seit 23.10.2026 stehen die Kacheln in Blöcken (Aktien, Geldwerte, Sachwerte), oben je
+    Block ein Feld mit dem, was in ihm auffällt."""
+
+    BLOCK = {"Aktie": "aktien", "Rentenfonds": "geldwerte", "Edelmetall": "sachwerte"}
+
+    def _k(self, pid, name, klasse, urteile=None, day=None):
+        p = Position(id=pid, name=name, ticker=f"T{pid}", asset_class=klasse, investment_type="x",
+                     unit="Stück", added_date=date(2026, 1, 1), in_portfolio=True)
+        return kachel(p, "depot", _bew(day=day), urteile or {}, pruefbar=klasse != "Edelmetall")
+
+    def _bloecke(self, ks):
+        from core.kacheln import bloecke
+        return bloecke(ks, self.BLOCK.get, ["aktien", "geldwerte", "sachwerte"])
+
+    def test_reihenfolge_der_bloecke_und_vorrang_im_block(self):
+        ks = [self._k(1, "Gold", "Edelmetall"),
+              self._k(2, "Zeta", "Aktie", {"storychecker": _urteil("storychecker", "intact")}),
+              self._k(3, "Alpha", "Aktie", {"storychecker": _urteil("storychecker", "gefährdet")})]
+        bs = self._bloecke(ks)
+        assert [b.name for b in bs] == ["aktien", "sachwerte"]   # Geldwerte leer: faellt weg
+        assert [k.name for k in bs[0].kacheln] == ["Alpha", "Zeta"]
+        assert bs[0].zahl == {"gefaehrdet": 1, "bewegung": 0, "nie": 0}
+
+    def test_unbekannte_klasse_steht_zuletzt(self):
+        bs = self._bloecke([self._k(1, "X", "Neuland"), self._k(2, "A", "Aktie")])
+        assert [b.name for b in bs] == ["aktien", "sonstige"]
+
+    def test_feld_nennt_die_auffaelligen_titel(self):
+        from core.ui.kacheln import feld_satz
+        ks = [self._k(1, "Alpha", "Aktie", {"storychecker": _urteil("storychecker", "gefährdet")}),
+              self._k(2, "Beta", "Aktie", day=-7.0), self._k(3, "Gamma", "Aktie"),
+              self._k(4, "Delta", "Aktie"),
+              self._k(5, "Eta", "Aktie", {"storychecker": _urteil("storychecker", "intact")})]
+        satz = feld_satz(self._bloecke(ks)[0])
+        assert satz.startswith("Alpha ist gefährdet, Beta bewegt sich heute um")
+        # Drei mit Namen (nie geprüft nach Name: Delta vor Gamma), der vierte als "weitere".
+        assert satz.endswith("Delta wurde noch nie geprüft und 1 weitere.")
+        assert "Eta" not in satz
+
+    def test_ruhiger_block(self):
+        from core.ui.kacheln import feld_satz, felder_html
+        b = self._bloecke([self._k(1, "Gold", "Edelmetall")])[0]
+        assert feld_satz(b) == "Nichts, was handeln lässt."
+        assert "wk-feld ruhig" in felder_html([b]) and "wk-marke" not in felder_html([b])
+
+    def test_feld_escaped_und_springt_zum_block(self):
+        from core.ui.kacheln import block_kopf_html, felder_html
+        b = self._bloecke([self._k(1, "<b>Böse</b>", "Aktie")])[0]
+        html = felder_html([b])
+        assert "<b>Böse</b>" not in html and "&lt;b&gt;Böse&lt;/b&gt;" in html
+        assert 'href="#block-aktien"' in html and 'id="block-aktien"' in block_kopf_html(b)
+        assert "1 nie geprüft" in html and "1 Position" in html

@@ -10,6 +10,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from core.asset_class_config import get_asset_class_registry
 from core.currency import symbol
 from core.i18n import t, fmt_dt
 from core.macro_context import load_or_refresh_macro
@@ -20,6 +21,7 @@ from core.symbol_aggregation import (
 )
 from core.ui import tagesperformance
 from core.ui.charts import bar_label, style_bar_chart
+from core.ui.kacheln import block_farbe, block_name
 from core.yearly_attribution import compute_yearly_attribution
 from core.yearly_digest_generator import generate_yearly_digest
 from state import (
@@ -413,20 +415,20 @@ st.divider()
 # ------------------------------------------------------------------
 st.subheader(t("analysis.weight_by_position"))
 
-# Sector grouping for 3-level sunburst (Sektor → Anlageklasse → Position)
-_SEKTOR_MAP = {
-    "Wertpapiere": "Wertpapiere",
-    "Renten": "Geldwerte",
-    "Geld": "Geldwerte",
-    "Bargeld": "Geldwerte",
-    "Immobilien": "Sachwerte",
-    "Rohstoffe": "Sachwerte",
-    "Krypto": "Krypto",
-}
+# 3-level sunburst (Block → Anlageart → Position). Die Bloecke und ihre Farben sind dieselben wie
+# auf den Kacheln (config/asset_classes.yaml, ``bloecke``).
+_klassen = get_asset_class_registry()
+
+
+def _block(v) -> str:
+    return block_name(_klassen.block_von(v.asset_class) or "sonstige")
+
+
+_BLOCK_FARBEN = {block_name(b): block_farbe(b) for b in _klassen.bloecke() + ["sonstige"]}
 
 rows = [
     {
-        "sektor": _SEKTOR_MAP.get(v.investment_type, v.investment_type),
+        "sektor": _block(v),
         "anlageklasse": t(f"investment_types.{v.investment_type}"),
         "position": v.symbol,
         "wert": v.current_value_eur
@@ -440,7 +442,8 @@ if rows:
         df,
         path=["sektor", "anlageklasse", "position"],
         values="wert",
-        color="sektor"
+        color="sektor",
+        color_discrete_map=_BLOCK_FARBEN,
     )
     fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
     st.plotly_chart(fig)

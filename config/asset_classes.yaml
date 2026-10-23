@@ -9,16 +9,30 @@
 #   watchlist_eligible: false — portfolio-only (Festgeld, Immobilien, etc.)
 #   manual_valuation: true — "Schätzwert aktualisieren" button shown in detail view
 #   extra_fields — type-specific fields stored in extra_data (JSON, encrypted)
-#   farbe — the class colour, the same everywhere in the app (tiles; monogram instead of a logo)
+#   block — aktien, geldwerte or sachwerte (see bloecke below): where the class stands on the tiles
+#           and in the charts
+#   farbe — the class colour, the same everywhere in the app (tiles; monogram instead of a logo),
+#           a shade of its block's colour family
 #   pruefbar: false — the checks (story, fundamentals, consensus, capital allocation, devil's
 #                     advocate) do not run for this class and its tiles show no verdicts: they
 #                     judge companies and funds, a commodity has none of that (default: true)
+
+# The blocks, in the order the tiles and charts show them. Each has a colour family: the block's
+# own colour (heading, overview, charts) and a shade of it for each of its classes.
+bloecke:
+  aktien:
+    farbe: "#1A5BA0"
+  geldwerte:
+    farbe: "#13734F"
+  sachwerte:
+    farbe: "#A6402A"
 
 asset_classes:
 
   Aktie:
     investment_type: Wertpapiere
-    farbe: "#2F5D8A"
+    block: aktien
+    farbe: "#1A5BA0"
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
@@ -40,7 +54,8 @@ asset_classes:
 
   Aktienfonds:
     investment_type: Wertpapiere
-    farbe: "#5B4B9A"
+    block: aktien
+    farbe: "#3D6DB5"
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
@@ -62,7 +77,8 @@ asset_classes:
 
   Rentenfonds:
     investment_type: Renten
-    farbe: "#3E7C6E"
+    block: geldwerte
+    farbe: "#1F7F6A"
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
@@ -84,7 +100,8 @@ asset_classes:
 
   Immobilienfonds:
     investment_type: Immobilien
-    farbe: "#A0573A"
+    block: sachwerte
+    farbe: "#B5502A"
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
@@ -107,7 +124,8 @@ asset_classes:
 
   Infrastrukturfonds:
     investment_type: Immobilien
-    farbe: "#6A7A2E"
+    block: sachwerte
+    farbe: "#8E5C12"
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
@@ -130,7 +148,8 @@ asset_classes:
 
   Edelmetall:
     investment_type: Rohstoffe
-    farbe: "#A07A1C"
+    block: sachwerte
+    farbe: "#94700A"
     pruefbar: false
     default_unit: Troy Oz
     unit_options:
@@ -154,7 +173,8 @@ asset_classes:
 
   Kryptowährung:
     investment_type: Krypto
-    farbe: "#2E7D9A"
+    block: sachwerte
+    farbe: "#9A3F55"
     default_unit: Stück
     auto_fetch: true
     watchlist_eligible: true
@@ -173,7 +193,8 @@ asset_classes:
 
   Anleihe:
     investment_type: Renten
-    farbe: "#4F6B5B"
+    block: geldwerte
+    farbe: "#13734F"
     default_unit: Stück
     auto_fetch: false
     watchlist_eligible: false
@@ -199,7 +220,8 @@ asset_classes:
 
   Festgeld:
     investment_type: Geld
-    farbe: "#5E6B7A"
+    block: geldwerte
+    farbe: "#2E6E3C"
     default_unit: Stück
     auto_fetch: false
     watchlist_eligible: false
@@ -223,7 +245,8 @@ asset_classes:
 
   Bargeld:
     investment_type: Bargeld
-    farbe: "#7A8290"
+    block: geldwerte
+    farbe: "#4E7254"
     default_unit: €
     auto_fetch: false
     watchlist_eligible: false
@@ -244,7 +267,8 @@ asset_classes:
 
   Immobilie:
     investment_type: Immobilien
-    farbe: "#8A4B3C"
+    block: sachwerte
+    farbe: "#A6402A"
     default_unit: Stück
     auto_fetch: false
     watchlist_eligible: false
@@ -266,7 +290,8 @@ asset_classes:
 
   Grundstück:
     investment_type: Immobilien
-    farbe: "#6E5B3C"
+    block: sachwerte
+    farbe: "#7D5A2C"
     default_unit: Stück
     auto_fetch: false
     watchlist_eligible: false
@@ -285,7 +310,8 @@ asset_classes:
 
   Altersvorsorge-Rente:
     investment_type: Renten
-    farbe: "#7A4F7A"
+    block: geldwerte
+    farbe: "#0F6B6E"
     default_unit: Stück
     auto_fetch: false
     watchlist_eligible: false
@@ -307,7 +333,8 @@ asset_classes:
 
   Altersvorsorge-Festgeld:
     investment_type: Geld
-    farbe: "#5A5F86"
+    block: geldwerte
+    farbe: "#3A7A5A"
     default_unit: Stück
     auto_fetch: false
     watchlist_eligible: false

@@ -16,14 +16,16 @@ Welcher Satz oben steht, entscheidet ein fester Vorrang, nicht der Agent:
    ihm, also steht auch kein Urteil da, nur seine Bewegung
 
 Termine (Zahlen, Ex-Tag) und Zielkurse fehlen, weil die App für beides keine Quelle hat.
-Nach demselben Vorrang wird sortiert: Was handeln lässt, steht oben.
+Nach demselben Vorrang wird sortiert: Was handeln lässt, steht oben -- seit 23.10.2026 je Block
+(Aktien, Geldwerte, Sachwerte, ``bloecke``), und oben auf der Seite sagt je Block ein Feld, was in
+ihm auffällt.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Iterable, Optional, Sequence
+from typing import Callable, Iterable, Optional, Sequence
 
 from core.bewegung import STANDARD_PROZENT
 from core.pruefung import MOEGLICH
@@ -160,3 +162,38 @@ def sortiert(kacheln: Iterable[Kachel]) -> list[Kachel]:
         -abs(k.tag_prozent or 0) if k.grund == "bewegung" else 0,
         k.name.lower(),
     ))
+
+
+#: Was im Feld eines Blocks oben auf der Seite steht: alles, was handeln lässt -- und "nie
+#: geprüft", weil Blindzeit eine Aussage ist.
+AUFFAELLIG = ("gefaehrdet", "bewegung", "nie")
+
+#: Der Block einer Klasse, die keinen nennt (unbekannte Klasse): steht zuletzt.
+SONSTIGE = "sonstige"
+
+
+@dataclass
+class Block:
+    name: str                    # aktien, geldwerte, sachwerte (asset_classes.yaml) oder SONSTIGE
+    kacheln: list[Kachel]        # nach Vorrang
+    zahl: dict[str, int]         # je Grund aus AUFFAELLIG, wie viele Kacheln ihn tragen
+
+    @property
+    def auffaellig(self) -> list[Kachel]:
+        return [k for k in self.kacheln if k.grund in AUFFAELLIG]
+
+
+def bloecke(kacheln: Iterable[Kachel], block_von: Callable[[str], Optional[str]],
+            reihenfolge: Sequence[str]) -> list[Block]:
+    """Die Kacheln je Block (Aktien, Geldwerte, Sachwerte), in ``reihenfolge``, in jedem Block
+    nach Vorrang. Ein Block ohne Kachel fällt weg. Der Vorrang gilt so nur noch im Block -- dafür
+    sagt das Feld des Blocks oben auf der Seite, was in ihm auffällt (Erik, 23.10.2026)."""
+    je_block: dict[str, list[Kachel]] = {}
+    for k in kacheln:
+        je_block.setdefault(block_von(k.anlageklasse) or SONSTIGE, []).append(k)
+    namen = list(reihenfolge) + [n for n in je_block if n not in reihenfolge]
+    return [
+        Block(name=n, kacheln=(ks := sortiert(je_block[n])),
+              zahl={g: sum(1 for k in ks if k.grund == g) for g in AUFFAELLIG})
+        for n in namen if n in je_block
+    ]

@@ -121,3 +121,45 @@ class TestYAMLValidation:
         reg = load_asset_classes(path)
         assert reg.get("MyClass") is not None
         assert reg.get("MyClass").investment_type == "Renten"
+
+
+class TestBloecke:
+    """Die Bloecke der Kacheln und Diagramme (23.10.2026): jede Klasse in genau einem, jede Farbe
+    ein Ton, auf dem das weisse Kuerzel lesbar bleibt."""
+
+    def setup_method(self):
+        self.reg = load_asset_classes()
+
+    def test_reihenfolge(self):
+        assert self.reg.bloecke() == ["aktien", "geldwerte", "sachwerte"]
+
+    def test_jede_klasse_hat_einen_block(self):
+        assert all(self.reg.block_von(n) in self.reg.bloecke() for n in self.reg.all_names())
+        assert self.reg.block_von("Kryptowährung") == "sachwerte"
+        assert self.reg.block_von("Rentenfonds") == "geldwerte"
+        assert self.reg.block_von("Unbekannt") is None
+
+    def test_weisses_kuerzel_bleibt_lesbar(self):
+        def leucht(h):
+            c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+            c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+            return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+        farben = [self.reg.get(n).farbe for n in self.reg.all_names()]
+        farben += [self.reg.block_farbe(b) for b in self.reg.bloecke()]
+        assert all(1.05 / (leucht(f) + 0.05) >= 4.5 for f in farben)
+
+    def test_unbekannter_block_scheitert(self, tmp_path):
+        p = tmp_path / "asset_classes.yaml"
+        p.write_text(textwrap.dedent("""
+            bloecke:
+              aktien: {farbe: "#1A5BA0"}
+            asset_classes:
+              X:
+                investment_type: Wertpapiere
+                block: aktein
+                default_unit: Stück
+                visible_fields: [ticker]
+                price_source: yfinance
+        """))
+        with pytest.raises(ValueError, match="aktein"):
+            load_asset_classes(str(p))

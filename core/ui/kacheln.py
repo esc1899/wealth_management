@@ -1,5 +1,9 @@
 """Die Kachel-Ansicht: Depot und Watchlist als Raster, in der Gestalt der Serien-Watchlist.
 
+Seit 23.10.2026 in Blöcken (Aktien, Geldwerte, Sachwerte; ``core.kacheln.bloecke``): oben je Block
+ein Feld mit dem, was in ihm auffällt, und einem Sprung zu ihm; darunter je Block sein Kopf in
+der Farbe der Familie und seine Kacheln.
+
 Oben ein Monogramm (Ticker) in der Farbe der Anlageklasse, daneben der Name als Absprung in
 die Analyse, darunter Anlageart und Ticker (Logos bräuchten einen Lizenzgeber; die Farbe steht
 je Klasse in ``config/asset_classes.yaml`` und ist überall in der App dieselbe). Darunter Chips
@@ -22,7 +26,7 @@ from typing import Optional
 import streamlit as st
 
 from core.i18n import fmt_date, t
-from core.kacheln import Kachel, Urteil, kachel, sortiert
+from core.kacheln import Block, Kachel, Urteil, bloecke, kachel
 from core.tagesbild import prozent
 from core.ui.verdicts import VERDICT_CONFIGS
 
@@ -46,7 +50,35 @@ _NOTIZ = {"gefaehrdet": "rot", "bewegung": "gelb", "geprueft": "", "nie": "leer"
 CSS = """
 <style>
 .wk-einl { color: var(--lotsee-text-leise); margin: -0.4rem 0 0.2rem; max-width: 80ch; }
-.wk-zaehler { color: var(--lotsee-text-leise); font-size: 0.85rem; margin-bottom: 0.8rem; }
+/* Oben je Block ein Feld (Fassung B, 23.10.2026): im Licht seiner Farbfamilie, Satz und Marken,
+   ein Sprung zum Block. --farbe setzt jedes Feld und jeder Kopf selbst (felder_html, block_kopf_html). */
+.wk-felder { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;
+  margin: 0.4rem 0 0.8rem; }
+a.wk-feld { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; text-decoration: none;
+  color: var(--lotsee-text); border-radius: var(--lotsee-rundung-karte);
+  background: color-mix(in srgb, var(--farbe) 7%, var(--lotsee-flaeche));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--farbe) 25%, var(--lotsee-flaeche)); }
+a.wk-feld:hover { box-shadow: 0 0 0 1px var(--farbe); }
+.wk-feld-kopf { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+/* Unterstrichen, damit das Feld auch ohne Maus als Sprung erkennbar ist (iPad). */
+.wk-feld-name { font-weight: 700; font-size: 1.05rem; color: var(--farbe); text-decoration: underline;
+  text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.wk-feld-zahl { color: var(--lotsee-text-leise); font-size: 0.8rem; }
+.wk-feld-satz { font-size: 0.88rem; line-height: 1.45; }
+a.wk-feld.ruhig .wk-feld-satz { color: var(--lotsee-text-leise); }
+.wk-marken { display: flex; flex-wrap: wrap; gap: 6px; }
+.wk-marke { display: inline-flex; align-items: center; gap: 6px; font-size: 0.74rem; padding: 1px 8px;
+  border-radius: var(--lotsee-rundung-chip); background: var(--lotsee-flaeche);
+  box-shadow: 0 0 0 1px var(--lotsee-linie); }
+.wk-marke::before { content: ""; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; }
+.wk-marke.rot::before { background: var(--lotsee-zustand-alarm); }
+.wk-marke.gelb::before { background: var(--lotsee-zustand-hinweis); }
+.wk-marke.leer::before { border: 2px solid var(--lotsee-zustand-blind); }
+/* Der Kopf eines Blocks: Name in der Farbe der Familie, Linie darunter. */
+.wk-block { display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; margin: 1.4rem 0 0.4rem;
+  padding-bottom: 6px; border-bottom: 2px solid var(--farbe); scroll-margin-top: 4rem; }
+.wk-block b { font-size: 1.3rem; font-weight: 700; color: var(--farbe); }
+.wk-block span { color: var(--lotsee-text-leise); font-size: 0.85rem; }
 div[class*="st-key-wk-karte-"] { background: var(--lotsee-flaeche); border-radius: var(--lotsee-rundung-karte);
   box-shadow: 0 1px 2px rgba(11, 30, 45, 0.08), 0 0 0 1px var(--lotsee-linie);
   padding: 14px 16px 12px; gap: 0.5rem; overflow: hidden; }
@@ -138,6 +170,74 @@ def farbe(anlageklasse: str) -> str:
 
 
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
+
+#: So viele Titel nennt das Feld eines Blocks mit Namen, der Rest steht als "und n weitere" da.
+_FELD_TITEL = 3
+
+# Das Licht einer Marke je Grund, wie vor dem Satz der Kachel.
+_MARKE = {"gefaehrdet": "rot", "bewegung": "gelb", "nie": "leer"}
+
+
+def block_name(block: str) -> str:
+    return t(f"kacheln.block_{block}")
+
+
+def block_farbe(block: str) -> str:
+    """Die Farbe der Familie (asset_classes.yaml, ``bloecke``); was nicht wie #RRGGBB aussieht,
+    kommt nicht ins CSS."""
+    from core.asset_class_config import get_asset_class_registry
+    f = get_asset_class_registry().block_farbe(block) or _FARBE_SONST
+    return f if _HEX.fullmatch(f) else _FARBE_SONST
+
+
+def _anker(block: str) -> str:
+    return "block-" + re.sub(r"[^a-z0-9]", "", block.lower())
+
+
+def _positionen(n: int) -> str:
+    return t("kacheln.position_eins") if n == 1 else t("kacheln.positionen").format(n=n)
+
+
+def feld_satz(b: Block) -> str:
+    """Der Satz im Feld eines Blocks: die auffaelligen Titel mit Namen, nach Vorrang; ohne sie
+    "nichts, was handeln laesst". Klartext -- escaped wird beim Einsetzen."""
+    teile = []
+    for k in b.auffaellig[:_FELD_TITEL]:
+        if k.grund == "gefaehrdet":
+            teile.append(t("kacheln.feld_gefaehrdet").format(name=k.name))
+        elif k.grund == "bewegung":
+            teile.append(t("kacheln.feld_bewegung").format(name=k.name, prozent=prozent(k.tag_prozent)))
+        else:
+            teile.append(t("kacheln.feld_nie").format(name=k.name))
+    if not teile:
+        return t("kacheln.feld_ruhig")
+    satz = ", ".join(teile)
+    if (rest := len(b.auffaellig) - len(teile)) > 0:
+        satz += " " + t("kacheln.feld_weitere").format(n=rest)
+    return satz + "."
+
+
+def felder_html(gruppen: list[Block]) -> str:
+    """Oben auf der Seite je Block ein Feld: Name, Zahl der Positionen, der Satz und je Grund eine
+    Marke; das ganze Feld springt zu seinem Block."""
+    felder = []
+    for b in gruppen:
+        marken = "".join(
+            f'<span class="wk-marke {_MARKE[g]}">{escape(t(f"kacheln.marke_{g}").format(n=n))}</span>'
+            for g, n in b.zahl.items() if n)
+        felder.append(
+            f'<a class="wk-feld{"" if b.auffaellig else " ruhig"}" href="#{_anker(b.name)}" '
+            f'style="--farbe: {block_farbe(b.name)}">'
+            f'<span class="wk-feld-kopf"><span class="wk-feld-name">{escape(block_name(b.name))}</span>'
+            f'<span class="wk-feld-zahl">{escape(_positionen(len(b.kacheln)))}</span></span>'
+            f'<span class="wk-feld-satz">{escape(feld_satz(b))}</span>'
+            + (f'<span class="wk-marken">{marken}</span>' if marken else "") + "</a>")
+    return f'<div class="wk-felder">{"".join(felder)}</div>'
+
+
+def block_kopf_html(b: Block) -> str:
+    return (f'<div class="wk-block" id="{_anker(b.name)}" style="--farbe: {block_farbe(b.name)}">'
+            f'<b>{escape(block_name(b.name))}</b><span>{escape(_positionen(len(b.kacheln)))}</span></div>')
 
 
 def monogramm(k: Kachel) -> str:
@@ -340,18 +440,21 @@ def seite(art: str) -> None:
         _heute()
         _portfolio_satz()
 
-    kacheln = sortiert(kacheln_fuer(art, positionen))
+    from core.asset_class_config import get_asset_class_registry
+
+    klassen = get_asset_class_registry()
+    gruppen = bloecke(kacheln_fuer(art, positionen), klassen.block_von, klassen.bloecke())
     je_id = {p.id: p for p in positionen}
 
-    zahl = {g: sum(1 for k in kacheln if k.grund == g) for g in ("gefaehrdet", "bewegung", "nie")}
-    st.markdown(f'<div class="wk-zaehler">{escape(t("kacheln.zaehler").format(**zahl))}</div>',
-                unsafe_allow_html=True)
+    st.markdown(felder_html(gruppen), unsafe_allow_html=True)
     if ohne:
         st.caption(t("kacheln.ohne_ticker").format(n=ohne))
 
-    # Zeile für Zeile, damit die Kacheln oben auf einer Linie stehen (wie bei den Serien).
-    for start in range(0, len(kacheln), _SPALTEN):
-        spalten = st.columns(_SPALTEN)
-        for spalte, k in zip(spalten, kacheln[start:start + _SPALTEN]):
-            with spalte:
-                karte(k, art, je_id[k.position_id])
+    for b in gruppen:
+        st.markdown(block_kopf_html(b), unsafe_allow_html=True)
+        # Zeile für Zeile, damit die Kacheln oben auf einer Linie stehen (wie bei den Serien).
+        for start in range(0, len(b.kacheln), _SPALTEN):
+            spalten = st.columns(_SPALTEN)
+            for spalte, k in zip(spalten, b.kacheln[start:start + _SPALTEN]):
+                with spalte:
+                    karte(k, art, je_id[k.position_id])

@@ -165,3 +165,13 @@ def test_depot_zeigt_den_tag_wie_die_analyse(depot_und_watchlist, monkeypatch):
     assert "+5,00" in zeile and "+0,33 %" in zeile
     assert "Analyse" not in zeile and "Gesamt" not in zeile
     assert depot.get("plotly_chart"), "das Tages-Chart fehlt"
+
+
+def test_depot_in_bloecken_mit_feld(depot_und_watchlist):
+    """Oben je Block ein Feld, das den gefährdeten Titel nennt; darunter der Kopf des Blocks."""
+    at = _app("kacheln_depot.py")
+    at.run()
+    assert not at.exception, at.exception
+    felder = next(m.value for m in at.markdown if 'class="wk-felder"' in m.value)
+    assert "Novo Nordisk ist gefährdet" in felder and 'href="#block-aktien"' in felder
+    assert any('id="block-aktien"' in m.value for m in at.markdown)
