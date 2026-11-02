@@ -153,10 +153,10 @@ def test_run_durchgang_reihenfolge_fehler_und_abschluss(tmp_path, monkeypatch):
 
     assert reihe[-1] == "watchlist_checker"           # liest die Urteile der anderen
     assert zustand["running"] is False
-    assert zustand["fehler"] == ["DA kaputt"]
+    assert zustand["fehler"] == ["devils_advocate: DA kaputt"]   # mit Namen: die Kachel liest ihn
     c = get_connection(pfad)
     d = DurchgaengeRepository(c).get(zustand["durchgang_id"])
-    assert d.beendet is not None and d.fehler == "DA kaputt"
+    assert d.beendet is not None and d.fehler == "devils_advocate: DA kaputt"
     # Auch das Urteil eines Checks, der einen Fehler meldet, gehoert zum Durchgang.
     assert c.execute("SELECT COUNT(*) FROM position_analyses WHERE durchgang_id = ?",
                      (d.id,)).fetchone()[0] == 3
@@ -375,12 +375,23 @@ class TestPruefungsJob:
         assert all(namen == ["Alpha", "Beta"] for _, _, namen in laeufe)
         assert DurchgaengeRepository(c).fuer_titel(gold.id) == []
 
-    def test_ein_check_scheitert_der_job_bleibt_gruen(self, dienst):
+    def test_ein_check_scheitert_der_job_ist_rot_aber_erledigt(self, dienst):
+        """02.11.2026: bis dahin blieb der Job gruen -- der Storychecker-Batch scheiterte so
+        einen Monat lang, ohne dass es jemand sah."""
+        from core.scheduler import TeilweiseGescheitert
         d, c, enc = dienst
         a, _, _ = self._vorbereiten(d, c, enc, scheitern=("capital_allocator",))
-        asyncio.run(d._run_pruefung_job(self._job(), c, lambda _: None, "depot"))
+        with pytest.raises(TeilweiseGescheitert) as fehler:
+            asyncio.run(d._run_pruefung_job(self._job(), c, lambda _: None, "depot"))
+        assert fehler.value.checks == ["capital_allocator"]
         [durchgang] = DurchgaengeRepository(c).fuer_titel(a.id)
         assert "capital_allocator kaputt" in durchgang.fehler
+
+    def test_nachholen_laesst_nur_die_genannten_checks_laufen(self, dienst):
+        d, c, enc = dienst
+        _, _, laeufe = self._vorbereiten(d, c, enc)
+        asyncio.run(d._run_pruefung_job(self._job(), c, lambda _: None, "depot", nur=("capital_allocator",)))
+        assert [check for check, _, _ in laeufe] == ["capital_allocator"]
 
     def test_alle_checks_scheitern_der_job_ist_rot(self, dienst):
         d, c, enc = dienst

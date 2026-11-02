@@ -236,3 +236,60 @@ def test_block_kopf_ohne_anker_fuer_die_seite_positionen():
     assert 'id="block-geldwerte"' in block_kopf("geldwerte", 2)
     html = block_kopf("geldwerte", 2, anker=False)
     assert " id=" not in html and "Geldwerte" in html and "2 Positionen" in html
+
+
+class TestStandJeCheck:
+    """02.11.2026: Story und Fundamental scheiterten am 01.11. im Batch, die Kacheln zeigten ihre
+    Urteile vom 01.10. ohne Datum -- als sei alles gelaufen."""
+
+    @staticmethod
+    def _dg(checks, tag=20, beendet=True, fehler=None):
+        from datetime import timezone
+        from core.storage.durchgaenge import Durchgang
+        beginn = datetime(2026, 10, tag, 8, 0, tzinfo=timezone.utc)
+        return Durchgang(id=tag, liste="depot", position_id=1, ausloeser="job", checks=tuple(checks),
+                         begonnen=beginn, beendet=beginn if beendet else None, fehler=fehler)
+
+    def _kachel(self, durchgaenge, urteile=None):
+        urteile = urteile if urteile is not None else {
+            "storychecker": _urteil("storychecker", "intact", tag=1),
+            "consensus_gap": _urteil("consensus_gap", "stabil", tag=21)}
+        return kachel(_pos(), "depot", _bew(), urteile,
+                      agenten=("storychecker", "consensus_gap"), durchgaenge=durchgaenge)
+
+    def test_gescheitert_altes_urteil_grau_dahinter(self):
+        from core.ui.kacheln import kaestchen_text
+        k = self._kachel([self._dg(["storychecker", "consensus_gap"], fehler="storychecker: ImportError")])
+        assert k.staende["storychecker"].zustand == "gescheitert"
+        assert "consensus_gap" not in k.staende              # sein Urteil ist aus diesem Durchgang
+        text, _, grau = kaestchen_text(k, "storychecker", k.urteile[0])
+        assert grau and text == "Story gescheitert am 20.10.2026 · zuletzt intakt, 01.10.2026"
+
+    def test_laeuft_solange_der_durchgang_offen_ist(self):
+        k = self._kachel([self._dg(["storychecker"], beendet=False)])
+        assert k.staende["storychecker"].zustand == "laeuft"
+
+    def test_beendet_ohne_urteil(self):
+        k = self._kachel([self._dg(["storychecker"])])
+        assert k.staende["storychecker"].zustand == "ohne"
+
+    def test_zaehlt_der_juengste_durchgang_mit_diesem_check(self):
+        """Das Nachholen laeuft nur mit den gescheiterten Checks; ein juengerer Durchgang ohne
+        den Check aendert an seinem Stand nichts."""
+        k = self._kachel([self._dg(["consensus_gap"], tag=25),
+                          self._dg(["storychecker", "consensus_gap"], tag=20, fehler="storychecker: x")])
+        assert k.staende["storychecker"].zustand == "gescheitert"
+
+    def test_neues_urteil_ist_kein_stand_und_traegt_sein_datum(self):
+        from core.ui.kacheln import kaestchen_text
+        k = self._kachel([self._dg(["storychecker"], tag=1)],
+                         {"storychecker": _urteil("storychecker", "intact", tag=2)})
+        assert k.staende == {}
+        text, _, grau = kaestchen_text(k, "storychecker", k.urteile[0])
+        assert not grau and text == "Story intakt · 02.10.2026"
+
+    def test_nie_geprueft_aber_laeuft(self):
+        from core.ui.kacheln import kaestchen_text
+        k = self._kachel([self._dg(["storychecker"], beendet=False)], {})
+        text, icon, grau = kaestchen_text(k, "storychecker", None)
+        assert grau and text == "Story läuft seit 20.10.2026" and icon == "⏳"

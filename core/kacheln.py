@@ -15,6 +15,11 @@ Welcher Satz oben steht, entscheidet ein fester Vorrang, nicht der Agent:
 5. **ohne Checks** — ein Rohstoff (``core/pruefung.py::pruefbar``): kein Check sagt etwas zu
    ihm, also steht auch kein Urteil da, nur seine Bewegung
 
+Je Check zaehlt der juengste Durchgang des Titels, der ihn enthielt (``staende``): Entstand
+darin noch kein Urteil, laeuft er, scheiterte er oder blieb ohne Urteil -- das alte Urteil
+bleibt dann eine Aussage, steht aber als "zuletzt" dahinter (Erik, 02.11.2026: die Kacheln
+sahen nach einem Monat ohne Story-Check aus, als sei alles gelaufen).
+
 Termine (Zahlen, Ex-Tag) und Zielkurse fehlen, weil die App für beides keine Quelle hat.
 Nach demselben Vorrang wird sortiert: Was handeln lässt, steht oben -- seit 23.10.2026 je Block
 (Aktien, Geldwerte, Sachwerte, ``bloecke``), und oben auf der Seite sagt je Block ein Feld, was in
@@ -55,6 +60,36 @@ class Urteil:
     created_at: Optional[datetime]
 
 
+@dataclass(frozen=True)
+class Stand:
+    """Ein Check, der im juengsten Durchgang mit ihm noch kein Urteil hat."""
+    zustand: str        # "laeuft", "gescheitert" oder "ohne" (beendet, kein Urteil)
+    seit: datetime      # Beginn dieses Durchgangs
+
+
+def _gescheitert(fehler: Optional[str], check: str) -> bool:
+    # Job und Knopf vermerken "check: Fehler", mehrere mit "; " verbunden.
+    return any(teil.strip().startswith(f"{check}:") for teil in (fehler or "").split("; "))
+
+
+def staende(durchgaenge: Sequence, urteile: dict, agenten: Sequence[str]) -> dict[str, Stand]:
+    """Je Check aus ``agenten`` sein Stand, wenn der juengste Durchgang mit ihm (``durchgaenge``:
+    die des Titels, der juengste zuerst) noch kein Urteil brachte. ``urteile``: je Agent das
+    juengste (``created_at``). Ein Check ohne Durchgang hat keinen Stand -- sein Urteil gilt."""
+    ergebnis = {}
+    for a in agenten:
+        d = next((d for d in durchgaenge if a in d.checks), None)
+        if d is None:
+            continue
+        u = urteile.get(a)
+        if u is not None and u.created_at is not None and _utc(u.created_at) >= _utc(d.begonnen):
+            continue
+        zustand = ("gescheitert" if _gescheitert(d.fehler, a)
+                   else "laeuft" if d.beendet is None else "ohne")
+        ergebnis[a] = Stand(zustand, _utc(d.begonnen))
+    return ergebnis
+
+
 @dataclass
 class Kachel:
     position_id: int
@@ -74,6 +109,7 @@ class Kachel:
     urteile: list[Urteil] = field(default_factory=list)   # je Agent das juengste
     nie: list[str] = field(default_factory=list)          # gewaehlte Checks ohne Urteil
     bewegung_grund: Optional[str] = None                  # warum er sich heute bewegt (Nachrichten)
+    staende: dict[str, Stand] = field(default_factory=dict)  # Checks, deren letzter Durchgang kein Urteil brachte
 
 
 def _utc(ts: Optional[datetime]) -> Optional[datetime]:
@@ -96,12 +132,13 @@ def tagesprozent(day_pnl_pct: Optional[float], kurs: Optional[float],
 def kachel(position, art: str, valuation=None, urteile: Optional[dict] = None,
            vortag: Optional[float] = None, aufnahme_kurs: Optional[float] = None,
            agenten: Optional[Sequence[str]] = None, schwelle: float = BEWEGUNG_PROZENT,
-           bewegung_grund: Optional[str] = None, pruefbar: bool = True) -> Kachel:
+           bewegung_grund: Optional[str] = None, pruefbar: bool = True,
+           durchgaenge: Sequence = ()) -> Kachel:
     """Eine Kachel aus Position, Bewertung (``PortfolioValuation`` oder None) und den
     jüngsten Urteilen je Agent (``{agent: PositionAnalysis}``). ``aufnahme_kurs``: der
     gespeicherte Schlusskurs am Tag, an dem der Titel auf die Watchlist kam. ``agenten``: die
     Auswahl der Liste; ohne sie alles, was die Liste kennt. ``pruefbar=False``: keine Checks,
-    auch alte Urteile nicht."""
+    auch alte Urteile nicht. ``durchgaenge``: die des Titels in dieser Liste, der juengste zuerst."""
     if agenten is None:
         agenten = MOEGLICH[art]
     if not pruefbar:
@@ -152,6 +189,7 @@ def kachel(position, art: str, valuation=None, urteile: Optional[dict] = None,
         urteile=vorhanden,
         nie=[a for a in agenten if a not in {u.agent for u in vorhanden}],
         bewegung_grund=bewegung_grund if grund == "bewegung" else None,
+        staende=staende(durchgaenge, {u.agent: u for u in vorhanden}, agenten),
     )
 
 

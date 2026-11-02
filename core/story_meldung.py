@@ -56,10 +56,12 @@ def story_meldung(urteile: dict[int, tuple[str, datetime]], positionen: Iterable
         v = urteile[i][0]
         zahl[v if v in zahl else "unknown"] += 1
     teile = [f"{zahl[k]} {wort}" for k, wort in _WORTE if zahl[k] or k != "unknown"]
-    fertig = max(_utc(urteile[i][1]) for i in ids).astimezone()
+    # "vom" ist der Durchgang, nicht das juengste Urteil: Bis 02.11.2026 stand dort das Datum
+    # zweier Titel, die von Hand neu geprueft waren, waehrend 22 Urteile einen Monat aelter
+    # waren -- der gescheiterte Batch fiel darum nicht auf.
     return {"text": "Story-Check: " + " · ".join(teile),
             "zustand": "schlecht" if zahl["gefaehrdet"] else "hinweis",
-            "lauf": "Story-Check", "von": fertig.date().isoformat(),
+            "lauf": "Story-Check", "von": stamm.astimezone().date().isoformat(),
             "ziel": "storychecker", "schluessel": schluessel,
             # Das x: POST an den Empfänger (scripts/meldungen_dienst.py), über denselben Weg
             # wie das Kachel-JSON -- sonst zeigt die Startseite keins.

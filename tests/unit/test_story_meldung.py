@@ -17,8 +17,15 @@ def test_die_summe_der_urteile_mit_link_auf_den_checker():
     m = story_meldung(URTEILE, [1, 2, 3, 4])
     assert m["text"] == "Story-Check: 2 intakt · 1 gemischt · 1 gefährdet"
     assert m["zustand"] == "schlecht"                 # ein gefährdetes Urteil färbt die Meldung
-    assert (m["lauf"], m["von"], m["ziel"]) == ("Story-Check", "2026-09-21", "storychecker")
+    assert (m["lauf"], m["von"], m["ziel"]) == ("Story-Check", "2026-09-20", "storychecker")
     assert m["schluessel"] == "2026-09-20T09:00:00+00:00"   # das älteste jüngste Urteil
+
+
+def test_vom_nennt_den_durchgang_nicht_das_juengste_urteil():
+    """02.11.2026: zwei Titel von Hand neu geprueft, der Rest einen Monat alt -- die Kachel
+    sagte "vom 11.10.", der Durchgang war vom 01.10."""
+    teils = {**URTEILE, 3: ("intact", _t(28))}
+    assert story_meldung(teils, [1, 2, 3, 4])["von"] == "2026-09-20"
 
 
 def test_ohne_gefaehrdet_ein_hinweis_und_die_null_steht_da():

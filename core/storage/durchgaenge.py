@@ -92,6 +92,19 @@ class DurchgaengeRepository:
         ).fetchall()
         return [self._zeile(r) for r in rows]
 
+    def fuer_liste(self, liste: str, position_ids: Iterable[int]) -> dict[int, list[Durchgang]]:
+        """Je Titel seine Durchgaenge in dieser Liste, der juengste zuerst."""
+        ids = list(position_ids)
+        if not ids:
+            return {}
+        rows = self._conn.execute(
+            f"SELECT * FROM durchgaenge WHERE liste = ? AND position_id IN ({','.join('?' * len(ids))}) "
+            "ORDER BY begonnen DESC", (liste, *ids)).fetchall()
+        je_titel: dict[int, list[Durchgang]] = {}
+        for r in rows:
+            je_titel.setdefault(r["position_id"], []).append(self._zeile(r))
+        return je_titel
+
     @staticmethod
     def _zeile(row: sqlite3.Row) -> Durchgang:
         return Durchgang(

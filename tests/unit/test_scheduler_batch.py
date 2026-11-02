@@ -274,7 +274,7 @@ async def test_quelle_des_laufs_entscheidet(monkeypatch, source, erwartet):
                               anthropic_api_key="sk-ant-real", default_claude_model="claude-haiku-4-5")
     gesehen = {}
 
-    async def dispatch(job, conn, log_fn):
+    async def dispatch(job, conn, log_fn, nur=None):
         gesehen["batch"] = s._can_use_batch_api("claude-sonnet-5-5")
 
     s._open_conn = Mock(return_value=MagicMock())
@@ -414,3 +414,24 @@ def test_ohne_zeitpunkt_des_abschickens_gilt_jetzt():
     from core.scheduler import _abgeschickt
     assert _abgeschickt(None) is None and _abgeschickt("kaputt") is None
     assert _abgeschickt("2026-10-11T11:05:00+00:00").utcoffset().total_seconds() == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asset_class", ["Aktie", "Fonds"])
+async def test_story_und_fundamental_lassen_sich_als_batch_einreichen(scheduler, asset_class):
+    """Bis 01.11.2026 scheiterten beide schon beim Einreichen (ImportError, TypeError), der
+    Lauf blieb gruen, und die Kachel zeigte wochenlang den Story-Check vom 11.10."""
+    from core.storage.models import PublicPosition
+    pub = PublicPosition(id=7, name="Beispiel AG", ticker="BSP.DE", asset_class=asset_class,
+                         story="Waechst mit dem Markt.")
+    pos = MagicMock(id=7, story=pub.story, story_skill=None, asset_class=asset_class)
+    pos.oeffentlich.return_value = pub
+    with patch("core.llm.claude.ClaudeProvider.submit_batch", new=AsyncMock(return_value="b1")) as senden, \
+         patch("core.storage.batch_queue.BatchQueueRepository"):
+        assert await scheduler._submit_storychecker_batch([pos], None, "claude-sonnet-5-5", MagicMock(), print) == "b1"
+        assert await scheduler._submit_fundamental_batch([pub], "", "", "claude-sonnet-5-5", MagicMock(), print) == "b1"
+    sc, fa = (c.args[0][0]["params"] for c in senden.call_args_list)
+    from agents import fundamental_analyzer_agent, storychecker_agent
+    assert sc["system"].startswith(storychecker_agent._build_system_prompt(asset_class, "de"))
+    assert fa["system"].startswith(fundamental_analyzer_agent._build_system_prompt(asset_class, "de", verdict_via="tool"))
+    assert any(t.get("name") == "submit_fa_verdict" for t in fa["tools"])

@@ -295,6 +295,10 @@ the job decides what is due (`core.scheduler.ist_faellig`: the most recent sched
 has passed and the job has not run since). After three failed scheduled attempts since
 that time a job waits for its next one, and `agenten` stays red meanwhile
 (`FEHLVERSUCHE_JE_TERMIN`) — otherwise a failing job would retry, and pay, every hour.
+A check list (`pruefung_depot`, `pruefung_watchlist`) of which only some checks failed
+is red but counts as run (`TeilweiseGescheitert`): only the failed checks are noted
+(`NACHHOLEN_KEY` in app_config) and the next hourly run catches up on just those — the others
+are paid for — with the same three attempts per scheduled time.
 The app keeps an `AgentSchedulerService` only
 for "run now". Don't add a scheduler to the app again — add a job.
 

@@ -184,3 +184,23 @@ def test_positionen_in_bloecken(depot_und_watchlist):
     assert not at.exception, at.exception
     koepfe = [m.value for m in at.markdown if 'class="wk-block"' in m.value]
     assert len(koepfe) == 2 and all("Aktien" in k and " id=" not in k for k in koepfe)
+
+
+def test_gescheiterter_check_steht_grau_mit_dem_alten_urteil(depot_und_watchlist):
+    """02.11.2026: Ein Durchgang, in dem der Storychecker scheiterte -- die Kachel sagt es und
+    nennt das alte Urteil mit Datum, statt es als aktuell zu zeigen."""
+    from core.storage.durchgaenge import DurchgaengeRepository
+    from state import get_analyses_repo
+    muv = depot_und_watchlist["muv"]
+    repo = DurchgaengeRepository(get_analyses_repo()._conn)
+    d = repo.beginnen("depot", muv.id, "job", ["storychecker"])
+    repo.abschliessen(d, "storychecker: ImportError")
+    try:
+        at = _app("kacheln_depot.py")
+        at.run()
+        assert not at.exception, at.exception
+        texte = [p.proto.label for p in at.get("page_link")]
+        assert any(t.startswith("Story gescheitert am ") and "· zuletzt intakt, " in t for t in texte), texte
+    finally:
+        repo._conn.execute("DELETE FROM durchgaenge WHERE id = ?", (d,))
+        repo._conn.commit()

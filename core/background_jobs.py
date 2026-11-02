@@ -400,7 +400,9 @@ def _parallel(checks, position, language: str, db_path: str, enc_key: str, api_k
         threads.append(th)
     for th in threads:
         th.join()
-    return [z["error"] for z in zustaende if z["error"]]
+    # "check: Fehler" wie im Job (core/scheduler.py::_run_pruefung_job): Die Kachel liest daraus,
+    # welcher Check im Durchgang scheiterte (core/kacheln.py::staende).
+    return [f"{check}: {z['error']}" for check, z in zip(checks, zustaende) if z["error"]]
 
 
 def run_durchgang(position, liste: str, checks, language: str, job: dict, db_path: str,

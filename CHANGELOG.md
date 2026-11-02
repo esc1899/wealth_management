@@ -8,6 +8,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Story-Check und Fundamentalwert wieder als Batch, Teilfehler rot — 2026-11-02
+
+**Warum:** Die Kachel der Startseite zeigte am 02.11. noch den Story-Check vom 11.10., obwohl
+die Depot-Prüfung am 01.11. gelaufen war. Storychecker und Fundamentalwert scheiterten schon
+beim Einreichen des Batches: Der Weg griff auf Namen, die es seit Juni nicht mehr gibt
+(`BASE_SYSTEM_PROMPT`, `include_verdict_tool`), und kein Test rief ihn auf. Weil ein Teilfehler
+der Prüfung absichtlich grün blieb, sah es niemand.
+
+**Änderungen:**
+- `core/scheduler.py`: `_submit_storychecker_batch` und `_submit_fundamental_batch` bauen den
+  System-Prompt wie live (`_build_system_prompt` je Anlageklasse, Fundamentalwert mit
+  `verdict_via="tool"`); ein Test reicht beide ein.
+- Scheitert ein Teil der Checks einer Prüfung, ist der Lauf rot (`TeilweiseGescheitert`), und
+  der nächste stündliche Lauf holt nur die gescheiterten Checks nach — als Batch, höchstens
+  dreimal je Termin, dann rot bis zum nächsten. Die gelungenen werden nicht noch einmal
+  bezahlt. Vorgemerkt in app_config (`scheduler.nachholen.<job>`), gelöscht, sobald ein Lauf
+  gelingt.
+- `core/story_meldung.py`: „Story-Check vom …“ nennt den Durchgang (das älteste der jüngsten
+  Urteile), nicht das jüngste Urteil. Zwei am 11.10. von Hand geprüfte Titel ließen die Kachel
+  einen Monat frischer aussehen, als der letzte Durchgang (01.10.) war.
+- Kacheln: Jedes Kästchen eines Checks trägt sein Datum. Brachte der jüngste Durchgang mit dem
+  Check noch kein Urteil, steht vorn sein Stand — „läuft seit“, „gescheitert am“ oder „ohne
+  neues Urteil seit“ — und das alte Urteil grau dahinter („zuletzt intakt, 01.10.2026“), statt
+  als aktuell (`core/kacheln.py::staende`). Dafür vermerkt auch „Jetzt checken“ seine Fehler
+  als „check: Fehler“ wie der Job.
+
 ### Kacheln in Blöcken, Farben je Familie — 2026-10-23
 
 **Warum:** Depot und Watchlist standen als eine Liste nach Vorrang; Erik wollte Aktien,

@@ -106,11 +106,10 @@ def agenten(dienst, batch_api: bool) -> int:
     if verfallen:
         print(f"Volltexte: {verfallen} ältere Texte gelöscht, Urteile bleiben.")
     if gebremst:
-        # Rot, obwohl nichts lief: Sonst wäre die Kachel nach dem dritten Fehlversuch
-        # wieder grün, und der Job stünde still, ohne dass es jemand sieht.
-        from core.scheduler import FEHLVERSUCHE_JE_TERMIN
-        print(f"Gebremst nach {FEHLVERSUCHE_JE_TERMIN} Fehlversuchen, warten auf den nächsten Termin: "
-              f"{', '.join(gebremst)}")
+        # Rot, obwohl nichts lief: Sonst wäre die Kachel nach dem dritten Fehlversuch (auch
+        # beim Nachholen gescheiterter Checks) wieder grün, und der Job stünde still, ohne
+        # dass es jemand sieht. Den Grund je Job nennt laufen_lassen.
+        print(f"Rot bis zum nächsten Termin: {', '.join(gebremst)}")
     if fehlgeschlagen:
         print(f"{len(fehlgeschlagen)} von {gelaufen} fehlgeschlagen: {', '.join(fehlgeschlagen)}")
     elif gelaufen:

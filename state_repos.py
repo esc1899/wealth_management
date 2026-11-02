@@ -55,6 +55,12 @@ def get_news_repo() -> NewsRepository:
 
 
 @st.cache_resource
+def get_durchgaenge_repo():
+    from core.storage.durchgaenge import DurchgaengeRepository
+    return DurchgaengeRepository(get_db_connection())
+
+
+@st.cache_resource
 def get_search_repo() -> SearchRepository:
     return SearchRepository(get_db_connection())
 

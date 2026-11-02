@@ -1238,6 +1238,10 @@ scheduler:
 kacheln:
   nav_gruppe: "Auf einen Blick"
   check_nie: "{check} nie geprüft"
+  stand_laeuft: "{check} läuft seit {datum}"
+  stand_gescheitert: "{check} gescheitert am {datum}"
+  stand_ohne: "{check} ohne neues Urteil seit {datum}"
+  zuletzt: "zuletzt {urteil}, {datum}"
   portfolio_satz: "Das Depot als Ganzes gegen deine Story ({datum}): <b>{urteil}</b>. {satz}"
   portfolio_nie: "Das Depot als Ganzes wurde noch nie gegen deine Story geprüft."
   portfolio_link: "Portfolio-Story und Portfolio Checker"

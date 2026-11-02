@@ -49,6 +49,23 @@ _BATCH_ERLAUBT: contextvars.ContextVar[bool] = contextvars.ContextVar("batch_erl
 #: gruen mit "wartet" (14.10.2026 -- drei Tage lang unbemerkt).
 ABHOLFEHLER = "Fehler beim Abholen"
 
+class TeilweiseGescheitert(RuntimeError):
+    """Ein Teil der Checks einer Pruefung scheiterte, der Rest ist gelaufen und bezahlt.
+    Der Lauf ist rot, der Job gilt als gelaufen (last_run), und die gescheiterten Checks
+    werden vorgemerkt: Der naechste Lauf holt nur sie nach, hoechstens
+    FEHLVERSUCHE_JE_TERMIN-mal je Termin (02.11.2026: der Storychecker-Batch scheiterte
+    einen Monat lang gruen, und nachgeholt wurde nichts)."""
+
+    def __init__(self, checks: list[str], fehler: list[str]):
+        super().__init__("; ".join(fehler))
+        self.checks = checks
+
+
+#: Unter diesem Schluessel (app_config, je Job) stehen die Checks, die ein Lauf nachholt:
+#: {"gemerkt": Zeitpunkt (ISO, lokal), "checks": [...]}. Gilt nur bis zum naechsten Termin.
+NACHHOLEN_KEY = "scheduler.nachholen.{}"
+
+
 #: Wie ein Mensch die Batch-Agenten liest (Job-Ausgabe, ops-core-Kachel).
 BATCH_NAMEN = {
     "storychecker": "Storychecker", "fundamental_analyzer": "Fundamentalwert",
@@ -186,7 +203,8 @@ class AgentSchedulerService:
         now = now or datetime.now()
         self._close_orphaned_runs()
         gelaufen, fehlgeschlagen, gebremst = 0, [], []
-        for job in self.faellige_jobs(now):
+        faellig = [(job, None) for job in self.faellige_jobs(now)]
+        for job, nur in faellig + self._nachzuholen(now):
             name = f"{job.agent_name} (#{job.id})"
             versuche = self._fehlversuche_seit_termin(job, now)
             if versuche >= FEHLVERSUCHE_JE_TERMIN:
@@ -194,9 +212,15 @@ class AgentSchedulerService:
                     f"wartet auf den nächsten (Jetzt ausführen geht weiter)")
                 gebremst.append(name)
                 continue
-            aus(f"{name}: fällig ({job.frequency}), läuft")
+            if nur is None:
+                aus(f"{name}: fällig ({job.frequency}), läuft")
+            else:
+                aus(f"{name}: holt nach ({', '.join(nur)}), läuft")
             try:
-                asyncio.run(self._execute_job(job.id))
+                if nur is None:
+                    asyncio.run(self._execute_job(job.id))
+                else:
+                    asyncio.run(self._execute_job(job.id, nur=nur))
                 aus(f"{name}: fertig")
             except Exception as exc:
                 logger.exception("Job %s failed", job.id)
@@ -204,6 +228,41 @@ class AgentSchedulerService:
                 fehlgeschlagen.append(name)
             gelaufen += 1
         return gelaufen, fehlgeschlagen, gebremst
+
+    @staticmethod
+    def _nachholen_merken(conn, job: ScheduledJob, checks: Optional[list[str]]) -> None:
+        """Merkt die gescheiterten Checks vor -- oder loescht die Vormerkung (``checks``
+        None), wenn der Lauf gelang."""
+        from core.storage.app_config import AppConfigRepository
+        repo, key = AppConfigRepository(conn), NACHHOLEN_KEY.format(job.id)
+        if checks:
+            repo.set_json(key, {"gemerkt": datetime.now().isoformat(timespec="seconds"),
+                                "checks": list(checks)})
+        elif repo.get(key) is not None:
+            repo.delete(key)
+
+    def _nachzuholen(self, now: datetime) -> list[tuple[ScheduledJob, tuple[str, ...]]]:
+        """Die nicht faelligen Jobs mit vorgemerkten Checks fuer ihren letzten Termin. Eine
+        Vormerkung zu einem frueheren Termin gilt nicht mehr: Der Job lief seitdem ganz."""
+        from core.storage.app_config import AppConfigRepository
+        conn = self._open_conn()
+        try:
+            repo = AppConfigRepository(conn)
+            offen = []
+            for job in ScheduledJobsRepository(conn).get_enabled():
+                feuer = letzte_feuerzeit(job, now)
+                if feuer is None or ist_faellig(job, now):
+                    continue
+                vormerkung = repo.get_json(NACHHOLEN_KEY.format(job.id))
+                try:
+                    gemerkt = datetime.fromisoformat(vormerkung["gemerkt"])
+                except (TypeError, KeyError, ValueError):
+                    continue
+                if vormerkung.get("checks") and gemerkt >= feuer:
+                    offen.append((job, tuple(vormerkung["checks"])))
+            return offen
+        finally:
+            conn.close()
 
     def _fehlversuche_seit_termin(self, job: ScheduledJob, now: datetime) -> int:
         feuer = letzte_feuerzeit(job, now)
@@ -310,7 +369,11 @@ class AgentSchedulerService:
                 await self._dispatch_agent(job, conn, log_fn)
                 jobs_repo.update_last_run(job_id)
                 runs_repo.complete(run.id)
+                self._nachholen_merken(conn, job, None)
             except Exception as exc:
+                if isinstance(exc, TeilweiseGescheitert):
+                    jobs_repo.update_last_run(job_id)
+                    self._nachholen_merken(conn, job, exc.checks)
                 runs_repo.fail(run.id, str(exc))
                 logger.exception("Job force-run %s failed: %s", job_id, exc)
                 raise
@@ -334,7 +397,8 @@ class AgentSchedulerService:
         finally:
             conn.close()
 
-    async def _execute_job(self, job_id: int, source: str = "scheduled") -> None:
+    async def _execute_job(self, job_id: int, source: str = "scheduled",
+                           nur: Optional[tuple[str, ...]] = None) -> None:
         conn = self._open_conn()
         try:
             jobs_repo = ScheduledJobsRepository(conn)
@@ -348,10 +412,14 @@ class AgentSchedulerService:
                 logger.info("[job %s] %s", job_id, msg)
             batch_token = _BATCH_ERLAUBT.set(source == "scheduled")
             try:
-                await self._dispatch_agent(job, conn, log_fn)
+                await self._dispatch_agent(job, conn, log_fn, nur=nur)
                 jobs_repo.update_last_run(job_id)
                 runs_repo.complete(run.id)
+                self._nachholen_merken(conn, job, None)
             except Exception as exc:
+                if isinstance(exc, TeilweiseGescheitert):
+                    jobs_repo.update_last_run(job_id)
+                    self._nachholen_merken(conn, job, exc.checks)
                 runs_repo.fail(run.id, str(exc))
                 raise
             finally:
@@ -359,7 +427,8 @@ class AgentSchedulerService:
         finally:
             conn.close()
 
-    async def _dispatch_agent(self, job: ScheduledJob, conn, log_fn=None) -> None:
+    async def _dispatch_agent(self, job: ScheduledJob, conn, log_fn=None,
+                              nur: Optional[tuple[str, ...]] = None) -> None:
         _log = log_fn or (lambda msg: logger.info(msg))
         if job.agent_name == "news":
             await self._run_news_job(job, conn, _log)
@@ -381,7 +450,7 @@ class AgentSchedulerService:
             await self._run_capital_allocator_job(job, conn, _log)
         elif job.agent_name in ("pruefung_depot", "pruefung_watchlist"):
             from core.pruefung import LISTE_DES_JOBS
-            await self._run_pruefung_job(job, conn, _log, LISTE_DES_JOBS[job.agent_name])
+            await self._run_pruefung_job(job, conn, _log, LISTE_DES_JOBS[job.agent_name], nur=nur)
         elif job.agent_name == "wealth_snapshot":
             await self._run_wealth_snapshot_job(job, conn, _log)
         elif job.agent_name == "monthly_digest":
@@ -828,7 +897,8 @@ class AgentSchedulerService:
         "devils_advocate": "_run_devils_advocate_job",
     }
 
-    async def _run_pruefung_job(self, job, conn, log_fn, liste: str) -> None:
+    async def _run_pruefung_job(self, job, conn, log_fn, liste: str,
+                                nur: Optional[tuple[str, ...]] = None) -> None:
         """Die Auswahl der Liste fuer alle ihre Titel (core/pruefung.py). Je Titel beginnt ein
         Durchgang; die Cloud-Checks laufen einer nach dem anderen ueber alle Titel, als Batch
         oder live. Fertig wird der Durchgang in ``durchgaenge_nachziehen`` -- gleich am Ende,
@@ -846,6 +916,9 @@ class AgentSchedulerService:
         titel = [p for p in quelle if p.id is not None and not p.analysis_excluded and pruefbar(p)]
         app_cfg, skills_repo = AppConfigRepository(conn), SkillsRepository(conn)
         checks = auswahl(app_cfg, liste)
+        if nur is not None:
+            # Nachholen: nur die Checks, die im Lauf zum selben Termin scheiterten.
+            checks = tuple(c for c in checks if c in nur)
         if not titel or not checks:
             _log("Keine Titel oder keine Checks gewählt — übersprungen")
             return
@@ -855,6 +928,7 @@ class AgentSchedulerService:
         ids = [durchgaenge.beginnen(liste, p.id, "job", checks) for p in titel]
 
         fehler: list[str] = []
+        gescheitert: list[str] = []
         cloud = reihenfolge(checks)[0]
         for check in cloud:
             name, prompt = skill_fuer(app_cfg, skills_repo, liste, check)
@@ -869,14 +943,17 @@ class AgentSchedulerService:
                 logger.exception("Check %s im Job %s", check, job.agent_name)
                 _log(f"{check}: fehlgeschlagen: {exc}")
                 fehler.append(f"{check}: {exc}")
+                gescheitert.append(check)
                 durchgaenge.fehler_vermerken(ids, f"{check}: {exc}")
         for zeile in await self._nachziehen(conn):
             _log(zeile)
-        # Rot nur, wenn nichts ging: Sonst wiederholte der Scheduler stuendlich den ganzen Job
-        # und bezahlte die gelungenen Checks noch einmal. Ein einzelner Fehler steht im
-        # Durchgang und in der Ausgabe.
-        if cloud and len(fehler) == len(cloud):
+        # Ging nichts, ist der Job faellig wie jeder gescheiterte. Ging ein Teil, ist er rot,
+        # und nachgeholt werden nur die gescheiterten Checks (TeilweiseGescheitert): Ein
+        # ganzer neuer Versuch bezahlte die gelungenen noch einmal.
+        if cloud and len(fehler) == len(cloud) and nur is None:
             raise RuntimeError("; ".join(fehler))
+        if fehler:
+            raise TeilweiseGescheitert(gescheitert, fehler)
 
     def bewegungen_nachrichten(self, now: Optional[datetime] = None,
                                aus: Callable[[str], None] = print, batch: bool = False) -> int:
@@ -1926,8 +2003,7 @@ class AgentSchedulerService:
         return batch_id
 
     async def _submit_storychecker_batch(self, positions, skills_repo, model: str, conn, _log) -> str:
-        from agents.storychecker_agent import BASE_SYSTEM_PROMPT, WEB_SEARCH_TOOL, _build_initial_message
-        from agents.agent_language import response_language_instruction, current_date_context
+        from agents.storychecker_agent import WEB_SEARCH_TOOL, _build_initial_message, _build_system_prompt
         from core.llm.claude import ClaudeProvider
         from core.storage.batch_queue import BatchQueueRepository
 
@@ -1940,7 +2016,9 @@ class AgentSchedulerService:
                 skill = skills_repo.get_by_name(pos.story_skill)
                 if skill:
                     skill_name, skill_prompt = skill.name, skill.prompt
-            system = current_date_context() + BASE_SYSTEM_PROMPT + "\n" + response_language_instruction("de")
+            # Derselbe Prompt wie live (Fonds oder Unternehmen): Bis 01.11.2026 griff der Batch
+            # noch auf BASE_SYSTEM_PROMPT, den es seit Juni nicht mehr gibt.
+            system = _build_system_prompt(pos.asset_class, "de")
             requests.append(ClaudeProvider.build_batch_request(
                 custom_id=f"sc_{pos.id}",
                 model=model,
@@ -2007,7 +2085,7 @@ class AgentSchedulerService:
         eligible = [p for p in pub_positions if p.ticker and p.id is not None]
         requests = []
         for pos in eligible:
-            system = _build_system_prompt(pos.asset_class, "de", include_verdict_tool=True)
+            system = _build_system_prompt(pos.asset_class, "de", verdict_via="tool")
             if skill_prompt:
                 system += f"\n\n## Fokus-Bereich ({skill_name})\n{skill_prompt}"
             requests.append(ClaudeProvider.build_batch_request(

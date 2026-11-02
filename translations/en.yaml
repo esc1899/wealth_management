@@ -1239,6 +1239,10 @@ scheduler:
 kacheln:
   nav_gruppe: "At a glance"
   check_nie: "{check} never checked"
+  stand_laeuft: "{check} running since {datum}"
+  stand_gescheitert: "{check} failed on {datum}"
+  stand_ohne: "{check} no new verdict since {datum}"
+  zuletzt: "last {urteil}, {datum}"
   portfolio_satz: "The portfolio as a whole against your story ({datum}): <b>{urteil}</b>. {satz}"
   portfolio_nie: "The portfolio as a whole has never been checked against your story."
   portfolio_link: "Portfolio story and Portfolio Checker"

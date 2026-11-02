@@ -10,7 +10,7 @@ Verbindung, :memory: wäre jedes Mal leer.
 """
 
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
@@ -316,6 +316,59 @@ class TestBremse:
             self._gescheitert(repo, j.id, datetime(2026, 10, 1, stunde, 5), source="manual")
         d, (gelaufen, _, gebremst) = self._laufen(pfad)
         assert gelaufen == 1 and gebremst == []
+
+    def test_teilweise_gescheitert_holt_nur_die_gescheiterten_nach(self, db):
+        """02.11.2026: Storychecker und Fundamentalwert scheiterten im Batch, Konsens-Luecken
+        und Kapitalallokation liefen. Der Job ist rot, laeuft nicht ganz neu (die beiden sind
+        bezahlt), und der naechste Lauf holt nur die zwei nach."""
+        from core.scheduler import TeilweiseGescheitert
+        from core.storage.scheduled_jobs import ScheduledJobRunsRepository
+        pfad, repo = db
+        j = _neu(repo, agent_name="pruefung_depot")
+        d = _dienst(pfad)
+        d._dispatch_agent = AsyncMock(side_effect=TeilweiseGescheitert(
+            ["storychecker", "fundamental_analyzer"], ["storychecker: kaputt", "fundamental_analyzer: kaputt"]))
+        _, fehl, _ = d.laufen_lassen(now=self.JETZT, aus=lambda _: None)
+        assert fehl == [f"pruefung_depot (#{j.id})"]
+        assert repo.get(j.id).last_run is not None
+        assert ScheduledJobRunsRepository(repo._conn).get_for_job(j.id)[0].status == "failed"
+
+        d._dispatch_agent = AsyncMock()
+        gelaufen, fehl, _ = d.laufen_lassen(now=self.JETZT + timedelta(hours=1), aus=lambda _: None)
+        assert (gelaufen, fehl) == (1, [])
+        assert d._dispatch_agent.await_args.kwargs["nur"] == ("storychecker", "fundamental_analyzer")
+
+        # Nachgeholt: die Vormerkung ist weg, eine Stunde spaeter laeuft nichts mehr.
+        d._dispatch_agent = AsyncMock()
+        gelaufen, _, _ = d.laufen_lassen(now=self.JETZT + timedelta(hours=2), aus=lambda _: None)
+        assert gelaufen == 0
+        d._dispatch_agent.assert_not_awaited()
+
+    def test_nachholen_hoert_nach_drei_fehlversuchen_auf(self, db):
+        from core.scheduler import NACHHOLEN_KEY
+        from core.storage.app_config import AppConfigRepository
+        pfad, repo = db
+        j = _neu(repo, agent_name="pruefung_depot")
+        _lief_um(repo, j.id, datetime(2026, 10, 1, 8, 5))
+        AppConfigRepository(repo._conn).set_json(NACHHOLEN_KEY.format(j.id), {
+            "gemerkt": "2026-10-01T08:05:00", "checks": ["storychecker"]})
+        for stunde in (8, 9, 10):
+            self._gescheitert(repo, j.id, datetime(2026, 10, 1, stunde, 5))
+        d, (gelaufen, _, gebremst) = self._laufen(pfad)
+        d._execute_job.assert_not_awaited()
+        assert gelaufen == 0 and gebremst == [f"pruefung_depot (#{j.id})"]
+
+    def test_eine_vormerkung_vom_letzten_termin_gilt_nicht_mehr(self, db):
+        """Seit dem Termin lief der Job ganz -- dabei war alles dabei."""
+        from core.scheduler import NACHHOLEN_KEY
+        from core.storage.app_config import AppConfigRepository
+        pfad, repo = db
+        j = _neu(repo, agent_name="pruefung_depot")
+        _lief_um(repo, j.id, datetime(2026, 10, 1, 8, 5))
+        AppConfigRepository(repo._conn).set_json(NACHHOLEN_KEY.format(j.id), {
+            "gemerkt": "2026-09-01T08:05:00", "checks": ["storychecker"]})
+        d, (gelaufen, _, _) = self._laufen(pfad)
+        assert gelaufen == 0
 
     def test_gebremst_bleibt_der_lauf_rot(self, capsys):
         d = MagicMock()

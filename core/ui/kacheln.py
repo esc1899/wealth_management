@@ -131,6 +131,10 @@ div[class*="st-key-wk-urteile-"] [data-testid="stPageLink-NavLink"] { border: 1p
 div[class*="st-key-wk-urteile-"] [data-testid="stPageLink-NavLink"]:hover { border-color: var(--lotsee-leit-tief); }
 div[class*="st-key-wk-urteile-"] [data-testid="stPageLink-NavLink"] p { font-size: 0.74rem;
   color: var(--lotsee-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Der letzte Durchgang brachte kein Urteil: Stand und altes Urteil grau, darf umbrechen. */
+div[class*="st-key-wk-alt-"] [data-testid="stPageLink-NavLink"] { background: var(--lotsee-flaeche-leise); }
+div[class*="st-key-wk-urteile-"] div[class*="st-key-wk-alt-"] [data-testid="stPageLink-NavLink"] p {
+  color: var(--lotsee-text-leise); white-space: normal; }
 </style>
 """
 
@@ -149,13 +153,39 @@ def _verdict_eintrag(u: Urteil) -> tuple[str, str]:
     return config.get(verdict, ("⚪", u.verdict or "—"))
 
 
-def urteil_label(u: Urteil) -> str:
-    """Der Text eines Kästchens, als halber Satz: "Story gefährdet", "Konsens stabil". Das Urteil
-    klein, ausser es traegt selbst Grossbuchstaben ("Fair Value") -- dann ist es ein Begriff."""
+def _urteil_wort(u: Urteil) -> str:
+    """Das Urteil klein, ausser es traegt selbst Grossbuchstaben ("Fair Value") -- dann ist es
+    ein Begriff."""
     wort = _verdict_eintrag(u)[1]
     if wort[1:] == wort[1:].lower():
         wort = wort[:1].lower() + wort[1:]
-    return f"{_agent(u.agent)} {wort}"
+    return wort
+
+
+def urteil_label(u: Urteil) -> str:
+    """Der Text eines Kästchens, als halber Satz: "Story gefährdet", "Konsens stabil"."""
+    return f"{_agent(u.agent)} {_urteil_wort(u)}"
+
+
+#: Das Zeichen vor einem Kaestchen, dessen letzter Durchgang kein Urteil brachte.
+_STAND_ICON = {"laeuft": "⏳", "gescheitert": "⚠️", "ohne": "⚪"}
+
+
+def kaestchen_text(k: Kachel, agent: str, u: Optional[Urteil]) -> tuple[str, str, bool]:
+    """(Text, Zeichen, grau) eines Kaestchens. Mit Datum: "Story intakt · 01.10.2026". Hat der
+    juengste Durchgang mit dem Check kein Urteil gebracht, steht vorn sein Stand und das alte
+    Urteil dahinter: "Story gescheitert am 01.11.2026 · zuletzt intakt, 01.10.2026" -- grau."""
+    stand = k.staende.get(agent)
+    if stand is not None:
+        text = t(f"kacheln.stand_{stand.zustand}").format(check=_agent(agent), datum=fmt_date(stand.seit))
+        if u is not None:
+            datum = fmt_date(u.created_at) if u.created_at else "—"
+            text += " · " + t("kacheln.zuletzt").format(urteil=_urteil_wort(u), datum=datum)
+        return text, _STAND_ICON[stand.zustand], True
+    if u is None:
+        return t("kacheln.check_nie").format(check=_agent(agent)), "⚪", False
+    text = urteil_label(u) + (f" · {fmt_date(u.created_at)}" if u.created_at else "")
+    return text, _verdict_eintrag(u)[0], False
 
 
 def urteile_sortiert(k: Kachel) -> list[Urteil]:
@@ -340,19 +370,15 @@ def kaestchen(k: Kachel, art: str) -> None:
     if not (k.urteile or k.nie):
         return
     # Untereinander und volle Breite: alle Kaestchen gleich gross, nie zwei in einer Reihe.
+    # Blindzeit ist eine Aussage: auch ein gewaehlter Check, der fuer den Titel nie lief.
+    reihe = [(u.agent, u) for u in urteile_sortiert(k)] + [(a, None) for a in k.nie]
     with st.container(key=f"wk-urteile-{k.position_id}"):
-        for u in urteile_sortiert(k):
-            st.page_link(
-                ziel(art, u.agent), label=urteil_label(u), icon=_verdict_eintrag(u)[0],
-                query_params={"position": k.position_id, "check": u.agent}, width="stretch",
-            )
-        # Blindzeit ist eine Aussage: ein gewaehlter Check, der fuer den Titel nie lief.
-        for agent in k.nie:
-            st.page_link(
-                ziel(art, agent), label=t("kacheln.check_nie").format(check=_agent(agent)),
-                icon="⚪", query_params={"position": k.position_id, "check": agent},
-                width="stretch",
-            )
+        for agent, u in reihe:
+            text, icon, grau = kaestchen_text(k, agent, u)
+            # Grau in eigenem Container: Streamlit setzt den Text, die Farbe kommt ueber den Key.
+            with st.container(key=f"wk-{'alt' if grau else 'jetzt'}-{k.position_id}-{agent}"):
+                st.page_link(ziel(art, agent), label=text, icon=icon,
+                             query_params={"position": k.position_id, "check": agent}, width="stretch")
 
 
 def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:
@@ -360,8 +386,8 @@ def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:
     ihren Kopf daraus, damit dort derselbe Satz steht wie auf der Kachel."""
     from datetime import date as _date
 
-    from state import (get_analysis_service, get_app_config_repo, get_market_agent, get_market_repo,
-                       get_news_repo)
+    from state import (get_analysis_service, get_app_config_repo, get_durchgaenge_repo, get_market_agent,
+                       get_market_repo, get_news_repo)
     from core import bewegung
     from core.pruefung import auswahl, pruefbar
 
@@ -379,6 +405,7 @@ def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:
     # Der Grund einer starken Bewegung: was der Job kurse heute fuer den Titel gesucht hat.
     gesucht = bewegung.heute_gesucht(get_news_repo().list_runs(limit=30), _date.today())
     je_agent = {a: analysen.get_verdicts(ids, a) for a in agenten}
+    durchgaenge = get_durchgaenge_repo().fuer_liste(art, ids)
 
     kacheln = []
     for p in positionen:
@@ -394,7 +421,7 @@ def kacheln_fuer(art: str, positionen: list) -> list[Kachel]:
         lauf = gesucht.get((p.ticker or "").upper())
         kacheln.append(kachel(p, art, v, urteile, vortag, aufnahme, agenten=agenten, schwelle=schwelle,
                               bewegung_grund=bewegung.grund(lauf.result, p.ticker) if lauf else None,
-                              pruefbar=pruefbar(p)))
+                              pruefbar=pruefbar(p), durchgaenge=durchgaenge.get(p.id, ())))
     return kacheln
 
 
